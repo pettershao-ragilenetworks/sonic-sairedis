@@ -534,7 +534,6 @@ void translate_rid_to_vid_list(
 sai_object_id_t translate_vid_to_rid(
         _In_ sai_object_id_t vid)
 {
-
     SWSS_LOG_ENTER();
 
     if (vid == SAI_NULL_OBJECT_ID)
@@ -601,6 +600,8 @@ sai_object_id_t translate_vid_to_rid(
 void translate_list_vid_to_rid(
         _In_ sai_object_list_t &element)
 {
+    SWSS_LOG_ENTER();
+
     for (uint32_t i = 0; i < element.count; i++)
     {
         element.list[i] = translate_vid_to_rid(element.list[i]);
@@ -1024,6 +1025,8 @@ service_method_table_t test_services = {
 
 void startDiagShell()
 {
+    SWSS_LOG_ENTER();
+
     if (options.diagShell)
     {
         SWSS_LOG_NOTICE("starting diag shell thread");
@@ -2661,6 +2664,8 @@ void processFlexCounterPluginEvent(
 
 void printUsage()
 {
+    SWSS_LOG_ENTER();
+
     std::cout << "Usage: syncd [-N] [-d] [-p profile] [-i interval] [-t [cold|warm|fast]] [-h] [-u] [-S]" << std::endl;
     std::cout << "    -N --nocounters:" << std::endl;
     std::cout << "        Disable counter thread" << std::endl;
@@ -2877,6 +2882,8 @@ std::map<std::set<int>, std::string> gPortMap;
 // FIXME: introduce common config format for SONiC
 void handlePortMap(const std::string& portMapFile)
 {
+    SWSS_LOG_ENTER();
+
     if (portMapFile.size() == 0)
     {
         return;
@@ -2949,7 +2956,6 @@ bool handleRestartQuery(swss::NotificationConsumer &restartQuery)
 
 bool isVeryFirstRun()
 {
-
     SWSS_LOG_ENTER();
 
     /*
@@ -2979,6 +2985,7 @@ int get_enum_value_from_name(
         _In_ const char *name,
         _In_ const sai_enum_metadata_t* metadata)
 {
+    SWSS_LOG_ENTER();
 
     for (uint32_t idx = 0; idx < metadata->valuescount; idx++)
     {
@@ -2994,6 +3001,8 @@ int get_enum_value_from_name(
 
 void saiLoglevelNotify(std::string apiStr, std::string prioStr)
 {
+    SWSS_LOG_ENTER();
+
     using namespace swss;
 
     static const std::map<std::string, sai_log_level_t> saiLoglevelMap = {
@@ -3166,6 +3175,8 @@ void sai_meta_log_syncd(
         _In_ const char *format,
         ...)
 {
+    // SWSS_LOG_ENTER() is ommited since this is logging for metadata
+
     char buffer[0x1000];
 
     va_list ap;
