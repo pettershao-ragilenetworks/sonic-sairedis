@@ -239,6 +239,10 @@ sai_status_t transfer_attribute(
             RETURN_ON_ERROR(transfer_list(src_attr.value.qosmap, dst_attr.value.qosmap, countOnly));
             break;
 
+        case SAI_ATTR_VALUE_TYPE_ACL_RESOURCE_LIST:
+            RETURN_ON_ERROR(transfer_list(src_attr.value.aclresource, dst_attr.value.aclresource, countOnly));
+            break;
+
 
             /* ACL FIELD DATA */
 
@@ -992,6 +996,49 @@ std::string sai_serialize_qos_map_list(
     return j.dump();
 }
 
+json sai_serialize_acl_resource(
+        _In_ const sai_acl_resource_t& aclresource)
+{
+    json j;
+
+    j["stage"]    = sai_serialize_enum(aclresource.stage, &sai_metadata_enum_sai_acl_stage_t);
+    j["bind_point"]  = sai_serialize_enum(aclresource.bind_point, &sai_metadata_enum_sai_acl_bind_point_type_t);
+    j["avail_num"]  = sai_serialize_number(aclresource.avail_num);
+
+    return j;
+}
+
+std::string sai_serialize_acl_resource_list(
+        _In_ const sai_acl_resource_list_t& aclresource,
+        _In_ bool countOnly)
+{
+    SWSS_LOG_ENTER();
+
+    json j;
+
+    j["count"] = aclresource.count;
+
+    if (aclresource.list == NULL || countOnly)
+    {
+        j["list"] = nullptr;
+
+        return j.dump();
+    }
+
+    json arr = json::array();
+
+    for (uint32_t i = 0; i < aclresource.count; ++i)
+    {
+        json item = sai_serialize_acl_resource(aclresource.list[i]);
+
+        arr.push_back(item);
+    }
+
+    j["list"] = arr;
+
+    return j.dump();
+}
+
 template <typename T>
 std::string sai_serialize_range(
         _In_ const T& range)
@@ -1216,6 +1263,9 @@ std::string sai_serialize_attr_value(
 
         case SAI_ATTR_VALUE_TYPE_QOS_MAP_LIST:
             return sai_serialize_qos_map_list(attr.value.qosmap, countOnly);
+
+        case SAI_ATTR_VALUE_TYPE_ACL_RESOURCE_LIST:
+            return sai_serialize_acl_resource_list(attr.value.aclresource, countOnly);
 
             // ACL FIELD DATA
 
@@ -1807,6 +1857,75 @@ void sai_deserialize_qos_map_list(
     }
 }
 
+void sai_deserialize_acl_stage(
+        _In_ const std::string& s,
+        _Out_ sai_acl_stage_t& stage)
+{
+    SWSS_LOG_ENTER();
+
+    sai_deserialize_enum(s, &sai_metadata_enum_sai_acl_stage_t, (int32_t&)stage);
+}
+
+void sai_deserialize_acl_bind_point(
+        _In_ const std::string& s,
+        _Out_ sai_acl_bind_point_type_t& bind_point)
+{
+    SWSS_LOG_ENTER();
+
+    sai_deserialize_enum(s, &sai_metadata_enum_sai_acl_bind_point_type_t, (int32_t&)bind_point);
+}
+
+void sai_deserialize_acl_resource(
+        _In_ const json& j,
+        _Out_ sai_acl_resource_t& aclresource)
+{
+    SWSS_LOG_ENTER();
+
+    sai_deserialize_acl_stage(j["stage"], aclresource.stage);
+    sai_deserialize_acl_bind_point(j["bind_point"], aclresource.bind_point);
+    sai_deserialize_number(j["avail_num"], aclresource.avail_num);
+}
+
+void sai_deserialize_acl_resource_list(
+        _In_ const std::string& s,
+        _Out_ sai_acl_resource_list_t& aclresource,
+        _In_ bool countOnly)
+{
+    SWSS_LOG_ENTER();
+
+    json j = json::parse(s);
+
+    aclresource.count = j["count"];
+
+    if (countOnly)
+    {
+        return;
+    }
+
+    if (j["list"] == nullptr)
+    {
+        aclresource.list = NULL;
+        return;
+    }
+
+    json arr = j["list"];
+
+    if (arr.size() != (size_t)aclresource.count)
+    {
+        SWSS_LOG_ERROR("acl resource count mismatch %lu vs %u", arr.size(), aclresource.count);
+        throw std::runtime_error("acl resource count mismatch");
+    }
+
+    aclresource.list = sai_alloc_n_of_ptr_type(aclresource.count, aclresource.list);
+
+    for (uint32_t i = 0; i < aclresource.count; ++i)
+    {
+        const json& item = arr[i];
+
+        sai_deserialize_acl_resource(item, aclresource.list[i]);
+    }
+}
+
 void sai_deserialize_ipv6(
         _In_ const std::string& s,
         _Out_ sai_ip6_t& ipaddr)
@@ -2122,6 +2241,9 @@ void sai_deserialize_attr_value(
 
         case SAI_ATTR_VALUE_TYPE_QOS_MAP_LIST:
             return sai_deserialize_qos_map_list(s, attr.value.qosmap, countOnly);
+
+        case SAI_ATTR_VALUE_TYPE_ACL_RESOURCE_LIST:
+            return sai_deserialize_acl_resource_list(s, attr.value.aclresource, countOnly);
 
             // ACL FIELD DATA
 
@@ -2558,6 +2680,10 @@ void sai_deserialize_free_attribute_value(
 
         case SAI_ATTR_VALUE_TYPE_QOS_MAP_LIST:
             sai_free_list(attr.value.qosmap);
+            break;
+
+        case SAI_ATTR_VALUE_TYPE_ACL_RESOURCE_LIST:
+            sai_free_list(attr.value.aclresource);
             break;
 
             /* ACL FIELD DATA */

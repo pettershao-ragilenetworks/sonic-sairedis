@@ -1302,6 +1302,9 @@ sai_status_t meta_generic_validation_create(
             case SAI_ATTR_VALUE_TYPE_QOS_MAP_LIST:
                 VALIDATION_LIST(md, value.qosmap);
                 break;
+            case SAI_ATTR_VALUE_TYPE_ACL_RESOURCE_LIST:
+                VALIDATION_LIST(md, value.aclresource);
+                break;
 
             case SAI_ATTR_VALUE_TYPE_UINT32_RANGE:
 
@@ -1977,6 +1980,9 @@ sai_status_t meta_generic_validation_set(
         case SAI_ATTR_VALUE_TYPE_QOS_MAP_LIST:
             VALIDATION_LIST(md, value.qosmap);
             break;
+        case SAI_ATTR_VALUE_TYPE_ACL_RESOURCE_LIST:
+            VALIDATION_LIST(md, value.aclresource);
+            break;
 
         case SAI_ATTR_VALUE_TYPE_UINT32_RANGE:
 
@@ -2344,6 +2350,9 @@ sai_status_t meta_generic_validation_get(
             case SAI_ATTR_VALUE_TYPE_QOS_MAP_LIST:
                 VALIDATION_LIST(md, value.qosmap);
                 break;
+            case SAI_ATTR_VALUE_TYPE_ACL_RESOURCE_LIST:
+                VALIDATION_LIST(md, value.aclresource);
+                break;
 
             case SAI_ATTR_VALUE_TYPE_UINT32_RANGE:
             case SAI_ATTR_VALUE_TYPE_INT32_RANGE:
@@ -2666,6 +2675,7 @@ void meta_generic_validation_post_create(
             case SAI_ATTR_VALUE_TYPE_QOS_MAP_LIST:
             case SAI_ATTR_VALUE_TYPE_UINT32_RANGE:
             case SAI_ATTR_VALUE_TYPE_INT32_RANGE:
+            case SAI_ATTR_VALUE_TYPE_ACL_RESOURCE_LIST:
                 // no special action required
                 break;
 
@@ -2800,6 +2810,7 @@ void meta_generic_validation_post_remove(
             case SAI_ATTR_VALUE_TYPE_QOS_MAP_LIST:
             case SAI_ATTR_VALUE_TYPE_UINT32_RANGE:
             case SAI_ATTR_VALUE_TYPE_INT32_RANGE:
+            case SAI_ATTR_VALUE_TYPE_ACL_RESOURCE_LIST:
                 // no special action required
                 break;
 
@@ -3050,6 +3061,7 @@ void meta_generic_validation_post_set(
         case SAI_ATTR_VALUE_TYPE_QOS_MAP_LIST:
         case SAI_ATTR_VALUE_TYPE_UINT32_RANGE:
         case SAI_ATTR_VALUE_TYPE_INT32_RANGE:
+        case SAI_ATTR_VALUE_TYPE_ACL_RESOURCE_LIST:
             // no special action required
             break;
 
@@ -3342,6 +3354,9 @@ void meta_generic_validation_post_get(
                 break;
             case SAI_ATTR_VALUE_TYPE_QOS_MAP_LIST:
                 VALIDATION_LIST_GET(md, value.qosmap);
+                break;
+            case SAI_ATTR_VALUE_TYPE_ACL_RESOURCE_LIST:
+                VALIDATION_LIST_GET(md, value.aclresource);
                 break;
 
             case SAI_ATTR_VALUE_TYPE_UINT32_RANGE:
