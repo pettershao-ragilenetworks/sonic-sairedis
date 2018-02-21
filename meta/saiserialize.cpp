@@ -999,6 +999,8 @@ std::string sai_serialize_qos_map_list(
 json sai_serialize_acl_resource(
         _In_ const sai_acl_resource_t& aclresource)
 {
+    SWSS_LOG_ENTER();
+
     json j;
 
     j["stage"]    = sai_serialize_enum(aclresource.stage, &sai_metadata_enum_sai_acl_stage_t);
