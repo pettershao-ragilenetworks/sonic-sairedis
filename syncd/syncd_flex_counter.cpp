@@ -75,8 +75,8 @@ void FlexCounter::setPortCounterList(
     {
         SWSS_LOG_ERROR("Port %s does not has supported counters", sai_serialize_object_id(portId).c_str());
 
-        // Remove flex counter if counter IDs map is empty
-        if (fc.isCounterMapsEmpty())
+        // Remove flex counter if all counter IDs and plugins are unregistered
+        if (fc.isEmpty())
         {
             removeInstance(instanceId);
         }
@@ -124,8 +124,8 @@ void FlexCounter::setQueueCounterList(
     {
         SWSS_LOG_ERROR("Queue %s does not has supported counters", sai_serialize_object_id(queueId).c_str());
 
-        // Remove flex counter if counter IDs map is empty
-        if (fc.isCounterMapsEmpty())
+        // Remove flex counter if all counter IDs and plugins are unregistered
+        if (fc.isEmpty())
         {
             removeInstance(instanceId);
         }
@@ -145,8 +145,8 @@ void FlexCounter::setQueueCounterList(
     {
         SWSS_LOG_ERROR("Queue %s can't provide the statistic",  sai_serialize_object_id(queueId).c_str());
 
-        // Remove flex counter if counter IDs map is empty
-        if (fc.isCounterMapsEmpty())
+        // Remove flex counter if all counter IDs and plugins are unregistered
+        if (fc.isEmpty())
         {
             removeInstance(instanceId);
         }
@@ -205,8 +205,8 @@ void FlexCounter::removePort(
     if (it == fc.m_portCounterIdsMap.end())
     {
         SWSS_LOG_NOTICE("Trying to remove nonexisting port counter Ids 0x%lx", portVid);
-        // Remove flex counter if counter IDs map is empty
-        if (fc.isCounterMapsEmpty())
+        // Remove flex counter if all counter IDs and plugins are unregistered
+        if (fc.isEmpty())
         {
             removeInstance(instanceId);
         }
@@ -215,8 +215,8 @@ void FlexCounter::removePort(
 
     fc.m_portCounterIdsMap.erase(it);
 
-    // Remove flex counter if counter IDs map is empty
-    if (fc.isCounterMapsEmpty())
+    // Remove flex counter if all counter IDs and plugins are unregistered
+    if (fc.isEmpty())
     {
         removeInstance(instanceId);
     }
@@ -251,8 +251,8 @@ void FlexCounter::removeQueue(
         return;
     }
 
-    // Remove flex counter if counter IDs map is empty
-    if (fc.isCounterMapsEmpty())
+    // Remove flex counter if all counter IDs and plugins are unregistered
+    if (fc.isEmpty())
     {
         removeInstance(instanceId);
     }
@@ -305,8 +305,8 @@ void FlexCounter::removeCounterPlugin(
     fc.m_queuePlugins.erase(sha);
     fc.m_portPlugins.erase(sha);
 
-    // Remove flex counter if counter IDs maps are empty
-    if (fc.isCounterMapsEmpty() && fc.m_queuePlugins.empty() && fc.m_portPlugins.empty())
+    // Remove flex counter if all counter IDs and plugins are unregistered
+    if (fc.isEmpty())
     {
         removeInstance(instanceId);
     }
@@ -322,8 +322,8 @@ void FlexCounter::removeCounterPlugin(
     fc.m_queuePlugins.clear();
     fc.m_portPlugins.clear();
 
-    // Remove flex counter if counter IDs maps are empty
-    if (fc.isCounterMapsEmpty() && fc.m_queuePlugins.empty() && fc.m_portPlugins.empty())
+    // Remove flex counter if all counter IDs and plugins are unregistered
+    if (fc.isEmpty())
     {
         removeInstance(instanceId);
     }
@@ -337,11 +337,15 @@ FlexCounter::~FlexCounter(void)
     endFlexCounterThread();
 }
 
-bool FlexCounter::isCounterMapsEmpty()
+bool FlexCounter::isEmpty()
 {
     SWSS_LOG_ENTER();
 
-    return m_queueCounterIdsMap.empty() && m_portCounterIdsMap.empty() && m_queueAttrIdsMap.empty();
+    return m_queueCounterIdsMap.empty() &&
+           m_portCounterIdsMap.empty() &&
+           m_queueAttrIdsMap.empty() &&
+           m_queuePlugins.empty() &&
+           m_portPlugins.empty();
 }
 
 bool FlexCounter::isPortCounterSupported(sai_port_stat_t counter) const
