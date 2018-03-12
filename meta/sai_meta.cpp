@@ -4657,6 +4657,86 @@ DECLARE_META_GET_STATS_OID(tunnel);
 
 // NOTIFICATIONS
 
+static sai_mac_t zero_mac = { 0, 0, 0, 0, 0, 0 };
+
+void meta_sai_on_fdb_flush_event_consolidated(
+        _In_ const sai_fdb_event_notification_data_t& data)
+{
+    SWSS_LOG_ENTER();
+
+    // since we don't keep objects by type, we need to scan via all objects
+    // and find fdb entries
+
+    auto bpid = sai_metadata_get_attr_by_id(SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID, data.attr_count, data.attr);
+    auto type = sai_metadata_get_attr_by_id(SAI_FDB_ENTRY_ATTR_TYPE, data.attr_count, data.attr);
+
+    SWSS_LOG_NOTICE("processing consolidated fdb flush event of type: %s",
+            sai_metadata_get_fdb_entry_type_name((sai_fdb_entry_type_t)type->value.s32));
+
+    std::vector<sai_object_meta_key_t> toremove;
+
+    for (auto it = ObjectAttrHash.begin(); it != ObjectAttrHash.end(); ++it)
+    {
+        const std::string &key_fdb = it->first;
+
+        if (strstr(key_fdb.c_str(), "bvid") == NULL)
+        {
+            // this is not fdb_entry key
+            continue;
+        }
+
+        sai_object_meta_key_t meta_key_fdb;
+
+        meta_key_fdb.objecttype = SAI_OBJECT_TYPE_FDB_ENTRY;
+
+        sai_deserialize_object_meta_key(key_fdb, meta_key_fdb);
+
+        if (it->second.at(SAI_FDB_ENTRY_ATTR_TYPE)->getattr()->value.s32 != type->value.s32)
+        {
+            // entry type is not matching on this fdb entry
+            continue;
+        }
+
+        if (bpid != NULL)
+        {
+            if (it->second.find(SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID) == it->second.end())
+            {
+                // port is not defined for this fdb entry
+                continue;
+            }
+
+            if (it->second.at(SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID)->getattr()->value.oid != bpid->value.oid)
+            {
+                // bridge port is not matching this fdb entry
+                continue;
+            }
+        }
+
+        if (data.fdb_entry.bv_id != SAI_NULL_OBJECT_ID)
+        {
+            if (data.fdb_entry.bv_id != meta_key_fdb.objectkey.key.fdb_entry.bv_id)
+            {
+                // vlan/bridge id is not matching on this fdb entry
+                continue;
+            }
+        }
+
+        // this fdb entry is matching, removing
+
+        SWSS_LOG_INFO("removing %s", key_fdb.c_str());
+
+        // since meta_generic_validation_post_remove also modifies ObjectAttrHash
+        // we need to push this to a vector and remove in next loop
+        toremove.push_back(meta_key_fdb);
+    }
+
+    for (auto it = toremove.begin(); it != toremove.end(); ++it)
+    {
+        // remove selected objects
+        meta_generic_validation_post_remove(*it);
+    }
+}
+
 void meta_sai_on_fdb_event_single(
         _In_ const sai_fdb_event_notification_data_t& data)
 {
@@ -4709,11 +4789,28 @@ void meta_sai_on_fdb_event_single(
             break;
 
         case SAI_FDB_EVENT_AGED:
-        case SAI_FDB_EVENT_FLUSHED:
 
             if (!object_exists(key_fdb))
             {
-                SWSS_LOG_WARN("object key %s doesn't exist but received AGED/FLUSHED event", key_fdb.c_str());
+                SWSS_LOG_WARN("object key %s doesn't exist but received AGED event", key_fdb.c_str());
+                break;
+            }
+
+            meta_generic_validation_post_remove(meta_key_fdb);
+
+            break;
+
+        case SAI_FDB_EVENT_FLUSHED:
+
+            if (memcmp(data.fdb_entry.mac_address, zero_mac, sizeof(zero_mac)) == 0)
+            {
+                meta_sai_on_fdb_flush_event_consolidated(data);
+                break;
+            }
+
+            if (!object_exists(key_fdb))
+            {
+                SWSS_LOG_WARN("object key %s doesn't exist but received FLUSHED event", key_fdb.c_str());
                 break;
             }
 
