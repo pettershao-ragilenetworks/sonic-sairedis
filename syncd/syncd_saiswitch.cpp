@@ -328,17 +328,6 @@ void SaiSwitch::helperCheckLaneMap()
         SWSS_LOG_THROW("lanes map size differ: %lu vs %lu", laneMap.size(), redisLaneMap.size());
     }
 
-    /*
-     * We assume there are at least 32 ports and port number
-     * can be divided by 16 without rest.
-     */
-
-    if (laneMap.size() < 32 || (laneMap.size() % 16 != 0))
-    {
-        // TODO throw here
-        SWSS_LOG_ERROR("LANES size is %zu, something is wrong!", laneMap.size());
-    }
-
     for (auto kv: laneMap)
     {
         sai_uint32_t lane = kv.first;
