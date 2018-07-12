@@ -63,7 +63,6 @@ sai_status_t vs_clear_port_pool_stats(
     return SAI_STATUS_NOT_IMPLEMENTED;
 }
 
-
 VS_GENERIC_GET_STATS(PORT,port);
 VS_GENERIC_GET_STATS(PORT_POOL,port_pool);
 

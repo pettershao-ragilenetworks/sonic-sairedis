@@ -62,7 +62,6 @@ sai_status_t redis_clear_port_pool_stats(
     return SAI_STATUS_NOT_IMPLEMENTED;
 }
 
-
 REDIS_GENERIC_QUAD(PORT,port);
 REDIS_GENERIC_QUAD(PORT_POOL,port_pool);
 
