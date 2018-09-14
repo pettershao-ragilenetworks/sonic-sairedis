@@ -3589,6 +3589,9 @@ int syncd_main(int argc, char **argv)
         exit_and_notify(EXIT_FAILURE);
     }
 
+    sai_switch_api_t *sai_switch_api = NULL;
+    sai_api_query(SAI_API_SWITCH, (void**)&sai_switch_api);
+
     if (restartType == SYNCD_RESTART_TYPE_WARM)
     {
         const char *warmBootWriteFile = profile_get_value(0, SAI_KEY_WARM_BOOT_WRITE_FILE);
@@ -3601,11 +3604,27 @@ int syncd_main(int argc, char **argv)
 
             restartType = SYNCD_RESTART_TYPE_COLD;
         }
+        else
+        {
+            SWSS_LOG_NOTICE("Warm Reboot requested, keeping data plane running");
+
+            sai_attribute_t attr;
+
+            attr.id = SAI_SWITCH_ATTR_RESTART_WARM;
+            attr.value.booldata = true;
+
+            status = sai_switch_api->set_switch_attribute(gSwitchId, &attr);
+
+            if (status != SAI_STATUS_SUCCESS)
+            {
+                SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_RESTART_WARM=true: %s, fall back to cold restart",
+                        sai_serialize_status(status).c_str());
+                restartType = SYNCD_RESTART_TYPE_COLD;
+            }
+        }
     }
 
     SWSS_LOG_NOTICE("Removing the switch gSwitchId=0x%lx", gSwitchId);
-    sai_switch_api_t *sai_switch_api = NULL;
-    sai_api_query(SAI_API_SWITCH, (void**)&sai_switch_api);
 
 #ifdef SAI_SWITCH_ATTR_UNINIT_DATA_PLANE_ON_REMOVAL
 
