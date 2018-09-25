@@ -3528,12 +3528,12 @@ int syncd_main(int argc, char **argv)
 
     SWSS_LOG_NOTICE("syncd started");
 
-    syncd_restart_type_t restartType = SYNCD_RESTART_TYPE_COLD;
+    syncd_restart_type_t shutdownType = SYNCD_RESTART_TYPE_COLD;
 
     try
     {
         SWSS_LOG_NOTICE("before onSyncdStart");
-        onSyncdStart(options.startType == SAI_WARM_BOOT);
+        onSyncdStart(false);
         SWSS_LOG_NOTICE("after onSyncdStart");
 
         startNotificationsProcessingThread();
@@ -3565,7 +3565,7 @@ int syncd_main(int argc, char **argv)
                  * lead to unable to find some objects.
                  */
 
-                restartType = handleRestartQuery(*restartQuery);
+                shutdownType = handleRestartQuery(*restartQuery);
                 break;
             }
             else if (sel == flexCounter.get())
@@ -3592,7 +3592,7 @@ int syncd_main(int argc, char **argv)
     sai_switch_api_t *sai_switch_api = NULL;
     sai_api_query(SAI_API_SWITCH, (void**)&sai_switch_api);
 
-    if (restartType == SYNCD_RESTART_TYPE_WARM)
+    if (shutdownType == SYNCD_RESTART_TYPE_WARM)
     {
         const char *warmBootWriteFile = profile_get_value(0, SAI_KEY_WARM_BOOT_WRITE_FILE);
 
@@ -3602,7 +3602,7 @@ int syncd_main(int argc, char **argv)
         {
             SWSS_LOG_WARN("user requested warm shutdown but warmBootWriteFile is not specified, forcing cold shutdown");
 
-            restartType = SYNCD_RESTART_TYPE_COLD;
+            shutdownType = SYNCD_RESTART_TYPE_COLD;
         }
         else
         {
@@ -3619,7 +3619,7 @@ int syncd_main(int argc, char **argv)
             {
                 SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_RESTART_WARM=true: %s, fall back to cold restart",
                         sai_serialize_status(status).c_str());
-                restartType = SYNCD_RESTART_TYPE_COLD;
+                shutdownType = SYNCD_RESTART_TYPE_COLD;
             }
         }
     }
@@ -3628,7 +3628,7 @@ int syncd_main(int argc, char **argv)
 
 #ifdef SAI_SWITCH_ATTR_UNINIT_DATA_PLANE_ON_REMOVAL
 
-    if (restartType == SYNCD_RESTART_TYPE_FAST)
+    if (shutdownType == SYNCD_RESTART_TYPE_FAST)
     {
         SWSS_LOG_NOTICE("Fast Reboot requested, keeping data plane running");
 
