@@ -277,8 +277,23 @@ sub test_brcm_qos_map_order
     play "qos_map_order.rec", 0;
 }
 
+sub test_brcm_acl_tables
+{
+    fresh_start;
+
+    # we expect no asic operation on lag's that has no members
+
+    play "acl_tables.rec";
+    play "acl_tables.rec", 0;
+    play "acl_tables.rec", 0;
+    play "acl_tables.rec", 0;
+    play "acl_tables.rec", 0;
+    play "acl_tables.rec", 0;
+}
+
 # RUN TESTS
 
+test_brcm_acl_tables;
 test_brcm_qos_map_order;
 test_brcm_lag_no_members;
 test_brcm_rif_loopback;
