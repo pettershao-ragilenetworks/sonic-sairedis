@@ -827,6 +827,50 @@ void tap2veth_fun(std::shared_ptr<hostif_info_t> info)
     SWSS_LOG_NOTICE("ending thread proc for %s", info->name.c_str());
 }
 
+std::string vs_get_veth_name(
+        _In_ const std::string& tapname,
+        _In_ sai_object_id_t port_id)
+{
+    SWSS_LOG_ENTER();
+
+    std::string vethname = SAI_VS_VETH_PREFIX + tapname;
+
+    // check if user override interface names
+
+    sai_attribute_t attr;
+
+    uint32_t lanes[4];
+
+    attr.id = SAI_PORT_ATTR_HW_LANE_LIST;
+
+    attr.value.u32list.count = 4;
+    attr.value.u32list.list = lanes;
+
+    if (vs_generic_get(SAI_OBJECT_TYPE_PORT, port_id, 1, &attr) != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_WARN("failed to get port %s lanes, using veth: %s",
+                sai_serialize_object_id(port_id).c_str(),
+                vethname.c_str());
+    }
+    else
+    {
+        auto it = g_lane_to_ifname.find(lanes[0]);
+
+        if (it == g_lane_to_ifname.end())
+        {
+            SWSS_LOG_WARN("failed to get ifname from lane number %u", lanes[0]);
+        }
+        else
+        {
+            SWSS_LOG_NOTICE("using %s instead of %s", it->second.c_str(), vethname.c_str());
+
+            vethname = it->second;
+        }
+    }
+
+    return vethname;
+}
+
 bool hostif_create_tap_veth_forwarding(
         _In_ const std::string &tapname,
         _In_ int tapfd,
@@ -836,44 +880,9 @@ bool hostif_create_tap_veth_forwarding(
 
     // we assume here that veth devices were added by user before creating this
     // host interface, vEthernetX will be used for packet transfer between ip
-    // namespaces
+    // namespaces or ethernet device name used in lane map if provided
 
-    std::string vethname = SAI_VS_VETH_PREFIX + tapname;
-
-    // check if user override interface names
-
-    {
-        sai_attribute_t attr;
-
-        uint32_t lanes[4];
-
-        attr.id = SAI_PORT_ATTR_HW_LANE_LIST;
-
-        attr.value.u32list.count = 4;
-        attr.value.u32list.list = lanes;
-
-        if (vs_generic_get(SAI_OBJECT_TYPE_PORT, port_id, 1, &attr) != SAI_STATUS_SUCCESS)
-        {
-            SWSS_LOG_WARN("failed to get port %s lanes, using veth: %s",
-                    sai_serialize_object_id(port_id).c_str(),
-                    vethname.c_str());
-        }
-        else
-        {
-            auto it = g_lane_to_ifname.find(lanes[0]);
-
-            if (it == g_lane_to_ifname.end())
-            {
-                SWSS_LOG_WARN("failed to get ifname from lane number %u", lanes[0]);
-            }
-            else
-            {
-                SWSS_LOG_NOTICE("using %s instead of %s", it->second.c_str(), vethname.c_str());
-
-                vethname = it->second;
-            }
-        }
-    }
+    std::string vethname = vs_get_veth_name(tapname, port_id);
 
     int packet_socket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 
@@ -1081,7 +1090,7 @@ sai_status_t vs_create_hostif_int(
         SWSS_LOG_ERROR("forwarding rule on %s was not added", name.c_str());
     }
 
-    std::string vname = SAI_VS_VETH_PREFIX + name;
+    std::string vname = vs_get_veth_name(name, obj_id);
 
     SWSS_LOG_INFO("mapping interface %s to port id %s",
             vname.c_str(),
