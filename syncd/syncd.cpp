@@ -2925,7 +2925,7 @@ void printUsage()
 {
     SWSS_LOG_ENTER();
 
-    std::cout << "Usage: syncd [-N] [-U] [-d] [-p profile] [-i interval] [-t [cold|warm|fast]] [-h] [-u] [-S]" << std::endl;
+    std::cout << "Usage: syncd [-N] [-U] [-d] [-p profile] [-i interval] [-t [cold|warm|fast|fastfast]] [-h] [-u] [-S]" << std::endl;
     std::cout << "    -N --nocounters" << std::endl;
     std::cout << "        Disable counter thread" << std::endl;
     std::cout << "    -d --diag" << std::endl;
@@ -2935,7 +2935,7 @@ void printUsage()
     std::cout << "    -i --countersInterval interval" << std::endl;
     std::cout << "        Provide counter thread interval" << std::endl;
     std::cout << "    -t --startType type" << std::endl;
-    std::cout << "        Specify cold|warm|fast start type" << std::endl;
+    std::cout << "        Specify cold|warm|fast|fastfast start type" << std::endl;
     std::cout << "    -u --useTempView:" << std::endl;
     std::cout << "        Use temporary view between init and apply" << std::endl;
     std::cout << "    -S --disableExitSleep" << std::endl;
@@ -3033,6 +3033,10 @@ void handleCmdLine(int argc, char **argv)
                 else if (std::string(optarg) == "fast")
                 {
                     options.startType = SAI_FAST_BOOT;
+                }
+                else if (std::string(optarg) == "fastfast")
+                {
+                    options.startType = SAI_FASTFAST_BOOT;
                 }
                 else
                 {
@@ -3218,6 +3222,35 @@ syncd_restart_type_t handleRestartQuery(swss::NotificationConsumer &restartQuery
 
     SWSS_LOG_WARN("received '%s' unknown switch shutdown event, assuming COLD", op.c_str());
     return SYNCD_RESTART_TYPE_COLD;
+}
+
+void handleFfbEvent(swss::NotificationConsumer &ffb)
+{
+    SWSS_LOG_ENTER();
+
+    std::string op;
+    std::string data;
+    std::vector<swss::FieldValueTuple> values;
+
+    ffb.pop(op, data, values);
+
+    if ((op == "SET") && (data == "ISSU_END"))
+    {
+        sai_switch_api_t *sai_switch_api = NULL;
+        sai_api_query(SAI_API_SWITCH, (void**)&sai_switch_api);
+
+        sai_attribute_t attr;
+
+        attr.id = SAI_SWITCH_ATTR_FAST_API_ENABLE;
+        attr.value.booldata = false;
+
+        sai_status_t status = sai_switch_api->set_switch_attribute(gSwitchId, &attr);
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_FAST_API_ENABLE=false: %s", sai_serialize_status(status).c_str());
+        }
+    }
 }
 
 bool isVeryFirstRun()
@@ -3475,6 +3508,7 @@ int syncd_main(int argc, char **argv)
     std::shared_ptr<swss::NotificationConsumer> restartQuery = std::make_shared<swss::NotificationConsumer>(dbAsic.get(), "RESTARTQUERY");
     std::shared_ptr<swss::ConsumerTable> flexCounter = std::make_shared<swss::ConsumerTable>(dbFlexCounter.get(), FLEX_COUNTER_TABLE);
     std::shared_ptr<swss::ConsumerTable> flexCounterGroup = std::make_shared<swss::ConsumerTable>(dbFlexCounter.get(), FLEX_COUNTER_GROUP_TABLE);
+    std::shared_ptr<swss::NotificationConsumer> ffb = std::make_shared<swss::NotificationConsumer>(dbAsic.get(), "MLNX_FFB");
 
     /*
      * At the end we cant use producer consumer concept since if one process
@@ -3520,7 +3554,16 @@ int syncd_main(int argc, char **argv)
         options.startType = SAI_COLD_BOOT;
     }
 
-    gProfileMap[SAI_KEY_BOOT_TYPE] = std::to_string(options.startType);
+    if (options.startType == SAI_FASTFAST_BOOT)
+    {
+        /*
+         * Mellanox SAI requires to pass SAI_WARM_BOOT as SAI_BOOT_KEY
+         * to start 'fast-fast'
+         */
+        gProfileMap[SAI_KEY_BOOT_TYPE] = std::to_string(SAI_WARM_BOOT);
+    } else {
+        gProfileMap[SAI_KEY_BOOT_TYPE] = std::to_string(options.startType);
+    }
 
     sai_status_t status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
 
@@ -3574,6 +3617,7 @@ int syncd_main(int argc, char **argv)
         s.addSelectable(restartQuery.get());
         s.addSelectable(flexCounter.get());
         s.addSelectable(flexCounterGroup.get());
+        s.addSelectable(ffb.get());
 
         SWSS_LOG_NOTICE("starting main loop");
 
@@ -3652,6 +3696,10 @@ int syncd_main(int argc, char **argv)
                     attr.value.booldata = false;
                     status = sai_switch_api->set_switch_attribute(gSwitchId, &attr);
                 }
+            }
+            else if (sel == ffb.get())
+            {
+                handleFfbEvent(*ffb);
             }
             else if (sel == flexCounter.get())
             {

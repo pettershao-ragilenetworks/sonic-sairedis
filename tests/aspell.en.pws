@@ -59,6 +59,7 @@ endl
 enum
 eth
 ethernet
+fastfast
 fdb
 FDB
 fdbs
@@ -99,6 +100,7 @@ LOOPBACK
 lua
 MCAST
 md
+Mellanox
 metadata
 mlnx
 mpls
