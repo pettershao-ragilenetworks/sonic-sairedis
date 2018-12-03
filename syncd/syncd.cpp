@@ -3593,6 +3593,15 @@ int syncd_main(int argc, char **argv)
                  * lead to unable to find some objects.
                  */
 
+                SWSS_LOG_NOTICE("is asic queue empty: %d",asicState->empty());
+
+                while (!asicState->empty())
+                {
+                    processEvent(*asicState.get());
+                }
+
+                SWSS_LOG_NOTICE("drained queue");
+
                 shutdownType = handleRestartQuery(*restartQuery);
                 if (shutdownType != SYNCD_RESTART_TYPE_PRE_SHUTDOWN)
                 {
