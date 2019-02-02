@@ -826,6 +826,14 @@ std::string sai_serialize_queue_stat(
     return sai_serialize_enum(counter, &sai_metadata_enum_sai_queue_stat_t);
 }
 
+std::string sai_serialize_router_interface_stat(
+        _In_ const sai_router_interface_stat_t counter)
+{
+    SWSS_LOG_ENTER();
+
+    return sai_serialize_enum(counter, &sai_metadata_enum_sai_router_interface_stat_t);
+}
+
 std::string sai_serialize_ingress_priority_group_stat(
         _In_ const sai_ingress_priority_group_stat_t counter)
 {

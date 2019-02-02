@@ -90,6 +90,9 @@ std::string sai_serialize_port_pool_stat(
 std::string sai_serialize_queue_stat(
         _In_ const sai_queue_stat_t counter);
 
+std::string sai_serialize_router_interface_stat(
+        _In_ const sai_router_interface_stat_t counter);
+
 std::string sai_serialize_ingress_priority_group_stat(
         _In_ const sai_ingress_priority_group_stat_t counter);
 
