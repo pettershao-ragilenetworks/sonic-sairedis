@@ -107,6 +107,7 @@ mlnx
 mpls
 mutex
 mutexes
+MTU
 namespace
 namespaces
 NHG
