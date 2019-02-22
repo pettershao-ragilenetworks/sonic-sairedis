@@ -2615,7 +2615,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForNextHopGroup(
         SWSS_LOG_NOTICE("failed to find route candidate for NHG: %s",
                 temporaryObj->str_object_id.c_str());
 
-        return false;
+        return nullptr;
     }
 
     /*
@@ -6840,7 +6840,7 @@ void logViewObjectCount(
 }
 
 void checkAsicVsDatabaseConsistency(
-        _In_ const AsicView cur,
+        _In_ const AsicView &cur,
         _In_ const AsicView &tmp)
 {
     SWSS_LOG_ENTER();
