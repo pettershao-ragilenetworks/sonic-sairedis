@@ -34,6 +34,7 @@ config
 const
 CONST
 consts
+counterName
 countOnly
 cout
 cpu
@@ -87,6 +88,7 @@ inout
 INSEG
 ip
 IP
+IPG
 ipmc
 IPv
 isobjectid
@@ -113,6 +115,7 @@ namespaces
 NHG
 nhgm
 nlog
+ntf
 nullptr
 OA
 ObjectAttrHash
@@ -153,6 +156,9 @@ RIDs
 RIDTOVID
 rif
 RIF
+rifCounterIds
+rifId
+rifStats
 RO
 RPC
 runtime
