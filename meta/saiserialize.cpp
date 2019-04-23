@@ -850,6 +850,14 @@ std::string sai_serialize_ingress_priority_group_attr(
     return sai_serialize_enum(attr, &sai_metadata_enum_sai_ingress_priority_group_attr_t);
 }
 
+std::string sai_serialize_buffer_pool_stat(
+        _In_ const sai_buffer_pool_stat_t counter)
+{
+    SWSS_LOG_ENTER();
+
+    return sai_serialize_enum(counter, &sai_metadata_enum_sai_buffer_pool_stat_t);
+}
+
 std::string sai_serialize_tunnel_stat(
         _In_ const sai_tunnel_stat_t counter)
 {
