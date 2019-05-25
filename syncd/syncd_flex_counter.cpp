@@ -197,7 +197,7 @@ void FlexCounter::setQueueCounterList(
 
     if (supportedIds.size() == 0)
     {
-        SWSS_LOG_NOTICE("Queue %s does not has supported counters", sai_serialize_object_id(queueId).c_str());
+        SWSS_LOG_NOTICE("%s: queue %s does not has supported counters", instanceId.c_str(), sai_serialize_object_id(queueId).c_str());
 
         // Remove flex counter if all counter IDs and plugins are unregistered
         if (fc.isEmpty())
@@ -297,7 +297,7 @@ void FlexCounter::setPriorityGroupCounterList(
 
     if (supportedIds.size() == 0)
     {
-        SWSS_LOG_NOTICE("Priority group %s does not have supported counters", sai_serialize_object_id(priorityGroupId).c_str());
+        SWSS_LOG_NOTICE("%s: priority group %s does not have supported counters", instanceId.c_str(), sai_serialize_object_id(priorityGroupId).c_str());
 
         // Remove flex counter if all counter IDs and plugins are unregistered
         if (fc.isEmpty())
@@ -818,17 +818,21 @@ void FlexCounter::collectCounters(
                 static_cast<uint32_t>(queueCounterIds.size()),
                 (const sai_stat_id_t *)queueCounterIds.data(),
                 queueStats.data());
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_ERROR("%s: failed to get stats of queue 0x%lx: %d", m_instanceId.c_str(), queueVid, status);
+            continue;
+        }
         if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR){
             status = sai_metadata_sai_queue_api->clear_queue_stats(
                     queueId,
                     static_cast<uint32_t>(queueCounterIds.size()),
                     (const sai_stat_id_t *)queueCounterIds.data());
-        }
-
-        if (status != SAI_STATUS_SUCCESS)
-        {
-            SWSS_LOG_ERROR("Failed to get stats of queue 0x%lx: %d", queueVid, status);
-            continue;
+            if (status != SAI_STATUS_SUCCESS)
+            {
+                SWSS_LOG_ERROR("%s: failed to clear stats of queue 0x%lx: %d", m_instanceId.c_str(), queueVid, status);
+                continue;
+            }
         }
 
         // Push all counter values to a single vector
@@ -905,17 +909,21 @@ void FlexCounter::collectCounters(
                         static_cast<uint32_t>(priorityGroupCounterIds.size()),
                         (const sai_stat_id_t *)priorityGroupCounterIds.data(),
                         priorityGroupStats.data());
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_ERROR("%s: failed to get %ld/%ld stats of PG 0x%lx: %d", m_instanceId.c_str(), priorityGroupCounterIds.size(), priorityGroupStats.size(), priorityGroupVid, status);
+            continue;
+        }
         if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR){
             status = sai_metadata_sai_buffer_api->clear_ingress_priority_group_stats(
                             priorityGroupId,
                             static_cast<uint32_t>(priorityGroupCounterIds.size()),
                             (const sai_stat_id_t *)priorityGroupCounterIds.data());
-        }
-
-        if (status != SAI_STATUS_SUCCESS)
-        {
-            SWSS_LOG_ERROR("Failed to get %ld/%ld stats of PG 0x%lx: %d", priorityGroupCounterIds.size(), priorityGroupStats.size(), priorityGroupVid, status);
-            continue;
+            if (status != SAI_STATUS_SUCCESS)
+            {
+                SWSS_LOG_ERROR("%s: failed to clear %ld/%ld stats of PG 0x%lx: %d", m_instanceId.c_str(), priorityGroupCounterIds.size(), priorityGroupStats.size(), priorityGroupVid, status);
+                continue;
+            }
         }
 
         // Push all counter values to a single vector
@@ -1191,17 +1199,31 @@ void FlexCounter::saiUpdateSupportedQueueCounters(
 
         if (status != SAI_STATUS_SUCCESS)
         {
-            SWSS_LOG_INFO("Counter %s is not supported on queue %s, rv: %s",
+            SWSS_LOG_NOTICE("%s: counter %s is not supported on queue %s, rv: %s",
+                    m_instanceId.c_str(),
                     sai_serialize_queue_stat(counter).c_str(),
                     sai_serialize_object_id(queueId).c_str(),
                     sai_serialize_status(status).c_str());
 
             continue;
         }
-        else
+
+        if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR)
         {
-            supportedQueueCounters.insert(counter);
+            status = sai_metadata_sai_queue_api->clear_queue_stats(queueId, 1, (const sai_stat_id_t *)&counter);
+            if (status != SAI_STATUS_SUCCESS)
+            {
+                SWSS_LOG_NOTICE("%s: clear counter %s is not supported on queue %s, rv: %s",
+                        m_instanceId.c_str(),
+                        sai_serialize_queue_stat(counter).c_str(),
+                        sai_serialize_object_id(queueId).c_str(),
+                        sai_serialize_status(status).c_str());
+
+                continue;
+            }
         }
+
+        supportedQueueCounters.insert(counter);
     }
 }
 
@@ -1220,17 +1242,31 @@ void FlexCounter::saiUpdateSupportedPriorityGroupCounters(
 
         if (status != SAI_STATUS_SUCCESS)
         {
-            SWSS_LOG_INFO("Counter %s is not supported on PG %s, rv: %s",
+            SWSS_LOG_NOTICE("%s: counter %s is not supported on PG %s, rv: %s",
+                    m_instanceId.c_str(),
                     sai_serialize_ingress_priority_group_stat(counter).c_str(),
                     sai_serialize_object_id(priorityGroupId).c_str(),
                     sai_serialize_status(status).c_str());
 
             continue;
         }
-        else
+
+        if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR)
         {
-            supportedPriorityGroupCounters.insert(counter);
+            status = sai_metadata_sai_buffer_api->clear_ingress_priority_group_stats(priorityGroupId, 1, (const sai_stat_id_t *)&counter);
+            if (status != SAI_STATUS_SUCCESS)
+            {
+                SWSS_LOG_NOTICE("%s: clear counter %s is not supported on PG %s, rv: %s",
+                        m_instanceId.c_str(),
+                        sai_serialize_ingress_priority_group_stat(counter).c_str(),
+                        sai_serialize_object_id(priorityGroupId).c_str(),
+                        sai_serialize_status(status).c_str());
+
+                continue;
+            }
         }
+
+        supportedPriorityGroupCounters.insert(counter);
     }
 }
 
