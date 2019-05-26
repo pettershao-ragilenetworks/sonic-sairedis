@@ -37,6 +37,11 @@ class FlexCounter
                 _In_ sai_object_id_t rifId,
                 _In_ std::string instanceId,
                 _In_ const std::vector<sai_router_interface_stat_t> &counterIds);
+        static void setBufferPoolCounterList(
+                _In_ sai_object_id_t bufferPoolVid,
+                _In_ sai_object_id_t bufferPoolId,
+                _In_ std::string instanceId,
+                _In_ const std::vector<sai_buffer_pool_stat_t> &counterIds);
         static void setQueueAttrList(
                 _In_ sai_object_id_t queueVid,
                 _In_ sai_object_id_t queueId,
@@ -66,6 +71,9 @@ class FlexCounter
         static void removeRif(
                 _In_ sai_object_id_t rifVid,
                 _In_ std::string instanceId);
+        static void removeBufferPool(
+                _In_ sai_object_id_t bufferPoolVid,
+                _In_ std::string instanceId);
 
         static void addPortCounterPlugin(
                 _In_ std::string sha,
@@ -74,6 +82,9 @@ class FlexCounter
                 _In_ std::string sha,
                 _In_ std::string instanceId);
         static void addPriorityGroupCounterPlugin(
+                _In_ std::string sha,
+                _In_ std::string instanceId);
+        static void addBufferPoolCounterPlugin(
                 _In_ std::string sha,
                 _In_ std::string instanceId);
         static void removeCounterPlugin(
@@ -128,6 +139,16 @@ class FlexCounter
             std::vector<sai_ingress_priority_group_attr_t> priorityGroupAttrIds;
         };
 
+        struct BufferPoolCounterIds
+        {
+            BufferPoolCounterIds(
+                _In_ sai_object_id_t bufferPool,
+                _In_ const std::vector<sai_buffer_pool_stat_t> &bufferPoolIds);
+
+            sai_object_id_t bufferPoolId;
+            std::vector<sai_buffer_pool_stat_t> bufferPoolCounterIds;
+        };
+
         struct PortCounterIds
         {
             PortCounterIds(
@@ -162,10 +183,12 @@ class FlexCounter
         void saiUpdateSupportedQueueCounters(sai_object_id_t queueId, const std::vector<sai_queue_stat_t> &counterIds);
         void saiUpdateSupportedPriorityGroupCounters(sai_object_id_t priorityGroupId, const std::vector<sai_ingress_priority_group_stat_t> &counterIds);
         void saiUpdateSupportedRifCounters(sai_object_id_t rifId);
+        void saiUpdateSupportedBufferPoolCounters(sai_object_id_t bufferPoolId, const std::vector<sai_buffer_pool_stat_t> &counterIds);
         bool isPortCounterSupported(sai_port_stat_t counter) const;
         bool isQueueCounterSupported(sai_queue_stat_t counter) const;
         bool isPriorityGroupCounterSupported(sai_ingress_priority_group_stat_t counter) const;
         bool isRifCounterSupported(sai_router_interface_stat_t counter) const;
+        bool isBufferPoolCounterSupported(sai_buffer_pool_stat_t counter) const;
         bool isEmpty();
 
         // Key is a Virtual ID
@@ -175,11 +198,13 @@ class FlexCounter
         std::map<sai_object_id_t, std::shared_ptr<IngressPriorityGroupCounterIds>> m_priorityGroupCounterIdsMap;
         std::map<sai_object_id_t, std::shared_ptr<IngressPriorityGroupAttrIds>> m_priorityGroupAttrIdsMap;
         std::map<sai_object_id_t, std::shared_ptr<RifCounterIds>> m_rifCounterIdsMap;
+        std::map<sai_object_id_t, std::shared_ptr<BufferPoolCounterIds>> m_bufferPoolCounterIdsMap;
 
         // Plugins
         std::set<std::string> m_queuePlugins;
         std::set<std::string> m_portPlugins;
         std::set<std::string> m_priorityGroupPlugins;
+        std::set<std::string> m_bufferPoolPlugins;
 
         std::atomic_bool m_runFlexCounterThread = { false };
         std::shared_ptr<std::thread> m_flexCounterThread = nullptr;

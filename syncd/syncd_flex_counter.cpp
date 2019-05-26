@@ -9,6 +9,7 @@ static std::set<sai_port_stat_t> supportedPortCounters;
 static std::set<sai_queue_stat_t> supportedQueueCounters;
 static std::set<sai_ingress_priority_group_stat_t> supportedPriorityGroupCounters;
 static std::set<sai_router_interface_stat_t> supportedRifCounters;
+static std::set<sai_buffer_pool_stat_t> supportedBufferPoolCounters;
 
 FlexCounter::PortCounterIds::PortCounterIds(
         _In_ sai_object_id_t port,
@@ -54,6 +55,14 @@ FlexCounter::RifCounterIds::RifCounterIds(
         _In_ sai_object_id_t rif,
         _In_ const std::vector<sai_router_interface_stat_t> &rifIds):
     rifId(rif), rifCounterIds(rifIds)
+{
+    SWSS_LOG_ENTER();
+}
+
+FlexCounter::BufferPoolCounterIds::BufferPoolCounterIds(
+        _In_ sai_object_id_t bufferPool,
+        _In_ const std::vector<sai_buffer_pool_stat_t> &bufferPoolIds):
+    bufferPoolId(bufferPool), bufferPoolCounterIds(bufferPoolIds)
 {
     SWSS_LOG_ENTER();
 }
@@ -429,6 +438,58 @@ void FlexCounter::setRifCounterList(
     }
 }
 
+void FlexCounter::setBufferPoolCounterList(
+        _In_ sai_object_id_t bufferPoolVid,
+        _In_ sai_object_id_t bufferPoolId,
+        _In_ std::string instanceId,
+        _In_ const std::vector<sai_buffer_pool_stat_t> &counterIds)
+{
+    SWSS_LOG_ENTER();
+
+    FlexCounter &fc = getInstance(instanceId);
+
+    fc.saiUpdateSupportedBufferPoolCounters(bufferPoolId, counterIds);
+
+    // Filter unsupported counters
+    std::vector<sai_buffer_pool_stat_t> supportedIds;
+    for (auto counterId : counterIds)
+    {
+        if (fc.isBufferPoolCounterSupported(counterId))
+        {
+            supportedIds.push_back(counterId);
+        }
+    }
+
+    if (supportedIds.size() == 0)
+    {
+        SWSS_LOG_NOTICE("Buffer pool %s does not has supported counters", sai_serialize_object_id(bufferPoolId).c_str());
+
+        // Remove flex counter if all counter IDs and plugins are unregistered
+        if (fc.isEmpty())
+        {
+            removeInstance(instanceId);
+        }
+
+        return;
+    }
+
+    auto it = fc.m_bufferPoolCounterIdsMap.find(bufferPoolVid);
+    if (it != fc.m_bufferPoolCounterIdsMap.end())
+    {
+        it->second->bufferPoolCounterIds = supportedIds;
+        return;
+    }
+
+    auto bufferPoolCounterIds = std::make_shared<BufferPoolCounterIds>(bufferPoolId, supportedIds);
+    fc.m_bufferPoolCounterIdsMap.emplace(bufferPoolVid, bufferPoolCounterIds);
+
+    // Start flex counter thread in case it was not running due to empty counter IDs map
+    if (fc.m_pollInterval > 0)
+    {
+        fc.startFlexCounterThread();
+    }
+}
+
 void FlexCounter::removePort(
         _In_ sai_object_id_t portVid,
         _In_ std::string instanceId)
@@ -559,6 +620,35 @@ void FlexCounter::removeRif(
     }
 }
 
+void FlexCounter::removeBufferPool(
+        _In_ sai_object_id_t bufferPoolVid,
+        _In_ std::string instanceId)
+{
+    SWSS_LOG_ENTER();
+
+    bool found = false;
+    FlexCounter &fc = getInstance(instanceId);
+
+    auto it = fc.m_bufferPoolCounterIdsMap.find(bufferPoolVid);
+    if (it != fc.m_bufferPoolCounterIdsMap.end())
+    {
+        fc.m_bufferPoolCounterIdsMap.erase(it);
+        found = true;
+    }
+
+    if (!found)
+    {
+        SWSS_LOG_NOTICE("Trying to remove nonexisting buffer pool 0x%lx from flex counter %s", bufferPoolVid, fc.m_instanceId.c_str());
+        return;
+    }
+
+    // Remove flex counter if all counter IDs and plugins are unregistered
+    if (fc.isEmpty())
+    {
+        removeInstance(instanceId);
+    }
+}
+
 void FlexCounter::addPortCounterPlugin(
         _In_ std::string sha,
         _In_ std::string instanceId)
@@ -616,6 +706,23 @@ void FlexCounter::addPriorityGroupCounterPlugin(
     SWSS_LOG_NOTICE("Priority group counters plugin %s registered", sha.c_str());
 }
 
+void FlexCounter::addBufferPoolCounterPlugin(
+        _In_ std::string sha,
+        _In_ std::string instanceId)
+{
+    SWSS_LOG_ENTER();
+
+    FlexCounter &fc = getInstance(instanceId);
+
+    if (fc.m_bufferPoolPlugins.find(sha) != fc.m_bufferPoolPlugins.end())
+    {
+        SWSS_LOG_ERROR("Plugin %s already registered", sha.c_str());
+    }
+
+    fc.m_bufferPoolPlugins.insert(sha);
+    SWSS_LOG_NOTICE("Buffer pool counters plugin %s registered", sha.c_str());
+}
+
 void FlexCounter::removeCounterPlugin(
         _In_ std::string sha,
         _In_ std::string instanceId)
@@ -627,6 +734,7 @@ void FlexCounter::removeCounterPlugin(
     fc.m_queuePlugins.erase(sha);
     fc.m_portPlugins.erase(sha);
     fc.m_priorityGroupPlugins.erase(sha);
+    fc.m_bufferPoolPlugins.erase(sha);
 
     // Remove flex counter if all counter IDs and plugins are unregistered
     if (fc.isEmpty())
@@ -645,6 +753,7 @@ void FlexCounter::removeCounterPlugin(
     fc.m_queuePlugins.clear();
     fc.m_portPlugins.clear();
     fc.m_priorityGroupPlugins.clear();
+    fc.m_bufferPoolPlugins.clear();
 
     // Remove flex counter if all counter IDs and plugins are unregistered
     if (fc.isEmpty())
@@ -680,7 +789,9 @@ bool FlexCounter::isEmpty()
            m_rifCounterIdsMap.empty() &&
            m_queueAttrIdsMap.empty() &&
            m_queuePlugins.empty() &&
-           m_portPlugins.empty();
+           m_portPlugins.empty() &&
+           m_bufferPoolCounterIdsMap.empty() &&
+           m_bufferPoolPlugins.empty();
 }
 
 bool FlexCounter::isPortCounterSupported(sai_port_stat_t counter) const
@@ -709,6 +820,13 @@ bool FlexCounter::isRifCounterSupported(sai_router_interface_stat_t counter) con
     SWSS_LOG_ENTER();
 
     return supportedRifCounters.count(counter) != 0;
+}
+
+bool FlexCounter::isBufferPoolCounterSupported(sai_buffer_pool_stat_t counter) const
+{
+    SWSS_LOG_ENTER();
+
+    return supportedBufferPoolCounters.count(counter) != 0;
 }
 
 FlexCounter::FlexCounter(std::string instanceId) : m_instanceId(instanceId)
@@ -747,6 +865,7 @@ void FlexCounter::collectCounters(
     std::map<sai_object_id_t, std::shared_ptr<IngressPriorityGroupCounterIds>> priorityGroupCounterIdsMap;
     std::map<sai_object_id_t, std::shared_ptr<IngressPriorityGroupAttrIds>> priorityGroupAttrIdsMap;
     std::map<sai_object_id_t, std::shared_ptr<RifCounterIds>> rifCounterIdsMap;
+    std::map<sai_object_id_t, std::shared_ptr<BufferPoolCounterIds>> bufferPoolCounterIdsMap;
 
     {
         std::lock_guard<std::mutex> lock(g_mutex);
@@ -756,6 +875,7 @@ void FlexCounter::collectCounters(
         priorityGroupCounterIdsMap = m_priorityGroupCounterIdsMap;
         priorityGroupAttrIdsMap = m_priorityGroupAttrIdsMap;
         rifCounterIdsMap = m_rifCounterIdsMap;
+        bufferPoolCounterIdsMap = m_bufferPoolCounterIdsMap;
     }
 
     // Collect stats for every registered port
@@ -805,14 +925,14 @@ void FlexCounter::collectCounters(
 
         // Get queue stats
         sai_status_t status = -1;
-//        TODO: replace if with get_queue_stats_ext() call when it's fully supported
-//        Example:
-//        sai_status_t status = sai_metadata_sai_queue_api->get_queue_stats_ext(
-//                queueId,
-//                static_cast<uint32_t>(queueCounterIds.size()),
-//                queueCounterIds.data(),
-//                m_statsMode,
-//                queueStats.data());
+        // TODO: replace if with get_queue_stats_ext() call when it is fully supported
+        // Example:
+        // sai_status_t status = sai_metadata_sai_queue_api->get_queue_stats_ext(
+        //         queueId,
+        //         static_cast<uint32_t>(queueCounterIds.size()),
+        //         queueCounterIds.data(),
+        //         m_statsMode,
+        //         queueStats.data());
         status = sai_metadata_sai_queue_api->get_queue_stats(
                 queueId,
                 static_cast<uint32_t>(queueCounterIds.size()),
@@ -903,7 +1023,7 @@ void FlexCounter::collectCounters(
 
         // Get PG stats
         sai_status_t status = -1;
-//        TODO: replace if with get_ingress_priority_group_stats_ext() call when it's fully supported
+        // TODO: replace if with get_ingress_priority_group_stats_ext() call when it is fully supported
         status = sai_metadata_sai_buffer_api->get_ingress_priority_group_stats(
                         priorityGroupId,
                         static_cast<uint32_t>(priorityGroupCounterIds.size()),
@@ -1018,6 +1138,61 @@ void FlexCounter::collectCounters(
         countersTable.set(rifVidStr, values, "");
     }
 
+    // Collect stats for every registered buffer pool
+    for (const auto &it : bufferPoolCounterIdsMap)
+    {
+        const auto &bufferPoolVid = it.first;
+        const auto &bufferPoolId = it.second->bufferPoolId;
+        const auto &bufferPoolCounterIds = it.second->bufferPoolCounterIds;
+
+        std::vector<uint64_t> bufferPoolStats(bufferPoolCounterIds.size());
+
+        // Get buffer pool stats
+        sai_status_t status = -1;
+
+        status = sai_metadata_sai_buffer_api->get_buffer_pool_stats(
+                        bufferPoolId,
+                        static_cast<uint32_t>(bufferPoolCounterIds.size()),
+                        reinterpret_cast<const sai_stat_id_t *>(bufferPoolCounterIds.data()),
+                        bufferPoolStats.data());
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            // Because of stat pre-qualification in setting the buffer pool counter list,
+            // it is less likely that we will get a failure return here in polling the stats
+            SWSS_LOG_ERROR("%s: failed to get stats of buffer pool %s, rv: %s",
+                    m_instanceId.c_str(),
+                    sai_serialize_object_id(bufferPoolId).c_str(),
+                    sai_serialize_status(status).c_str());
+            continue;
+        }
+        if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR)
+        {
+            status = sai_metadata_sai_buffer_api->clear_buffer_pool_stats(
+                            bufferPoolId,
+                            static_cast<uint32_t>(bufferPoolCounterIds.size()),
+                            reinterpret_cast<const sai_stat_id_t *>(bufferPoolCounterIds.data()));
+        }
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            // Because of stat pre-qualification in setting the buffer pool counter list,
+            // it is less likely that we will get a failure return here in clearing the stats
+            SWSS_LOG_ERROR("%s: failed to clear stats of buffer pool %s, rv: %s",
+                    m_instanceId.c_str(),
+                    sai_serialize_object_id(bufferPoolId).c_str(),
+                    sai_serialize_status(status).c_str());
+            continue;
+        }
+
+        // Write counter values to DB table
+        std::vector<swss::FieldValueTuple> fvTuples;
+        for (size_t i = 0; i < bufferPoolCounterIds.size(); ++i)
+        {
+            fvTuples.emplace_back(sai_serialize_buffer_pool_stat(bufferPoolCounterIds[i]), std::to_string(bufferPoolStats[i]));
+        }
+
+        countersTable.set(sai_serialize_object_id(bufferPoolVid), fvTuples);
+    }
+
     countersTable.flush();
 }
 
@@ -1031,9 +1206,11 @@ void FlexCounter::runPlugins(
     std::map<sai_object_id_t, std::shared_ptr<QueueAttrIds>> queueAttrIdsMap;
     std::map<sai_object_id_t, std::shared_ptr<IngressPriorityGroupCounterIds>> priorityGroupCounterIdsMap;
     std::map<sai_object_id_t, std::shared_ptr<IngressPriorityGroupAttrIds>> priorityGroupAttrIdsMap;
+    std::map<sai_object_id_t, std::shared_ptr<BufferPoolCounterIds>> bufferPoolCounterIdsMap;
     std::set<std::string> queuePlugins;
     std::set<std::string> portPlugins;
     std::set<std::string> priorityGroupPlugins;
+    std::set<std::string> bufferPoolPlugins;
 
     {
         std::lock_guard<std::mutex> lock(g_mutex);
@@ -1045,6 +1222,8 @@ void FlexCounter::runPlugins(
         priorityGroupCounterIdsMap = m_priorityGroupCounterIdsMap;
         priorityGroupAttrIdsMap = m_priorityGroupAttrIdsMap;
         priorityGroupPlugins = m_priorityGroupPlugins;
+        bufferPoolCounterIdsMap = m_bufferPoolCounterIdsMap;
+        bufferPoolPlugins = m_bufferPoolPlugins;
     }
 
     const std::vector<std::string> argv = 
@@ -1060,7 +1239,6 @@ void FlexCounter::runPlugins(
     {
         portList.push_back(sai_serialize_object_id(kv.first));
     }
-
     for (const auto& sha : portPlugins)
     {
         runRedisScript(db, sha, portList, argv);
@@ -1072,7 +1250,6 @@ void FlexCounter::runPlugins(
     {
         queueList.push_back(sai_serialize_object_id(kv.first));
     }
-
     for (const auto& sha : queuePlugins)
     {
         runRedisScript(db, sha, queueList, argv);
@@ -1084,10 +1261,20 @@ void FlexCounter::runPlugins(
     {
         priorityGroupList.push_back(sai_serialize_object_id(kv.first));
     }
-
     for (const auto& sha : priorityGroupPlugins)
     {
         runRedisScript(db, sha, priorityGroupList, argv);
+    }
+
+    std::vector<std::string> bufferPoolVids;
+    bufferPoolVids.reserve(bufferPoolCounterIdsMap.size());
+    for (const auto& it : bufferPoolCounterIdsMap)
+    {
+        bufferPoolVids.push_back(sai_serialize_object_id(it.first));
+    }
+    for (const auto& sha : bufferPoolPlugins)
+    {
+        runRedisScript(db, sha, bufferPoolVids, argv);
     }
 }
 
@@ -1292,5 +1479,47 @@ void FlexCounter::saiUpdateSupportedRifCounters(sai_object_id_t rifId)
         }
 
         supportedRifCounters.insert(counter);
+    }
+}
+
+void FlexCounter::saiUpdateSupportedBufferPoolCounters(
+        _In_ sai_object_id_t bufferPoolId,
+        _In_ const std::vector<sai_buffer_pool_stat_t> &counterIds)
+{
+    SWSS_LOG_ENTER();
+
+    uint64_t value;
+    supportedBufferPoolCounters.clear();
+
+    for (const auto &counterId : counterIds)
+    {
+        sai_status_t status = sai_metadata_sai_buffer_api->get_buffer_pool_stats(bufferPoolId, 1, (const sai_stat_id_t *)&counterId, &value);
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_ERROR("%s: counter %s is not supported on buffer pool %s, rv: %s",
+                    m_instanceId.c_str(),
+                    sai_serialize_buffer_pool_stat(counterId).c_str(),
+                    sai_serialize_object_id(bufferPoolId).c_str(),
+                    sai_serialize_status(status).c_str());
+
+            continue;
+        }
+
+        if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR)
+        {
+            status = sai_metadata_sai_buffer_api->clear_buffer_pool_stats(bufferPoolId, 1, (const sai_stat_id_t *)&counterId);
+            if (status != SAI_STATUS_SUCCESS)
+            {
+                SWSS_LOG_ERROR("%s: clear counter %s is not supported on buffer pool %s, rv: %s",
+                        m_instanceId.c_str(),
+                        sai_serialize_buffer_pool_stat(counterId).c_str(),
+                        sai_serialize_object_id(bufferPoolId).c_str(),
+                        sai_serialize_status(status).c_str());
+
+                continue;
+            }
+        }
+
+        supportedBufferPoolCounters.insert(counterId);
     }
 }

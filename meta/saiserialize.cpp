@@ -2968,6 +2968,15 @@ void sai_deserialize_ingress_priority_group_attr(
     sai_deserialize_enum(s, &sai_metadata_enum_sai_ingress_priority_group_attr_t, (int32_t&)attr);
 }
 
+void sai_deserialize_buffer_pool_stat(
+        _In_ const std::string& s,
+        _Out_ sai_buffer_pool_stat_t& stat)
+{
+    SWSS_LOG_ENTER();
+
+    sai_deserialize_enum(s, &sai_metadata_enum_sai_buffer_pool_stat_t, (int32_t&)stat);
+}
+
 void sai_deserialize_queue_attr(
         _In_ const std::string& s,
         _Out_ sai_queue_attr_t& attr)
