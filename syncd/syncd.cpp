@@ -2782,9 +2782,11 @@ void processFlexCounterGroupEvent(
 {
     SWSS_LOG_ENTER();
 
-    std::lock_guard<std::mutex> lock(g_mutex);
     swss::KeyOpFieldsValuesTuple kco;
-    consumer.pop(kco);
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        consumer.pop(kco);
+    }
 
     const auto &groupName = kfvKey(kco);
     const auto &op = kfvOp(kco);
@@ -2860,10 +2862,11 @@ void processFlexCounterEvent(
 {
     SWSS_LOG_ENTER();
 
-    std::lock_guard<std::mutex> lock(g_mutex);
-
     swss::KeyOpFieldsValuesTuple kco;
-    consumer.pop(kco);
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        consumer.pop(kco);
+    }
 
     const auto &key = kfvKey(kco);
     const auto &op = kfvOp(kco);

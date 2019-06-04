@@ -206,11 +206,13 @@ class FlexCounter
         std::set<std::string> m_priorityGroupPlugins;
         std::set<std::string> m_bufferPoolPlugins;
 
-        std::atomic_bool m_runFlexCounterThread = { false };
+        bool m_runFlexCounterThread = false;
         std::shared_ptr<std::thread> m_flexCounterThread = nullptr;
         std::mutex m_mtxSleep;
         std::condition_variable m_cvSleep;
 
+        std::mutex m_mtx;
+        std::condition_variable m_pollCond;
         uint32_t m_pollInterval = 0;
         std::string m_instanceId;
         sai_stats_mode_t m_statsMode;
