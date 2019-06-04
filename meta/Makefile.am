@@ -60,22 +60,26 @@ WARN = \
 # NOTE: this compilation could be moved to configure.ac
 
 libsaimeta_la_SOURCES =  \
-					  ../SAI/meta/saimetadata.c \
-					  ../SAI/meta/saimetadatautils.c \
-					  ../SAI/meta/saiserialize.c
+					  $(top_srcdir)/SAI/meta/saimetadata.c \
+					  $(top_srcdir)/SAI/meta/saimetadatautils.c \
+					  $(top_srcdir)/SAI/meta/saiserialize.c
 
 libsaimeta_la_CFLAGS = $(DBGFLAGS) $(WARN)
 
-../SAI/meta/saimetadata.h ../SAI/meta/saimetadata.c:
-	make -C ../SAI/meta
+$(top_srcdir)/SAI/meta/saimetadata.h $(top_srcdir)/SAI/meta/saimetadata.c: saimeta-gen
+
+saimeta-gen:
+	make -C $(top_srcdir)/SAI/meta
 
 clean-local:
-	make -C ../SAI/meta clean
+	make -C $(top_srcdir)/SAI/meta clean
 
 libsaimetadata_la_SOURCES = \
 							sai_meta.cpp \
 							saiattributelist.cpp \
 							saiserialize.cpp
+
+BUILT_SOURCES = $(top_srcdir)/SAI/meta/saimetadata.h $(top_srcdir)/SAI/meta/saimetadata.c
 
 libsaimetadata_la_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON)
 libsaimetadata_la_LIBADD = -lhiredis -lswsscommon libsaimeta.la
@@ -84,6 +88,6 @@ bin_PROGRAMS = tests
 
 tests_SOURCES = tests.cpp
 tests_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON)
-tests_LDADD = -lhiredis -lswsscommon -lpthread -L$(top_dir)/meta/.libs -lsaimetadata -lsaimeta
+tests_LDADD = -lhiredis -lswsscommon -lpthread libsaimetadata.la libsaimeta.la
 
 TESTS = tests

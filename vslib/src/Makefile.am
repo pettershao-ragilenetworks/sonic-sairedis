@@ -65,6 +65,6 @@ bin_PROGRAMS = tests
 
 tests_SOURCES = tests.cpp
 tests_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON)
-tests_LDADD = -lhiredis -lswsscommon -lpthread -L$(top_srcdir)/vslib/src/.libs -lsaivs -L$(top_srcdir)/meta/.libs -lsaimetadata -lsaimeta
+tests_LDADD = -lhiredis -lswsscommon -lpthread libsaivs.la $(top_srcdir)/meta/libsaimetadata.la $(top_srcdir)/meta/libsaimeta.la
 
 TESTS = tests
