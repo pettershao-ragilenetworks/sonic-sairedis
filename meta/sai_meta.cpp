@@ -3466,6 +3466,10 @@ void meta_generic_validation_post_get(
                 meta_generic_validation_post_get_objlist(meta_key, md, switch_id, value.aclaction.parameter.objlist.count, value.aclaction.parameter.objlist.list);
                 break;
 
+            case SAI_ATTR_VALUE_TYPE_ACL_CAPABILITY:
+                VALIDATION_LIST_GET(md, value.aclcapability.action_list);
+                break;
+
                 // ACL END
 
             case SAI_ATTR_VALUE_TYPE_UINT8_LIST:
