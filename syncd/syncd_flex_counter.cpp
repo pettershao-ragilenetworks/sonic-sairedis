@@ -836,16 +836,29 @@ bool FlexCounter::isEmpty()
 {
     SWSS_LOG_ENTER();
 
+    return allIdsEmpty() && allPluginsEmpty();
+}
+
+bool FlexCounter::allIdsEmpty()
+{
+    SWSS_LOG_ENTER();
+
     return m_priorityGroupCounterIdsMap.empty() &&
            m_priorityGroupAttrIdsMap.empty() &&
-           m_priorityGroupPlugins.empty() &&
            m_queueCounterIdsMap.empty() &&
+           m_queueAttrIdsMap.empty() &&
            m_portCounterIdsMap.empty() &&
            m_rifCounterIdsMap.empty() &&
-           m_queueAttrIdsMap.empty() &&
+           m_bufferPoolCounterIdsMap.empty();
+}
+
+bool FlexCounter::allPluginsEmpty()
+{
+    SWSS_LOG_ENTER();
+
+    return m_priorityGroupPlugins.empty() &&
            m_queuePlugins.empty() &&
            m_portPlugins.empty() &&
-           m_bufferPoolCounterIdsMap.empty() &&
            m_bufferPoolPlugins.empty();
 }
 
@@ -1308,7 +1321,7 @@ void FlexCounter::flexCounterThread(void)
         {
             return;
         }
-        while (!m_enable || isEmpty() || (m_pollInterval == 0))
+        while (!m_enable || allIdsEmpty() || (m_pollInterval == 0))
         {
             if (!m_runFlexCounterThread)
             {

@@ -190,6 +190,8 @@ class FlexCounter
         bool isRifCounterSupported(sai_router_interface_stat_t counter) const;
         bool isBufferPoolCounterSupported(sai_buffer_pool_stat_t counter) const;
         bool isEmpty();
+        bool allIdsEmpty();
+        bool allPluginsEmpty();
 
         // Key is a Virtual ID
         std::map<sai_object_id_t, std::shared_ptr<PortCounterIds>> m_portCounterIdsMap;
