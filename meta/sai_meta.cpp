@@ -14,15 +14,15 @@
 #include <map>
 #include <iterator>
 
-#define META_LOG_STATUS(s)\
+#define META_LOG_STATUS(op, s)\
     if (s == SAI_STATUS_SUCCESS)                                           \
-        SWSS_LOG_DEBUG("get status: %s", sai_serialize_status(s).c_str()); \
+        SWSS_LOG_DEBUG(#op " status: %s", sai_serialize_status(s).c_str()); \
     else if (s == SAI_STATUS_BUFFER_OVERFLOW                               \
                || SAI_STATUS_IS_ATTR_NOT_IMPLEMENTED(s)                    \
                || SAI_STATUS_IS_ATTR_NOT_SUPPORTED(s))                     \
-        SWSS_LOG_INFO("get status: %s", sai_serialize_status(s).c_str());  \
+        SWSS_LOG_INFO(#op " status: %s", sai_serialize_status(s).c_str());  \
     else                                                                   \
-        SWSS_LOG_ERROR("get status: %s", sai_serialize_status(s).c_str());
+        SWSS_LOG_ERROR(#op " status: %s", sai_serialize_status(s).c_str());
 
 static volatile bool unittests_enabled = false;
 
@@ -3808,7 +3808,7 @@ sai_status_t meta_sai_get_fdb_entry(
 
     status = get(fdb_entry, attr_count, attr_list);
 
-    META_LOG_STATUS(status);
+    META_LOG_STATUS(get, status);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -4086,7 +4086,7 @@ sai_status_t meta_sai_get_mcast_fdb_entry(
 
     status = get(mcast_fdb_entry, attr_count, attr_list);
 
-    META_LOG_STATUS(status);
+    META_LOG_STATUS(get, status);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -4374,7 +4374,7 @@ sai_status_t meta_sai_get_neighbor_entry(
 
     status = get(neighbor_entry, attr_count, attr_list);
 
-    META_LOG_STATUS(status);
+    META_LOG_STATUS(get, status);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -4674,7 +4674,7 @@ sai_status_t meta_sai_get_route_entry(
 
     status = get(route_entry, attr_count, attr_list);
 
-    META_LOG_STATUS(status);
+    META_LOG_STATUS(get, status);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -4990,7 +4990,7 @@ sai_status_t meta_sai_get_l2mc_entry(
 
     status = get(l2mc_entry, attr_count, attr_list);
 
-    META_LOG_STATUS(status);
+    META_LOG_STATUS(get, status);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -5306,7 +5306,7 @@ sai_status_t meta_sai_get_ipmc_entry(
 
     status = get(ipmc_entry, attr_count, attr_list);
 
-    META_LOG_STATUS(status);
+    META_LOG_STATUS(get, status);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -5516,7 +5516,7 @@ sai_status_t meta_sai_get_inseg_entry(
 
     status = get(inseg_entry, attr_count, attr_list);
 
-    META_LOG_STATUS(status);
+    META_LOG_STATUS(get, status);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -5807,7 +5807,7 @@ sai_status_t meta_sai_get_oid(
 
     status = get(object_type, object_id, attr_count, attr_list);
 
-    META_LOG_STATUS(status);
+    META_LOG_STATUS(get, status);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -5930,7 +5930,110 @@ sai_status_t meta_sai_get_stats_oid(
 
     status = get_stats(object_type, object_id, stats_enum, count, counter_id_list, counter_list);
 
-    META_LOG_STATUS(status);
+    META_LOG_STATUS(get, status);
+
+    return status;
+}
+
+sai_status_t meta_generic_validation_clear_stats(
+        _In_ const sai_object_meta_key_t& meta_key,
+        _In_ const sai_enum_metadata_t* stats_enum,
+        _In_ uint32_t count,
+        _In_ const int32_t *counter_id_list)
+{
+    SWSS_LOG_ENTER();
+
+    if (meta_unittests_enabled() && (count & 0x80000000))
+    {
+        /*
+         * If last bit of counters count is set to high, and unittests are enabled,
+         * then this api can be used to SET counter values by user for debugging purposes.
+         */
+        count = count & ~0x80000000;
+    }
+
+    if (count < 1)
+    {
+        SWSS_LOG_ERROR("expected at least 1 stat when calling clear_stats, zero given");
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    if (count > MAX_LIST_COUNT)
+    {
+        SWSS_LOG_ERROR("clear_stats count %u > max list count %u", count, MAX_LIST_COUNT);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    if (counter_id_list == NULL)
+    {
+        SWSS_LOG_ERROR("counter id list pointer is NULL");
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    if (stats_enum == NULL)
+    {
+        SWSS_LOG_ERROR("enum metadata pointer is NULL, bug?");
+
+        return SAI_STATUS_FAILURE;
+    }
+
+    for (uint32_t i = 0; i < count; i++)
+    {
+        if (sai_metadata_get_enum_value_name(stats_enum, counter_id_list[i]) == NULL)
+        {
+            SWSS_LOG_ERROR("counter id %u is not allowed on %s", counter_id_list[i], stats_enum->name);
+
+            return SAI_STATUS_INVALID_PARAMETER;
+        }
+    }
+
+    return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t meta_sai_clear_stats_oid(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ const sai_enum_metadata_t* stats_enum,
+        _In_ uint32_t count,
+        _In_ const int32_t *counter_id_list,
+        _In_ sai_clear_generic_stats_fn clear_stats)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t switch_id = sai_switch_id_query(object_id);
+
+    sai_status_t status = meta_sai_validate_oid(object_type, &object_id, switch_id, false);
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_ERROR("oid validation failed");
+        return status;
+    }
+
+    sai_object_meta_key_t meta_key = { .objecttype = object_type, .objectkey = { .key = { .object_id  = object_id } } };
+
+    // This ensures that all counter ids in counter id list are valid
+    // with regards to stats_enum before calling clear_stats()
+    status = meta_generic_validation_clear_stats(meta_key, stats_enum, count, counter_id_list);
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_ERROR("clear_stats generic validation failed");
+        return status;
+    }
+
+    if (clear_stats == NULL)
+    {
+        SWSS_LOG_ERROR("clear_stats function pointer is NULL");
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    status = clear_stats(object_type, object_id, stats_enum, count, counter_id_list);
+
+    META_LOG_STATUS(clear, status);
 
     return status;
 }

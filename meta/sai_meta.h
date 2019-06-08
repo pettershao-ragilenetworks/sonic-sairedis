@@ -127,6 +127,21 @@ sai_status_t meta_sai_get_stats_oid(
         _Out_ uint64_t *counter_list,
         _In_ sai_get_generic_stats_fn get_stats);
 
+typedef sai_status_t (*sai_clear_generic_stats_fn)(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ const sai_enum_metadata_t *enum_metadata,
+        _In_ uint32_t number_of_counters,
+        _In_ const int32_t *counter_ids);
+
+sai_status_t meta_sai_clear_stats_oid(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ const sai_enum_metadata_t* stats_enum,
+        _In_ uint32_t count,
+        _In_ const int32_t *counter_id_list,
+        _In_ sai_clear_generic_stats_fn clear_stats);
+
 // NOTIFICATIONS
 
 extern void meta_sai_on_fdb_event(

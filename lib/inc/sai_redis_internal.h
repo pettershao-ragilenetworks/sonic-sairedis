@@ -150,7 +150,7 @@
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
-        return  meta_sai_get_stats_oid(                             \
+        return meta_sai_get_stats_oid(                              \
                 SAI_OBJECT_TYPE_ ## OBJECT_TYPE,                    \
                 object_type ## _id,                                 \
                 &sai_metadata_enum_sai_ ## object_type ## _stat_t,  \
@@ -188,12 +188,13 @@
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
-        return redis_generic_clear_stats(                           \
+        return meta_sai_clear_stats_oid(                            \
                 SAI_OBJECT_TYPE_ ## OBJECT_TYPE,                    \
                 object_type ## _id,                                 \
                 &sai_metadata_enum_sai_ ## object_type ## _stat_t,  \
                 number_of_counters,                                 \
-                (const int32_t*)counter_ids);                       \
+                (const int32_t*)counter_ids,                        \
+                &redis_generic_clear_stats);                        \
     }
 
 #define REDIS_GENERIC_STATS(OT, ot)    \
