@@ -11,7 +11,7 @@ bool                   g_apiInitialized = false;
 volatile bool          g_run = false;
 
 // this event is used to nice end notifications thread
-swss::SelectableEvent g_redisNotificationTrheadEvent;
+swss::SelectableEvent g_redisNotificationThreadEvent;
 std::shared_ptr<std::thread> notification_thread;
 
 std::shared_ptr<swss::DBConnector>          g_db;
@@ -61,7 +61,7 @@ void ntf_thread()
     swss::Select s;
 
     s.addSelectable(g_redisNotifications.get());
-    s.addSelectable(&g_redisNotificationTrheadEvent);
+    s.addSelectable(&g_redisNotificationThreadEvent);
 
     while (g_run)
     {
@@ -69,7 +69,7 @@ void ntf_thread()
 
         int result = s.select(&sel);
 
-        if (sel == &g_redisNotificationTrheadEvent)
+        if (sel == &g_redisNotificationThreadEvent)
         {
             // user requested shutdown_switch
             break;
@@ -136,7 +136,7 @@ sai_status_t sai_api_initialize(
 
     SWSS_LOG_DEBUG("creating notification thread");
 
-    notification_thread = std::make_shared<std::thread>(std::thread(ntf_thread));
+    notification_thread = std::make_shared<std::thread>(ntf_thread);
 
     g_apiInitialized = true;
 
@@ -161,7 +161,7 @@ sai_status_t sai_api_uninitialize(void)
     g_run = false;
 
     // notify thread that it should end
-    g_redisNotificationTrheadEvent.notify();
+    g_redisNotificationThreadEvent.notify();
 
     notification_thread->join();
 
