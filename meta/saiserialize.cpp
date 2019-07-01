@@ -1,6 +1,7 @@
 #include "sai_serialize.h"
 #include "meta/sai_meta.h"
 #include "swss/tokenize.h"
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wshadow"
 #include "swss/json.hpp"
