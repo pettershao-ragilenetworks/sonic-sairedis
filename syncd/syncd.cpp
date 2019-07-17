@@ -103,6 +103,7 @@ struct cmdOptions
     bool run_rpc_server;
     std::string portMapFile;
 #endif // SAITHRIFT
+    bool syncMode;
     ~cmdOptions() {}
 };
 
@@ -1005,6 +1006,33 @@ void internal_syncd_get_send(
     SWSS_LOG_INFO("response for GET api was send");
 }
 
+void internal_syncd_api_send_response(
+        _In_ sai_common_api_t api,
+        _In_ sai_status_t status)
+{
+    SWSS_LOG_ENTER();
+
+    /*
+     * By default synchronous mode is disabled and can be enabled by command
+     * line on syncd start. This will also require to enable synchronous mode
+     * in OA/sairedis because same GET RESPONSE channel is used to generate
+     * response for sairedis quad API.
+     */
+
+    if (!options.syncMode)
+        return;
+
+    std::vector<swss::FieldValueTuple> entry;
+
+    std::string str_status = sai_serialize_status(status);
+
+    SWSS_LOG_INFO("sending response for %d api with status: %s", api, str_status.c_str());
+
+    getResponse->set(str_status, entry, "getresponse");
+
+    SWSS_LOG_INFO("response for %d api was send", api);
+}
+
 const char* profile_get_value(
         _In_ sai_switch_profile_id_t profile_id,
         _In_ const char* variable)
@@ -1467,7 +1495,7 @@ void sendNotifyResponse(
 
     std::vector<swss::FieldValueTuple> entry;
 
-    SWSS_LOG_NOTICE("sending response: %s", str_status.c_str());
+    SWSS_LOG_INFO("sending response: %s", str_status.c_str());
 
     getResponse->set(str_status, entry, "notify");
 }
@@ -2240,6 +2268,8 @@ sai_status_t processEventInInitViewMode(
                 }
             }
 
+            internal_syncd_api_send_response(api, SAI_STATUS_SUCCESS);
+
             return SAI_STATUS_SUCCESS;
 
         case SAI_COMMON_API_REMOVE:
@@ -2277,6 +2307,8 @@ sai_status_t processEventInInitViewMode(
                 initViewRemovedVidSet.insert(object_vid);
             }
 
+            internal_syncd_api_send_response(api, SAI_STATUS_SUCCESS);
+
             return SAI_STATUS_SUCCESS;
 
         case SAI_COMMON_API_SET:
@@ -2284,6 +2316,8 @@ sai_status_t processEventInInitViewMode(
             /*
              * We support SET api on all objects in init view mode.
              */
+
+            internal_syncd_api_send_response(api, SAI_STATUS_SUCCESS);
 
             return SAI_STATUS_SUCCESS;
 
@@ -2479,6 +2513,7 @@ sai_status_t handle_bulk_generic(
 
         if (status != SAI_STATUS_SUCCESS)
         {
+            internal_syncd_api_send_response(api, status);
             return status;
         }
     }
@@ -2586,6 +2621,8 @@ sai_status_t processBulkEvent(
         SWSS_LOG_THROW("failed to execute bulk api: %s",
                 sai_serialize_status(status).c_str());
     }
+
+    internal_syncd_api_send_response(api, status);
 
     return status;
 }
@@ -2850,6 +2887,8 @@ sai_status_t processEvent(
         }
         else if (status != SAI_STATUS_SUCCESS)
         {
+            internal_syncd_api_send_response(api, status);
+
             if (!info->isnonobjectid && api == SAI_COMMON_API_SET)
             {
                 sai_object_id_t vid;
@@ -2872,6 +2911,11 @@ sai_status_t processEvent(
                     key.c_str(),
                     sai_serialize_status(status).c_str());
         }
+        else // non GET api, status is SUCCESS
+        {
+            internal_syncd_api_send_response(api, status);
+        }
+
     } while (!consumer.empty());
 
     return status;
@@ -3060,7 +3104,7 @@ bool processFlexCounterEvent(
 
     if (!try_translate_vid_to_rid(vid, rid))
     {
-        SWSS_LOG_WARN("port VID %s, was not found (probably port was removed/splitted) and will remove from counters now", 
+        SWSS_LOG_WARN("port VID %s, was not found (probably port was removed/splitted) and will remove from counters now",
                 sai_serialize_object_id(vid).c_str());
 
         return false;
@@ -3216,7 +3260,7 @@ void printUsage()
 {
     SWSS_LOG_ENTER();
 
-    std::cout << "Usage: syncd [-N] [-U] [-d] [-p profile] [-i interval] [-t [cold|warm|fast|fastfast]] [-h] [-u] [-S]" << std::endl;
+    std::cout << "Usage: syncd [-N] [-U] [-d] [-p profile] [-i interval] [-t [cold|warm|fast|fastfast]] [-h] [-u] [-S] [-s]" << std::endl;
     std::cout << "    -N --nocounters" << std::endl;
     std::cout << "        Disable counter thread" << std::endl;
     std::cout << "    -d --diag" << std::endl;
@@ -3241,6 +3285,8 @@ void printUsage()
     std::cout << "    -m --portmap"             << std::endl;
     std::cout << "        Specify port map file" << std::endl;
 #endif // SAITHRIFT
+    std::cout << "    -s --syncMode"             << std::endl;
+    std::cout << "        Enable synchronous mode" << std::endl;
     std::cout << "    -h --help" << std::endl;
     std::cout << "        Print out this message" << std::endl;
 }
@@ -3251,6 +3297,7 @@ void handleCmdLine(int argc, char **argv)
 
     options.disableExitSleep = false;
     options.enableUnittests = false;
+    options.syncMode = false;
 
 #ifdef SAITHRIFT
     options.run_rpc_server = false;
@@ -3275,6 +3322,7 @@ void handleCmdLine(int argc, char **argv)
             { "rpcserver",               no_argument,       0, 'r' },
             { "portmap",                 required_argument, 0, 'm' },
 #endif // SAITHRIFT
+            { "syncMode",                no_argument,       0, 's' },
             { 0,                         0,                 0,  0  }
         };
 
@@ -3354,6 +3402,11 @@ void handleCmdLine(int argc, char **argv)
                 options.portMapFile = std::string(optarg);
                 break;
 #endif // SAITHRIFT
+
+            case 's':
+                SWSS_LOG_NOTICE("enable synchronous mode");
+                options.syncMode = true;
+                break;
 
             case 'h':
                 printUsage();
