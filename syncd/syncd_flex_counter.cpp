@@ -5,7 +5,7 @@
 
 /* Global map with FlexCounter instances for different polling interval */
 static std::map<std::string, std::shared_ptr<FlexCounter>> g_flex_counters_map;
-// List with supported counters 
+// List with supported counters
 static std::set<sai_port_stat_t> supportedPortCounters;
 static std::set<sai_queue_stat_t> supportedQueueCounters;
 static std::set<sai_ingress_priority_group_stat_t> supportedPriorityGroupCounters;
@@ -16,6 +16,15 @@ FlexCounter::PortCounterIds::PortCounterIds(
         _In_ sai_object_id_t port,
         _In_ const std::vector<sai_port_stat_t> &portIds):
     portId(port), portCounterIds(portIds)
+{
+    SWSS_LOG_ENTER();
+}
+
+FlexCounter::SwitchCounterIds::SwitchCounterIds(
+        _In_ sai_object_id_t oid,
+        _In_ const std::vector<sai_switch_stat_t> &counterIds)
+    : switchId(oid),
+      switchCounterIds(counterIds)
 {
     SWSS_LOG_ENTER();
 }
@@ -212,6 +221,54 @@ void FlexCounter::setPortCounterList(
     }
 }
 
+void FlexCounter::setPortDebugCounterList(
+        _In_ sai_object_id_t portVid,
+        _In_ sai_object_id_t portId,
+        _In_ std::string instanceId,
+        _In_ const std::vector<sai_port_stat_t> &counterIds)
+{
+    SWSS_LOG_ENTER();
+
+    FlexCounter &fc = getInstance(instanceId);
+
+    // Because debug counters can be added and removed over time, we currently
+    // check that the provided list of counters is valid every time.
+    std::vector<sai_port_stat_t> supportedIds = fc.saiCheckSupportedPortDebugCounters(portId, counterIds);
+
+    if (supportedIds.size() == 0)
+    {
+        SWSS_LOG_NOTICE("Port %s does not have supported debug counters", sai_serialize_object_id(portId).c_str());
+
+        // Remove flex counter if all counter IDs and plugins are unregistered
+        if (fc.isEmpty())
+        {
+            removeInstance(instanceId);
+        }
+
+        return;
+    }
+
+    std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
+
+    auto it = fc.m_portDebugCounterIdsMap.find(portVid);
+    if (it != fc.m_portDebugCounterIdsMap.end())
+    {
+        it->second->portCounterIds = supportedIds;
+        return;
+    }
+
+    auto portDebugCounterIds = std::make_shared<PortCounterIds>(portId, supportedIds);
+    fc.m_portDebugCounterIdsMap.emplace(portVid, portDebugCounterIds);
+
+    fc.addCollectCountersHandler(PORT_DEBUG_COUNTER_ID_LIST, &FlexCounter::collectPortDebugCounters);
+
+    // Start flex counter thread in case it was not running due to empty counter IDs map
+    if (fc.m_pollInterval > 0)
+    {
+        fc.startFlexCounterThread();
+    }
+}
+
 void FlexCounter::setQueueCounterList(
         _In_ sai_object_id_t queueVid,
         _In_ sai_object_id_t queueId,
@@ -389,6 +446,54 @@ void FlexCounter::setPriorityGroupCounterList(
     fc.m_priorityGroupCounterIdsMap.emplace(priorityGroupVid, priorityGroupCounterIds);
 
     fc.addCollectCountersHandler(PG_COUNTER_ID_LIST, &FlexCounter::collectPriorityGroupCounters);
+
+    // Start flex counter thread in case it was not running due to empty counter IDs map
+    if (fc.m_pollInterval > 0)
+    {
+        fc.startFlexCounterThread();
+    }
+}
+
+void FlexCounter::setSwitchDebugCounterList(
+        _In_ sai_object_id_t switchVid,
+        _In_ sai_object_id_t switchId,
+        _In_ std::string instanceId,
+        _In_ const std::vector<sai_switch_stat_t> &counterIds)
+{
+    SWSS_LOG_ENTER();
+
+    FlexCounter &fc = getInstance(instanceId);
+
+    // Because debug counters can be added and removed over time, we currently
+    // check that the provided list of counters is valid every time.
+    std::vector<sai_switch_stat_t> supportedIds = fc.saiCheckSupportedSwitchDebugCounters(switchId, counterIds);
+
+    if (supportedIds.size() == 0)
+    {
+        SWSS_LOG_NOTICE("Switch %s does not have supported debug counters", sai_serialize_object_id(switchId).c_str());
+
+        // Remove flex counter if all counter IDs and plugins are unregistered
+        if (fc.isEmpty())
+        {
+            removeInstance(instanceId);
+        }
+
+        return;
+    }
+
+    std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
+
+    auto it = fc.m_switchDebugCounterIdsMap.find(switchVid);
+    if (it != fc.m_switchDebugCounterIdsMap.end())
+    {
+        it->second->switchCounterIds = supportedIds;
+        return;
+    }
+
+    auto switchDebugCounterIds = std::make_shared<SwitchCounterIds>(switchId, supportedIds);
+    fc.m_switchDebugCounterIdsMap.emplace(switchVid, switchDebugCounterIds);
+
+    fc.addCollectCountersHandler(SWITCH_DEBUG_COUNTER_ID_LIST, &FlexCounter::collectSwitchDebugCounters);
 
     // Start flex counter thread in case it was not running due to empty counter IDs map
     if (fc.m_pollInterval > 0)
@@ -597,6 +702,44 @@ void FlexCounter::removePort(
     }
 }
 
+void FlexCounter::removePortDebugCounters(
+        _In_ sai_object_id_t portVid,
+        _In_ std::string instanceId)
+{
+    SWSS_LOG_ENTER();
+
+    FlexCounter &fc = getInstance(instanceId);
+
+    std::unique_lock<std::mutex> lkMgr(fc.m_mtx);
+
+    auto it = fc.m_portDebugCounterIdsMap.find(portVid);
+    if (it == fc.m_portDebugCounterIdsMap.end())
+    {
+        SWSS_LOG_NOTICE("Trying to remove nonexisting port debug counter Ids 0x%" PRIx64, portVid);
+
+        // Remove flex counter if all counter IDs and plugins are unregistered
+        if (fc.isEmpty())
+        {
+            lkMgr.unlock();
+            removeInstance(instanceId);
+        }
+        return;
+    }
+
+    fc.m_portDebugCounterIdsMap.erase(it);
+    if (fc.m_portDebugCounterIdsMap.empty())
+    {
+        fc.removeCollectCountersHandler(PORT_DEBUG_COUNTER_ID_LIST);
+    }
+
+    // Remove flex counter if all counter IDs and plugins are unregistered
+    if (fc.isEmpty())
+    {
+        lkMgr.unlock();
+        removeInstance(instanceId);
+    }
+}
+
 void FlexCounter::removeQueue(
         _In_ sai_object_id_t queueVid,
         _In_ std::string instanceId)
@@ -765,6 +908,44 @@ void FlexCounter::removeBufferPool(
     }
 }
 
+void FlexCounter::removeSwitchDebugCounters(
+        _In_ sai_object_id_t switchVid,
+        _In_ std::string instanceId)
+{
+    SWSS_LOG_ENTER();
+
+    FlexCounter &fc = getInstance(instanceId);
+
+    std::unique_lock<std::mutex> lkMgr(fc.m_mtx);
+
+    auto it = fc.m_switchDebugCounterIdsMap.find(switchVid);
+    if (it == fc.m_switchDebugCounterIdsMap.end())
+    {
+        SWSS_LOG_NOTICE("Trying to remove nonexisting switch debug counter Ids 0x%" PRIx64, switchVid);
+
+        // Remove flex counter if all counter IDs and plugins are unregistered
+        if (fc.isEmpty())
+        {
+            lkMgr.unlock();
+            removeInstance(instanceId);
+        }
+        return;
+    }
+
+    fc.m_switchDebugCounterIdsMap.erase(it);
+    if (fc.m_switchDebugCounterIdsMap.empty())
+    {
+        fc.removeCollectCountersHandler(SWITCH_DEBUG_COUNTER_ID_LIST);
+    }
+
+    // Remove flex counter if all counter IDs and plugins are unregistered
+    if (fc.isEmpty())
+    {
+        lkMgr.unlock();
+        removeInstance(instanceId);
+    }
+}
+
 void FlexCounter::addPortCounterPlugin(
         _In_ std::string sha,
         _In_ std::string instanceId)
@@ -923,8 +1104,10 @@ bool FlexCounter::allIdsEmpty()
            m_queueCounterIdsMap.empty() &&
            m_queueAttrIdsMap.empty() &&
            m_portCounterIdsMap.empty() &&
+           m_portDebugCounterIdsMap.empty() &&
            m_rifCounterIdsMap.empty() &&
-           m_bufferPoolCounterIdsMap.empty();
+           m_bufferPoolCounterIdsMap.empty() &&
+           m_switchDebugCounterIdsMap.empty();
 }
 
 bool FlexCounter::allPluginsEmpty()
@@ -1028,6 +1211,48 @@ void FlexCounter::collectPortCounters(_In_ swss::Table &countersTable)
                 portId,
                 static_cast<uint32_t>(portCounterIds.size()),
                 (const sai_stat_id_t *)portCounterIds.data(),
+                portStats.data());
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_ERROR("Failed to get stats of port 0x%" PRIx64 ": %d", portId, status);
+            continue;
+        }
+
+        // Push all counter values to a single vector
+        std::vector<swss::FieldValueTuple> values;
+
+        for (size_t i = 0; i != portCounterIds.size(); i++)
+        {
+            const std::string &counterName = sai_serialize_port_stat(portCounterIds[i]);
+            values.emplace_back(counterName, std::to_string(portStats[i]));
+        }
+
+        // Write counters to DB
+        std::string portVidStr = sai_serialize_object_id(portVid);
+
+        countersTable.set(portVidStr, values, "");
+    }
+}
+
+void FlexCounter::collectPortDebugCounters(_In_ swss::Table &countersTable)
+{
+    SWSS_LOG_ENTER();
+
+    // Collect stats for every registered port
+    for (const auto &kv: m_portDebugCounterIdsMap)
+    {
+        const auto &portVid = kv.first;
+        const auto &portId = kv.second->portId;
+        const auto &portCounterIds = kv.second->portCounterIds;
+
+        std::vector<uint64_t> portStats(portCounterIds.size());
+
+        // Get port stats
+        sai_status_t status = sai_metadata_sai_port_api->get_port_stats_ext(
+                portId,
+                static_cast<uint32_t>(portCounterIds.size()),
+                (const sai_stat_id_t *)portCounterIds.data(),
+                SAI_STATS_MODE_READ,
                 portStats.data());
         if (status != SAI_STATUS_SUCCESS)
         {
@@ -1213,6 +1438,48 @@ void FlexCounter::collectPriorityGroupCounters(_In_ swss::Table &countersTable)
     }
 }
 
+void FlexCounter::collectSwitchDebugCounters(_In_ swss::Table &countersTable)
+{
+    SWSS_LOG_ENTER();
+
+    // Collect stats for every registered port
+    for (const auto &kv: m_switchDebugCounterIdsMap)
+    {
+        const auto &switchVid = kv.first;
+        const auto &switchId = kv.second->switchId;
+        const auto &switchCounterIds = kv.second->switchCounterIds;
+
+        std::vector<uint64_t> switchStats(switchCounterIds.size());
+
+        // Get port stats
+        sai_status_t status = sai_metadata_sai_switch_api->get_switch_stats_ext(
+                switchId,
+                static_cast<uint32_t>(switchCounterIds.size()),
+                (const sai_stat_id_t *)switchCounterIds.data(),
+                SAI_STATS_MODE_READ,
+                switchStats.data());
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_ERROR("Failed to get stats of port 0x%" PRIx64 ": %d", switchId, status);
+            continue;
+        }
+
+        // Push all counter values to a single vector
+        std::vector<swss::FieldValueTuple> values;
+
+        for (size_t i = 0; i != switchCounterIds.size(); i++)
+        {
+            const std::string &counterName = sai_serialize_switch_stat(switchCounterIds[i]);
+            values.emplace_back(counterName, std::to_string(switchStats[i]));
+        }
+
+        // Write counters to DB
+        std::string switchVidStr = sai_serialize_object_id(switchVid);
+
+        countersTable.set(switchVidStr, values, "");
+    }
+}
+
 void FlexCounter::collectPriorityGroupAttrs(_In_ swss::Table &countersTable)
 {
     SWSS_LOG_ENTER();
@@ -1367,7 +1634,7 @@ void FlexCounter::runPlugins(
 {
     SWSS_LOG_ENTER();
 
-    const std::vector<std::string> argv = 
+    const std::vector<std::string> argv =
     {
         std::to_string(COUNTERS_DB),
         COUNTERS_TABLE,
@@ -1532,6 +1799,40 @@ void FlexCounter::saiUpdateSupportedPortCounters(sai_object_id_t portId)
     }
 }
 
+std::vector<sai_port_stat_t> FlexCounter::saiCheckSupportedPortDebugCounters(
+    _In_ sai_object_id_t portId,
+    _In_ const std::vector<sai_port_stat_t> &counterIds)
+{
+    SWSS_LOG_ENTER();
+
+    std::vector<sai_port_stat_t> supportedPortDebugCounters;
+    uint64_t value;
+    for (auto counter: counterIds)
+    {
+        if (counter < SAI_PORT_STAT_IN_DROP_REASON_RANGE_BASE || counter >= SAI_PORT_STAT_OUT_DROP_REASON_RANGE_END)
+        {
+            SWSS_LOG_NOTICE("Debug counter %s out of bounds", sai_serialize_port_stat(counter).c_str());
+            continue;
+        }
+
+        sai_status_t status = sai_metadata_sai_port_api->get_port_stats_ext(portId, 1, (const sai_stat_id_t *)&counter, SAI_STATS_MODE_READ, &value);
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_NOTICE("Debug counter %s is not supported on port RID %s: %s",
+                    sai_serialize_port_stat(counter).c_str(),
+                    sai_serialize_object_id(portId).c_str(),
+                    sai_serialize_status(status).c_str());
+
+            continue;
+        }
+
+        supportedPortDebugCounters.push_back(counter);
+    }
+
+    return supportedPortDebugCounters;
+}
+
 void FlexCounter::saiUpdateSupportedQueueCounters(
         _In_ sai_object_id_t queueId,
         _In_ const std::vector<sai_queue_stat_t> &counterIds)
@@ -1684,4 +1985,38 @@ void FlexCounter::saiUpdateSupportedBufferPoolCounters(
 
         supportedBufferPoolCounters.insert(counterId);
     }
+}
+
+std::vector<sai_switch_stat_t> FlexCounter::saiCheckSupportedSwitchDebugCounters(
+    _In_ sai_object_id_t switchId,
+    _In_ const std::vector<sai_switch_stat_t> &counterIds)
+{
+    SWSS_LOG_ENTER();
+
+    std::vector<sai_switch_stat_t> supportedSwitchDebugCounters;
+    uint64_t value;
+    for (auto counter: counterIds)
+    {
+        if (counter < SAI_SWITCH_STAT_IN_DROP_REASON_RANGE_BASE || counter >= SAI_SWITCH_STAT_OUT_DROP_REASON_RANGE_END)
+        {
+            SWSS_LOG_NOTICE("Debug counter %s out of bounds", sai_serialize_switch_stat(counter).c_str());
+            continue;
+        }
+
+        sai_status_t status = sai_metadata_sai_switch_api->get_switch_stats_ext(switchId, 1, (const sai_stat_id_t *)&counter, SAI_STATS_MODE_READ, &value);
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_NOTICE("Debug counter %s is not supported on switch RID %s: %s",
+                    sai_serialize_switch_stat(counter).c_str(),
+                    sai_serialize_object_id(switchId).c_str(),
+                    sai_serialize_status(status).c_str());
+
+            continue;
+        }
+
+        supportedSwitchDebugCounters.push_back(counter);
+    }
+
+    return supportedSwitchDebugCounters;
 }

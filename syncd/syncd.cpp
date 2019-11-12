@@ -3376,6 +3376,7 @@ void processFlexCounterEvent(
         if (objectType == SAI_OBJECT_TYPE_PORT)
         {
             FlexCounter::removePort(vid, groupName);
+            FlexCounter::removePortDebugCounters(vid, groupName);
         }
         else if (objectType == SAI_OBJECT_TYPE_QUEUE)
         {
@@ -3392,6 +3393,10 @@ void processFlexCounterEvent(
         else if (objectType == SAI_OBJECT_TYPE_BUFFER_POOL)
         {
             FlexCounter::removeBufferPool(vid, groupName);
+        }
+        else if (objectType == SAI_OBJECT_TYPE_SWITCH)
+        {
+            FlexCounter::removeSwitchDebugCounters(vid, groupName);
         }
         else
         {
@@ -3422,6 +3427,18 @@ void processFlexCounterEvent(
                 }
 
                 FlexCounter::setPortCounterList(vid, rid, groupName, portCounterIds);
+            }
+            else if (objectType == SAI_OBJECT_TYPE_PORT && field == PORT_DEBUG_COUNTER_ID_LIST)
+            {
+                std::vector<sai_port_stat_t> portDebugCounterIds;
+                for (const auto &str : idStrings)
+                {
+                    sai_port_stat_t stat;
+                    sai_deserialize_port_stat(str.c_str(), &stat);
+                    portDebugCounterIds.push_back(stat);
+                }
+
+                FlexCounter::setPortDebugCounterList(vid, rid, groupName, portDebugCounterIds);
             }
             else if (objectType == SAI_OBJECT_TYPE_QUEUE && field == QUEUE_COUNTER_ID_LIST)
             {
@@ -3482,6 +3499,18 @@ void processFlexCounterEvent(
                 }
 
                 FlexCounter::setRifCounterList(vid, rid, groupName, rifCounterIds);
+            }
+            else if (objectType == SAI_OBJECT_TYPE_SWITCH && field == SWITCH_DEBUG_COUNTER_ID_LIST)
+            {
+                std::vector<sai_switch_stat_t> switchCounterIds;
+                for (const auto &str : idStrings)
+                {
+                    sai_switch_stat_t stat;
+                    sai_deserialize_switch_stat(str.c_str(), &stat);
+                    switchCounterIds.push_back(stat);
+                }
+
+                FlexCounter::setSwitchDebugCounterList(vid, rid, groupName, switchCounterIds);
             }
             else if (objectType == SAI_OBJECT_TYPE_BUFFER_POOL && field == BUFFER_POOL_COUNTER_ID_LIST)
             {
