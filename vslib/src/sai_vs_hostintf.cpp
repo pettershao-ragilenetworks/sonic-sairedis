@@ -1,6 +1,8 @@
 #include "sai_vs.h"
 #include "sai_vs_internal.h"
 #include "sai_vs_state.h"
+#include "swss/selectableevent.h"
+#include "swss/select.h"
 
 #include "meta/sai_serialize.h"
 
@@ -28,7 +30,37 @@
 
 using json = nlohmann::json;
 
-// TODO on hostif remove we should stop threads
+class SelectableFd :
+    public swss::Selectable
+{
+    public:
+        SelectableFd(
+                _In_ int fd)
+        {
+            SWSS_LOG_ENTER();
+
+            m_fd = fd;
+        }
+
+        int getFd() override
+        {
+            SWSS_LOG_ENTER();
+
+            return m_fd;
+        }
+
+        uint64_t readData() override
+        {
+            SWSS_LOG_ENTER();
+
+            // empty
+            return 0;
+        }
+
+    private:
+
+        int m_fd;
+};
 
 typedef struct _hostif_info_t
 {
@@ -38,6 +70,9 @@ typedef struct _hostif_info_t
     std::shared_ptr<std::thread> e2t;
     std::shared_ptr<std::thread> t2e;
 
+    swss::SelectableEvent e2tEvent;
+    swss::SelectableEvent t2eEvent;
+
     sai_object_id_t hostif_vid;
 
     volatile bool run_thread;
@@ -46,8 +81,47 @@ typedef struct _hostif_info_t
 
     sai_object_id_t portid;
 
+    void veth2tap_fun();
+
+    void tap2veth_fun();
+
+    void process_packet_for_fdb_event(
+            _In_ const uint8_t *buffer,
+            _In_ size_t size) const;
+
+    _hostif_info_t()
+    {
+        SWSS_LOG_ENTER();
+
+        tapfd = -1;
+        packet_socket = -1;
+        run_thread = false;
+    }
+
+    ~_hostif_info_t()
+    {
+        SWSS_LOG_ENTER();
+
+        run_thread = false;
+
+        e2tEvent.notify();
+        t2eEvent.notify();
+
+        if (t2e)
+            t2e->join();
+
+        if (e2t)
+            e2t->join();
+
+        SWSS_LOG_NOTICE("joined threads for hostif: %s", name.c_str());
+
+        // TODO close socket and tapfd here ?
+    }
+
 } hostif_info_t;
 
+// TODO must be per switch when multiple switch support will be used
+// since interface names can be the same in each switch
 std::map<std::string, std::shared_ptr<hostif_info_t>> hostif_info_map;
 
 std::set<fdb_info_t> g_fdb_info_set;
@@ -455,10 +529,9 @@ bool isLagOrPortRifBased(
     return false;
 }
 
-void process_packet_for_fdb_event(
+void hostif_info_t::process_packet_for_fdb_event(
         _In_ const uint8_t *buffer,
-        _In_ size_t size,
-        _In_ const std::shared_ptr<hostif_info_t> &info)
+        _In_ size_t size) const
 {
     MUTEX();
 
@@ -494,7 +567,7 @@ void process_packet_for_fdb_event(
 
         if (vlan_id == 0xfff)
         {
-            SWSS_LOG_WARN("invalid vlan id %u in ethernet frame on %s", vlan_id, info->name.c_str());
+            SWSS_LOG_WARN("invalid vlan id %u in ethernet frame on %s", vlan_id, name.c_str());
             return;
         }
 
@@ -515,7 +588,7 @@ void process_packet_for_fdb_event(
 
         sai_object_id_t lag_id;
 
-        if (getLagFromPort(info->portid, lag_id))
+        if (getLagFromPort(portid, lag_id))
         {
             // if port belongs to lag we need to get SAI_LAG_ATTR_PORT_VLAN_ID
 
@@ -543,12 +616,12 @@ void process_packet_for_fdb_event(
         {
             attr.id = SAI_PORT_ATTR_PORT_VLAN_ID;
 
-            sai_status_t status = vs_generic_get(SAI_OBJECT_TYPE_PORT, info->portid, 1, &attr);
+            sai_status_t status = vs_generic_get(SAI_OBJECT_TYPE_PORT,portid, 1, &attr);
 
             if (status != SAI_STATUS_SUCCESS)
             {
                 SWSS_LOG_WARN("failed to get port vlan id from port %s",
-                        sai_serialize_object_id(info->portid).c_str());
+                        sai_serialize_object_id(portid).c_str());
                 return;
             }
 
@@ -557,10 +630,10 @@ void process_packet_for_fdb_event(
         }
     }
 
-    if (isLagOrPortRifBased(info->portid))
+    if (isLagOrPortRifBased(portid))
     {
         SWSS_LOG_DEBUG("port %s is rif based, skip mac learning",
-                sai_serialize_object_id(info->portid).c_str());
+                sai_serialize_object_id(portid).c_str());
         return;
     }
 
@@ -568,7 +641,7 @@ void process_packet_for_fdb_event(
 
     fdb_info_t fi;
 
-    fi.port_id = info->portid;
+    fi.port_id = portid;
     fi.vlan_id = vlan_id;
 
     memcpy(fi.fdb_entry.mac_address, eh->h_source, sizeof(sai_mac_t));
@@ -592,9 +665,9 @@ void process_packet_for_fdb_event(
     // key was not found, get additional information
 
     fi.timestamp = frametime;
-    fi.fdb_entry.switch_id = sai_switch_id_query(info->portid);
+    fi.fdb_entry.switch_id = sai_switch_id_query(portid);
 
-    findBridgeVlanForPortVlan(info->portid, vlan_id, fi.fdb_entry.bv_id, fi.bridge_port_id);
+    findBridgeVlanForPortVlan(portid, vlan_id, fi.fdb_entry.bv_id, fi.bridge_port_id);
 
     if (fi.fdb_entry.bv_id == SAI_NULL_OBJECT_ID)
     {
@@ -644,7 +717,9 @@ sai_status_t vs_send_hostif_packet(
     return SAI_STATUS_NOT_IMPLEMENTED;
 }
 
-int vs_create_tap_device(const char *dev, int flags)
+int vs_create_tap_device(
+        _In_ const char *dev,
+        _In_ int flags)
 {
     SWSS_LOG_ENTER();
 
@@ -681,7 +756,9 @@ int vs_create_tap_device(const char *dev, int flags)
     return fd;
 }
 
-int vs_set_dev_mac_address(const char *dev, const sai_mac_t& mac)
+int vs_set_dev_mac_address(
+        _In_ const char *dev,
+        _In_ const sai_mac_t& mac)
 {
     SWSS_LOG_ENTER();
 
@@ -849,16 +926,20 @@ int vs_set_dev_mtu(
 #define MAC_ADDRESS_SIZE (6)
 #define VLAN_TAG_SIZE (4)
 
-void veth2tap_fun(std::shared_ptr<hostif_info_t> info)
+void hostif_info_t::veth2tap_fun()
 {
     SWSS_LOG_ENTER();
 
     unsigned char buffer[ETH_FRAME_BUFFER_SIZE];
 
-    while (info->run_thread)
-    {
-        // TODO convert to non blocking using select
+    swss::Select s;
+    SelectableFd fd(packet_socket);
 
+    s.addSelectable(&e2tEvent);
+    s.addSelectable(&fd);
+
+    while (run_thread)
+    {
         struct msghdr  msg;
         memset(&msg, 0, sizeof(struct msghdr));
 
@@ -878,12 +959,25 @@ void veth2tap_fun(std::shared_ptr<hostif_info_t> info)
         msg.msg_control = control;
         msg.msg_controllen = sizeof(control);
 
-        ssize_t size = recvmsg(info->packet_socket, &msg, 0);
+        swss::Selectable *sel = NULL;
+
+        int result = s.select(&sel);
+
+        if (result != swss::Select::OBJECT)
+        {
+            SWSS_LOG_ERROR("selectable failed: %d, ending thread for %s", result, name.c_str());
+            return;
+        }
+
+        if (sel == &e2tEvent) // thread end event
+            break;
+
+        ssize_t size = recvmsg(packet_socket, &msg, 0);
 
         if (size < 0)
         {
             SWSS_LOG_ERROR("failed to read from socket fd %d, errno(%d): %s",
-                    info->packet_socket, errno, strerror(errno));
+                    packet_socket, errno, strerror(errno));
 
             continue;
         }
@@ -928,9 +1022,9 @@ void veth2tap_fun(std::shared_ptr<hostif_info_t> info)
             }
         }
 
-        process_packet_for_fdb_event(buffer, size, info);
+        process_packet_for_fdb_event(buffer, size);
 
-        if (write(info->tapfd, buffer, size) < 0)
+        if (write(tapfd, buffer, size) < 0)
         {
             /*
              * We filter out EIO because of this patch:
@@ -940,46 +1034,77 @@ void veth2tap_fun(std::shared_ptr<hostif_info_t> info)
             if (errno != ENETDOWN && errno != EIO)
             {
                 SWSS_LOG_ERROR("failed to write to tap device fd %d, errno(%d): %s",
-                        info->tapfd, errno, strerror(errno));
+                        tapfd, errno, strerror(errno));
+            }
+
+            if (errno == EBADF)
+            {
+                // bad file descriptor, just end thread
+                SWSS_LOG_NOTICE("ending thread for tap fd %d", tapfd);
+                return;
             }
 
             continue;
         }
     }
 
-    SWSS_LOG_NOTICE("ending thread proc for %s", info->name.c_str());
+    SWSS_LOG_NOTICE("ending thread proc for %s", name.c_str());
 }
 
-void tap2veth_fun(std::shared_ptr<hostif_info_t> info)
+void hostif_info_t::tap2veth_fun()
 {
     SWSS_LOG_ENTER();
 
     unsigned char buffer[ETH_FRAME_BUFFER_SIZE];
 
-    while (info->run_thread)
-    {
-        // TODO convert to non blocking using select
+    swss::Select s;
+    SelectableFd fd(tapfd);
 
-        ssize_t size = read(info->tapfd, buffer, sizeof(buffer));
+    s.addSelectable(&t2eEvent);
+    s.addSelectable(&fd);
+
+    while (run_thread)
+    {
+        swss::Selectable *sel = NULL;
+
+        int result = s.select(&sel);
+
+        if (result != swss::Select::OBJECT)
+        {
+            SWSS_LOG_ERROR("selectable failed: %d, ending thread for %s", result, name.c_str());
+            return;
+        }
+
+        if (sel == &t2eEvent) // thread end event
+            break;
+
+        ssize_t size = read(tapfd, buffer, sizeof(buffer));
 
         if (size < 0)
         {
             SWSS_LOG_ERROR("failed to read from tapfd fd %d, errno(%d): %s",
-                    info->tapfd, errno, strerror(errno));
+                    tapfd, errno, strerror(errno));
+
+            if (errno == EBADF)
+            {
+                // bad file descriptor, just close the thread
+                SWSS_LOG_NOTICE("ending thread for tap fd %d",tapfd);
+                return;
+            }
 
             continue;
         }
 
-        if (write(info->packet_socket, buffer, (int)size) < 0)
+        if (write(packet_socket, buffer, (int)size) < 0)
         {
             SWSS_LOG_ERROR("failed to write to socket fd %d, errno(%d): %s",
-                    info->packet_socket, errno, strerror(errno));
+                    packet_socket, errno, strerror(errno));
 
             continue;
         }
     }
 
-    SWSS_LOG_NOTICE("ending thread proc for %s", info->name.c_str());
+    SWSS_LOG_NOTICE("ending thread proc for %s", name.c_str());
 }
 
 std::string vs_get_veth_name(
@@ -1107,16 +1232,14 @@ bool hostif_create_tap_veth_forwarding(
 
     hostif_info_map[tapname] = info;
 
+    // TODO move to constructor
     info->packet_socket = packet_socket;
     info->tapfd         = tapfd;
     info->run_thread    = true;
-    info->e2t           = std::make_shared<std::thread>(veth2tap_fun, info);
-    info->t2e           = std::make_shared<std::thread>(tap2veth_fun, info);
+    info->e2t           = std::make_shared<std::thread>(&hostif_info_t::veth2tap_fun, info.get());
+    info->t2e           = std::make_shared<std::thread>(&hostif_info_t::tap2veth_fun, info.get());
     info->name          = tapname;
     info->portid        = port_id;
-
-    info->e2t->detach();
-    info->t2e->detach();
 
     SWSS_LOG_NOTICE("setup forward rule for %s succeeded", tapname.c_str());
 
@@ -1262,8 +1385,8 @@ sai_status_t vs_create_hostif_tap_interface(
             sai_serialize_object_id(obj_id).c_str());
 
     g_switch_state_map.at(switch_id)->setIfNameToPortId(vname, obj_id);
+    g_switch_state_map.at(switch_id)->setPortIdToTapName(obj_id, name);
 
-    g_switch_state_map.at(switch_id)->setTapNameToPortId(name, obj_id);
     // TODO what about FDB entries notifications, they also should
     // be generated if new mac address will show up on the interface/arp table
 
@@ -1306,6 +1429,87 @@ sai_status_t vs_recreate_hostif_tap_interfaces(
 
         vs_create_hostif_tap_interface(switch_id, (uint32_t)attrs.size(), attrs.data());
     }
+
+    return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t vs_remove_hostif_tap_interface(
+        _In_ sai_object_id_t hostif_id)
+{
+    SWSS_LOG_ENTER();
+
+    // get tap interface name
+
+    sai_object_id_t switch_id = sai_switch_id_query(hostif_id);
+
+    if (switch_id == SAI_NULL_OBJECT_ID)
+    {
+        SWSS_LOG_ERROR("failed to obtain switch_id from hostif_id %s",
+                sai_serialize_object_id(hostif_id).c_str());
+
+        return SAI_STATUS_FAILURE;
+    }
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_HOSTIF_ATTR_NAME;
+
+    sai_status_t status = vs_generic_get(SAI_OBJECT_TYPE_HOSTIF, hostif_id, 1, &attr);
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_ERROR("failed to get attr name for hostif %s",
+                sai_serialize_object_id(hostif_id).c_str());
+
+        return status;
+    }
+
+    if (strnlen(attr.value.chardata, sizeof(attr.value.chardata)) >= MAX_INTERFACE_NAME_LEN)
+    {
+        SWSS_LOG_ERROR("interface name is too long: %.*s", MAX_INTERFACE_NAME_LEN, attr.value.chardata);
+
+        return SAI_STATUS_FAILURE;
+    }
+
+    std::string name = std::string(attr.value.chardata);
+
+    auto it = hostif_info_map.find(name);
+
+    if (it == hostif_info_map.end())
+    {
+        SWSS_LOG_ERROR("failed to find host info entry for tap device: %s", name.c_str());
+
+        return SAI_STATUS_FAILURE;
+    }
+
+    SWSS_LOG_NOTICE("attempting to remove tap device: %s", name.c_str());
+
+    // TODO add hostif id into hostif info entry and search by this but id is
+    // created after creating tap device
+
+    auto info = it->second;
+
+    // remove host info entry from map
+
+    hostif_info_map.erase(it); // will stop threads
+
+    // remove tap device
+
+    int err = close(info->tapfd);
+
+    if (err)
+    {
+        SWSS_LOG_ERROR("failed to remove tap device: %s, err: %d", name.c_str(), err);
+    }
+
+    // remove interface mapping
+
+    std::string vname = vs_get_veth_name(name, info->portid);
+
+    g_switch_state_map.at(switch_id)->removeIfNameToPortId(vname);
+    g_switch_state_map.at(switch_id)->removePortIdToTapName(info->portid);
+
+    SWSS_LOG_NOTICE("successfully removed hostif tap device: %s", name.c_str());
 
     return SAI_STATUS_SUCCESS;
 }
@@ -1362,7 +1566,41 @@ sai_status_t vs_create_hostif(
 // TODO set must also be supported when we change operational status up/down
 // and probably also generate notification then
 
-VS_REMOVE(HOSTIF,hostif);
+sai_status_t vs_remove_hostif_int(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t hostif_id)
+{
+    SWSS_LOG_ENTER();
+
+    if (g_vs_hostif_use_tap_device == true)
+    {
+        sai_status_t status = vs_remove_hostif_tap_interface(
+                hostif_id);
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            return status;
+        }
+    }
+
+    return vs_generic_remove(
+            SAI_OBJECT_TYPE_HOSTIF,
+            hostif_id);
+}
+
+sai_status_t vs_remove_hostif(
+        _In_ sai_object_id_t hostif_id)
+{
+    MUTEX();
+
+    SWSS_LOG_ENTER();
+
+    return meta_sai_remove_oid(
+            SAI_OBJECT_TYPE_HOSTIF,
+            hostif_id,
+            &vs_remove_hostif_int);
+}
+
 VS_SET(HOSTIF,hostif);
 VS_GET(HOSTIF,hostif);
 
