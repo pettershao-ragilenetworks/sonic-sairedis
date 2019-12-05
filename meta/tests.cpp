@@ -1,5 +1,4 @@
 #include "sai_meta.h"
-#include "sai_extra.h"
 #include "sai_serialize.h"
 
 #include <inttypes.h>
