@@ -61,7 +61,9 @@ libsairedis_la_SOURCES = \
 						 Globals.cpp \
 						 SkipRecordAttrContainer.cpp \
 						 Switch.cpp \
-						 SwitchContainer.cpp
+						 SwitchContainer.cpp \
+						 VirtualObjectIdManager.cpp
+
 
 libsairedis_la_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON)
 libsairedis_la_LIBADD = -lhiredis -lswsscommon
