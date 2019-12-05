@@ -104,26 +104,6 @@ extern const sai_wred_api_t             redis_wred_api;
 extern const sai_debug_counter_api_t    redis_debug_counter_api;
 extern const sai_nat_api_t              redis_nat_api;
 
-#define UNREFERENCED_PARAMETER(X)
-
-bool redis_validate_contains_attribute(
-        _In_ sai_attr_id_t required_id,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list);
-
-const sai_attribute_t* redis_get_attribute_by_id(
-        _In_ sai_attr_id_t id,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list);
-
-sai_object_id_t redis_create_virtual_object_id(
-        _In_ sai_object_type_t object_type);
-
-void translate_rid_to_vid(
-        _In_ sai_object_type_t object_type,
-        _In_ uint32_t attr_count,
-        _In_ sai_attribute_t *attr_list);
-
 // OID QUAD
 
 sai_status_t redis_generic_create(
