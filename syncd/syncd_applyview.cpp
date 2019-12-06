@@ -4,9 +4,13 @@
 #include "swss/logger.h"
 #include "swss/dbconnector.h"
 
+#include "CommandLineOptions.h"
+
 #include <inttypes.h>
 #include <algorithm>
 #include <list>
+
+extern std::shared_ptr<CommandLineOptions> g_commandLineOptions;
 
 /*
  * NOTE: All methods taking current and temporary view could be moved to
@@ -7513,7 +7517,7 @@ void checkAsicVsDatabaseConsistency(
 
     swss::Logger::getInstance().setMinPrio(swss::Logger::SWSS_NOTICE);
 
-    if (hasErrors && enableUnittests())
+    if (hasErrors && g_commandLineOptions->m_enableUnittests)
     {
         SWSS_LOG_THROW("ASIC content is differnt than DB content!");
     }
@@ -7933,7 +7937,7 @@ sai_status_t syncdApplyView()
 
     updateRedisDatabase(current, temp);
 
-    if (g_enableConsistencyCheck)
+    if (g_commandLineOptions->m_enableConsistencyCheck)
     {
         checkAsicVsDatabaseConsistency(current, temp);
     }
@@ -8470,7 +8474,7 @@ void executeOperationsOnAsic(
 
         SWSS_LOG_TIMER("asic apply");
 
-        if (enableUnittests())
+        if (g_commandLineOptions->m_enableUnittests)
             dumpComparisonLogicOutput(currentView);
 
         currentView.dumpVidToAsicOperatioId();
