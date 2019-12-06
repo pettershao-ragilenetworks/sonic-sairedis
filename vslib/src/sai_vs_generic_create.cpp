@@ -284,7 +284,7 @@ std::shared_ptr<SwitchState> vs_read_switch_database_for_warm_restart(
     {
         SWSS_LOG_ERROR("failed to open: %s, switching to cold boot", g_warm_boot_read_file);
 
-        g_vs_boot_type = SAI_VS_COLD_BOOT;
+        g_vs_boot_type = SAI_VS_BOOT_TYPE_COLD;
 
         return nullptr;
     }
@@ -579,7 +579,7 @@ sai_status_t internal_vs_generic_create(
     {
         std::shared_ptr<SwitchState> warmBootState = nullptr;
 
-        if (g_vs_boot_type == SAI_VS_WARM_BOOT)
+        if (g_vs_boot_type == SAI_VS_BOOT_TYPE_WARM)
         {
             warmBootState = vs_read_switch_database_for_warm_restart(switch_id);
 

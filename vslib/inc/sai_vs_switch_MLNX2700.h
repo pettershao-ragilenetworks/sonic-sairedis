@@ -1,7 +1,6 @@
 #ifndef __SAI_VS_SWITCH_MLNX2700__
 #define __SAI_VS_SWITCH_MLNX2700__
 
-#include "meta/sai_meta.h"
 #include "meta/sai_serialize.h"
 #include "meta/saiattributelist.h"
 

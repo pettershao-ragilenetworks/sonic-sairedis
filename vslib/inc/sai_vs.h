@@ -12,67 +12,7 @@ extern "C" {
 
 #include <mutex>
 
-#define SAI_KEY_VS_SWITCH_TYPE              "SAI_VS_SWITCH_TYPE"
-
-/**
- * @def SAI_KEY_VS_INTERFACE_LANE_MAP_FILE
- *
- * If specified in profile.ini it should point to eth interface to lane map.
- *
- * Example:
- * eth0:1,2,3,4
- * eth1:5,6,7,8
- */
-#define SAI_KEY_VS_INTERFACE_LANE_MAP_FILE  "SAI_VS_INTERFACE_LANE_MAP_FILE"
-
-/**
- * @def SAI_KEY_VS_HOSTIF_USE_TAP_DEVICE
- *
- * Bool flag, (true/false). If set to true, then during create host interface
- * sai object also tap device will be created and mac address will be assigned.
- * For this operation root privileges will be required.
- *
- * By default this flag is set to false.
- */
-#define SAI_KEY_VS_HOSTIF_USE_TAP_DEVICE      "SAI_VS_HOSTIF_USE_TAP_DEVICE"
-
-// TODO probably should be per switch
-#define SAI_VALUE_VS_SWITCH_TYPE_BCM56850     "SAI_VS_SWITCH_TYPE_BCM56850"
-#define SAI_VALUE_VS_SWITCH_TYPE_MLNX2700     "SAI_VS_SWITCH_TYPE_MLNX2700"
-
-#define SAI_VS_COLD_BOOT 0
-#define SAI_VS_WARM_BOOT 1
-#define SAI_VS_FAST_BOOT 2
-
 #define SAI_VS_MAX_PORTS 1024
-
-/**
- * @def SAI_VS_UNITTEST_CHANNEL
- *
- * Notification channel for redis database.
- */
-#define SAI_VS_UNITTEST_CHANNEL     "SAI_VS_UNITTEST_CHANNEL"
-
-/**
- * @def SAI_VS_UNITTEST_SET_RO_OP
- *
- * Notification operation for "SET" READ_ONLY attribute.
- */
-#define SAI_VS_UNITTEST_SET_RO_OP   "set_ro"
-
-/**
- * @def SAI_VS_UNITTEST_SET_STATS
- *
- * Notification operation for "SET" stats on specific object.
- */
-#define SAI_VS_UNITTEST_SET_STATS_OP      "set_stats"
-
-/**
- * @def SAI_VS_UNITTEST_ENABLE
- *
- * Notification operation for enabling unittests.
- */
-#define SAI_VS_UNITTEST_ENABLE_UNITTESTS  "enable_unittests"
 
 #define SAI_VS_VETH_PREFIX   "v"
 
@@ -86,13 +26,24 @@ typedef enum _sai_vs_switch_type_t
 
 } sai_vs_switch_type_t;
 
+typedef enum _sai_vs_boot_type_t
+{
+    SAI_VS_BOOT_TYPE_COLD,
+
+    SAI_VS_BOOT_TYPE_WARM,
+
+    SAI_VS_BOOT_TYPE_FAST,
+
+} sai_vs_boot_type_t;
+
+
+
 extern bool                             g_vs_hostif_use_tap_device;
 extern sai_vs_switch_type_t             g_vs_switch_type;
 extern std::recursive_mutex             g_recursive_mutex;
 
-extern int g_vs_boot_type;
+extern sai_vs_boot_type_t g_vs_boot_type;
 
-extern const char *g_boot_type;
 extern const char *g_warm_boot_read_file;
 extern const char *g_warm_boot_write_file;
 

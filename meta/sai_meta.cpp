@@ -458,6 +458,9 @@ bool object_exists(
     return object_exists(key);
 }
 
+// make sure db is initialized before usage
+static sai_status_t inited = meta_init_db();
+
 sai_status_t meta_init_db()
 {
     SWSS_LOG_ENTER();

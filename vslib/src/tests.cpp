@@ -15,7 +15,8 @@ extern "C" {
 #include <sai.h>
 }
 
-#include "../inc/sai_vs.h"
+#include "sai_vs.h"
+#include "saivs.h"
 
 const char* profile_get_value(
         _In_ sai_switch_profile_id_t profile_id,

@@ -1,3 +1,4 @@
+#include "saivs.h"
 #include "sai_vs.h"
 #include "sai_vs_internal.h"
 #include "sai_vs_state.h"
@@ -25,7 +26,7 @@ std::shared_ptr<swss::DBConnector>          g_dbNtf;
 volatile bool                               g_fdbAgingThreadRun;
 std::shared_ptr<std::thread>                g_fdbAgingThread;
 
-int g_vs_boot_type = SAI_VS_COLD_BOOT;
+sai_vs_boot_type_t g_vs_boot_type = SAI_VS_BOOT_TYPE_COLD;
 
 std::map<uint32_t,std::string> g_lane_to_ifname;
 std::map<std::string,std::vector<uint32_t>> g_ifname_to_lanes;
@@ -735,17 +736,17 @@ sai_status_t sai_api_initialize(
 
     std::string bt = (g_boot_type == NULL) ? "cold" : g_boot_type;
 
-    if (bt == "cold" || bt == "0")
+    if (bt == "cold" || bt == SAI_VALUE_VS_BOOT_TYPE_COLD)
     {
-        g_vs_boot_type = SAI_VS_COLD_BOOT;
+        g_vs_boot_type = SAI_VS_BOOT_TYPE_COLD;
     }
-    else if (bt == "warm" || bt == "1")
+    else if (bt == "warm" || bt == SAI_VALUE_VS_BOOT_TYPE_WARM)
     {
-        g_vs_boot_type = SAI_VS_WARM_BOOT;
+        g_vs_boot_type = SAI_VS_BOOT_TYPE_WARM;
     }
-    else if (bt == "fast" || bt == "2")
+    else if (bt == "fast" || bt == SAI_VALUE_VS_BOOT_TYPE_COLD)
     {
-        g_vs_boot_type = SAI_VS_FAST_BOOT;
+        g_vs_boot_type = SAI_VS_BOOT_TYPE_FAST;
     }
     else
     {

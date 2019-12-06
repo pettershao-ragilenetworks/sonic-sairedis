@@ -3,6 +3,7 @@
 
 extern "C" {
 #include "sai.h"
+#include "saimetadata.h"
 }
 
 #include <iostream>
@@ -13,9 +14,9 @@ extern "C" {
 #include <iomanip>
 #include <map>
 #include <tuple>
-#include <string.h>
+#include <cstring>
+
 #include "swss/logger.h"
-#include "sai_meta.h"
 
 // util
 

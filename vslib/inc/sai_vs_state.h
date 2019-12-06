@@ -1,7 +1,6 @@
 #ifndef __SAI_VS_STATE__
 #define __SAI_VS_STATE__
 
-#include "meta/sai_meta.h"
 #include "meta/sai_serialize.h"
 #include "meta/saiattributelist.h"
 

@@ -1,5 +1,4 @@
 #include "saiattributelist.h"
-#include "sai_meta.h"
 #include "sai_serialize.h"
 
 SaiAttributeList::SaiAttributeList(
