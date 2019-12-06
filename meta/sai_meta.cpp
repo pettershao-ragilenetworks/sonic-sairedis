@@ -1,3 +1,5 @@
+#include "SaiAttrWrapper.h"
+
 #include "sai_meta.h"
 #include "sai_serialize.h"
 
@@ -23,6 +25,8 @@
         SWSS_LOG_INFO(#op " status: %s", sai_serialize_status(s).c_str());  \
     else                                                                   \
         SWSS_LOG_ERROR(#op " status: %s", sai_serialize_status(s).c_str());
+
+using namespace saimeta;
 
 static volatile bool unittests_enabled = false;
 
@@ -170,67 +174,6 @@ std::vector<const sai_attr_metadata_t*> get_attributes_metadata(
     return attrs;
 }
 
-class SaiAttrWrapper
-{
-    public:
-
-        SaiAttrWrapper(
-                _In_ const sai_attr_metadata_t* meta,
-                _In_ const sai_attribute_t& attr):
-            m_meta(meta),
-            m_attr(attr)
-        {
-            SWSS_LOG_ENTER();
-
-            m_attr.id = attr.id;
-
-            /*
-             * We are making serialize and deserialize to get copy of
-             * attribute, it may be a list so we need to allocate new memory.
-             *
-             * This copy will be used later to get previous value of attribute
-             * if attribute will be updated. And if this attribute is oid list
-             * then we need to release object reference count.
-             */
-
-            std::string s = sai_serialize_attr_value(*meta, attr, false);
-
-            sai_deserialize_attr_value(s, *meta, m_attr, false);
-        }
-
-        ~SaiAttrWrapper()
-        {
-            SWSS_LOG_ENTER();
-
-            /*
-             * On destructor we need to call free to deallocate possible
-             * allocated list on constructor.
-             */
-
-            sai_deserialize_free_attribute_value(m_meta->attrvaluetype, m_attr);
-        }
-
-        const sai_attribute_t* getattr() const
-        {
-            SWSS_LOG_ENTER();
-            return &m_attr;
-        }
-
-        const sai_attr_metadata_t* getMeta() const
-        {
-            SWSS_LOG_ENTER();
-
-            return m_meta;
-        }
-
-    private:
-
-        SaiAttrWrapper(const SaiAttrWrapper&);
-        SaiAttrWrapper& operator=(const SaiAttrWrapper&);
-
-        const sai_attr_metadata_t* m_meta;
-        sai_attribute_t m_attr;
-};
 
 std::string get_attr_info(const sai_attr_metadata_t& md)
 {
@@ -511,7 +454,7 @@ const sai_attribute_t* get_object_previous_attr(
      * attribute list that could be already freed.
      */
 
-    return ita->second->getattr();
+    return ita->second->getSaiAttr();
 }
 
 void set_object(
@@ -1760,9 +1703,9 @@ bool meta_is_object_in_default_state(
 
     for (const auto& attr: attrs)
     {
-        auto &md = *attr.second->getMeta();
+        auto &md = *attr.second->getSaiAttrMetadata();
 
-        auto *a = attr.second->getattr();
+        auto *a = attr.second->getSaiAttr();
 
         if (md.isreadonly)
             continue;
@@ -3048,7 +2991,7 @@ void meta_generic_validation_post_remove(
 
     for (auto&it: get_object_attributes(meta_key))
     {
-        const sai_attribute_t* attr = it->getattr();
+        const sai_attribute_t* attr = it->getSaiAttr();
 
         auto mdp = sai_metadata_get_attr_metadata(meta_key.objecttype, attr->id);
 
@@ -6366,7 +6309,7 @@ void meta_sai_on_fdb_flush_event_consolidated(
 
         sai_deserialize_object_meta_key(key_fdb, meta_key_fdb);
 
-        if (it->second.at(SAI_FDB_ENTRY_ATTR_TYPE)->getattr()->value.s32 != type->value.s32)
+        if (it->second.at(SAI_FDB_ENTRY_ATTR_TYPE)->getSaiAttr()->value.s32 != type->value.s32)
         {
             // entry type is not matching on this fdb entry
             continue;
@@ -6382,7 +6325,7 @@ void meta_sai_on_fdb_flush_event_consolidated(
                 continue;
             }
 
-            if (it->second.at(SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID)->getattr()->value.oid != bpid->value.oid)
+            if (it->second.at(SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID)->getSaiAttr()->value.oid != bpid->value.oid)
             {
                 // bridge port is not matching this fdb entry
                 continue;
