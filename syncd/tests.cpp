@@ -15,6 +15,9 @@ extern "C" {
 #include "meta/sai_serialize.h"
 #include "syncd.h"
 
+#include "meta/OidRefCounter.h"
+#include "meta/SaiAttrWrapper.h"
+
 #include <map>
 #include <unordered_map>
 #include <vector>
@@ -39,6 +42,8 @@ sai_status_t redis_bulk_remove_fdb_entry(
 #define ASSERT_SUCCESS(format,...) \
     if ((status)!=SAI_STATUS_SUCCESS) \
         SWSS_LOG_THROW(format ": %s", ##__VA_ARGS__, sai_serialize_status(status).c_str());
+
+using namespace saimeta;
 
 static sai_next_hop_group_api_t test_next_hop_group_api;
 static std::vector<std::tuple<sai_object_id_t, sai_object_id_t, std::vector<sai_attribute_t>>> created_next_hop_group_member;
@@ -151,11 +156,11 @@ void test_enable_recording()
     ASSERT_SUCCESS("Failed to enable recording");
 }
 
-class SaiAttrWrapper;
 extern std::unordered_map<std::string,
        std::unordered_map<sai_attr_id_t,
        std::shared_ptr<SaiAttrWrapper>>> ObjectAttrHash;
-extern void object_reference_insert(sai_object_id_t oid);
+
+extern OidRefCounter g_oids;
 
 sai_object_id_t create_dummy_object_id(
         _In_ sai_object_type_t objecttype)
@@ -247,7 +252,7 @@ void test_bulk_next_hop_group_member_create()
 
     // next hop group
     sai_object_id_t hopgroup = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP_GROUP);
-    object_reference_insert(hopgroup);
+    g_oids.objectReferenceInsert(hopgroup);
     sai_object_meta_key_t meta_key_hopgruop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP_GROUP, .objectkey = { .key = { .object_id = hopgroup } } };
     std::string hopgroup_key = sai_serialize_object_meta_key(meta_key_hopgruop);
     ObjectAttrHash[hopgroup_key] = { };
@@ -257,7 +262,7 @@ void test_bulk_next_hop_group_member_create()
     {
         // next hop
         sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP);
-        object_reference_insert(hop);
+        g_oids.objectReferenceInsert(hop);
         sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
         std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
         ObjectAttrHash[hop_key] = { };
@@ -348,21 +353,21 @@ void test_bulk_fdb_create()
     {
         // virtual router
         sai_object_id_t vr = create_dummy_object_id(SAI_OBJECT_TYPE_VIRTUAL_ROUTER);
-        object_reference_insert(vr);
+        g_oids.objectReferenceInsert(vr);
         sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
         std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
         ObjectAttrHash[vr_key] = { };
 
         // bridge port
         sai_object_id_t bridge_port = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE_PORT);
-        object_reference_insert(bridge_port);
+        g_oids.objectReferenceInsert(bridge_port);
         sai_object_meta_key_t meta_key_bridge_port = { .objecttype = SAI_OBJECT_TYPE_BRIDGE_PORT, .objectkey = { .key = { .object_id = bridge_port } } };
         std::string bridge_port_key = sai_serialize_object_meta_key(meta_key_bridge_port);
         ObjectAttrHash[bridge_port_key] = { };
 
         // bridge
         sai_object_id_t bridge = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE);
-        object_reference_insert(bridge);
+        g_oids.objectReferenceInsert(bridge);
         sai_object_meta_key_t meta_key_bridge = { .objecttype = SAI_OBJECT_TYPE_BRIDGE, .objectkey = { .key = { .object_id = bridge } } };
         std::string bridge_key = sai_serialize_object_meta_key(meta_key_bridge);
         ObjectAttrHash[bridge_key] = { };
@@ -459,14 +464,14 @@ void test_bulk_route_set()
 
         // virtual router
         sai_object_id_t vr = create_dummy_object_id(SAI_OBJECT_TYPE_VIRTUAL_ROUTER);
-        object_reference_insert(vr);
+        g_oids.objectReferenceInsert(vr);
         sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
         std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
         ObjectAttrHash[vr_key] = { };
 
         // next hop
         sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP);
-        object_reference_insert(hop);
+        g_oids.objectReferenceInsert(hop);
         sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
         std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
         ObjectAttrHash[hop_key] = { };

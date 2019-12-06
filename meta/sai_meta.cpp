@@ -1,4 +1,5 @@
 #include "SaiAttrWrapper.h"
+#include "OidRefCounter.h"
 
 #include "sai_meta.h"
 #include "sai_serialize.h"
@@ -199,17 +200,18 @@ std::string get_attr_info(const sai_attr_metadata_t& md)
  * removed at any time.
  */
 
-static std::unordered_map<sai_object_id_t,int32_t> ObjectReferences;
+OidRefCounter g_oids;
 static std::unordered_map<std::string,std::string> AttributeKeys;
 std::unordered_map<std::string,std::unordered_map<sai_attr_id_t,std::shared_ptr<SaiAttrWrapper>>> ObjectAttrHash;
 
+// TODO to be removed
 void dump_object_reference()
 {
     SWSS_LOG_ENTER();
 
     SWSS_LOG_NOTICE("dump references in meta");
 
-    for (auto kvp: ObjectReferences)
+    for (auto kvp: g_oids.getAllReferences())
     {
         sai_object_id_t oid = kvp.first;
 
@@ -239,145 +241,6 @@ void dump_object_reference()
 }
 
 // GENERIC REFERENCE FUNCTIONS
-
-bool object_reference_exists(
-        _In_ sai_object_id_t oid)
-{
-    SWSS_LOG_ENTER();
-
-    bool exists = ObjectReferences.find(oid) != ObjectReferences.end();
-
-    SWSS_LOG_DEBUG("object 0x%" PRIx64 " refrence: %s", oid, exists ? "exists" : "missing");
-
-    return exists;
-}
-
-void object_reference_inc(
-        _In_ sai_object_id_t oid)
-{
-    SWSS_LOG_ENTER();
-
-    if (oid == SAI_NULL_OBJECT_ID)
-    {
-        /*
-         * We don't keep track of NULL object id's.
-         */
-
-        return;
-    }
-
-    if (!object_reference_exists(oid))
-    {
-        SWSS_LOG_THROW("FATAL: object oid 0x%" PRIx64 " not in reference map", oid);
-    }
-
-    ObjectReferences[oid]++;
-
-    SWSS_LOG_DEBUG("increased reference on oid 0x%" PRIx64 " to %d", oid, ObjectReferences[oid]);
-}
-
-void object_reference_dec(
-        _In_ sai_object_id_t oid)
-{
-    SWSS_LOG_ENTER();
-
-    if (oid == SAI_NULL_OBJECT_ID)
-    {
-        /*
-         * We don't keep track of NULL object id's.
-         */
-
-        return;
-    }
-
-    if (!object_reference_exists(oid))
-    {
-        SWSS_LOG_THROW("FATAL: object oid 0x%" PRIx64 " not in reference map", oid);
-    }
-
-    ObjectReferences[oid]--;
-
-    if (ObjectReferences[oid] < 0)
-    {
-        SWSS_LOG_THROW("FATAL: object oid 0x%" PRIx64 " reference count is negative!", oid);
-    }
-
-    SWSS_LOG_DEBUG("decreased reference on oid 0x%" PRIx64 " to %d", oid, ObjectReferences[oid]);
-}
-
-void object_reference_dec(
-        _In_ const sai_object_list_t& list)
-{
-    SWSS_LOG_ENTER();
-
-    for (uint32_t i = 0; i < list.count; ++i)
-    {
-        object_reference_dec(list.list[i]);
-    }
-}
-
-void object_reference_inc(
-        _In_ const sai_object_list_t& list)
-{
-    SWSS_LOG_ENTER();
-
-    for (uint32_t i = 0; i < list.count; ++i)
-    {
-        object_reference_inc(list.list[i]);
-    }
-}
-
-void object_reference_insert(
-        _In_ sai_object_id_t oid)
-{
-    SWSS_LOG_ENTER();
-
-    if (object_reference_exists(oid))
-    {
-        SWSS_LOG_THROW("FATAL: object oid 0x%" PRIx64 " already in reference map", oid);
-    }
-
-    ObjectReferences[oid] = 0;
-
-    SWSS_LOG_DEBUG("inserted reference on 0x%" PRIx64 "", oid);
-}
-
-int32_t object_reference_count(
-        _In_ sai_object_id_t oid)
-{
-    SWSS_LOG_ENTER();
-
-    if (object_reference_exists(oid))
-    {
-        int32_t count = ObjectReferences[oid];
-
-        SWSS_LOG_DEBUG("reference count on oid 0x%" PRIx64 " is %d", oid, count);
-
-        return count;
-    }
-
-    SWSS_LOG_THROW("FATAL: object oid 0x%" PRIx64 " reference not in map", oid);
-}
-
-void object_reference_remove(
-        _In_ sai_object_id_t oid)
-{
-    SWSS_LOG_ENTER();
-
-    if (object_reference_exists(oid))
-    {
-        int32_t count = object_reference_count(oid);
-
-        if (count > 0)
-        {
-            SWSS_LOG_THROW("FATAL: removing object oid 0x%" PRIx64 " but reference count is: %d", oid, count);
-        }
-    }
-
-    SWSS_LOG_DEBUG("removing object oid 0x%" PRIx64 " reference", oid);
-
-    ObjectReferences.erase(oid);
-}
 
 bool object_exists(
         _In_ const std::string& key)
@@ -412,7 +275,7 @@ sai_status_t meta_init_db()
      * This DB will contain objects from all switches.
      */
 
-    ObjectReferences.clear();
+    g_oids.clear();
     ObjectAttrHash.clear();
     AttributeKeys.clear();
 
@@ -612,7 +475,7 @@ sai_status_t meta_generic_validation_objlist(
             return SAI_STATUS_INVALID_PARAMETER;
         }
 
-        if (!object_reference_exists(oid))
+        if (!g_oids.objectReferenceExists(oid))
         {
             META_LOG_ERROR(md, "object on list [%u] oid 0x%" PRIx64 " object type %d does not exists in local DB", i, oid, ot);
 
@@ -635,7 +498,7 @@ sai_status_t meta_generic_validation_objlist(
 
         sai_object_id_t query_switch_id = sai_switch_id_query(oid);
 
-        if (!object_reference_exists(query_switch_id))
+        if (!g_oids.objectReferenceExists(query_switch_id))
         {
             SWSS_LOG_ERROR("switch id 0x%" PRIx64 " doesn't exist", query_switch_id);
             return SAI_STATUS_INVALID_PARAMETER;
@@ -898,7 +761,7 @@ sai_status_t meta_generic_validate_non_object_on_create(
             return SAI_STATUS_INVALID_PARAMETER;
         }
 
-        if (!object_reference_exists(oid))
+        if (!g_oids.objectReferenceExists(oid))
         {
             SWSS_LOG_ERROR("object don't exist 0x%" PRIx64 " (%s)", oid, m->membername);
 
@@ -933,7 +796,7 @@ sai_status_t meta_generic_validate_non_object_on_create(
 
         sai_object_id_t oid_switch_id = sai_switch_id_query(oid);
 
-        if (!object_reference_exists(oid_switch_id))
+        if (!g_oids.objectReferenceExists(oid_switch_id))
         {
             SWSS_LOG_ERROR("switch id 0x%" PRIx64 " doesn't exist", oid_switch_id);
 
@@ -1018,7 +881,7 @@ sai_status_t meta_generic_validation_create(
             return SAI_STATUS_INVALID_PARAMETER;
         }
 
-        if (!object_reference_exists(switch_id))
+        if (!g_oids.objectReferenceExists(switch_id))
         {
             SWSS_LOG_ERROR("switch id 0x%" PRIx64 " doesn't exist yet", switch_id);
 
@@ -1678,7 +1541,7 @@ bool meta_is_object_in_default_state(
     if (oid == SAI_NULL_OBJECT_ID)
         SWSS_LOG_THROW("not expected NULL object id");
 
-    if (!object_reference_exists(oid))
+    if (!g_oids.objectReferenceExists(oid))
     {
         SWSS_LOG_WARN("object %s refrence not exists, bug!",
                 sai_serialize_object_id(oid).c_str());
@@ -1769,7 +1632,7 @@ sai_status_t meta_port_remove_validation(
         return SAI_STATUS_SUCCESS;
     }
 
-    if (object_reference_count(port_id) != 0)
+    if (g_oids.getObjectReferenceCount(port_id) != 0)
     {
         SWSS_LOG_ERROR("port %s reference count is not zero, can't remove",
                 sai_serialize_object_id(port_id).c_str());
@@ -1787,7 +1650,7 @@ sai_status_t meta_port_remove_validation(
 
     for (auto oid: it->second)
     {
-        if (object_reference_count(oid) != 0)
+        if (g_oids.getObjectReferenceCount(oid) != 0)
         {
             SWSS_LOG_ERROR("port %s related object %s reference count is not zero, can't remove",
                     sai_serialize_object_id(port_id).c_str(),
@@ -1860,14 +1723,14 @@ sai_status_t meta_generic_validation_remove(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    if (!object_reference_exists(oid))
+    if (!g_oids.objectReferenceExists(oid))
     {
         SWSS_LOG_ERROR("object 0x%" PRIx64 " reference doesn't exist", oid);
 
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    int count = object_reference_count(oid);
+    int count = g_oids.getObjectReferenceCount(oid);
 
     if (count != 0)
     {
@@ -1965,7 +1828,7 @@ sai_status_t meta_generic_validation_set(
     {
         switch_id = sai_switch_id_query(meta_key.objectkey.key.object_id);
 
-        if (!object_reference_exists(switch_id))
+        if (!g_oids.objectReferenceExists(switch_id))
         {
             SWSS_LOG_ERROR("switch id 0x%" PRIx64 " doesn't exist", switch_id);
             return SAI_STATUS_INVALID_PARAMETER;
@@ -2705,7 +2568,7 @@ void meta_generic_validation_post_create(
                 continue;
             }
 
-            object_reference_inc(m->getoid(&meta_key));
+            g_oids.objectReferenceIncrement(m->getoid(&meta_key));
         }
     }
     else
@@ -2750,7 +2613,7 @@ void meta_generic_validation_post_create(
 
                 sai_object_id_t query_switch_id = sai_switch_id_query(meta_key.objectkey.key.object_id);
 
-                if (!object_reference_exists(query_switch_id))
+                if (!g_oids.objectReferenceExists(query_switch_id))
                 {
                     SWSS_LOG_ERROR("switch id 0x%" PRIx64 " doesn't exist", query_switch_id);
                     break;
@@ -2770,7 +2633,7 @@ void meta_generic_validation_post_create(
             }
             else
             {
-                object_reference_insert(oid);
+                g_oids.objectReferenceInsert(oid);
             }
 
         } while (false);
@@ -2825,11 +2688,11 @@ void meta_generic_validation_post_create(
                 break;
 
             case SAI_ATTR_VALUE_TYPE_OBJECT_ID:
-                object_reference_inc(value.oid);
+                g_oids.objectReferenceIncrement(value.oid);
                 break;
 
             case SAI_ATTR_VALUE_TYPE_OBJECT_LIST:
-                object_reference_inc(value.objlist);
+                g_oids.objectReferenceIncrement(value.objlist);
                 break;
 
             case SAI_ATTR_VALUE_TYPE_VLAN_LIST:
@@ -2853,14 +2716,14 @@ void meta_generic_validation_post_create(
             case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_OBJECT_ID:
                 if (value.aclfield.enable)
                 {
-                    object_reference_inc(value.aclfield.data.oid);
+                    g_oids.objectReferenceIncrement(value.aclfield.data.oid);
                 }
                 break;
 
             case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_OBJECT_LIST:
                 if (value.aclfield.enable)
                 {
-                    object_reference_inc(value.aclfield.data.objlist);
+                    g_oids.objectReferenceIncrement(value.aclfield.data.objlist);
                 }
                 break;
 
@@ -2884,14 +2747,14 @@ void meta_generic_validation_post_create(
             case SAI_ATTR_VALUE_TYPE_ACL_ACTION_DATA_OBJECT_ID:
                 if (value.aclaction.enable)
                 {
-                    object_reference_inc(value.aclaction.parameter.oid);
+                    g_oids.objectReferenceIncrement(value.aclaction.parameter.oid);
                 }
                 break;
 
             case SAI_ATTR_VALUE_TYPE_ACL_ACTION_DATA_OBJECT_LIST:
                 if (value.aclaction.enable)
                 {
-                    object_reference_inc(value.aclaction.parameter.objlist);
+                    g_oids.objectReferenceIncrement(value.aclaction.parameter.objlist);
                 }
                 break;
 
@@ -3023,11 +2886,11 @@ void meta_generic_validation_post_remove(
                 break;
 
             case SAI_ATTR_VALUE_TYPE_OBJECT_ID:
-                object_reference_dec(value.oid);
+                g_oids.objectReferenceDecrement(value.oid);
                 break;
 
             case SAI_ATTR_VALUE_TYPE_OBJECT_LIST:
-                object_reference_dec(value.objlist);
+                g_oids.objectReferenceDecrement(value.objlist);
                 break;
 
                 // ACL FIELD
@@ -3047,14 +2910,14 @@ void meta_generic_validation_post_remove(
             case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_OBJECT_ID:
                 if (value.aclfield.enable)
                 {
-                    object_reference_dec(value.aclfield.data.oid);
+                    g_oids.objectReferenceDecrement(value.aclfield.data.oid);
                 }
                 break;
 
             case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_OBJECT_LIST:
                 if (value.aclfield.enable)
                 {
-                    object_reference_dec(value.aclfield.data.objlist);
+                    g_oids.objectReferenceDecrement(value.aclfield.data.objlist);
                 }
                 break;
 
@@ -3077,14 +2940,14 @@ void meta_generic_validation_post_remove(
             case SAI_ATTR_VALUE_TYPE_ACL_ACTION_DATA_OBJECT_ID:
                 if (value.aclaction.enable)
                 {
-                    object_reference_dec(value.aclaction.parameter.oid);
+                    g_oids.objectReferenceDecrement(value.aclaction.parameter.oid);
                 }
                 break;
 
             case SAI_ATTR_VALUE_TYPE_ACL_ACTION_DATA_OBJECT_LIST:
                 if (value.aclaction.enable)
                 {
-                    object_reference_dec(value.aclaction.parameter.objlist);
+                    g_oids.objectReferenceDecrement(value.aclaction.parameter.objlist);
                 }
                 break;
 
@@ -3130,12 +2993,12 @@ void meta_generic_validation_post_remove(
                 continue;
             }
 
-            object_reference_dec(m->getoid(&meta_key));
+            g_oids.objectReferenceDecrement(m->getoid(&meta_key));
         }
     }
     else
     {
-        object_reference_remove(meta_key.objectkey.key.object_id);
+        g_oids.objectReferenceRemove(meta_key.objectkey.key.object_id);
     }
 
     remove_object(meta_key);
@@ -3218,10 +3081,10 @@ void meta_generic_validation_post_set(
                 if (previous_attr != NULL)
                 {
                     // decrease previous if it was set
-                    object_reference_dec(previous_attr->value.oid);
+                    g_oids.objectReferenceDecrement(previous_attr->value.oid);
                 }
 
-                object_reference_inc(value.oid);
+                g_oids.objectReferenceIncrement(value.oid);
 
                 break;
             }
@@ -3234,10 +3097,10 @@ void meta_generic_validation_post_set(
                 if (previous_attr != NULL)
                 {
                     // decrease previous if it was set
-                    object_reference_dec(previous_attr->value.objlist);
+                    g_oids.objectReferenceDecrement(previous_attr->value.objlist);
                 }
 
-                object_reference_inc(value.objlist);
+                g_oids.objectReferenceIncrement(value.objlist);
 
                 break;
             }
@@ -3268,11 +3131,11 @@ void meta_generic_validation_post_set(
                 {
                     // decrease previous if it was set
                     if (previous_attr->value.aclfield.enable)
-                    object_reference_dec(previous_attr->value.aclfield.data.oid);
+                    g_oids.objectReferenceDecrement(previous_attr->value.aclfield.data.oid);
                 }
 
                 if (value.aclfield.enable)
-                object_reference_inc(value.aclfield.data.oid);
+                g_oids.objectReferenceIncrement(value.aclfield.data.oid);
 
                 break;
             }
@@ -3286,11 +3149,11 @@ void meta_generic_validation_post_set(
                 {
                     // decrease previous if it was set
                     if (previous_attr->value.aclfield.enable)
-                    object_reference_dec(previous_attr->value.aclfield.data.objlist);
+                    g_oids.objectReferenceDecrement(previous_attr->value.aclfield.data.objlist);
                 }
 
                 if (value.aclfield.enable)
-                object_reference_inc(value.aclfield.data.objlist);
+                g_oids.objectReferenceIncrement(value.aclfield.data.objlist);
 
                 break;
             }
@@ -3321,11 +3184,11 @@ void meta_generic_validation_post_set(
                 {
                     // decrease previous if it was set
                     if (previous_attr->value.aclaction.enable)
-                    object_reference_dec(previous_attr->value.aclaction.parameter.oid);
+                    g_oids.objectReferenceDecrement(previous_attr->value.aclaction.parameter.oid);
                 }
 
                 if (value.aclaction.enable)
-                object_reference_inc(value.aclaction.parameter.oid);
+                g_oids.objectReferenceIncrement(value.aclaction.parameter.oid);
                 break;
             }
 
@@ -3338,11 +3201,11 @@ void meta_generic_validation_post_set(
                 {
                     // decrease previous if it was set
                     if (previous_attr->value.aclaction.enable)
-                    object_reference_dec(previous_attr->value.aclaction.parameter.objlist);
+                    g_oids.objectReferenceDecrement(previous_attr->value.aclaction.parameter.objlist);
                 }
 
                 if (value.aclaction.enable)
-                object_reference_inc(value.aclaction.parameter.objlist);
+                g_oids.objectReferenceIncrement(value.aclaction.parameter.objlist);
 
                 break;
             }
@@ -3458,7 +3321,7 @@ void meta_generic_validation_post_get_objlist(
             META_LOG_ERROR(md, "returned get object on list [%u] oid 0x%" PRIx64 " object type %d is not allowed on this attribute", i, oid, ot);
         }
 
-        if (!object_reference_exists(oid))
+        if (!g_oids.objectReferenceExists(oid))
         {
             // NOTE: there may happen that user will request multiple object lists
             // and first list was retrieved ok, but second failed with overflow
@@ -3468,7 +3331,7 @@ void meta_generic_validation_post_get_objlist(
 
             sai_object_meta_key_t key = { .objecttype = ot, .objectkey = { .key = { .object_id = oid } } };
 
-            object_reference_insert(oid);
+            g_oids.objectReferenceInsert(oid);
 
             if (!object_exists(key))
             {
@@ -3478,7 +3341,7 @@ void meta_generic_validation_post_get_objlist(
 
         sai_object_id_t query_switch_id = sai_switch_id_query(oid);
 
-        if (!object_reference_exists(query_switch_id))
+        if (!g_oids.objectReferenceExists(query_switch_id))
         {
             SWSS_LOG_ERROR("switch id 0x%" PRIx64 " doesn't exist", query_switch_id);
         }
@@ -6048,7 +5911,7 @@ sai_status_t meta_sai_get_oid(
     {
         sai_object_id_t switch_id = sai_switch_id_query(object_id);
 
-        if (!object_reference_exists(switch_id))
+        if (!g_oids.objectReferenceExists(switch_id))
         {
             SWSS_LOG_ERROR("switch id 0x%" PRIx64 " doesn't exist", switch_id);
         }
@@ -6365,7 +6228,7 @@ void meta_fdb_event_snoop_oid(
     if (oid == SAI_NULL_OBJECT_ID)
         return;
 
-    if (object_reference_exists(oid))
+    if (g_oids.objectReferenceExists(oid))
         return;
 
     sai_object_type_t ot = sai_object_type_query(oid);
@@ -6378,7 +6241,7 @@ void meta_fdb_event_snoop_oid(
 
     sai_object_meta_key_t key = { .objecttype = ot, .objectkey = { .key = { .object_id = oid } } };
 
-    object_reference_insert(oid);
+    g_oids.objectReferenceInsert(oid);
 
     if (!object_exists(key))
         create_object(key);
@@ -6594,7 +6457,7 @@ sai_status_t meta_sai_flush_fdb_entries(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    if (!object_reference_exists(switch_id))
+    if (!g_oids.objectReferenceExists(switch_id))
     {
         SWSS_LOG_ERROR("switch id %s doesn't exist",
                 sai_serialize_object_id(switch_id).c_str());

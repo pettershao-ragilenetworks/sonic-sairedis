@@ -77,7 +77,8 @@ libsaimetadata_la_SOURCES = \
 							sai_meta.cpp \
 							saiattributelist.cpp \
 							saiserialize.cpp \
-							SaiAttrWrapper.cpp
+							SaiAttrWrapper.cpp \
+							OidRefCounter.cpp
 
 BUILT_SOURCES = $(top_srcdir)/SAI/meta/saimetadata.h $(top_srcdir)/SAI/meta/saimetadata.c
 

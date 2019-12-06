@@ -1,6 +1,9 @@
 #include "sai_meta.h"
 #include "sai_serialize.h"
 
+#include "OidRefCounter.h"
+#include "SaiAttrWrapper.h"
+
 #include <inttypes.h>
 #include <string.h>
 #include <arpa/inet.h>
@@ -11,16 +14,13 @@
 #include <memory>
 #include <vector>
 
-class SaiAttrWrapper;
+using namespace saimeta;
+
 extern std::unordered_map<std::string,std::unordered_map<sai_attr_id_t,std::shared_ptr<SaiAttrWrapper>>> ObjectAttrHash;
 extern bool is_ipv6_mask_valid(const uint8_t* mask);
 extern bool object_exists(const std::string& key);
-extern bool object_reference_exists(sai_object_id_t oid);
-extern void object_reference_inc(sai_object_id_t oid);
-extern void object_reference_dec(sai_object_id_t oid);
-extern void object_reference_dec(const sai_object_list_t& list);
-extern void object_reference_insert(sai_object_id_t oid);
-extern int32_t object_reference_count(sai_object_id_t oid);
+
+extern OidRefCounter g_oids;
 
 std::string construct_key(
         _In_ const sai_object_meta_key_t& meta_key,
@@ -616,12 +616,12 @@ void test_switch_set()
 //    attr.id = SAI_SWITCH_ATTR_LAG_HASH_IPV6;
 //    attr.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_HASH);
 //
-//    object_reference_insert(attr.value.oid);
+//    g_oids.objectReferenceInsert(attr.value.oid);
 //
 //    status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, &dummy_success_sai_set_oid);
 //    META_ASSERT_SUCCESS(status);
 //
-//    META_ASSERT_TRUE(object_reference_count(attr.value.oid) == 1);
+//    META_ASSERT_TRUE(g_oids.getObjectReferenceCount(attr.value.oid) == 1);
 
     // object id with allowed null
 
@@ -635,7 +635,7 @@ void test_switch_set()
     attr.id = SAI_SWITCH_ATTR_QOS_DOT1P_TO_TC_MAP;
     attr.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_LAG, switchid);
 
-    object_reference_insert(attr.value.oid);
+    g_oids.objectReferenceInsert(attr.value.oid);
 
     status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, &dummy_success_sai_set_oid);
     META_ASSERT_FAIL(status);
@@ -646,12 +646,12 @@ void test_switch_set()
 
     sai_object_id_t oid = attr.value.oid;
 
-    object_reference_insert(attr.value.oid);
+    g_oids.objectReferenceInsert(attr.value.oid);
 
     status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, &dummy_success_sai_set_oid);
     META_ASSERT_SUCCESS(status);
 
-    META_ASSERT_TRUE(object_reference_count(attr.value.oid) == 1);
+    META_ASSERT_TRUE(g_oids.getObjectReferenceCount(attr.value.oid) == 1);
 
     attr.id = SAI_SWITCH_ATTR_QOS_DOT1P_TO_TC_MAP;
     attr.value.oid = SAI_NULL_OBJECT_ID;
@@ -659,7 +659,7 @@ void test_switch_set()
     META_ASSERT_SUCCESS(status);
 
     // check if it was decreased
-    META_ASSERT_TRUE(object_reference_count(oid) == 0);
+    META_ASSERT_TRUE(g_oids.getObjectReferenceCount(oid) == 0);
 }
 
 void test_switch_get()
@@ -746,11 +746,11 @@ void test_fdb_entry_create()
     memcpy(fdb_entry.mac_address, mac, sizeof(mac));
     fdb_entry.switch_id = switch_id;
     sai_object_id_t bridge_id = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE, switch_id);
-    object_reference_insert(bridge_id);
+    g_oids.objectReferenceInsert(bridge_id);
     fdb_entry.bv_id = bridge_id;
 
     sai_object_id_t port = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE_PORT, switch_id);
-    object_reference_insert(port);
+    g_oids.objectReferenceInsert(port);
 
     SWSS_LOG_NOTICE("create tests");
 
@@ -852,11 +852,11 @@ void test_fdb_entry_remove()
     memcpy(fdb_entry.mac_address, mac, sizeof(mac));
     fdb_entry.switch_id = switch_id;
     sai_object_id_t bridge_id = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE, switch_id);
-    object_reference_insert(bridge_id);
+    g_oids.objectReferenceInsert(bridge_id);
     fdb_entry.bv_id= bridge_id;
 
     sai_object_id_t port = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE_PORT,switch_id);
-    object_reference_insert(port);
+    g_oids.objectReferenceInsert(port);
 
     sai_attribute_t list1[3] = { };
 
@@ -993,7 +993,7 @@ void test_fdb_entry_get()
     fdb_entry.switch_id = switch_id;
 
     sai_object_id_t bridge_id = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE, switch_id);
-    object_reference_insert(bridge_id);
+    g_oids.objectReferenceInsert(bridge_id);
     fdb_entry.bv_id = bridge_id;
 
     // TODO we should use CREATE for this
@@ -1068,11 +1068,11 @@ void test_fdb_entry_flow()
     fdb_entry.switch_id = switch_id;
 
     sai_object_id_t bridge_id = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE, switch_id);
-    object_reference_insert(bridge_id);
+    g_oids.objectReferenceInsert(bridge_id);
     fdb_entry.bv_id= bridge_id;
 
     sai_object_id_t lag = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE_PORT,switch_id);
-    object_reference_insert(lag);
+    g_oids.objectReferenceInsert(lag);
 
     sai_attribute_t list[4] = { };
 
@@ -1145,7 +1145,7 @@ void test_neighbor_entry_create()
 
     // TODO we should use create
     sai_object_id_t rif = create_dummy_object_id(SAI_OBJECT_TYPE_ROUTER_INTERFACE,switch_id);
-    object_reference_insert(rif);
+    g_oids.objectReferenceInsert(rif);
     sai_object_meta_key_t meta_key_rif = { .objecttype = SAI_OBJECT_TYPE_ROUTER_INTERFACE, .objectkey = { .key = { .object_id = rif } } };
     std::string rif_key = sai_serialize_object_meta_key(meta_key_rif);
     ObjectAttrHash[rif_key] = { };
@@ -1248,7 +1248,7 @@ void test_neighbor_entry_remove()
 
     // TODO we should use create
     sai_object_id_t rif = create_dummy_object_id(SAI_OBJECT_TYPE_ROUTER_INTERFACE,switch_id);
-    object_reference_insert(rif);
+    g_oids.objectReferenceInsert(rif);
     sai_object_meta_key_t meta_key_rif = { .objecttype = SAI_OBJECT_TYPE_ROUTER_INTERFACE, .objectkey = { .key = { .object_id = rif } } };
     std::string rif_key = sai_serialize_object_meta_key(meta_key_rif);
     ObjectAttrHash[rif_key] = { };
@@ -1340,7 +1340,7 @@ void test_neighbor_entry_set()
 
     // TODO we should use create
     sai_object_id_t rif = create_dummy_object_id(SAI_OBJECT_TYPE_ROUTER_INTERFACE,switch_id);
-    object_reference_insert(rif);
+    g_oids.objectReferenceInsert(rif);
     sai_object_meta_key_t meta_key_rif = { .objecttype = SAI_OBJECT_TYPE_ROUTER_INTERFACE, .objectkey = { .key = { .object_id = rif } } };
     std::string rif_key = sai_serialize_object_meta_key(meta_key_rif);
     ObjectAttrHash[rif_key] = { };
@@ -1421,7 +1421,7 @@ void test_neighbor_entry_get()
 
     // TODO we should use create
     sai_object_id_t rif = create_dummy_object_id(SAI_OBJECT_TYPE_ROUTER_INTERFACE,switch_id);
-    object_reference_insert(rif);
+    g_oids.objectReferenceInsert(rif);
     sai_object_meta_key_t meta_key_rif = { .objecttype = SAI_OBJECT_TYPE_ROUTER_INTERFACE, .objectkey = { .key = { .object_id = rif } } };
     std::string rif_key = sai_serialize_object_meta_key(meta_key_rif);
     ObjectAttrHash[rif_key] = { };
@@ -1522,7 +1522,7 @@ void test_neighbor_entry_flow()
 
     // TODO we should use create
     sai_object_id_t rif = create_dummy_object_id(SAI_OBJECT_TYPE_ROUTER_INTERFACE,switch_id);
-    object_reference_insert(rif);
+    g_oids.objectReferenceInsert(rif);
     sai_object_meta_key_t meta_key_rif = { .objecttype = SAI_OBJECT_TYPE_ROUTER_INTERFACE, .objectkey = { .key = { .object_id = rif } } };
     std::string rif_key = sai_serialize_object_meta_key(meta_key_rif);
     ObjectAttrHash[rif_key] = { };
@@ -1597,7 +1597,7 @@ void test_vlan_create()
 
     // TODO we should use create
     sai_object_id_t stp = create_dummy_object_id(SAI_OBJECT_TYPE_STP,switch_id);
-    object_reference_insert(stp);
+    g_oids.objectReferenceInsert(stp);
     sai_object_meta_key_t meta_key_stp = { .objecttype = SAI_OBJECT_TYPE_STP, .objectkey = { .key = { .object_id = stp } } };
     std::string stp_key = sai_serialize_object_meta_key(meta_key_stp);
     ObjectAttrHash[stp_key] = { };
@@ -1647,7 +1647,7 @@ void test_vlan_remove()
 
     // TODO we should use create
     sai_object_id_t stp = create_dummy_object_id(SAI_OBJECT_TYPE_STP,switch_id);
-    object_reference_insert(stp);
+    g_oids.objectReferenceInsert(stp);
     sai_object_meta_key_t meta_key_stp = { .objecttype = SAI_OBJECT_TYPE_STP, .objectkey = { .key = { .object_id = stp } } };
     std::string stp_key = sai_serialize_object_meta_key(meta_key_stp);
     ObjectAttrHash[stp_key] = { };
@@ -1710,7 +1710,7 @@ void test_vlan_set()
 
     // TODO we should use create
     sai_object_id_t stp = create_dummy_object_id(SAI_OBJECT_TYPE_STP,switch_id);
-    object_reference_insert(stp);
+    g_oids.objectReferenceInsert(stp);
     sai_object_meta_key_t meta_key_stp = { .objecttype = SAI_OBJECT_TYPE_STP, .objectkey = { .key = { .object_id = stp } } };
     std::string stp_key = sai_serialize_object_meta_key(meta_key_stp);
     ObjectAttrHash[stp_key] = { };
@@ -1819,7 +1819,7 @@ void test_vlan_get()
 
     // TODO we should use create
     sai_object_id_t stp = create_dummy_object_id(SAI_OBJECT_TYPE_STP,switch_id);
-    object_reference_insert(stp);
+    g_oids.objectReferenceInsert(stp);
     sai_object_meta_key_t meta_key_stp = { .objecttype = SAI_OBJECT_TYPE_STP, .objectkey = { .key = { .object_id = stp } } };
     std::string stp_key = sai_serialize_object_meta_key(meta_key_stp);
     ObjectAttrHash[stp_key] = { };
@@ -1948,7 +1948,7 @@ void test_vlan_flow()
 
     // TODO we should use create
     sai_object_id_t stp = create_dummy_object_id(SAI_OBJECT_TYPE_STP,switch_id);
-    object_reference_insert(stp);
+    g_oids.objectReferenceInsert(stp);
     sai_object_meta_key_t meta_key_stp = { .objecttype = SAI_OBJECT_TYPE_STP, .objectkey = { .key = { .object_id = stp } } };
     std::string stp_key = sai_serialize_object_meta_key(meta_key_stp);
     ObjectAttrHash[stp_key] = { };
@@ -2074,13 +2074,13 @@ void test_route_entry_create()
 
     // TODO we should use create
     sai_object_id_t vr = create_dummy_object_id(SAI_OBJECT_TYPE_VIRTUAL_ROUTER,switch_id);
-    object_reference_insert(vr);
+    g_oids.objectReferenceInsert(vr);
     sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
     std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
     ObjectAttrHash[vr_key] = { };
 
     sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP,switch_id);
-    object_reference_insert(hop);
+    g_oids.objectReferenceInsert(hop);
     sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
     std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
     ObjectAttrHash[hop_key] = { };
@@ -2206,13 +2206,13 @@ void test_route_entry_remove()
 
     // TODO we should use create
     sai_object_id_t vr = create_dummy_object_id(SAI_OBJECT_TYPE_VIRTUAL_ROUTER,switch_id);
-    object_reference_insert(vr);
+    g_oids.objectReferenceInsert(vr);
     sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
     std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
     ObjectAttrHash[vr_key] = { };
 
     sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP,switch_id);
-    object_reference_insert(hop);
+    g_oids.objectReferenceInsert(hop);
     sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
     std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
     ObjectAttrHash[hop_key] = { };
@@ -2314,13 +2314,13 @@ void test_route_entry_set()
 
     // TODO we should use create
     sai_object_id_t vr = create_dummy_object_id(SAI_OBJECT_TYPE_VIRTUAL_ROUTER,switch_id);
-    object_reference_insert(vr);
+    g_oids.objectReferenceInsert(vr);
     sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
     std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
     ObjectAttrHash[vr_key] = { };
 
     sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP,switch_id);
-    object_reference_insert(hop);
+    g_oids.objectReferenceInsert(hop);
     sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
     std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
     ObjectAttrHash[hop_key] = { };
@@ -2415,13 +2415,13 @@ void test_route_entry_get()
 
     // TODO we should use create
     sai_object_id_t vr = create_dummy_object_id(SAI_OBJECT_TYPE_VIRTUAL_ROUTER,switch_id);
-    object_reference_insert(vr);
+    g_oids.objectReferenceInsert(vr);
     sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
     std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
     ObjectAttrHash[vr_key] = { };
 
     sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP,switch_id);
-    object_reference_insert(hop);
+    g_oids.objectReferenceInsert(hop);
     sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
     std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
     ObjectAttrHash[hop_key] = { };
@@ -2514,13 +2514,13 @@ void test_route_entry_flow()
 
     // TODO we should use create
     sai_object_id_t vr = create_dummy_object_id(SAI_OBJECT_TYPE_VIRTUAL_ROUTER,switch_id);
-    object_reference_insert(vr);
+    g_oids.objectReferenceInsert(vr);
     sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
     std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
     ObjectAttrHash[vr_key] = { };
 
     sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP,switch_id);
-    object_reference_insert(hop);
+    g_oids.objectReferenceInsert(hop);
     sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
     std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
     ObjectAttrHash[hop_key] = { };
@@ -2737,7 +2737,7 @@ void test_serialization_type_char()
 
     // TODO we should use create
     sai_object_id_t rif = create_dummy_object_id(SAI_OBJECT_TYPE_PORT,switch_id);
-    object_reference_insert(rif);
+    g_oids.objectReferenceInsert(rif);
     sai_object_meta_key_t meta_key_rif = { .objecttype = SAI_OBJECT_TYPE_ROUTER_INTERFACE, .objectkey = { .key = { .object_id = rif } } };
     std::string rif_key = sai_serialize_object_meta_key(meta_key_rif);
     ObjectAttrHash[rif_key] = { };
@@ -2930,7 +2930,7 @@ sai_object_id_t insert_dummy_object(
 
     // TODO we should use create
     sai_object_id_t oid = create_dummy_object_id(ot,switch_id);
-    object_reference_insert(oid);
+    g_oids.objectReferenceInsert(oid);
     sai_object_meta_key_t meta_key_oid = { .objecttype = ot, .objectkey = { .key = { .object_id = oid } } };
     std::string oid_key = sai_serialize_object_meta_key(meta_key_oid);
     ObjectAttrHash[oid_key] = { };
@@ -3167,12 +3167,12 @@ void test_queue_create()
     attr3.id = SAI_QUEUE_ATTR_PORT;
     attr3.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_PORT, switch_id);
 
-    object_reference_insert(attr3.value.oid);
+    g_oids.objectReferenceInsert(attr3.value.oid);
 
     attr4.id = SAI_QUEUE_ATTR_PARENT_SCHEDULER_NODE;
     attr4.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_SCHEDULER_GROUP, switch_id);
 
-    object_reference_insert(attr4.value.oid);
+    g_oids.objectReferenceInsert(attr4.value.oid);
 
     sai_attribute_t list[4] = { attr1, attr2, attr3, attr4 };
 
