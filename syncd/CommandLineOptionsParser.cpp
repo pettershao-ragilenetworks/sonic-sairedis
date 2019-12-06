@@ -1,6 +1,10 @@
 #include "CommandLineOptionsParser.h"
 
+#include "swss/logger.h"
+
 #include <getopt.h>
+
+#include <iostream>
 
 std::shared_ptr<CommandLineOptions> CommandLineOptionsParser::parseCommandLine(
         _In_ int argc,

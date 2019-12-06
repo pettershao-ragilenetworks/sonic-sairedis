@@ -1,6 +1,5 @@
 #pragma once
 
-#include "syncd.h"
 #include "CommandLineOptions.h"
 
 #include <memory>
