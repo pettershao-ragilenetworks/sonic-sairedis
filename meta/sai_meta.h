@@ -157,6 +157,36 @@ extern sai_status_t meta_sai_flush_fdb_entries(
         _In_ const sai_attribute_t *attr_list,
         _In_ sai_flush_fdb_entries_fn flush_fdb_entries);
 
+// API INTERFACE
+
+typedef sai_status_t (*sai_query_attribute_enum_values_capability_fn)(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_object_type_t object_type,
+        _In_ sai_attr_id_t attr_id,
+        _Inout_ sai_s32_list_t *enum_values_capability);
+
+typedef sai_status_t (*sai_object_type_get_availability_fn)(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list,
+        _Out_ uint64_t *count);
+
+sai_status_t meta_sai_query_attribute_enum_values_capability(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_object_type_t object_type,
+        _In_ sai_attr_id_t attr_id,
+        _Inout_ sai_s32_list_t *enum_values_capability,
+        _In_ sai_query_attribute_enum_values_capability_fn get);
+
+sai_status_t meta_sai_object_type_get_availability(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list,
+        _Out_ uint64_t *count,
+        _In_ sai_object_type_get_availability_fn get);
+
 // UNIT TESTS HELPERS
 
 /**

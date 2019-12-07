@@ -6622,3 +6622,273 @@ sai_status_t meta_sai_get_nat_entry(
 
     return status;
 }
+
+static sai_status_t meta_validate_sai_query_attribute_enum_values_capability(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_object_type_t object_type,
+        _In_ sai_attr_id_t attr_id,
+        _Inout_ sai_s32_list_t *enum_values_capability)
+{
+    SWSS_LOG_ENTER();
+
+    // check if switch_exists
+    sai_object_meta_key_t meta_key = { .objecttype = SAI_OBJECT_TYPE_SWITCH, .objectkey = { .key = { .object_id = switch_id } } };
+
+    if (!g_saiObjectCollection.objectExists(meta_key))
+    {
+        SWSS_LOG_ERROR("switch %s don't exists",
+                sai_serialize_object_id(switch_id).c_str());
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    // check if switch has correct obejct type
+    sai_object_type_t ot = sai_object_type_query(switch_id);
+
+    if (ot == SAI_OBJECT_TYPE_SWITCH)
+    {
+        SWSS_LOG_ERROR("switch_id %s must be object type SWITCH, but is %s",
+                sai_serialize_object_id(switch_id).c_str(),
+                sai_serialize_object_type(ot).c_str());
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    // check specified object type
+    if (object_type <= SAI_OBJECT_TYPE_NULL ||
+            object_type >= SAI_OBJECT_TYPE_EXTENSIONS_MAX)
+    {
+        SWSS_LOG_ERROR("invalid object type specified: %d, FIXME", object_type);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    // check if specified attribute is valid
+
+    auto *md = sai_metadata_get_attr_metadata(object_type, attr_id);
+
+    if (md == NULL)
+    {
+        SWSS_LOG_ERROR("failed to get metadata for object type %s and attr id %d",
+                sai_serialize_object_type(object_type).c_str(),
+                attr_id);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    // check if attribute is enum or enum list
+
+    if (!( md->isenum || md->isenumlist))
+    {
+        SWSS_LOG_ERROR("%s is not enum/enumlist", md->attridname);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    // check capability pointer
+    if (enum_values_capability == NULL)
+    {
+        SWSS_LOG_ERROR("enum_values_capability pointer is NULL");
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    VALIDATION_LIST(*md, (*enum_values_capability));
+
+    return SAI_STATUS_SUCCESS;
+}
+
+void meta_validation_post_sai_query_attribute_enum_values_capability(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_object_type_t object_type,
+        _In_ sai_attr_id_t attr_id,
+        _Inout_ sai_s32_list_t *enum_values_capability)
+{
+    SWSS_LOG_ENTER();
+
+    auto& md = *sai_metadata_get_attr_metadata(object_type, attr_id);
+
+    if (enum_values_capability->list == NULL)
+        return;
+
+    // check if returned values are valid
+    for (uint32_t index = 0; index < enum_values_capability->count; index++)
+    {
+        int32_t value = enum_values_capability->list[index];
+
+        if (!sai_metadata_is_allowed_enum_value(&md, value))
+        {
+            META_LOG_ERROR(md, "returned enum value %d is not allowed on %s:%s",
+                    value,
+                    md.attridname,
+                    md.enummetadata->name);
+        }
+    }
+}
+
+sai_status_t meta_sai_query_attribute_enum_values_capability(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_object_type_t object_type,
+        _In_ sai_attr_id_t attr_id,
+        _Inout_ sai_s32_list_t *enum_values_capability,
+        _In_ sai_query_attribute_enum_values_capability_fn get)
+{
+    SWSS_LOG_ENTER();
+
+    sai_status_t status = meta_validate_sai_query_attribute_enum_values_capability(
+            switch_id,
+            object_type,
+            attr_id,
+            enum_values_capability);
+
+    if (status != SAI_STATUS_SUCCESS)
+        return status;
+
+    // execute actual API
+
+    status = get(switch_id, object_type, attr_id, enum_values_capability);
+
+    if (status == SAI_STATUS_SUCCESS)
+    {
+        meta_validation_post_sai_query_attribute_enum_values_capability(
+                    switch_id,
+                    object_type,
+                    attr_id,
+                    enum_values_capability);
+    }
+
+    return status;
+}
+
+static sai_status_t meta_validate_sai_object_type_get_availability(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list,
+        _Out_ uint64_t *count)
+{
+    SWSS_LOG_ENTER();
+
+    // check if switch_exists
+    sai_object_meta_key_t meta_key = { .objecttype = SAI_OBJECT_TYPE_SWITCH, .objectkey = { .key = { .object_id = switch_id } } };
+
+    if (!g_saiObjectCollection.objectExists(meta_key))
+    {
+        SWSS_LOG_ERROR("switch %s don't exists",
+                sai_serialize_object_id(switch_id).c_str());
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    // check if switch has correct obejct type
+    sai_object_type_t ot = sai_object_type_query(switch_id);
+
+    if (ot == SAI_OBJECT_TYPE_SWITCH)
+    {
+        SWSS_LOG_ERROR("switch_id %s must be object type SWITCH, but is %s",
+                sai_serialize_object_id(switch_id).c_str(),
+                sai_serialize_object_type(ot).c_str());
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    // check specified object type
+    if (object_type <= SAI_OBJECT_TYPE_NULL ||
+            object_type >= SAI_OBJECT_TYPE_EXTENSIONS_MAX)
+    {
+        SWSS_LOG_ERROR("invalid object type specified: %d, FIXME", object_type);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    // check attr count
+    if (attr_count == 0 || attr_count > MAX_LIST_COUNT)
+    {
+        SWSS_LOG_ERROR("invalid attr_count %u", attr_count);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    if (attr_list == NULL)
+    {
+        SWSS_LOG_ERROR("attr_list is NULL");
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    // check if attr ids are valid
+    for (uint32_t index = 0; index < attr_count; index++)
+    {
+        auto *md = sai_metadata_get_attr_metadata(object_type, attr_list[index].id);
+
+        if (md == NULL)
+        {
+            SWSS_LOG_ERROR("failed to get metadata for object type %s and attr id %d",
+                    sai_serialize_object_type(object_type).c_str(),
+                    attr_list[index].id);
+
+            return SAI_STATUS_INVALID_PARAMETER;
+        }
+    }
+
+    // check count
+    if (count == NULL)
+    {
+        SWSS_LOG_ERROR("count pointer is NULL");
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    // TODO if attr values are needed, they need to be checked
+
+    return SAI_STATUS_SUCCESS;
+}
+
+static void meta_validation_post_sai_object_type_get_availability(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list,
+        _Out_ uint64_t *count)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO if attr values are needed, they need to be checked
+}
+
+sai_status_t meta_sai_object_type_get_availability(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list,
+        _Out_ uint64_t *count,
+        _In_ sai_object_type_get_availability_fn get)
+{
+    SWSS_LOG_ENTER();
+
+    sai_status_t status = meta_validate_sai_object_type_get_availability(
+            switch_id,
+            object_type,
+            attr_count,
+            attr_list,
+            count);
+
+    if (status != SAI_STATUS_SUCCESS)
+        return status;
+
+    // execute actual API
+
+    status = get(switch_id, object_type, attr_count, attr_list, count);
+
+    if (status == SAI_STATUS_SUCCESS)
+    {
+        meta_validation_post_sai_object_type_get_availability(
+            switch_id,
+            object_type,
+            attr_count,
+            attr_list,
+            count);
+    }
+
+    return status;
+}

@@ -260,14 +260,12 @@ sai_status_t sai_api_query(
     }
 }
 
-sai_status_t sai_query_attribute_enum_values_capability(
+static sai_status_t redis_sai_query_attribute_enum_values_capability(
         _In_ sai_object_id_t switch_id,
         _In_ sai_object_type_t object_type,
         _In_ sai_attr_id_t attr_id,
         _Inout_ sai_s32_list_t *enum_values_capability)
 {
-    MUTEX();
-
     SWSS_LOG_ENTER();
 
     const std::string switch_id_str = sai_serialize_object_id(switch_id);
@@ -410,15 +408,31 @@ sai_status_t sai_query_attribute_enum_values_capability(
     return SAI_STATUS_FAILURE;
 }
 
-sai_status_t sai_object_type_get_availability(
+sai_status_t sai_query_attribute_enum_values_capability(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_object_type_t object_type,
+        _In_ sai_attr_id_t attr_id,
+        _Inout_ sai_s32_list_t *enum_values_capability)
+{
+    MUTEX();
+
+    SWSS_LOG_ENTER();
+
+    return meta_sai_query_attribute_enum_values_capability(
+            switch_id,
+            object_type,
+            attr_id,
+            enum_values_capability,
+            &redis_sai_query_attribute_enum_values_capability);
+}
+
+static sai_status_t redis_sai_object_type_get_availability(
         _In_ sai_object_id_t switch_id,
         _In_ sai_object_type_t object_type,
         _In_ uint32_t attr_count,
         _In_ const sai_attribute_t *attr_list,
         _Out_ uint64_t *count)
 {
-    MUTEX();
-
     SWSS_LOG_ENTER();
 
     const std::string switch_id_str = sai_serialize_object_id(switch_id);
@@ -524,6 +538,26 @@ sai_status_t sai_object_type_get_availability(
 
     SWSS_LOG_ERROR("Failed to receive a response from syncd");
     return SAI_STATUS_FAILURE;
+}
+
+sai_status_t sai_object_type_get_availability(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list,
+        _Out_ uint64_t *count)
+{
+    MUTEX();
+
+    SWSS_LOG_ENTER();
+
+    return meta_sai_object_type_get_availability(
+            switch_id,
+            object_type,
+            attr_count,
+            attr_list,
+            count,
+            &redis_sai_object_type_get_availability);
 }
 
 sai_object_type_t sai_object_type_query(
