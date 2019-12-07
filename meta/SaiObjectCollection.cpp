@@ -99,7 +99,7 @@ std::shared_ptr<SaiAttrWrapper> SaiObjectCollection::getObjectAttr(
 
     /*
      * We can't throw if object don't exists, since we can call this function
-     * on create API, and then previous object will not exists, of couse we
+     * on create API, and then previous object will not exists, of course we
      * should make exists check before.
      */
 

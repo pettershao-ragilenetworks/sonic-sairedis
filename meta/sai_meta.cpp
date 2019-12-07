@@ -6642,7 +6642,7 @@ static sai_status_t meta_validate_sai_query_attribute_enum_values_capability(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    // check if switch has correct obejct type
+    // check if switch has correct object type
     sai_object_type_t ot = sai_object_type_query(switch_id);
 
     if (ot == SAI_OBJECT_TYPE_SWITCH)
@@ -6780,7 +6780,7 @@ static sai_status_t meta_validate_sai_object_type_get_availability(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    // check if switch has correct obejct type
+    // check if switch has correct object type
     sai_object_type_t ot = sai_object_type_query(switch_id);
 
     if (ot == SAI_OBJECT_TYPE_SWITCH)
