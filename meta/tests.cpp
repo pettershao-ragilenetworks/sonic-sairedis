@@ -3,6 +3,7 @@
 
 #include "OidRefCounter.h"
 #include "SaiAttrWrapper.h"
+#include "AttrKeyMap.h"
 
 #include <inttypes.h>
 #include <string.h>
@@ -21,11 +22,6 @@ extern bool is_ipv6_mask_valid(const uint8_t* mask);
 extern bool object_exists(const std::string& key);
 
 extern OidRefCounter g_oids;
-
-std::string construct_key(
-        _In_ const sai_object_meta_key_t& meta_key,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t* attr_list);
 
 sai_object_type_t sai_object_type_query(
         _In_ sai_object_id_t oid)
@@ -3134,7 +3130,7 @@ void test_construct_key()
 
     meta_key.objecttype = SAI_OBJECT_TYPE_PORT;
 
-    std::string key = construct_key(meta_key, 1, &attr);
+    std::string key = AttrKeyMap::constructKey(meta_key, 1, &attr);
 
     SWSS_LOG_NOTICE("constructed key: %s", key.c_str());
 

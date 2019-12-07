@@ -1,5 +1,6 @@
 #include "SaiAttrWrapper.h"
 #include "OidRefCounter.h"
+#include "AttrKeyMap.h"
 
 #include "sai_meta.h"
 #include "sai_serialize.h"
@@ -201,7 +202,8 @@ std::string get_attr_info(const sai_attr_metadata_t& md)
  */
 
 OidRefCounter g_oids;
-static std::unordered_map<std::string,std::string> AttributeKeys;
+AttrKeyMap g_attrKeys;
+
 std::unordered_map<std::string,std::unordered_map<sai_attr_id_t,std::shared_ptr<SaiAttrWrapper>>> ObjectAttrHash;
 
 // TODO to be removed
@@ -277,7 +279,7 @@ sai_status_t meta_init_db()
 
     g_oids.clear();
     ObjectAttrHash.clear();
-    AttributeKeys.clear();
+    g_attrKeys.clear();
 
     map_port_to_related_set.clear();
 
@@ -560,91 +562,6 @@ sai_status_t meta_genetic_validation_list(
     {\
         return status1;\
     }\
-}
-
-std::string construct_key(
-        _In_ const sai_object_meta_key_t& meta_key,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t* attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    /*
-     * Use map to make sure that keys will be always sorted by id.
-     */
-
-    std::map<int32_t, std::string> keys;
-
-    for (uint32_t idx = 0; idx < attr_count; ++idx)
-    {
-        const sai_attribute_t* attr = &attr_list[idx];
-
-        const auto& md = *sai_metadata_get_attr_metadata(meta_key.objecttype, attr->id);
-
-        const sai_attribute_value_t& value = attr->value;
-
-        if (!SAI_HAS_FLAG_KEY(md.flags))
-        {
-            continue;
-        }
-
-        std::string name = md.attridname + std::string(":");
-
-        switch (md.attrvaluetype)
-        {
-            case SAI_ATTR_VALUE_TYPE_UINT32_LIST: // only for port lanes
-
-                // NOTE: this list should be sorted
-
-                for (uint32_t i = 0; i < value.u32list.count; ++i)
-                {
-                    name += std::to_string(value.u32list.list[i]);
-
-                    if (i != value.u32list.count - 1)
-                    {
-                        name += ",";
-                    }
-                }
-
-                break;
-
-            case SAI_ATTR_VALUE_TYPE_INT32:
-                name += std::to_string(value.s32); // if enum then get enum name?
-                break;
-
-            case SAI_ATTR_VALUE_TYPE_UINT32:
-                name += std::to_string(value.u32);
-                break;
-
-            case SAI_ATTR_VALUE_TYPE_UINT8:
-                name += std::to_string(value.u8);
-                break;
-
-            case SAI_ATTR_VALUE_TYPE_UINT16:
-                name += std::to_string(value.u16);
-                break;
-
-            case SAI_ATTR_VALUE_TYPE_OBJECT_ID:
-                name += sai_serialize_object_id(value.oid);
-                break;
-
-            default:
-                META_LOG_THROW(md, "FATAL: marked as key, but have invalid serialization type");
-        }
-
-        keys[md.attrid] = name;
-    }
-
-    std::string key;
-
-    for (auto& k: keys)
-    {
-        key += k.second + ";";
-    }
-
-    SWSS_LOG_DEBUG("constructed key: %s", key.c_str());
-
-    return key;
 }
 
 sai_object_id_t meta_extract_switch_id(
@@ -1515,18 +1432,14 @@ sai_status_t meta_generic_validation_create(
 
     if (haskeys)
     {
-        std::string key = construct_key(meta_key, attr_count, attr_list);
+        std::string key = AttrKeyMap::constructKey(meta_key, attr_count, attr_list);
 
-        for (auto& it: AttributeKeys)
+        // since we didn't created oid yet, we don't know if attribute key exists, check all
+        if (g_attrKeys.attrKeyExists(key))
         {
-            // since we didn't created oid yet, we don't know if attribute key exists, check all
+            SWSS_LOG_ERROR("attribute key %s already exists, can't create", key.c_str());
 
-            if (it.second == key)
-            {
-                SWSS_LOG_ERROR("attribute key %s already exists, can't create", key.c_str());
-
-                return SAI_STATUS_INVALID_PARAMETER;
-            }
+            return SAI_STATUS_INVALID_PARAMETER;
         }
     }
 
@@ -2784,9 +2697,11 @@ void meta_generic_validation_post_create(
 
     if (haskeys)
     {
-        std::string ok = sai_serialize_object_meta_key(meta_key);
+        auto mKey = sai_serialize_object_meta_key(meta_key);
 
-        AttributeKeys[ok] = construct_key(meta_key, attr_count, attr_list);
+        auto attrKey = AttrKeyMap::constructKey(meta_key, attr_count, attr_list);
+
+        g_attrKeys.insert(mKey, attrKey);
     }
 }
 
@@ -3003,14 +2918,9 @@ void meta_generic_validation_post_remove(
 
     remove_object(meta_key);
 
-    std::string ok = sai_serialize_object_meta_key(meta_key);
+    std::string metaKey = sai_serialize_object_meta_key(meta_key);
 
-    if (AttributeKeys.find(ok) != AttributeKeys.end())
-    {
-        SWSS_LOG_DEBUG("erasing attributes key %s", AttributeKeys[ok].c_str());
-
-        AttributeKeys.erase(ok);
-    }
+    g_attrKeys.eraseMetaKey(metaKey);
 
     if (meta_key.objecttype == SAI_OBJECT_TYPE_PORT)
     {
