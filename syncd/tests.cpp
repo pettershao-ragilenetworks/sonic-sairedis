@@ -17,6 +17,7 @@ extern "C" {
 
 #include "meta/OidRefCounter.h"
 #include "meta/SaiAttrWrapper.h"
+#include "meta/SaiObjectCollection.h"
 
 #include <map>
 #include <unordered_map>
@@ -156,9 +157,7 @@ void test_enable_recording()
     ASSERT_SUCCESS("Failed to enable recording");
 }
 
-extern std::unordered_map<std::string,
-       std::unordered_map<sai_attr_id_t,
-       std::shared_ptr<SaiAttrWrapper>>> ObjectAttrHash;
+extern SaiObjectCollection g_saiObjectCollection;
 
 extern OidRefCounter g_oids;
 
@@ -254,8 +253,7 @@ void test_bulk_next_hop_group_member_create()
     sai_object_id_t hopgroup = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP_GROUP);
     g_oids.objectReferenceInsert(hopgroup);
     sai_object_meta_key_t meta_key_hopgruop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP_GROUP, .objectkey = { .key = { .object_id = hopgroup } } };
-    std::string hopgroup_key = sai_serialize_object_meta_key(meta_key_hopgruop);
-    ObjectAttrHash[hopgroup_key] = { };
+    g_saiObjectCollection.createObject(meta_key_hopgruop);
     sai_object_id_t hopgroup_vid = translate_rid_to_vid(hopgroup, switch_id);
 
     for (uint32_t i = 0; i <  count; ++i)
@@ -265,7 +263,7 @@ void test_bulk_next_hop_group_member_create()
         g_oids.objectReferenceInsert(hop);
         sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
         std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
-        ObjectAttrHash[hop_key] = { };
+        g_saiObjectCollection.createObject(meta_key_hop);
         sai_object_id_t hop_vid = translate_rid_to_vid(hop, switch_id);
 
         std::vector<sai_attribute_t> list(2);
@@ -356,21 +354,21 @@ void test_bulk_fdb_create()
         g_oids.objectReferenceInsert(vr);
         sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
         std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
-        ObjectAttrHash[vr_key] = { };
+        g_saiObjectCollection.createObject(meta_key_vr);
 
         // bridge port
         sai_object_id_t bridge_port = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE_PORT);
         g_oids.objectReferenceInsert(bridge_port);
         sai_object_meta_key_t meta_key_bridge_port = { .objecttype = SAI_OBJECT_TYPE_BRIDGE_PORT, .objectkey = { .key = { .object_id = bridge_port } } };
         std::string bridge_port_key = sai_serialize_object_meta_key(meta_key_bridge_port);
-        ObjectAttrHash[bridge_port_key] = { };
+        g_saiObjectCollection.createObject(meta_key_bridge_port);
 
         // bridge
         sai_object_id_t bridge = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE);
         g_oids.objectReferenceInsert(bridge);
         sai_object_meta_key_t meta_key_bridge = { .objecttype = SAI_OBJECT_TYPE_BRIDGE, .objectkey = { .key = { .object_id = bridge } } };
         std::string bridge_key = sai_serialize_object_meta_key(meta_key_bridge);
-        ObjectAttrHash[bridge_key] = { };
+        g_saiObjectCollection.createObject(meta_key_bridge);
 
         sai_fdb_entry_t fdb_entry;
         fdb_entry.switch_id = switch_id;
@@ -467,14 +465,14 @@ void test_bulk_route_set()
         g_oids.objectReferenceInsert(vr);
         sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
         std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
-        ObjectAttrHash[vr_key] = { };
+        g_saiObjectCollection.createObject(meta_key_vr);
 
         // next hop
         sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP);
         g_oids.objectReferenceInsert(hop);
         sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
         std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
-        ObjectAttrHash[hop_key] = { };
+        g_saiObjectCollection.createObject(meta_key_hop);
 
         route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
         route_entry.destination.addr.ip4 = htonl(0x0a000000 | i);

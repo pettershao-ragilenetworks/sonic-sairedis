@@ -1,6 +1,8 @@
 #include "SaiAttrWrapper.h"
 #include "OidRefCounter.h"
 #include "AttrKeyMap.h"
+#include "Globals.h"
+#include "SaiObjectCollection.h"
 
 #include "sai_meta.h"
 #include "sai_serialize.h"
@@ -177,25 +179,6 @@ std::vector<const sai_attr_metadata_t*> get_attributes_metadata(
 }
 
 
-std::string get_attr_info(const sai_attr_metadata_t& md)
-{
-    SWSS_LOG_ENTER();
-
-    /*
-     * Attribute name will contain object type as well so we don't need to
-     * serialize object type separately.
-     */
-
-    return std::string(md.attridname) + ":" + sai_serialize_attr_value_type(md.attrvaluetype);
-}
-
-#define META_LOG_WARN(md, format, ...) SWSS_LOG_WARN("%s " format, get_attr_info(md).c_str(), ##__VA_ARGS__)
-#define META_LOG_ERROR(md, format, ...) SWSS_LOG_ERROR("%s " format, get_attr_info(md).c_str(), ##__VA_ARGS__)
-#define META_LOG_DEBUG(md, format, ...) SWSS_LOG_DEBUG("%s " format, get_attr_info(md).c_str(), ##__VA_ARGS__)
-#define META_LOG_NOTICE(md, format, ...) SWSS_LOG_NOTICE("%s " format, get_attr_info(md).c_str(), ##__VA_ARGS__)
-#define META_LOG_INFO(md, format, ...) SWSS_LOG_INFO("%s " format, get_attr_info(md).c_str(), ##__VA_ARGS__)
-#define META_LOG_THROW(md, format, ...) SWSS_LOG_THROW("%s " format, get_attr_info(md).c_str(), ##__VA_ARGS__)
-
 /*
  * Non object is don't need reference count since they are leafs and can be
  * removed at any time.
@@ -203,8 +186,7 @@ std::string get_attr_info(const sai_attr_metadata_t& md)
 
 OidRefCounter g_oids;
 AttrKeyMap g_attrKeys;
-
-std::unordered_map<std::string,std::unordered_map<sai_attr_id_t,std::shared_ptr<SaiAttrWrapper>>> ObjectAttrHash;
+SaiObjectCollection g_saiObjectCollection;
 
 // TODO to be removed
 void dump_object_reference()
@@ -244,28 +226,6 @@ void dump_object_reference()
 
 // GENERIC REFERENCE FUNCTIONS
 
-bool object_exists(
-        _In_ const std::string& key)
-{
-    SWSS_LOG_ENTER();
-
-    bool exists = ObjectAttrHash.find(key) != ObjectAttrHash.end();
-
-    SWSS_LOG_DEBUG("%s %s", key.c_str(), exists ? "exists" : "missing");
-
-    return exists;
-}
-
-bool object_exists(
-        _In_ const sai_object_meta_key_t& meta_key)
-{
-    SWSS_LOG_ENTER();
-
-    std::string key = sai_serialize_object_meta_key(meta_key);
-
-    return object_exists(key);
-}
-
 // make sure db is initialized before usage
 static sai_status_t inited = meta_init_db();
 
@@ -278,7 +238,7 @@ sai_status_t meta_init_db()
      */
 
     g_oids.clear();
-    ObjectAttrHash.clear();
+    g_saiObjectCollection.clear();
     g_attrKeys.clear();
 
     map_port_to_related_set.clear();
@@ -286,117 +246,13 @@ sai_status_t meta_init_db()
     return SAI_STATUS_SUCCESS;
 }
 
-const sai_attribute_t* get_object_previous_attr(
-        _In_ const sai_object_meta_key_t& meta_key,
+std::shared_ptr<SaiAttrWrapper> get_object_previous_attr(
+        _In_ const sai_object_meta_key_t& metaKey,
         _In_ const sai_attr_metadata_t& md)
 {
     SWSS_LOG_ENTER();
 
-    std::string key = sai_serialize_object_meta_key(meta_key);
-
-    auto it = ObjectAttrHash.find(key);
-
-    if (it == ObjectAttrHash.end())
-    {
-        SWSS_LOG_ERROR("object key %s not found", key.c_str());
-
-        return NULL;
-    }
-
-    auto ita = it->second.find(md.attrid);
-
-    if (ita == it->second.end())
-    {
-        /*
-         * Attribute id not found.
-         */
-
-        return NULL;
-    }
-
-    /*
-     * NOTE: this is actually dangerous since we possibly expose memory on
-     * attribute list that could be already freed.
-     */
-
-    return ita->second->getSaiAttr();
-}
-
-void set_object(
-        _In_ const sai_object_meta_key_t& meta_key,
-        _In_ const sai_attr_metadata_t& md,
-        _In_ const sai_attribute_t *attr)
-{
-    SWSS_LOG_ENTER();
-
-    std::string key = sai_serialize_object_meta_key(meta_key);
-
-    if (!object_exists(key))
-    {
-        SWSS_LOG_THROW("FATAL: object %s doesn't exist", key.c_str());
-    }
-
-    META_LOG_DEBUG(md, "set attribute %d on %s", attr->id, key.c_str());
-
-    ObjectAttrHash[key][attr->id] = std::make_shared<SaiAttrWrapper>(&md, *attr);
-}
-
-const std::vector<std::shared_ptr<SaiAttrWrapper>> get_object_attributes(
-        _In_ const sai_object_meta_key_t& meta_key)
-{
-    SWSS_LOG_ENTER();
-
-    std::string key = sai_serialize_object_meta_key(meta_key);
-
-    if (!object_exists(key))
-    {
-        SWSS_LOG_THROW("FATAL: object %s doesn't exist", key.c_str());
-    }
-
-    std::vector<std::shared_ptr<SaiAttrWrapper>> attrs;
-
-    const auto& hash = ObjectAttrHash[key];
-
-    for (auto it = hash.begin(); it != hash.end(); ++it)
-    {
-        attrs.push_back(it->second);
-    }
-
-    return attrs;
-}
-
-void remove_object(
-        _In_ const sai_object_meta_key_t& meta_key)
-{
-    SWSS_LOG_ENTER();
-
-    std::string key = sai_serialize_object_meta_key(meta_key);
-
-    if (!object_exists(key))
-    {
-        SWSS_LOG_THROW("FATAL: object %s doesn't exist", key.c_str());
-    }
-
-    SWSS_LOG_DEBUG("removing object %s", key.c_str());
-
-    ObjectAttrHash.erase(key);
-}
-
-void create_object(
-        _In_ const sai_object_meta_key_t& meta_key)
-{
-    SWSS_LOG_ENTER();
-
-    std::string key = sai_serialize_object_meta_key(meta_key);
-
-    if (object_exists(key))
-    {
-        SWSS_LOG_THROW("FATAL: object %s already exists", key.c_str());
-    }
-
-    SWSS_LOG_DEBUG("creating object %s", key.c_str());
-
-    ObjectAttrHash[key] = {};
+    return g_saiObjectCollection.getObjectAttr(metaKey, md.attrid);
 }
 
 sai_status_t meta_generic_validation_objlist(
@@ -791,7 +647,7 @@ sai_status_t meta_generic_validation_create(
 
         sai_object_meta_key_t switch_meta_key = { .objecttype = SAI_OBJECT_TYPE_SWITCH, .objectkey = { .key = { .object_id = switch_id } } };
 
-        if (!object_exists(switch_meta_key))
+        if (!g_saiObjectCollection.objectExists(switch_meta_key))
         {
             SWSS_LOG_ERROR("switch id 0x%" PRIx64 " doesn't exist yet", switch_id);
 
@@ -1209,7 +1065,7 @@ sai_status_t meta_generic_validation_create(
         // just sanity check if object already exists
         std::string key = sai_serialize_object_meta_key(meta_key);
 
-        if (object_exists(key))
+        if (g_saiObjectCollection.objectExists(key))
         {
             SWSS_LOG_ERROR("object key %s already exists", key.c_str());
 
@@ -1300,7 +1156,7 @@ sai_status_t meta_generic_validation_create(
                 }
                 else
                 {
-                    mode = (sai_buffer_pool_threshold_mode_t)prev->value.s32;
+                    mode = (sai_buffer_pool_threshold_mode_t)prev->getSaiAttr()->value.s32;
                 }
 
                 if ((mode == SAI_BUFFER_POOL_THRESHOLD_MODE_DYNAMIC && md.attrid == SAI_BUFFER_PROFILE_ATTR_SHARED_DYNAMIC_TH) ||
@@ -1468,20 +1324,20 @@ bool meta_is_object_in_default_state(
 
     std::string key = sai_serialize_object_meta_key(meta_key);
 
-    if (!object_exists(key))
+    if (!g_saiObjectCollection.objectExists(key))
     {
         SWSS_LOG_WARN("object %s don't exists in local database, bug!",
                 sai_serialize_object_id(oid).c_str());
         return false;
     }
 
-    auto& attrs =  ObjectAttrHash[key];
+    auto attrs = g_saiObjectCollection.getObject(meta_key)->getAttributes();
 
     for (const auto& attr: attrs)
     {
-        auto &md = *attr.second->getSaiAttrMetadata();
+        auto &md = *attr->getSaiAttrMetadata();
 
-        auto *a = attr.second->getSaiAttr();
+        auto *a = attr->getSaiAttr();
 
         if (md.isreadonly)
             continue;
@@ -1594,7 +1450,7 @@ sai_status_t meta_generic_validation_remove(
 
     std::string key = sai_serialize_object_meta_key(meta_key);
 
-    if (!object_exists(key))
+    if (!g_saiObjectCollection.objectExists(key))
     {
         SWSS_LOG_ERROR("object key %s doesn't exist", key.c_str());
 
@@ -2082,7 +1938,7 @@ sai_status_t meta_generic_validation_set(
 
     std::string key = sai_serialize_object_meta_key(meta_key);
 
-    if (!object_exists(key))
+    if (!g_saiObjectCollection.objectExists(key))
     {
         META_LOG_ERROR(md, "object key %s doesn't exist", key.c_str());
 
@@ -2375,7 +2231,7 @@ sai_status_t meta_generic_validation_get(
 
     std::string key = sai_serialize_object_meta_key(meta_key);
 
-    if (!object_exists(key))
+    if (!g_saiObjectCollection.objectExists(key))
     {
         SWSS_LOG_ERROR("object key %s doesn't exist", key.c_str());
 
@@ -2440,7 +2296,7 @@ void meta_generic_validation_post_create(
 
     std::string key = sai_serialize_object_meta_key(meta_key);
 
-    if (object_exists(key))
+    if (g_saiObjectCollection.objectExists(key))
     {
         if (warmBoot && meta_key.objecttype == SAI_OBJECT_TYPE_SWITCH)
         {
@@ -2460,7 +2316,7 @@ void meta_generic_validation_post_create(
     }
     else
     {
-        create_object(meta_key);
+        g_saiObjectCollection.createObject(meta_key);
     }
 
     auto info = sai_metadata_get_object_type_info(meta_key.objecttype);
@@ -2692,7 +2548,7 @@ void meta_generic_validation_post_create(
                 META_LOG_THROW(md, "serialization type is not supported yet FIXME");
         }
 
-        set_object(meta_key, md, attr);
+        g_saiObjectCollection.setObjectAttr(meta_key, md, attr);
     }
 
     if (haskeys)
@@ -2767,7 +2623,7 @@ void meta_generic_validation_post_remove(
 
     // get all attributes that was set
 
-    for (auto&it: get_object_attributes(meta_key))
+    for (auto&it: g_saiObjectCollection.getObject(meta_key)->getAttributes())
     {
         const sai_attribute_t* attr = it->getSaiAttr();
 
@@ -2916,7 +2772,7 @@ void meta_generic_validation_post_remove(
         g_oids.objectReferenceRemove(meta_key.objectkey.key.object_id);
     }
 
-    remove_object(meta_key);
+    g_saiObjectCollection.removeObject(meta_key);
 
     std::string metaKey = sai_serialize_object_meta_key(meta_key);
 
@@ -2986,12 +2842,12 @@ void meta_generic_validation_post_set(
         case SAI_ATTR_VALUE_TYPE_OBJECT_ID:
 
             {
-                const sai_attribute_t *previous_attr = get_object_previous_attr(meta_key, md);
+                auto prev = get_object_previous_attr(meta_key, md);
 
-                if (previous_attr != NULL)
+                if (prev != NULL)
                 {
                     // decrease previous if it was set
-                    g_oids.objectReferenceDecrement(previous_attr->value.oid);
+                    g_oids.objectReferenceDecrement(prev->getSaiAttr()->value.oid);
                 }
 
                 g_oids.objectReferenceIncrement(value.oid);
@@ -3002,12 +2858,12 @@ void meta_generic_validation_post_set(
         case SAI_ATTR_VALUE_TYPE_OBJECT_LIST:
 
             {
-                const sai_attribute_t *previous_attr = get_object_previous_attr(meta_key, md);
+                auto prev = get_object_previous_attr(meta_key, md);
 
-                if (previous_attr != NULL)
+                if (prev != NULL)
                 {
                     // decrease previous if it was set
-                    g_oids.objectReferenceDecrement(previous_attr->value.objlist);
+                    g_oids.objectReferenceDecrement(prev->getSaiAttr()->value.objlist);
                 }
 
                 g_oids.objectReferenceIncrement(value.objlist);
@@ -3035,17 +2891,17 @@ void meta_generic_validation_post_set(
         case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_OBJECT_ID:
 
             {
-                const sai_attribute_t *previous_attr = get_object_previous_attr(meta_key, md);
+                auto prev = get_object_previous_attr(meta_key, md);
 
-                if (previous_attr != NULL)
+                if (prev)
                 {
                     // decrease previous if it was set
-                    if (previous_attr->value.aclfield.enable)
-                    g_oids.objectReferenceDecrement(previous_attr->value.aclfield.data.oid);
+                    if (prev->getSaiAttr()->value.aclfield.enable)
+                        g_oids.objectReferenceDecrement(prev->getSaiAttr()->value.aclfield.data.oid);
                 }
 
                 if (value.aclfield.enable)
-                g_oids.objectReferenceIncrement(value.aclfield.data.oid);
+                    g_oids.objectReferenceIncrement(value.aclfield.data.oid);
 
                 break;
             }
@@ -3053,17 +2909,17 @@ void meta_generic_validation_post_set(
         case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_OBJECT_LIST:
 
             {
-                const sai_attribute_t *previous_attr = get_object_previous_attr(meta_key, md);
+                auto prev = get_object_previous_attr(meta_key, md);
 
-                if (previous_attr != NULL)
+                if (prev)
                 {
                     // decrease previous if it was set
-                    if (previous_attr->value.aclfield.enable)
-                    g_oids.objectReferenceDecrement(previous_attr->value.aclfield.data.objlist);
+                    if (prev->getSaiAttr()->value.aclfield.enable)
+                        g_oids.objectReferenceDecrement(prev->getSaiAttr()->value.aclfield.data.objlist);
                 }
 
                 if (value.aclfield.enable)
-                g_oids.objectReferenceIncrement(value.aclfield.data.objlist);
+                    g_oids.objectReferenceIncrement(value.aclfield.data.objlist);
 
                 break;
             }
@@ -3088,34 +2944,34 @@ void meta_generic_validation_post_set(
         case SAI_ATTR_VALUE_TYPE_ACL_ACTION_DATA_OBJECT_ID:
 
             {
-                const sai_attribute_t *previous_attr = get_object_previous_attr(meta_key, md);
+                auto prev = get_object_previous_attr(meta_key, md);
 
-                if (previous_attr != NULL)
+                if (prev)
                 {
                     // decrease previous if it was set
-                    if (previous_attr->value.aclaction.enable)
-                    g_oids.objectReferenceDecrement(previous_attr->value.aclaction.parameter.oid);
+                    if (prev->getSaiAttr()->value.aclaction.enable)
+                        g_oids.objectReferenceDecrement(prev->getSaiAttr()->value.aclaction.parameter.oid);
                 }
 
                 if (value.aclaction.enable)
-                g_oids.objectReferenceIncrement(value.aclaction.parameter.oid);
+                    g_oids.objectReferenceIncrement(value.aclaction.parameter.oid);
                 break;
             }
 
         case SAI_ATTR_VALUE_TYPE_ACL_ACTION_DATA_OBJECT_LIST:
 
             {
-                const sai_attribute_t *previous_attr = get_object_previous_attr(meta_key, md);
+                auto prev = get_object_previous_attr(meta_key, md);
 
-                if (previous_attr != NULL)
+                if (prev)
                 {
                     // decrease previous if it was set
-                    if (previous_attr->value.aclaction.enable)
-                    g_oids.objectReferenceDecrement(previous_attr->value.aclaction.parameter.objlist);
+                    if (prev->getSaiAttr()->value.aclaction.enable)
+                        g_oids.objectReferenceDecrement(prev->getSaiAttr()->value.aclaction.parameter.objlist);
                 }
 
                 if (value.aclaction.enable)
-                g_oids.objectReferenceIncrement(value.aclaction.parameter.objlist);
+                    g_oids.objectReferenceIncrement(value.aclaction.parameter.objlist);
 
                 break;
             }
@@ -3144,7 +3000,7 @@ void meta_generic_validation_post_set(
     // only on create we need to increase entry object types members
     // save actual attributes and values to local db
 
-    set_object(meta_key, md, attr);
+    g_saiObjectCollection.setObjectAttr(meta_key, md, attr);
 }
 
 void meta_generic_validation_post_get_objlist(
@@ -3243,9 +3099,9 @@ void meta_generic_validation_post_get_objlist(
 
             g_oids.objectReferenceInsert(oid);
 
-            if (!object_exists(key))
+            if (!g_saiObjectCollection.objectExists(key))
             {
-                create_object(key);
+                g_saiObjectCollection.createObject(key);
             }
         }
 
@@ -3610,7 +3466,7 @@ sai_status_t meta_sai_validate_fdb_entry(
 
     if (create)
     {
-        if (object_exists(key_fdb))
+        if (g_saiObjectCollection.objectExists(key_fdb))
         {
             SWSS_LOG_ERROR("object key %s already exists", key_fdb.c_str());
 
@@ -3622,7 +3478,7 @@ sai_status_t meta_sai_validate_fdb_entry(
 
     // set, get, remove
 
-    if (!object_exists(key_fdb) && !get)
+    if (!g_saiObjectCollection.objectExists(key_fdb) && !get)
     {
         SWSS_LOG_ERROR("object key %s doesn't exist", key_fdb.c_str());
 
@@ -3873,7 +3729,7 @@ sai_status_t meta_sai_validate_mcast_fdb_entry(
 
     std::string key_bv = sai_serialize_object_meta_key(meta_key_bv);
 
-    if (!object_exists(key_bv))
+    if (!g_saiObjectCollection.objectExists(key_bv))
     {
         SWSS_LOG_ERROR("object key %s doesn't exist", key_bv.c_str());
 
@@ -3888,7 +3744,7 @@ sai_status_t meta_sai_validate_mcast_fdb_entry(
 
     if (create)
     {
-        if (object_exists(key_fdb))
+        if (g_saiObjectCollection.objectExists(key_fdb))
         {
             SWSS_LOG_ERROR("object key %s already exists", key_fdb.c_str());
 
@@ -3900,7 +3756,7 @@ sai_status_t meta_sai_validate_mcast_fdb_entry(
 
     // set, get, remove
 
-    if (!object_exists(key_fdb) && !get)
+    if (!g_saiObjectCollection.objectExists(key_fdb) && !get)
     {
         SWSS_LOG_ERROR("object key %s doesn't exist", key_fdb.c_str());
 
@@ -4165,7 +4021,7 @@ sai_status_t meta_sai_validate_neighbor_entry(
 
     std::string key_rif = sai_serialize_object_meta_key(meta_key_rif);
 
-    if (!object_exists(key_rif))
+    if (!g_saiObjectCollection.objectExists(key_rif))
     {
         SWSS_LOG_ERROR("object key %s doesn't exist", key_rif.c_str());
 
@@ -4178,7 +4034,7 @@ sai_status_t meta_sai_validate_neighbor_entry(
 
     if (create)
     {
-        if (object_exists(key_neighbor))
+        if (g_saiObjectCollection.objectExists(key_neighbor))
         {
             SWSS_LOG_ERROR("object key %s already exists", key_neighbor.c_str());
 
@@ -4190,7 +4046,7 @@ sai_status_t meta_sai_validate_neighbor_entry(
 
     // set, get, remove
 
-    if (!object_exists(key_neighbor))
+    if (!g_saiObjectCollection.objectExists(key_neighbor))
     {
         SWSS_LOG_ERROR("object key %s doesn't exist", key_neighbor.c_str());
 
@@ -4465,7 +4321,7 @@ sai_status_t meta_sai_validate_route_entry(
 
     std::string key_vr = sai_serialize_object_meta_key(meta_key_vr);
 
-    if (!object_exists(key_vr))
+    if (!g_saiObjectCollection.objectExists(key_vr))
     {
         SWSS_LOG_ERROR("object key %s doesn't exist", key_vr.c_str());
 
@@ -4480,7 +4336,7 @@ sai_status_t meta_sai_validate_route_entry(
 
     if (create)
     {
-        if (object_exists(key_route))
+        if (g_saiObjectCollection.objectExists(key_route))
         {
             SWSS_LOG_ERROR("object key %s already exists", key_route.c_str());
 
@@ -4492,7 +4348,7 @@ sai_status_t meta_sai_validate_route_entry(
 
     // set, get, remove
 
-    if (!object_exists(key_route))
+    if (!g_saiObjectCollection.objectExists(key_route))
     {
         SWSS_LOG_ERROR("object key %s doesn't exist", key_route.c_str());
 
@@ -4781,7 +4637,7 @@ sai_status_t meta_sai_validate_l2mc_entry(
 
     std::string key_bv = sai_serialize_object_meta_key(meta_key_bv);
 
-    if (!object_exists(key_bv))
+    if (!g_saiObjectCollection.objectExists(key_bv))
     {
         SWSS_LOG_ERROR("object key %s doesn't exist", key_bv.c_str());
 
@@ -4796,7 +4652,7 @@ sai_status_t meta_sai_validate_l2mc_entry(
 
     if (create)
     {
-        if (object_exists(key_route))
+        if (g_saiObjectCollection.objectExists(key_route))
         {
             SWSS_LOG_ERROR("object key %s already exists", key_route.c_str());
 
@@ -4808,7 +4664,7 @@ sai_status_t meta_sai_validate_l2mc_entry(
 
     // set, get, remove
 
-    if (!object_exists(key_route))
+    if (!g_saiObjectCollection.objectExists(key_route))
     {
         SWSS_LOG_ERROR("object key %s doesn't exist", key_route.c_str());
 
@@ -5097,7 +4953,7 @@ sai_status_t meta_sai_validate_ipmc_entry(
 
     std::string key_bv = sai_serialize_object_meta_key(meta_key_bv);
 
-    if (!object_exists(key_bv))
+    if (!g_saiObjectCollection.objectExists(key_bv))
     {
         SWSS_LOG_ERROR("object key %s doesn't exist", key_bv.c_str());
 
@@ -5112,7 +4968,7 @@ sai_status_t meta_sai_validate_ipmc_entry(
 
     if (create)
     {
-        if (object_exists(key_route))
+        if (g_saiObjectCollection.objectExists(key_route))
         {
             SWSS_LOG_ERROR("object key %s already exists", key_route.c_str());
 
@@ -5124,7 +4980,7 @@ sai_status_t meta_sai_validate_ipmc_entry(
 
     // set, get, remove
 
-    if (!object_exists(key_route))
+    if (!g_saiObjectCollection.objectExists(key_route))
     {
         SWSS_LOG_ERROR("object key %s doesn't exist", key_route.c_str());
 
@@ -5607,7 +5463,7 @@ sai_status_t meta_sai_validate_oid(
 
     std::string key_oid = sai_serialize_object_meta_key(meta_key_oid);
 
-    if (!object_exists(key_oid))
+    if (!g_saiObjectCollection.objectExists(key_oid))
     {
         SWSS_LOG_ERROR("object key %s doesn't exist", key_oid.c_str());
 
@@ -6055,34 +5911,41 @@ void meta_sai_on_fdb_flush_event_consolidated(
 {
     SWSS_LOG_ENTER();
 
+    SWSS_LOG_TIMER("fdb flush");
+
     // since we don't keep objects by type, we need to scan via all objects
     // and find fdb entries
 
+    // TODO on flush we need to respect switch id, and remove fdb entries only
+    // from selected switch when adding multiple switch support
+
     auto bpid = sai_metadata_get_attr_by_id(SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID, data.attr_count, data.attr);
     auto type = sai_metadata_get_attr_by_id(SAI_FDB_ENTRY_ATTR_TYPE, data.attr_count, data.attr);
+
+    if (type == NULL)
+    {
+        SWSS_LOG_ERROR("FATAL: fdb flush notification don't contain SAI_FDB_ENTRY_ATTR_TYPE attribute! bug!, no entries were flushed in local DB!");
+        return;
+    }
 
     SWSS_LOG_NOTICE("processing consolidated fdb flush event of type: %s",
             sai_metadata_get_fdb_entry_type_name((sai_fdb_entry_type_t)type->value.s32));
 
     std::vector<sai_object_meta_key_t> toremove;
 
-    for (auto it = ObjectAttrHash.begin(); it != ObjectAttrHash.end(); ++it)
-    {
-        const std::string &key_fdb = it->first;
+    auto fdbEntries = g_saiObjectCollection.getObjectsByObjectType(SAI_OBJECT_TYPE_FDB_ENTRY);
 
-        if (strstr(key_fdb.c_str(), "bvid") == NULL)
+    for (auto& fdb: fdbEntries)
+    {
+        auto fdbTypeAttr = fdb->getAttr(SAI_FDB_ENTRY_ATTR_TYPE);
+
+        if (!fdbTypeAttr)
         {
-            // this is not fdb_entry key
+            SWSS_LOG_ERROR("FATAL: missing SAI_FDB_ENTRY_ATTR_TYPE on %s! bug! skipping flush", fdb->getStrMetaKey().c_str());
             continue;
         }
 
-        sai_object_meta_key_t meta_key_fdb;
-
-        meta_key_fdb.objecttype = SAI_OBJECT_TYPE_FDB_ENTRY;
-
-        sai_deserialize_object_meta_key(key_fdb, meta_key_fdb);
-
-        if (it->second.at(SAI_FDB_ENTRY_ATTR_TYPE)->getSaiAttr()->value.s32 != type->value.s32)
+        if (fdbTypeAttr->getSaiAttr()->value.s32 != type->value.s32)
         {
             // entry type is not matching on this fdb entry
             continue;
@@ -6092,18 +5955,22 @@ void meta_sai_on_fdb_flush_event_consolidated(
         // since vendor can add this attribute to fdb_entry with NULL value
         if (bpid != NULL && bpid->value.oid != SAI_NULL_OBJECT_ID)
         {
-            if (it->second.find(SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID) == it->second.end())
+            auto bpidAttr = fdb->getAttr(SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID);
+
+            if (!bpidAttr)
             {
                 // port is not defined for this fdb entry
                 continue;
             }
 
-            if (it->second.at(SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID)->getSaiAttr()->value.oid != bpid->value.oid)
+            if (bpidAttr->getSaiAttr()->value.oid != bpid->value.oid)
             {
                 // bridge port is not matching this fdb entry
                 continue;
             }
         }
+
+        auto& meta_key_fdb = fdb->getMetaKey();
 
         if (data.fdb_entry.bv_id != SAI_NULL_OBJECT_ID)
         {
@@ -6116,9 +5983,9 @@ void meta_sai_on_fdb_flush_event_consolidated(
 
         // this fdb entry is matching, removing
 
-        SWSS_LOG_INFO("removing %s", key_fdb.c_str());
+        SWSS_LOG_INFO("removing %s", fdb->getStrMetaKey().c_str());
 
-        // since meta_generic_validation_post_remove also modifies ObjectAttrHash
+        // since meta_generic_validation_post_remove also modifies g_saiObjectCollection
         // we need to push this to a vector and remove in next loop
         toremove.push_back(meta_key_fdb);
     }
@@ -6153,8 +6020,8 @@ void meta_fdb_event_snoop_oid(
 
     g_oids.objectReferenceInsert(oid);
 
-    if (!object_exists(key))
-        create_object(key);
+    if (!g_saiObjectCollection.objectExists(key))
+        g_saiObjectCollection.createObject(key);
 
     /*
      * In normal operation orch agent should query or create all bridge, vlan
@@ -6211,7 +6078,7 @@ void meta_sai_on_fdb_event_single(
     {
         case SAI_FDB_EVENT_LEARNED:
 
-            if (object_exists(key_fdb))
+            if (g_saiObjectCollection.objectExists(key_fdb))
             {
                 SWSS_LOG_WARN("object key %s alearedy exists, but received LEARNED event", key_fdb.c_str());
                 break;
@@ -6251,7 +6118,7 @@ void meta_sai_on_fdb_event_single(
 
         case SAI_FDB_EVENT_AGED:
 
-            if (!object_exists(key_fdb))
+            if (!g_saiObjectCollection.objectExists(key_fdb))
             {
                 SWSS_LOG_WARN("object key %s doesn't exist but received AGED event", key_fdb.c_str());
                 break;
@@ -6269,7 +6136,7 @@ void meta_sai_on_fdb_event_single(
                 break;
             }
 
-            if (!object_exists(key_fdb))
+            if (!g_saiObjectCollection.objectExists(key_fdb))
             {
                 SWSS_LOG_WARN("object key %s doesn't exist but received FLUSHED event", key_fdb.c_str());
                 break;
@@ -6281,7 +6148,7 @@ void meta_sai_on_fdb_event_single(
 
         case SAI_FDB_EVENT_MOVE:
 
-            if (!object_exists(key_fdb))
+            if (!g_saiObjectCollection.objectExists(key_fdb))
             {
                 SWSS_LOG_WARN("object key %s doesn't exist but received FDB MOVE event", key_fdb.c_str());
                 break;
@@ -6525,7 +6392,7 @@ sai_status_t meta_sai_validate_nat_entry(
 
     std::string key_vr = sai_serialize_object_meta_key(meta_key_vr);
 
-    if (!object_exists(key_vr))
+    if (!g_saiObjectCollection.objectExists(key_vr))
     {
         SWSS_LOG_ERROR("object key %s doesn't exist", key_vr.c_str());
 
@@ -6539,7 +6406,7 @@ sai_status_t meta_sai_validate_nat_entry(
 
     if (create)
     {
-        if (object_exists(key_nat))
+        if (g_saiObjectCollection.objectExists(key_nat))
         {
             SWSS_LOG_ERROR("object key %s already exists", key_nat.c_str());
 
@@ -6550,7 +6417,7 @@ sai_status_t meta_sai_validate_nat_entry(
     }
 
     // set, get, remove
-    if (!object_exists(key_nat))
+    if (!g_saiObjectCollection.objectExists(key_nat))
     {
         SWSS_LOG_ERROR("object key %s doesn't exist", key_nat.c_str());
 

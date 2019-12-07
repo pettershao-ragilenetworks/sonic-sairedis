@@ -4,6 +4,7 @@
 #include "OidRefCounter.h"
 #include "SaiAttrWrapper.h"
 #include "AttrKeyMap.h"
+#include "SaiObjectCollection.h"
 
 #include <inttypes.h>
 #include <string.h>
@@ -17,9 +18,8 @@
 
 using namespace saimeta;
 
-extern std::unordered_map<std::string,std::unordered_map<sai_attr_id_t,std::shared_ptr<SaiAttrWrapper>>> ObjectAttrHash;
+extern SaiObjectCollection g_saiObjectCollection;
 extern bool is_ipv6_mask_valid(const uint8_t* mask);
-extern bool object_exists(const std::string& key);
 
 extern OidRefCounter g_oids;
 
@@ -895,13 +895,13 @@ void test_fdb_entry_remove()
 
     std::string key = sai_serialize_object_meta_key(meta);
 
-    META_ASSERT_TRUE(object_exists(key));
+    META_ASSERT_TRUE(g_saiObjectCollection.objectExists(key));
 
     SWSS_LOG_NOTICE("success");
     status = meta_sai_remove_fdb_entry(&fdb_entry, &dummy_success_sai_remove_fdb_entry);
     META_ASSERT_SUCCESS(status);
 
-    META_ASSERT_TRUE(!object_exists(key));
+    META_ASSERT_TRUE(!g_saiObjectCollection.objectExists(key));
 }
 
 void test_fdb_entry_set()
@@ -926,7 +926,7 @@ void test_fdb_entry_set()
     // TODO we should use CREATE for this
     sai_object_meta_key_t meta_key_fdb = { .objecttype = SAI_OBJECT_TYPE_FDB_ENTRY, .objectkey = { .key = { .fdb_entry = fdb_entry } } };
     std::string fdb_key = sai_serialize_object_meta_key(meta_key_fdb);
-    ObjectAttrHash[fdb_key] = { };
+    g_saiObjectCollection.createObject(meta_key_fdb);
 
     SWSS_LOG_NOTICE("attr is null");
     status = meta_sai_set_fdb_entry(&fdb_entry, NULL, &dummy_success_sai_set_fdb_entry);
@@ -995,7 +995,7 @@ void test_fdb_entry_get()
     // TODO we should use CREATE for this
     sai_object_meta_key_t meta_key_fdb = { .objecttype = SAI_OBJECT_TYPE_FDB_ENTRY, .objectkey = { .key = { .fdb_entry = fdb_entry } } };
     std::string fdb_key = sai_serialize_object_meta_key(meta_key_fdb);
-    ObjectAttrHash[fdb_key] = { };
+    g_saiObjectCollection.createObject(meta_key_fdb);
 
     attr.id = SAI_FDB_ENTRY_ATTR_TYPE;
     attr.value.s32 = SAI_FDB_ENTRY_TYPE_STATIC;
@@ -1144,7 +1144,7 @@ void test_neighbor_entry_create()
     g_oids.objectReferenceInsert(rif);
     sai_object_meta_key_t meta_key_rif = { .objecttype = SAI_OBJECT_TYPE_ROUTER_INTERFACE, .objectkey = { .key = { .object_id = rif } } };
     std::string rif_key = sai_serialize_object_meta_key(meta_key_rif);
-    ObjectAttrHash[rif_key] = { };
+    g_saiObjectCollection.createObject(meta_key_rif);
 
     neighbor_entry.ip_address.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     neighbor_entry.ip_address.addr.ip4 = htonl(0x0a00000f);
@@ -1247,7 +1247,7 @@ void test_neighbor_entry_remove()
     g_oids.objectReferenceInsert(rif);
     sai_object_meta_key_t meta_key_rif = { .objecttype = SAI_OBJECT_TYPE_ROUTER_INTERFACE, .objectkey = { .key = { .object_id = rif } } };
     std::string rif_key = sai_serialize_object_meta_key(meta_key_rif);
-    ObjectAttrHash[rif_key] = { };
+    g_saiObjectCollection.createObject(meta_key_rif);
 
     neighbor_entry.ip_address.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     neighbor_entry.ip_address.addr.ip4 = htonl(0x0a00000f);
@@ -1298,13 +1298,13 @@ void test_neighbor_entry_remove()
 
     std::string key = sai_serialize_object_meta_key(meta);
 
-    META_ASSERT_TRUE(object_exists(key));
+    META_ASSERT_TRUE(g_saiObjectCollection.objectExists(key));
 
     SWSS_LOG_NOTICE("success");
     status = meta_sai_remove_neighbor_entry(&neighbor_entry, &dummy_success_sai_remove_neighbor_entry);
     META_ASSERT_SUCCESS(status);
 
-    META_ASSERT_TRUE(!object_exists(key));
+    META_ASSERT_TRUE(!g_saiObjectCollection.objectExists(key));
 }
 
 void test_neighbor_entry_set()
@@ -1339,7 +1339,7 @@ void test_neighbor_entry_set()
     g_oids.objectReferenceInsert(rif);
     sai_object_meta_key_t meta_key_rif = { .objecttype = SAI_OBJECT_TYPE_ROUTER_INTERFACE, .objectkey = { .key = { .object_id = rif } } };
     std::string rif_key = sai_serialize_object_meta_key(meta_key_rif);
-    ObjectAttrHash[rif_key] = { };
+    g_saiObjectCollection.createObject(meta_key_rif);
 
     neighbor_entry.ip_address.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     neighbor_entry.ip_address.addr.ip4 = htonl(0x0a00000f);
@@ -1420,7 +1420,7 @@ void test_neighbor_entry_get()
     g_oids.objectReferenceInsert(rif);
     sai_object_meta_key_t meta_key_rif = { .objecttype = SAI_OBJECT_TYPE_ROUTER_INTERFACE, .objectkey = { .key = { .object_id = rif } } };
     std::string rif_key = sai_serialize_object_meta_key(meta_key_rif);
-    ObjectAttrHash[rif_key] = { };
+    g_saiObjectCollection.createObject(meta_key_rif);
 
     neighbor_entry.ip_address.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     neighbor_entry.ip_address.addr.ip4 = htonl(0x0a00000f);
@@ -1521,7 +1521,7 @@ void test_neighbor_entry_flow()
     g_oids.objectReferenceInsert(rif);
     sai_object_meta_key_t meta_key_rif = { .objecttype = SAI_OBJECT_TYPE_ROUTER_INTERFACE, .objectkey = { .key = { .object_id = rif } } };
     std::string rif_key = sai_serialize_object_meta_key(meta_key_rif);
-    ObjectAttrHash[rif_key] = { };
+    g_saiObjectCollection.createObject(meta_key_rif);
 
     neighbor_entry.ip_address.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     neighbor_entry.ip_address.addr.ip4 = htonl(0x0a00000f);
@@ -1596,7 +1596,7 @@ void test_vlan_create()
     g_oids.objectReferenceInsert(stp);
     sai_object_meta_key_t meta_key_stp = { .objecttype = SAI_OBJECT_TYPE_STP, .objectkey = { .key = { .object_id = stp } } };
     std::string stp_key = sai_serialize_object_meta_key(meta_key_stp);
-    ObjectAttrHash[stp_key] = { };
+    g_saiObjectCollection.createObject(meta_key_stp);
 
     SWSS_LOG_NOTICE("create tests");
 
@@ -1646,7 +1646,7 @@ void test_vlan_remove()
     g_oids.objectReferenceInsert(stp);
     sai_object_meta_key_t meta_key_stp = { .objecttype = SAI_OBJECT_TYPE_STP, .objectkey = { .key = { .object_id = stp } } };
     std::string stp_key = sai_serialize_object_meta_key(meta_key_stp);
-    ObjectAttrHash[stp_key] = { };
+    g_saiObjectCollection.createObject(meta_key_stp);
 
     SWSS_LOG_NOTICE("create");
 
@@ -1709,7 +1709,7 @@ void test_vlan_set()
     g_oids.objectReferenceInsert(stp);
     sai_object_meta_key_t meta_key_stp = { .objecttype = SAI_OBJECT_TYPE_STP, .objectkey = { .key = { .object_id = stp } } };
     std::string stp_key = sai_serialize_object_meta_key(meta_key_stp);
-    ObjectAttrHash[stp_key] = { };
+    g_saiObjectCollection.createObject(meta_key_stp);
 
     SWSS_LOG_NOTICE("create");
 
@@ -1818,7 +1818,7 @@ void test_vlan_get()
     g_oids.objectReferenceInsert(stp);
     sai_object_meta_key_t meta_key_stp = { .objecttype = SAI_OBJECT_TYPE_STP, .objectkey = { .key = { .object_id = stp } } };
     std::string stp_key = sai_serialize_object_meta_key(meta_key_stp);
-    ObjectAttrHash[stp_key] = { };
+    g_saiObjectCollection.createObject(meta_key_stp);
 
     SWSS_LOG_NOTICE("create");
 
@@ -1947,7 +1947,7 @@ void test_vlan_flow()
     g_oids.objectReferenceInsert(stp);
     sai_object_meta_key_t meta_key_stp = { .objecttype = SAI_OBJECT_TYPE_STP, .objectkey = { .key = { .object_id = stp } } };
     std::string stp_key = sai_serialize_object_meta_key(meta_key_stp);
-    ObjectAttrHash[stp_key] = { };
+    g_saiObjectCollection.createObject(meta_key_stp);
 
     SWSS_LOG_NOTICE("create");
 
@@ -2073,13 +2073,13 @@ void test_route_entry_create()
     g_oids.objectReferenceInsert(vr);
     sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
     std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
-    ObjectAttrHash[vr_key] = { };
+    g_saiObjectCollection.createObject(meta_key_vr);
 
     sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP,switch_id);
     g_oids.objectReferenceInsert(hop);
     sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
     std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
-    ObjectAttrHash[hop_key] = { };
+    g_saiObjectCollection.createObject(meta_key_hop);
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     route_entry.destination.addr.ip4 = htonl(0x0a00000f);
@@ -2205,13 +2205,13 @@ void test_route_entry_remove()
     g_oids.objectReferenceInsert(vr);
     sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
     std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
-    ObjectAttrHash[vr_key] = { };
+    g_saiObjectCollection.createObject(meta_key_vr);
 
     sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP,switch_id);
     g_oids.objectReferenceInsert(hop);
     sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
     std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
-    ObjectAttrHash[hop_key] = { };
+    g_saiObjectCollection.createObject(meta_key_hop);
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     route_entry.destination.addr.ip4 = htonl(0x0a00000f);
@@ -2278,13 +2278,13 @@ void test_route_entry_remove()
 
     std::string key = sai_serialize_object_meta_key(meta);
 
-    META_ASSERT_TRUE(object_exists(key));
+    META_ASSERT_TRUE(g_saiObjectCollection.objectExists(key));
 
     SWSS_LOG_NOTICE("success");
     status = meta_sai_remove_route_entry(&route_entry, &dummy_success_sai_remove_route_entry);
     META_ASSERT_SUCCESS(status);
 
-    META_ASSERT_TRUE(!object_exists(key));
+    META_ASSERT_TRUE(!g_saiObjectCollection.objectExists(key));
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     route_entry.destination.addr.ip4 = htonl(0x0a00000f);
@@ -2313,13 +2313,13 @@ void test_route_entry_set()
     g_oids.objectReferenceInsert(vr);
     sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
     std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
-    ObjectAttrHash[vr_key] = { };
+    g_saiObjectCollection.createObject(meta_key_vr);
 
     sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP,switch_id);
     g_oids.objectReferenceInsert(hop);
     sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
     std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
-    ObjectAttrHash[hop_key] = { };
+    g_saiObjectCollection.createObject(meta_key_hop);
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     route_entry.destination.addr.ip4 = htonl(0x0a00000f);
@@ -2414,13 +2414,13 @@ void test_route_entry_get()
     g_oids.objectReferenceInsert(vr);
     sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
     std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
-    ObjectAttrHash[vr_key] = { };
+    g_saiObjectCollection.createObject(meta_key_vr);
 
     sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP,switch_id);
     g_oids.objectReferenceInsert(hop);
     sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
     std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
-    ObjectAttrHash[hop_key] = { };
+    g_saiObjectCollection.createObject(meta_key_hop);
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     route_entry.destination.addr.ip4 = htonl(0x0a00000f);
@@ -2513,13 +2513,13 @@ void test_route_entry_flow()
     g_oids.objectReferenceInsert(vr);
     sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
     std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
-    ObjectAttrHash[vr_key] = { };
+    g_saiObjectCollection.createObject(meta_key_vr);
 
     sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP,switch_id);
     g_oids.objectReferenceInsert(hop);
     sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
     std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
-    ObjectAttrHash[hop_key] = { };
+    g_saiObjectCollection.createObject(meta_key_hop);
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     route_entry.destination.addr.ip4 = htonl(0x0a00000f);
@@ -2736,7 +2736,7 @@ void test_serialization_type_char()
     g_oids.objectReferenceInsert(rif);
     sai_object_meta_key_t meta_key_rif = { .objecttype = SAI_OBJECT_TYPE_ROUTER_INTERFACE, .objectkey = { .key = { .object_id = rif } } };
     std::string rif_key = sai_serialize_object_meta_key(meta_key_rif);
-    ObjectAttrHash[rif_key] = { };
+    g_saiObjectCollection.createObject(meta_key_rif);
 
     sai_attribute_t attr, attr2, attr3;
 
@@ -2929,7 +2929,7 @@ sai_object_id_t insert_dummy_object(
     g_oids.objectReferenceInsert(oid);
     sai_object_meta_key_t meta_key_oid = { .objecttype = ot, .objectkey = { .key = { .object_id = oid } } };
     std::string oid_key = sai_serialize_object_meta_key(meta_key_oid);
-    ObjectAttrHash[oid_key] = { };
+    g_saiObjectCollection.createObject(meta_key_oid);
 
     return oid;
 }
