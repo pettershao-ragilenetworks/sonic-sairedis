@@ -18,9 +18,13 @@ namespace saimeta
 
             virtual ~SaiAttrWrapper();
 
+        public:
+
             const sai_attribute_t* getSaiAttr() const;
 
             const sai_attr_metadata_t* getSaiAttrMetadata() const;
+
+            sai_attr_id_t getAttrId() const;
 
         private:
 

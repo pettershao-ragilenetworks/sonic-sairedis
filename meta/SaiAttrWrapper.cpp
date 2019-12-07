@@ -61,3 +61,10 @@ const sai_attr_metadata_t* SaiAttrWrapper::getSaiAttrMetadata() const
     return m_meta;
 }
 
+sai_attr_id_t SaiAttrWrapper::getAttrId() const
+{
+    SWSS_LOG_ENTER();
+
+    return m_attr.id;
+}
+
