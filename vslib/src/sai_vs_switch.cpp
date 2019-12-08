@@ -14,6 +14,8 @@
 
 #include <thread>
 
+using namespace saivs;
+
 /**
  * @brief Get SwitchState by switch id.
  *
@@ -313,6 +315,10 @@ sai_status_t vs_create_switch(
     if (status == SAI_STATUS_SUCCESS)
     {
         vs_create_netlink_message_listener(*switch_id);
+
+        auto sw = std::make_shared<Switch>(*switch_id, attr_count, attr_list);
+
+        g_switchContainer->insert(sw);
     }
 
     return status;
@@ -327,13 +333,55 @@ sai_status_t vs_remove_switch(
 
     vs_remove_netlink_message_listener(switch_id);
 
-    return meta_sai_remove_oid(
+    sai_status_t status = meta_sai_remove_oid(
             SAI_OBJECT_TYPE_SWITCH,
             switch_id,
             &vs_generic_remove);
+
+    if (status == SAI_STATUS_SUCCESS)
+    {
+        // remove switch from container
+
+        g_switchContainer->removeSwitch(switch_id);
+    }
+
+    return status;
 }
 
-VS_SET(SWITCH,switch);
+sai_status_t vs_set_switch_attribute(
+        _In_ sai_object_id_t switch_id,
+        _In_ const sai_attribute_t *attr)
+{
+    MUTEX();
+
+    SWSS_LOG_ENTER();
+
+    sai_status_t status = meta_sai_set_oid(
+            SAI_OBJECT_TYPE_SWITCH,
+            switch_id,
+            attr,
+            &vs_generic_set);
+
+    if (status == SAI_STATUS_SUCCESS)
+    {
+        auto sw = g_switchContainer->getSwitch(switch_id);
+
+        if (!sw)
+        {
+            SWSS_LOG_THROW("failed to find switch %s in container",
+                    sai_serialize_object_id(switch_id).c_str());
+        }
+
+        /*
+         * When doing SET operation user may want to update notification
+         * pointers.
+         */
+        sw->updateNotifications(1, attr);
+    }
+
+    return status;
+}
+
 VS_GET(SWITCH,switch);
 VS_GENERIC_STATS(SWITCH, switch);
 

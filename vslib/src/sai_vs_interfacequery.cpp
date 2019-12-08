@@ -12,6 +12,8 @@
 #include "swss/notificationconsumer.h"
 #include "swss/select.h"
 
+#include "SwitchContainer.h"
+
 using namespace saivs;
 
 bool                    g_vs_hostif_use_tap_device = false;
@@ -32,6 +34,8 @@ std::map<uint32_t,std::string> g_lane_to_ifname;
 std::map<std::string,std::vector<uint32_t>> g_ifname_to_lanes;
 std::vector<uint32_t> g_lane_order;
 std::vector<std::vector<uint32_t>> g_laneMap;
+
+std::shared_ptr<SwitchContainer>          g_switchContainer;
 
 const char *g_boot_type             = NULL;
 const char *g_warm_boot_read_file   = NULL;
@@ -467,6 +471,8 @@ void clear_local_state()
     SWSS_LOG_ENTER();
 
     SWSS_LOG_NOTICE("clearing local state");
+
+    g_switchContainer = std::make_shared<SwitchContainer>();
 
     /*
      * Initialize metadata database.

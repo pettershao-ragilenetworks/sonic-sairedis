@@ -11,6 +11,7 @@ extern "C" {
 #include "meta/sai_meta.h"
 
 #include "Globals.h"
+#include "SwitchContainer.h"
 
 #include <mutex>
 
@@ -57,6 +58,8 @@ extern std::vector<std::vector<uint32_t>> g_laneMap;
 
 extern void getPortLaneMap(
         _Inout_ std::vector<std::vector<uint32_t>> &laneMap);
+
+extern std::shared_ptr<saivs::SwitchContainer>           g_switchContainer;
 
 extern const sai_acl_api_t              vs_acl_api;
 extern const sai_bfd_api_t              vs_bfd_api;
