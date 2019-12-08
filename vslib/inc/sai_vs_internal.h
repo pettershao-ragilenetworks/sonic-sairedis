@@ -1,6 +1,5 @@
 
-#define MUTEX() std::lock_guard<std::recursive_mutex> \
-    lock(g_recursive_mutex)
+#define MUTEX() std::lock_guard<std::recursive_mutex> _lock(saivs::Globals::apimutex)
 
 // object id
 

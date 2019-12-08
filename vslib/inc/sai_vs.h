@@ -10,6 +10,8 @@ extern "C" {
 #include "swss/tokenize.h"
 #include "meta/sai_meta.h"
 
+#include "Globals.h"
+
 #include <mutex>
 
 #define SAI_VS_MAX_PORTS 1024

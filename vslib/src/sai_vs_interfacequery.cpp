@@ -12,10 +12,10 @@
 #include "swss/notificationconsumer.h"
 #include "swss/select.h"
 
-bool                    g_api_initialized = false;
+using namespace saivs;
+
 bool                    g_vs_hostif_use_tap_device = false;
 sai_vs_switch_type_t    g_vs_switch_type = SAI_VS_SWITCH_TYPE_NONE;
-std::recursive_mutex    g_recursive_mutex;
 
 volatile bool                               g_unittestChannelRun;
 swss::SelectableEvent                       g_unittestChannelThreadEvent;
@@ -385,7 +385,7 @@ void processFdbEntriesForAging()
 {
     SWSS_LOG_ENTER();
 
-    if (!g_recursive_mutex.try_lock())
+    if (!Globals::apimutex.try_lock())
     {
         return;
     }
@@ -436,7 +436,7 @@ void processFdbEntriesForAging()
         }
     }
 
-    g_recursive_mutex.unlock();
+    Globals::apimutex.unlock();
 }
 
 void fdbAgingThreadProc()
@@ -698,7 +698,7 @@ sai_status_t sai_api_initialize(
 
     SWSS_LOG_ENTER();
 
-    if (g_api_initialized)
+    if (Globals::apiInitialized)
     {
         SWSS_LOG_ERROR("api already initialized");
 
@@ -802,7 +802,7 @@ sai_status_t sai_api_initialize(
     // TODO should this be moved to create switch and SwitchState?
     g_fdbAgingThread = std::make_shared<std::thread>(std::thread(fdbAgingThreadProc));
 
-    g_api_initialized = true;
+    Globals::apiInitialized = true;
 
     return SAI_STATUS_SUCCESS;
 }
@@ -813,7 +813,7 @@ sai_status_t sai_api_uninitialize(void)
 
     SWSS_LOG_ENTER();
 
-    if (!g_api_initialized)
+    if (!Globals::apiInitialized)
     {
         SWSS_LOG_ERROR("api not initialized");
 
@@ -833,7 +833,7 @@ sai_status_t sai_api_uninitialize(void)
 
     g_fdbAgingThread->join();
 
-    g_api_initialized = false;
+    Globals::apiInitialized = false;
 
     return SAI_STATUS_SUCCESS;
 }
@@ -868,7 +868,7 @@ sai_status_t sai_api_query(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    if (!g_api_initialized)
+    if (!Globals::apiInitialized)
     {
         SWSS_LOG_ERROR("SAI API not initialized before calling API query");
         return SAI_STATUS_UNINITIALIZED;
