@@ -36,7 +36,25 @@ sai_switch_notifications_t getSwitchNotifications(
 // We are assuming that notifications that has "count" member and don't have
 // explicit switch_id defined in struct (like fdb event), they will always come
 // from the same switch instance (same switch id). This is because we can define
-// different notifications pointers per switch instance.
+// different notifications pointers per switch instance. Similar notification
+// on_queue_pfc_deadlock_notification which only have queue_id
+
+static void process_metadata_on_switch_state_change(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_switch_oper_status_t switch_oper_status)
+{
+    MUTEX();
+
+    SWSS_LOG_ENTER();
+
+    // NOTE: this meta api must be under mutex since
+    // it will access meta DB and notification comes
+    // from different thread
+    //
+    // TODO move this to future notification processor
+
+    meta_sai_on_switch_state_change(switch_id, switch_oper_status);
+}
 
 void handle_switch_state_change(
         _In_ const std::string &data)
@@ -50,6 +68,8 @@ void handle_switch_state_change(
 
     sai_deserialize_switch_oper_status(data, switch_id, switch_oper_status);
 
+    process_metadata_on_switch_state_change(switch_id, switch_oper_status);
+
     auto sn = getSwitchNotifications(switch_id);
 
     if (sn.on_switch_state_change != NULL)
@@ -58,7 +78,7 @@ void handle_switch_state_change(
     }
 }
 
-void process_metadata_on_fdb_event(
+static void process_metadata_on_fdb_event(
         _In_ uint32_t count,
         _In_ sai_fdb_event_notification_data_t* data)
 {
@@ -105,6 +125,23 @@ void handle_fdb_event(
     sai_deserialize_free_fdb_event_ntf(count, fdbevent);
 }
 
+static void process_metadata_on_port_state_change(
+        _In_ uint32_t count,
+        _In_ const sai_port_oper_status_notification_t *data)
+{
+    MUTEX();
+
+    SWSS_LOG_ENTER();
+
+    // NOTE: this meta api must be under mutex since
+    // it will access meta DB and notification comes
+    // from different thread
+    //
+    // TODO move this to future notification processor
+
+    meta_sai_on_port_state_change(count, data);
+}
+
 void handle_port_state_change(
         _In_ const std::string &data)
 {
@@ -116,6 +153,8 @@ void handle_port_state_change(
     sai_port_oper_status_notification_t *portoperstatus = NULL;
 
     sai_deserialize_port_oper_status_ntf(data, count, &portoperstatus);
+
+    process_metadata_on_port_state_change(count, portoperstatus);
 
     sai_object_id_t switchId = SAI_NULL_OBJECT_ID;
 
@@ -133,6 +172,22 @@ void handle_port_state_change(
     sai_deserialize_free_port_oper_status_ntf(count, portoperstatus);
 }
 
+static void process_metadata_on_switch_shutdown_request(
+        _In_ sai_object_id_t switch_id)
+{
+    MUTEX();
+
+    SWSS_LOG_ENTER();
+
+    // NOTE: this meta api must be under mutex since
+    // it will access meta DB and notification comes
+    // from different thread
+    //
+    // TODO move this to future notification processor
+
+    meta_sai_on_switch_shutdown_request(switch_id);
+}
+
 void handle_switch_shutdown_request(
         _In_ const std::string &data)
 {
@@ -143,6 +198,8 @@ void handle_switch_shutdown_request(
     sai_object_id_t switch_id;
 
     sai_deserialize_switch_shutdown_request(data, switch_id);
+
+    process_metadata_on_switch_shutdown_request(switch_id);
 
     auto sn = getSwitchNotifications(switch_id);
 
@@ -163,6 +220,23 @@ void handle_packet_event(
     SWSS_LOG_ERROR("not implemented");
 }
 
+static void process_metadata_on_queue_pfc_deadlock_notification(
+        _In_ uint32_t count,
+        _In_ const sai_queue_deadlock_notification_data_t *data)
+{
+    MUTEX();
+
+    SWSS_LOG_ENTER();
+
+    // NOTE: this meta api must be under mutex since
+    // it will access meta DB and notification comes
+    // from different thread
+    //
+    // TODO move this to future notification processor
+
+    meta_sai_on_queue_pfc_deadlock_notification(count, data);
+}
+
 void handle_queue_deadlock_event(
         _In_ const std::string &data)
 {
@@ -174,6 +248,8 @@ void handle_queue_deadlock_event(
     sai_queue_deadlock_notification_data_t *ntfData = NULL;
 
     sai_deserialize_queue_deadlock_ntf(data, count, &ntfData);
+
+    process_metadata_on_queue_pfc_deadlock_notification(count, ntfData);
 
     // TODO metadata validate under mutex, possible snoop queue_id
 
@@ -200,7 +276,19 @@ void handle_notification(
 {
     SWSS_LOG_ENTER();
 
-    // TODO to pass switch_id for every notification we could add it to values at syncd side
+    // TODO to pass switch_id for every notification we could add it to values
+    // at syncd side
+    //
+    // Each global context (syncd) will have it's own notification thread
+    // handler, so we will know at which context notification arrived, but we
+    // also need to know at which switch id generated this notification. For
+    // that we will assign separate notification handlers in syncd itself, and
+    // each of those notifications will know to which switch id it belongs.
+    // Then later we could also check whether oids in notification actually
+    // belongs to given switch id.  This way we could find vendor bugs like
+    // sending notifications from one switch to another switch handler.
+    //
+    // But before that we will extract switch id from notification itself.
 
     if (g_record)
     {
