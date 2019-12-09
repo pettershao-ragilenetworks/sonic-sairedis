@@ -4,6 +4,8 @@ extern "C" {
 #include "saimetadata.h"
 }
 
+#include <string>
+
 namespace sairedis
 {
     class Switch
@@ -37,6 +39,12 @@ namespace sairedis
 
             sai_object_id_t getSwitchId() const;
 
+            const std::string& getHardwareInfo() const;
+
+            static std::string getHardwareInfo(
+                    _In_ uint32_t attrCount,
+                    _In_ const sai_attribute_t *attrList);
+
         private:
 
             sai_object_id_t m_switchId;
@@ -47,5 +55,7 @@ namespace sairedis
              * Each switch instance can have it's own notifications defined.
              */
             sai_switch_notifications_t m_switchNotifications;
+
+            std::string m_hardwareInfo;
     };
 }
