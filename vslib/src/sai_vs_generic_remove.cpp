@@ -124,7 +124,7 @@ sai_status_t vs_generic_remove(
 
     std::string str_object_id = sai_serialize_object_id(object_id);
 
-    sai_object_id_t switch_id = sai_switch_id_query(object_id);
+    sai_object_id_t switch_id = g_realObjectIdManager->saiSwitchIdQuery(object_id);
 
     /*
      * Perform db dump if warm restart was requested.
@@ -161,7 +161,7 @@ sai_status_t vs_generic_remove(
     {
         SWSS_LOG_NOTICE("removed switch: %s", sai_serialize_object_id(object_id).c_str());
 
-        vs_free_real_object_id(object_id);
+        g_realObjectIdManager->releaseObjectId(object_id);
 
         switch (g_vs_switch_type)
         {

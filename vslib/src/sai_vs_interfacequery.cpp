@@ -13,6 +13,7 @@
 #include "swss/select.h"
 
 #include "SwitchContainer.h"
+#include "RealObjectIdManager.h"
 
 using namespace saivs;
 
@@ -36,6 +37,7 @@ std::vector<uint32_t> g_lane_order;
 std::vector<std::vector<uint32_t>> g_laneMap;
 
 std::shared_ptr<SwitchContainer>          g_switchContainer;
+std::shared_ptr<RealObjectIdManager>      g_realObjectIdManager;
 
 const char *g_boot_type             = NULL;
 const char *g_warm_boot_read_file   = NULL;
@@ -95,7 +97,7 @@ void channelOpSetReadOnlyAttribute(
 
     sai_deserialize_object_id(str_object_id, object_id);
 
-    sai_object_type_t ot = sai_object_type_query(object_id);
+    sai_object_type_t ot = g_realObjectIdManager->saiObjectTypeQuery(object_id);
 
     if (ot != object_type)
     {
@@ -182,7 +184,7 @@ void channelOpSetStats(
 
     sai_deserialize_object_id(key, oid);
 
-    sai_object_type_t ot = sai_object_type_query(oid);
+    sai_object_type_t ot = g_realObjectIdManager->saiObjectTypeQuery(oid);
 
     if (ot == SAI_OBJECT_TYPE_NULL)
     {
@@ -480,17 +482,9 @@ void clear_local_state()
 
     meta_init_db();
 
-    /*
-     * Reset used switch ids.
-     */
-
-    vs_clear_switch_ids();
-
-    /*
-     * Reset real counter id values
-     */
-
-    vs_reset_id_counter();
+    // TODO since we create new manager, we need to create new meta db with
+    // updated functions for query object type and switch id
+    g_realObjectIdManager = std::make_shared<RealObjectIdManager>(0);
 }
 
 bool check_ifname(
@@ -990,4 +984,36 @@ sai_status_t sai_object_type_get_availability(
     }
 
     return SAI_STATUS_NOT_SUPPORTED;
+}
+
+sai_object_type_t sai_object_type_query(
+        _In_ sai_object_id_t objectId)
+{
+    MUTEX();
+
+    SWSS_LOG_ENTER();
+
+    if (!Globals::apiInitialized)
+    {
+        SWSS_LOG_ERROR("SAI API not initialized before calling sai_object_type_query");
+        return SAI_OBJECT_TYPE_NULL;
+    }
+
+    return g_realObjectIdManager->saiObjectTypeQuery(objectId);
+}
+
+sai_object_id_t sai_switch_id_query(
+        _In_ sai_object_id_t objectId)
+{
+    MUTEX();
+
+    SWSS_LOG_ENTER();
+
+    if (!Globals::apiInitialized)
+    {
+        SWSS_LOG_ERROR("SAI API not initialized before calling sai_switch_id_query");
+        return SAI_OBJECT_TYPE_NULL;
+    }
+
+    return g_realObjectIdManager->saiSwitchIdQuery(objectId);
 }

@@ -97,7 +97,7 @@ sai_status_t vs_generic_stats_function(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    sai_object_type_t ot = sai_object_type_query(object_id);
+    sai_object_type_t ot = g_realObjectIdManager->saiObjectTypeQuery(object_id);
 
     if (ot != object_type)
     {

@@ -12,6 +12,7 @@ extern "C" {
 
 #include "Globals.h"
 #include "SwitchContainer.h"
+#include "RealObjectIdManager.h"
 
 #include <mutex>
 
@@ -60,6 +61,7 @@ extern void getPortLaneMap(
         _Inout_ std::vector<std::vector<uint32_t>> &laneMap);
 
 extern std::shared_ptr<saivs::SwitchContainer>           g_switchContainer;
+extern std::shared_ptr<saivs::RealObjectIdManager>       g_realObjectIdManager;
 
 extern const sai_acl_api_t              vs_acl_api;
 extern const sai_bfd_api_t              vs_bfd_api;

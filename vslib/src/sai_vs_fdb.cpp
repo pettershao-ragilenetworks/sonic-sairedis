@@ -144,7 +144,7 @@ sai_status_t internal_vs_flush_fdb_entries(
 
             sai_deserialize_fdb_entry(it->first, fi.fdb_entry);
 
-            if (sai_object_type_query(fi.fdb_entry.bv_id) == SAI_OBJECT_TYPE_VLAN)
+            if (g_realObjectIdManager->saiObjectTypeQuery(fi.fdb_entry.bv_id) == SAI_OBJECT_TYPE_VLAN)
             {
                 sai_attribute_t attr;
 

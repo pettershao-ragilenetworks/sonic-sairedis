@@ -64,7 +64,7 @@ static bool vs_get_object_list(
 
     objlist.clear();
 
-    sai_object_type_t object_type = sai_object_type_query(object_id);
+    sai_object_type_t object_type = g_realObjectIdManager->saiObjectTypeQuery(object_id);
 
     auto* meta = sai_metadata_get_attr_metadata(object_type, attr_id);
 
@@ -149,7 +149,7 @@ bool vs_check_object_default_state(
 {
     SWSS_LOG_ENTER();
 
-    sai_object_type_t object_type = sai_object_type_query(object_id);
+    sai_object_type_t object_type = g_realObjectIdManager->saiObjectTypeQuery(object_id);
 
     if (object_type == SAI_OBJECT_TYPE_NULL)
     {
@@ -365,7 +365,7 @@ sai_status_t vs_check_port_dependencies(
         return SAI_STATUS_FAILURE;
     }
 
-    sai_object_type_t ot = sai_object_type_query(port_id);
+    sai_object_type_t ot = g_realObjectIdManager->saiObjectTypeQuery(port_id);
 
     if (ot != SAI_OBJECT_TYPE_PORT)
     {
@@ -498,7 +498,7 @@ sai_status_t vs_remove_port(
         // so we just need to execute remove for virtual switch db
 
         status = vs_generic_remove(
-                sai_object_type_query(oid),
+                g_realObjectIdManager->saiObjectTypeQuery(oid),
                 oid);
 
         if (status != SAI_STATUS_SUCCESS)
@@ -507,7 +507,7 @@ sai_status_t vs_remove_port(
             // port related objects: queues, ipgs, sg
 
             SWSS_LOG_THROW("FATAL: failed to removed port related oid: %s: %s, bug!",
-                    sai_serialize_object_type(sai_object_type_query(oid)).c_str(),
+                    sai_serialize_object_type(g_realObjectIdManager->saiObjectTypeQuery(oid)).c_str(),
                     sai_serialize_object_id(oid).c_str());
         }
     }

@@ -6,6 +6,8 @@
 
 #include "swss/selectableevent.h"
 
+#include "RealObjectIdManager.h"
+
 #include <unordered_map>
 #include <string>
 #include <set>
@@ -155,11 +157,11 @@ class SwitchState
         {
             SWSS_LOG_ENTER();
 
-            if (sai_object_type_query(switch_id) != SAI_OBJECT_TYPE_SWITCH)
+            if (g_realObjectIdManager->saiObjectTypeQuery(switch_id) != SAI_OBJECT_TYPE_SWITCH)
             {
                 SWSS_LOG_THROW("object %s is not SWITCH, its %s",
                         sai_serialize_object_id(switch_id).c_str(),
-                        sai_serialize_object_type(sai_object_type_query(switch_id)).c_str());
+                        sai_serialize_object_type(g_realObjectIdManager->saiObjectTypeQuery(switch_id)).c_str());
             }
 
             for (int i = SAI_OBJECT_TYPE_NULL; i < (int)SAI_OBJECT_TYPE_EXTENSIONS_MAX; ++i)
@@ -311,16 +313,7 @@ typedef std::map<sai_object_id_t, std::shared_ptr<SwitchState>> SwitchStateMap;
 
 extern SwitchStateMap g_switch_state_map;
 
-void vs_reset_id_counter();
-void vs_clear_switch_ids();
-void vs_free_real_object_id(
-        _In_ sai_object_id_t switch_id);
-
 sai_status_t vs_recreate_hostif_tap_interfaces(
-        _In_ sai_object_id_t switch_id);
-
-sai_object_id_t vs_create_real_object_id(
-        _In_ sai_object_type_t object_type,
         _In_ sai_object_id_t switch_id);
 
 void processFdbInfo(

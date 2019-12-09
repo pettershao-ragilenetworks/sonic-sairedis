@@ -61,7 +61,8 @@ libsaivs_la_SOURCES = \
 					  sai_vs_switch_MLNX2700.cpp \
 					  Globals.cpp \
 					  Switch.cpp \
-					  SwitchContainer.cpp
+					  SwitchContainer.cpp \
+					  RealObjectIdManager.cpp
 
 libsaivs_la_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON)
 libsaivs_la_LIBADD = -lhiredis -lswsscommon

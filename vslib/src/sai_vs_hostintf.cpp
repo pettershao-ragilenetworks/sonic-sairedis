@@ -1428,7 +1428,7 @@ sai_status_t vs_create_hostif_tap_interface(
 
     sai_object_id_t obj_id = attr_obj_id->value.oid;
 
-    sai_object_type_t ot = sai_object_type_query(obj_id);
+    sai_object_type_t ot = g_realObjectIdManager->saiObjectTypeQuery(obj_id);
 
     if (ot != SAI_OBJECT_TYPE_PORT)
     {
