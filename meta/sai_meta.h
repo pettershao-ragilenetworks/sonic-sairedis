@@ -149,6 +149,21 @@ extern void meta_sai_on_fdb_event(
         _In_ uint32_t count,
         _In_ sai_fdb_event_notification_data_t *data);
 
+extern void meta_sai_on_switch_state_change(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_switch_oper_status_t switch_oper_status);
+
+extern void meta_sai_on_switch_shutdown_request(
+        _In_ sai_object_id_t switch_id);
+
+extern void meta_sai_on_port_state_change(
+        _In_ uint32_t count,
+        _In_ const sai_port_oper_status_notification_t *data);
+
+extern void meta_sai_on_queue_pfc_deadlock_notification(
+        _In_ uint32_t count,
+        _In_ const sai_queue_deadlock_notification_data_t *data);
+
 // FDB FLUSH
 
 extern sai_status_t meta_sai_flush_fdb_entries(

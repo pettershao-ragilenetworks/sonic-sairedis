@@ -6186,9 +6186,206 @@ void meta_sai_on_fdb_event(
 {
     SWSS_LOG_ENTER();
 
+    if (count && data == NULL)
+    {
+        SWSS_LOG_ERROR("fdb_event_notification_data pointer is NULL when count is %u", count);
+        return;
+    }
+
     for (uint32_t i = 0; i < count; ++i)
     {
         meta_sai_on_fdb_event_single(data[i]);
+    }
+}
+
+void meta_sai_on_switch_state_change(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_switch_oper_status_t switch_oper_status)
+{
+    SWSS_LOG_ENTER();
+
+    auto ot = sai_object_type_query(switch_id);
+
+    if (ot != SAI_OBJECT_TYPE_SWITCH)
+    {
+        SWSS_LOG_WARN("switch_id %s is of type %s, but expected SAI_OBJECT_TYPE_SWITCH",
+                sai_serialize_object_id(switch_id).c_str(),
+                sai_serialize_object_type(ot).c_str());
+    }
+
+    sai_object_meta_key_t switch_meta_key = { .objecttype = ot , .objectkey = { .key = { .object_id = switch_id } } };
+
+    if (!g_saiObjectCollection.objectExists(switch_meta_key))
+    {
+        SWSS_LOG_ERROR("switch_id %s don't exists in local database",
+                sai_serialize_object_id(switch_id).c_str());
+    }
+
+    // we should not snoop switch_id, since switch id should be created directly by user
+
+    if (!sai_metadata_get_enum_value_name(
+                &sai_metadata_enum_sai_switch_oper_status_t,
+                switch_oper_status))
+    {
+        SWSS_LOG_WARN("switch oper status value (%d) not found in sai_switch_oper_status_t",
+                switch_oper_status);
+    }
+}
+
+void meta_sai_on_switch_shutdown_request(
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    auto ot = sai_object_type_query(switch_id);
+
+    if (ot != SAI_OBJECT_TYPE_SWITCH)
+    {
+        SWSS_LOG_WARN("switch_id %s is of type %s, but expected SAI_OBJECT_TYPE_SWITCH",
+                sai_serialize_object_id(switch_id).c_str(),
+                sai_serialize_object_type(ot).c_str());
+    }
+
+    sai_object_meta_key_t switch_meta_key = { .objecttype = ot , .objectkey = { .key = { .object_id = switch_id } } };
+
+    if (!g_saiObjectCollection.objectExists(switch_meta_key))
+    {
+        SWSS_LOG_ERROR("switch_id %s don't exists in local database",
+                sai_serialize_object_id(switch_id).c_str());
+    }
+
+    // we should not snoop switch_id, since switch id should be created directly by user
+}
+
+static void meta_sai_on_port_state_change_single(
+        _In_ const sai_port_oper_status_notification_t& data)
+{
+    SWSS_LOG_ENTER();
+
+    auto ot = sai_object_type_query(data.port_id);
+
+    bool valid = false;
+
+    switch (ot)
+    {
+        // TODO hardcoded types, must advance SAI repository commit to get metadata for this
+        case SAI_OBJECT_TYPE_PORT:
+        case SAI_OBJECT_TYPE_BRIDGE_PORT:
+        case SAI_OBJECT_TYPE_LAG:
+
+            valid = true;
+            break;
+
+        default:
+
+            SWSS_LOG_ERROR("data.port_id %s has unexpected type: %s, expected PORT, BRIDGE_PORT or LAG",
+                    sai_serialize_object_id(data.port_id).c_str(),
+                    sai_serialize_object_type(ot).c_str());
+            break;
+    }
+
+    SWSS_LOG_WARN("data.port_id has invalid type, skip snoop");
+
+    if (valid && !g_oids.objectReferenceExists(data.port_id))
+    {
+        SWSS_LOG_NOTICE("data.port_id new object spotted %s not present in local DB (snoop!)",
+                sai_serialize_object_id(data.port_id).c_str());
+
+        sai_object_meta_key_t key = { .objecttype = ot, .objectkey = { .key = { .object_id = data.port_id } } };
+
+        g_oids.objectReferenceInsert(data.port_id);
+
+        if (!g_saiObjectCollection.objectExists(key))
+        {
+            g_saiObjectCollection.createObject(key);
+        }
+    }
+
+    if (!sai_metadata_get_enum_value_name(
+                &sai_metadata_enum_sai_port_oper_status_t,
+                data.port_state))
+    {
+        SWSS_LOG_WARN("port_state value (%d) not found in sai_port_oper_status_t",
+                data.port_state);
+    }
+}
+
+void meta_sai_on_port_state_change(
+        _In_ uint32_t count,
+        _In_ const sai_port_oper_status_notification_t *data)
+{
+    SWSS_LOG_ENTER();
+
+    if (count && data == NULL)
+    {
+        SWSS_LOG_ERROR("port_oper_status_notification pointer is NULL but count is %u", count);
+        return;
+    }
+
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        meta_sai_on_port_state_change_single(data[i]);
+    }
+}
+
+static void meta_sai_on_queue_pfc_deadlock_notification_single(
+        _In_ const sai_queue_deadlock_notification_data_t& data)
+{
+    SWSS_LOG_ENTER();
+
+    auto ot = sai_object_type_query(data.queue_id);
+
+    bool valid = false;
+
+    switch (ot)
+    {
+        // TODO hardcoded types, must advance SAI repository commit to get metadata for this
+        case SAI_OBJECT_TYPE_QUEUE:
+
+            valid = true;
+            break;
+
+        default:
+
+            SWSS_LOG_ERROR("data.queue_id %s has unexpected type: %s, expected PORT, BRIDGE_PORT or LAG",
+                    sai_serialize_object_id(data.queue_id).c_str(),
+                    sai_serialize_object_type(ot).c_str());
+            break;
+    }
+
+    SWSS_LOG_WARN("data.queue_id has invalid type, skip snoop");
+
+    if (valid && !g_oids.objectReferenceExists(data.queue_id))
+    {
+        SWSS_LOG_NOTICE("data.queue_id new object spotted %s not present in local DB (snoop!)",
+                sai_serialize_object_id(data.queue_id).c_str());
+
+        sai_object_meta_key_t key = { .objecttype = ot, .objectkey = { .key = { .object_id = data.queue_id } } };
+
+        g_oids.objectReferenceInsert(data.queue_id);
+
+        if (!g_saiObjectCollection.objectExists(key))
+        {
+            g_saiObjectCollection.createObject(key);
+        }
+    }
+}
+
+void meta_sai_on_queue_pfc_deadlock_notification(
+        _In_ uint32_t count,
+        _In_ const sai_queue_deadlock_notification_data_t *data)
+{
+    SWSS_LOG_ENTER();
+
+    if (count && data == NULL)
+    {
+        SWSS_LOG_ERROR("queue_deadlock_notification_data pointer is NULL but count is %u", count);
+        return;
+    }
+
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        meta_sai_on_queue_pfc_deadlock_notification_single(data[i]);
     }
 }
 
