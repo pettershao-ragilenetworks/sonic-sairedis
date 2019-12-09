@@ -162,6 +162,8 @@ sai_status_t redis_create_switch(
     /*
      * Creating switch can't have any object attributes set on it, need to be
      * set on separate api.
+     *
+     * TODO: This check should be moved to metadata.
      */
 
     for (uint32_t i = 0; i < attr_count; ++i)
@@ -197,6 +199,8 @@ sai_status_t redis_create_switch(
          * When doing CREATE operation user may want to update notification
          * pointers, since notifications can be defined per switch we need to
          * update them.
+         *
+         * TODO: should be moved inside to redis_generic_create
          */
 
         auto sw = std::make_shared<Switch>(*switch_id, attr_count, attr_list);

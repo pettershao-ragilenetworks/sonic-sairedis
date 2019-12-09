@@ -135,6 +135,8 @@ sai_status_t sai_api_initialize(
 
     SWSS_LOG_DEBUG("creating notification thread");
 
+    // TODO what will happen when we receive notification in init view mode ?
+
     notification_thread = std::make_shared<std::thread>(ntf_thread);
 
     Globals::apiInitialized = true;
