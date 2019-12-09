@@ -253,5 +253,6 @@ vslib
 vxlan
 VXLAN
 workaroung
+WRED
 xoff
 xon
