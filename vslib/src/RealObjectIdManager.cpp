@@ -295,6 +295,10 @@ sai_object_id_t RealObjectIdManager::constructObjectId(
             objectIndex);
 }
 
+// TODO this must be considered per all switches if we are doing warm boot on VS
+// since it may happen that we warm boot 1 switch, then 1 notification will arrive
+// and produce colliding object id that is used in 2nd switch warm boot !!
+
 void RealObjectIdManager::updateWarmBootObjectIndex(
         _In_ sai_object_id_t oid)
 {
