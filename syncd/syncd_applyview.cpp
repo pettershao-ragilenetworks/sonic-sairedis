@@ -10,7 +10,7 @@
 #include <algorithm>
 #include <list>
 
-extern std::shared_ptr<CommandLineOptions> g_commandLineOptions;
+extern std::shared_ptr<CommandLineOptions> g_commandLineOptions; // TODO move to syncd object
 
 /*
  * NOTE: All methods taking current and temporary view could be moved to
