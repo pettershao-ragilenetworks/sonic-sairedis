@@ -1,18 +1,18 @@
-#ifndef __SAIREDISCOMMON__
-#define __SAIREDISCOMMON__
+#pragma once
 
-// TODO those defines are shared via syncd and sairedis
+/*
+ * This header will contain definitions used by libsairedis and syncd as well
+ * as libswsscommon (for producer/consumer) and lua scripts.
+ */
 
-#define SYNCD_INIT_VIEW     "INIT_VIEW"
-#define SYNCD_APPLY_VIEW    "APPLY_VIEW"
-#define SYNCD_INSPECT_ASIC  "SYNCD_INSPECT_ASIC"
-#define ASIC_STATE_TABLE    "ASIC_STATE"
-#define TEMP_PREFIX         "TEMP_"
+// TODO move this to SAI meta repository for auto generate
 
-// Messages for processing queries from libsairedis to syncd
-#define STRING_ATTR_ENUM_VALUES_CAPABILITY_QUERY        "attr_enum_values_capability_query"
-#define STRING_ATTR_ENUM_VALUES_CAPABILITY_RESPONSE     "attr_enum_values_capability_response"
-#define STRING_OBJECT_TYPE_GET_AVAILABILITY_QUERY       "object_type_get_availability_query"
-#define STRING_OBJECT_TYPE_GET_AVAILABILITY_RESPONSE    "object_type_get_availability_response"
+#define SAI_SWITCH_NOTIFICATION_NAME_BFD_SESSION_STATE_CHANGE   "bfd_session_state_change"
+#define SAI_SWITCH_NOTIFICATION_NAME_FDB_EVENT                  "fdb_event"
+#define SAI_SWITCH_NOTIFICATION_NAME_PACKET_EVENT               "packet_event"
+#define SAI_SWITCH_NOTIFICATION_NAME_PORT_STATE_CHANGE          "port_state_change"
+#define SAI_SWITCH_NOTIFICATION_NAME_QUEUE_PFC_DEADLOCK         "queue_deadlock"
+#define SAI_SWITCH_NOTIFICATION_NAME_SWITCH_SHUTDOWN_REQUEST    "switch_shutdown_request"
+#define SAI_SWITCH_NOTIFICATION_NAME_SWITCH_STATE_CHAENE        "switch_state_change"
+#define SAI_SWITCH_NOTIFICATION_NAME_TAM_EVENT                  "tam_event"
 
-#endif // __SAIREDISCOMMON__
