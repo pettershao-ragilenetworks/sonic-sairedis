@@ -46,6 +46,7 @@ currentView
 deallocate
 decap
 deserialize
+deserialized
 deserializer
 destructor
 Destructor
@@ -101,6 +102,7 @@ isoidattribute
 KEYs
 librediscommon
 libsairedis
+libswsscommon
 linux
 logrotate
 lookup
