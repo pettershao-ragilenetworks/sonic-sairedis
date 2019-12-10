@@ -62,7 +62,14 @@ libsairedis_la_SOURCES = \
 						 SkipRecordAttrContainer.cpp \
 						 Switch.cpp \
 						 SwitchContainer.cpp \
-						 VirtualObjectIdManager.cpp
+						 VirtualObjectIdManager.cpp \
+						 Notification.cpp \
+						 NotificationSwitchShutdownRequest.cpp \
+						 NotificationPortStateChange.cpp \
+						 NotificationSwitchStateChange.cpp \
+						 NotificationFdbEvent.cpp \
+						 NotificationQueuePfcDeadlock.cpp \
+						 NotificationFactory.cpp
 
 
 libsairedis_la_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON)

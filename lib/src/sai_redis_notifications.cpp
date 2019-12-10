@@ -2,6 +2,10 @@
 #include "meta/sai_serialize.h"
 #include "meta/saiattributelist.h"
 
+#include "NotificationFactory.h"
+
+using namespace sairedis;
+
 /**
  * @brief Get switch notifications structure.
  *
@@ -13,11 +17,9 @@
  * @return Copy of requested switch notifications struct or empty struct is
  * switch is not present in container.
  */
-sai_switch_notifications_t getSwitchNotifications(
+static sai_switch_notifications_t getSwitchNotifications(
         _In_ sai_object_id_t switchId)
 {
-    MUTEX();
-
     SWSS_LOG_ENTER();
 
     auto sw = g_switchContainer->getSwitch(switchId);
@@ -39,239 +41,29 @@ sai_switch_notifications_t getSwitchNotifications(
 // different notifications pointers per switch instance. Similar notification
 // on_queue_pfc_deadlock_notification which only have queue_id
 
-static void process_metadata_on_switch_state_change(
-        _In_ sai_object_id_t switch_id,
-        _In_ sai_switch_oper_status_t switch_oper_status)
+static sai_switch_notifications_t processNotification(
+        _In_ std::shared_ptr<Notification> notification)
 {
     MUTEX();
 
-    SWSS_LOG_ENTER();
+    SWSS_LOG_ERROR();
 
-    // NOTE: this meta api must be under mutex since
-    // it will access meta DB and notification comes
-    // from different thread
-    //
-    // TODO move this to future notification processor
+    // NOTE: process metadata must be executed under sairedis API mutex since
+    // it will access meta database and notification comes from different
+    // thread, and this method is executed from notifications thread
 
-    meta_sai_on_switch_state_change(switch_id, switch_oper_status);
-}
+    notification->processMetadata();
 
-void handle_switch_state_change(
-        _In_ const std::string &data)
-{
-    SWSS_LOG_ENTER();
+    auto objectId = notification->getAnyObjectId();
 
-    SWSS_LOG_DEBUG("data: %s", data.c_str());
+    auto switchId = g_virtualObjectIdManager->saiSwitchIdQuery(objectId);
 
-    sai_switch_oper_status_t switch_oper_status;
-    sai_object_id_t switch_id;
-
-    sai_deserialize_switch_oper_status(data, switch_id, switch_oper_status);
-
-    process_metadata_on_switch_state_change(switch_id, switch_oper_status);
-
-    auto sn = getSwitchNotifications(switch_id);
-
-    if (sn.on_switch_state_change != NULL)
-    {
-        sn.on_switch_state_change(switch_id, switch_oper_status);
-    }
-}
-
-static void process_metadata_on_fdb_event(
-        _In_ uint32_t count,
-        _In_ sai_fdb_event_notification_data_t* data)
-{
-    MUTEX();
-
-    SWSS_LOG_ENTER();
-
-    // NOTE: this meta api must be under mutex since
-    // it will access meta DB and notification comes
-    // from different thread
-    //
-    // TODO move this to future notification processor
-
-    meta_sai_on_fdb_event(count, data);
-}
-
-void handle_fdb_event(
-        _In_ const std::string &data)
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_DEBUG("data: %s", data.c_str());
-
-    uint32_t count;
-    sai_fdb_event_notification_data_t *fdbevent = NULL;
-
-    sai_deserialize_fdb_event_ntf(data, count, &fdbevent);
-
-    process_metadata_on_fdb_event(count, fdbevent);
-
-    // since notification don't contain switch id, obtain it from fdb_entry
-    sai_object_id_t switchId = SAI_NULL_OBJECT_ID;
-
-    if (count)
-        switchId = fdbevent[0].fdb_entry.switch_id;
-
-    auto sn = getSwitchNotifications(switchId);
-
-    if (sn.on_fdb_event != NULL)
-    {
-        sn.on_fdb_event(count, fdbevent);
-    }
-
-    sai_deserialize_free_fdb_event_ntf(count, fdbevent);
-}
-
-static void process_metadata_on_port_state_change(
-        _In_ uint32_t count,
-        _In_ const sai_port_oper_status_notification_t *data)
-{
-    MUTEX();
-
-    SWSS_LOG_ENTER();
-
-    // NOTE: this meta api must be under mutex since
-    // it will access meta DB and notification comes
-    // from different thread
-    //
-    // TODO move this to future notification processor
-
-    meta_sai_on_port_state_change(count, data);
-}
-
-void handle_port_state_change(
-        _In_ const std::string &data)
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_DEBUG("data: %s", data.c_str());
-
-    uint32_t count;
-    sai_port_oper_status_notification_t *portoperstatus = NULL;
-
-    sai_deserialize_port_oper_status_ntf(data, count, &portoperstatus);
-
-    process_metadata_on_port_state_change(count, portoperstatus);
-
-    sai_object_id_t switchId = SAI_NULL_OBJECT_ID;
-
-    // since notification don't contain switch id, obtain it from port id
-    if (count)
-        switchId = sai_switch_id_query(portoperstatus[0].port_id); // under api mutex (may come from any global context)
-
-    auto sn = getSwitchNotifications(switchId);
-
-    if (sn.on_port_state_change != NULL)
-    {
-        sn.on_port_state_change(count, portoperstatus);
-    }
-
-    sai_deserialize_free_port_oper_status_ntf(count, portoperstatus);
-}
-
-static void process_metadata_on_switch_shutdown_request(
-        _In_ sai_object_id_t switch_id)
-{
-    MUTEX();
-
-    SWSS_LOG_ENTER();
-
-    // NOTE: this meta api must be under mutex since
-    // it will access meta DB and notification comes
-    // from different thread
-    //
-    // TODO move this to future notification processor
-
-    meta_sai_on_switch_shutdown_request(switch_id);
-}
-
-void handle_switch_shutdown_request(
-        _In_ const std::string &data)
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_NOTICE("switch shutdown request");
-
-    sai_object_id_t switch_id;
-
-    sai_deserialize_switch_shutdown_request(data, switch_id);
-
-    process_metadata_on_switch_shutdown_request(switch_id);
-
-    auto sn = getSwitchNotifications(switch_id);
-
-    if (sn.on_switch_shutdown_request != NULL)
-    {
-        sn.on_switch_shutdown_request(switch_id);
-    }
-}
-
-void handle_packet_event(
-        _In_ const std::string &data,
-        _In_ const std::vector<swss::FieldValueTuple> &values)
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_DEBUG("data: %s, values: %lu", data.c_str(), values.size());
-
-    SWSS_LOG_ERROR("not implemented");
-}
-
-static void process_metadata_on_queue_pfc_deadlock_notification(
-        _In_ uint32_t count,
-        _In_ const sai_queue_deadlock_notification_data_t *data)
-{
-    MUTEX();
-
-    SWSS_LOG_ENTER();
-
-    // NOTE: this meta api must be under mutex since
-    // it will access meta DB and notification comes
-    // from different thread
-    //
-    // TODO move this to future notification processor
-
-    meta_sai_on_queue_pfc_deadlock_notification(count, data);
-}
-
-void handle_queue_deadlock_event(
-        _In_ const std::string &data)
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_DEBUG("data: %s", data.c_str());
-
-    uint32_t count;
-    sai_queue_deadlock_notification_data_t *ntfData = NULL;
-
-    sai_deserialize_queue_deadlock_ntf(data, count, &ntfData);
-
-    process_metadata_on_queue_pfc_deadlock_notification(count, ntfData);
-
-    // TODO metadata validate under mutex, possible snoop queue_id
-
-    // since notification don't contain switch id, obtain it from queue id
-    sai_object_id_t switchId = SAI_NULL_OBJECT_ID;
-
-    if (count)
-        switchId = sai_switch_id_query(ntfData[0].queue_id); // under api mutex (may come from any global context)
-
-    auto sn = getSwitchNotifications(switchId);
-
-    if (sn.on_queue_pfc_deadlock != NULL)
-    {
-        sn.on_queue_pfc_deadlock(count, ntfData);
-    }
-
-    sai_deserialize_free_queue_deadlock_ntf(count, ntfData);
+    return getSwitchNotifications(switchId);
 }
 
 void handle_notification(
-        _In_ const std::string &notification,
-        _In_ const std::string &data,
+        _In_ const std::string &name,
+        _In_ const std::string &serializedNotification,
         _In_ const std::vector<swss::FieldValueTuple> &values)
 {
     SWSS_LOG_ENTER();
@@ -290,37 +82,23 @@ void handle_notification(
     //
     // But before that we will extract switch id from notification itself.
 
+    // TODO record should also be under api mutex, all other apis are
+
     if (g_record)
     {
-        recordLine("n|" + notification + "|" + data + "|" + joinFieldValues(values));
+        recordLine("n|" + name + "|" + serializedNotification + "|" + joinFieldValues(values));
     }
 
-    if (notification == "switch_state_change")
+    auto notification = NotificationFactory::deserialize(name, serializedNotification);
+
+    if (notification)
     {
-        handle_switch_state_change(data);
-    }
-    else if (notification == "fdb_event")
-    {
-        handle_fdb_event(data);
-    }
-    else if (notification == "port_state_change")
-    {
-        handle_port_state_change(data);
-    }
-    else if (notification == "switch_shutdown_request")
-    {
-        handle_switch_shutdown_request(data);
-    }
-    else if (notification == "packet_event")
-    {
-        handle_packet_event(data, values);
-    }
-    else if (notification == "queue_deadlock")
-    {
-        handle_queue_deadlock_event(data);
-    }
-    else
-    {
-        SWSS_LOG_ERROR("unknow notification: %s", notification.c_str());
+        // process is done under api mutex
+
+        auto sn = processNotification(notification);
+
+        // execute callback from thread context
+
+        notification->executeCallback(sn);
     }
 }
