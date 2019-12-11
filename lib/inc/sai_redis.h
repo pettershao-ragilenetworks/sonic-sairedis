@@ -57,7 +57,6 @@ extern sai_service_method_table_t                   g_services;
 extern std::shared_ptr<swss::ProducerTable>         g_asicState;
 extern std::shared_ptr<swss::ConsumerTable>         g_redisGetConsumer;
 extern std::shared_ptr<swss::NotificationConsumer>  g_redisNotifications;
-extern std::shared_ptr<swss::RedisClient>           g_redisClient;
 
 extern std::shared_ptr<sairedis::SwitchContainer>           g_switchContainer;
 extern std::shared_ptr<sairedis::VirtualObjectIdManager>    g_virtualObjectIdManager;

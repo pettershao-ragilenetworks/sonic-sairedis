@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "VirtualObjectIdManager.h"
+#include "RedisVidIndexGenerator.h"
 
 using namespace sairedis;
 
@@ -24,12 +25,12 @@ std::shared_ptr<swss::DBConnector>          g_dbNtf;
 std::shared_ptr<swss::ProducerTable>        g_asicState;
 std::shared_ptr<swss::ConsumerTable>        g_redisGetConsumer;
 std::shared_ptr<swss::NotificationConsumer> g_redisNotifications;
-std::shared_ptr<swss::RedisClient>          g_redisClient;
 std::shared_ptr<swss::RedisPipeline>        g_redisPipeline;
 
 // TODO must be per syncd instance
 std::shared_ptr<SwitchContainer>            g_switchContainer;
 std::shared_ptr<VirtualObjectIdManager>     g_virtualObjectIdManager;
+std::shared_ptr<RedisVidIndexGenerator>     g_redisVidIndexGenerator;
 
 void clear_local_state()
 {
@@ -49,7 +50,7 @@ void clear_local_state()
     // TODO since we create new manager, we need to create new meta db with
     // updated functions for query object type and switch id
     // TODO update global context when supporting multiple syncd instances
-    g_virtualObjectIdManager = std::make_shared<VirtualObjectIdManager>(0);
+    g_virtualObjectIdManager = std::make_shared<VirtualObjectIdManager>(0, g_redisVidIndexGenerator);
 
 }
 
@@ -121,7 +122,7 @@ sai_status_t sai_api_initialize(
     g_asicState          = std::make_shared<swss::ProducerTable>(g_redisPipeline.get(), ASIC_STATE_TABLE, true);
     g_redisGetConsumer   = std::make_shared<swss::ConsumerTable>(g_db.get(), "GETRESPONSE");
     g_redisNotifications = std::make_shared<swss::NotificationConsumer>(g_dbNtf.get(), "NOTIFICATIONS");
-    g_redisClient        = std::make_shared<swss::RedisClient>(g_db.get());
+    g_redisVidIndexGenerator = std::make_shared<RedisVidIndexGenerator>(g_db, REDIS_KEY_VIDCOUNTER);
 
     clear_local_state();
 
