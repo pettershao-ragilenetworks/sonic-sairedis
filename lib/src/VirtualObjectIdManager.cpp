@@ -80,8 +80,10 @@ static_assert(SAI_REDIS_GET_OBJECT_INDEX(SAI_REDIS_TEST_OID) == 0x6789abcdef, "t
 using namespace sairedis;
 
 VirtualObjectIdManager::VirtualObjectIdManager(
-        _In_ uint32_t globalContext):
-    m_globalContext(globalContext)
+        _In_ uint32_t globalContext,
+        _In_ std::shared_ptr<OidIndexGenerator> oidIndexGenerator):
+    m_globalContext(globalContext),
+    m_oidIndexGenerator(oidIndexGenerator)
 {
     SWSS_LOG_ENTER();
 
@@ -107,6 +109,9 @@ sai_object_id_t VirtualObjectIdManager::saiSwitchIdQuery(
 
     if (objectType == SAI_OBJECT_TYPE_NULL)
     {
+        // TODO don't throw, those 2 functions should never throw
+        // it doesn't matter whether oid is correct, that will be validated
+        // in metadata
         SWSS_LOG_THROW("invalid object type of oid %s", 
                 sai_serialize_object_id(objectId).c_str());
     }
@@ -248,8 +253,7 @@ sai_object_id_t VirtualObjectIdManager::allocateNewObjectId(
 
     uint32_t switchIndex = (uint32_t)SAI_REDIS_GET_SWITCH_INDEX(switchId);
 
-    // TODO this must be extracted to constructor and wrapped to some object
-    uint64_t objectIndex = g_redisClient->incr("VIDCOUNTER"); // TODO use sairedis common
+    uint64_t objectIndex = m_oidIndexGenerator->increment(); // get new object index
 
     if (objectIndex > SAI_REDIS_OBJECT_INDEX_MAX)
     {

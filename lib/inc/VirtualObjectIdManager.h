@@ -1,10 +1,13 @@
 #pragma once
 
+#include "OidIndexGenerator.h"
+
 extern "C" {
 #include <sai.h>
 }
 
 #include <set>
+#include <memory>
 
 namespace sairedis
 {
@@ -14,7 +17,8 @@ namespace sairedis
         public:
 
             VirtualObjectIdManager(
-                    _In_ uint32_t globalContext);
+                    _In_ uint32_t globalContext,
+                    _In_ std::shared_ptr<OidIndexGenerator> oidIndexGenerator);
 
             virtual ~VirtualObjectIdManager() = default;
 
@@ -105,6 +109,11 @@ namespace sairedis
              * (system wide) syncd instance.
              */
             uint32_t m_globalContext;
+
+            /**
+             * @brief Oid index generator.
+             */
+            std::shared_ptr<OidIndexGenerator> m_oidIndexGenerator;
 
             /**
              * @brief Set of allocated switch indexes.
