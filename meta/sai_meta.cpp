@@ -6842,7 +6842,7 @@ static sai_status_t meta_validate_sai_query_attribute_enum_values_capability(
     // check if switch has correct object type
     sai_object_type_t ot = sai_object_type_query(switch_id);
 
-    if (ot == SAI_OBJECT_TYPE_SWITCH)
+    if (ot != SAI_OBJECT_TYPE_SWITCH)
     {
         SWSS_LOG_ERROR("switch_id %s must be object type SWITCH, but is %s",
                 sai_serialize_object_id(switch_id).c_str(),
@@ -6980,7 +6980,7 @@ static sai_status_t meta_validate_sai_object_type_get_availability(
     // check if switch has correct object type
     sai_object_type_t ot = sai_object_type_query(switch_id);
 
-    if (ot == SAI_OBJECT_TYPE_SWITCH)
+    if (ot != SAI_OBJECT_TYPE_SWITCH)
     {
         SWSS_LOG_ERROR("switch_id %s must be object type SWITCH, but is %s",
                 sai_serialize_object_id(switch_id).c_str(),
