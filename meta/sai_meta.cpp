@@ -3,6 +3,7 @@
 #include "AttrKeyMap.h"
 #include "Globals.h"
 #include "SaiObjectCollection.h"
+#include "PortRelatedSet.h"
 
 #include "sai_meta.h"
 #include "sai_serialize.h"
@@ -50,17 +51,6 @@ bool meta_unittests_enabled()
 
     return unittests_enabled;
 }
-
-/**
- * @brief Port map to related objects set.
- *
- * Key in map is port OID, and value is set of related objects ids
- * like queues, ipgs and scheduler groups.
- *
- * This map will help to identify objects to be automatically removed
- * when port will be removed.
- */
-std::map<sai_object_id_t, std::set<sai_object_id_t>> map_port_to_related_set;
 
 sai_status_t meta_unittests_allow_readonly_set_once(
         _In_ sai_object_type_t object_type,
@@ -179,14 +169,26 @@ std::vector<const sai_attr_metadata_t*> get_attributes_metadata(
 }
 
 
+/**
+ * @brief Port related objects set.
+ *
+ * Key in map is port OID, and value is set of related objects ids
+ * like queues, ipgs and scheduler groups.
+ *
+ * This map will help to identify objects to be automatically removed
+ * when port will be removed.
+ */
+PortRelatedSet g_portRelatedSet;
+
 /*
- * Non object is don't need reference count since they are leafs and can be
+ * Non object ids don't need reference count since they are leafs and can be
  * removed at any time.
  */
 
 OidRefCounter g_oids;
 AttrKeyMap g_attrKeys;
 SaiObjectCollection g_saiObjectCollection;
+
 
 // TODO to be removed
 void dump_object_reference()
@@ -240,8 +242,7 @@ sai_status_t meta_init_db()
     g_oids.clear();
     g_saiObjectCollection.clear();
     g_attrKeys.clear();
-
-    map_port_to_related_set.clear();
+    g_portRelatedSet.clear();
 
     return SAI_STATUS_SUCCESS;
 }
@@ -1392,9 +1393,9 @@ sai_status_t meta_port_remove_validation(
 
     sai_object_id_t port_id = meta_key.objectkey.key.object_id;
 
-    auto it = map_port_to_related_set.find(port_id);
+    auto relatedObjects = g_portRelatedSet.getPortRelatedObjects(port_id);
 
-    if (it == map_port_to_related_set.end())
+    if (relatedObjects.size() == 0)
     {
         // user didn't query any queues, ipgs or scheduler groups
         // for this port, then we can just skip this
@@ -1417,7 +1418,7 @@ sai_status_t meta_port_remove_validation(
         return SAI_STATUS_OBJECT_IN_USE;
     }
 
-    for (auto oid: it->second)
+    for (auto oid: relatedObjects)
     {
         if (g_oids.getObjectReferenceCount(oid) != 0)
         {
@@ -2571,9 +2572,9 @@ void post_port_remove(
 
     sai_object_id_t port_id = meta_key.objectkey.key.object_id;
 
-    auto it = map_port_to_related_set.find(port_id);
+    auto relatedObjects = g_portRelatedSet.getPortRelatedObjects(port_id);
 
-    if (it == map_port_to_related_set.end())
+    if (relatedObjects.size() == 0)
     {
         // user didn't query any queues, ipgs or scheduler groups
         // for this port, then we can just skip this
@@ -2581,7 +2582,7 @@ void post_port_remove(
         return;
     }
 
-    for (auto oid: it->second)
+    for (auto oid: relatedObjects)
     {
         // to remove existing objects, let's just call post remove for them
         // and metadata will take the rest
@@ -2600,7 +2601,7 @@ void post_port_remove(
 
     // all related objects were removed, we need to clear current state
 
-    it->second.clear();
+    g_portRelatedSet.removePort(port_id);
 
     SWSS_LOG_NOTICE("success executing post port remove actions: %s",
             sai_serialize_object_id(port_id).c_str());
@@ -3140,7 +3141,7 @@ void meta_add_port_to_related_map(
         if (rel == SAI_NULL_OBJECT_ID)
             SWSS_LOG_THROW("not expected NULL oid on the list");
 
-        map_port_to_related_set[port_id].insert(rel);
+        g_portRelatedSet.insert(port_id, rel);
     }
 }
 

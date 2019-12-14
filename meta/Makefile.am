@@ -82,7 +82,8 @@ libsaimetadata_la_SOURCES = \
 							AttrKeyMap.cpp \
 							Globals.cpp \
 							SaiObject.cpp \
-							SaiObjectCollection.cpp
+							SaiObjectCollection.cpp \
+							PortRelatedSet.cpp
 
 
 BUILT_SOURCES = $(top_srcdir)/SAI/meta/saimetadata.h $(top_srcdir)/SAI/meta/saimetadata.c
