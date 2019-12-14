@@ -20,7 +20,7 @@
  * @brief Redis virtual object id counter key name.
  *
  * This key will be used by sairedis and syncd in REDIS database to generate
- * new object indexes used when construting new virtual object id (VID).
+ * new object indexes used when constructing new virtual object id (VID).
  *
  * This key must have atomic access since it can be used at any time by syncd
  * process or orchagent process.

@@ -20,7 +20,7 @@ uint64_t RedisVidIndexGenerator::increment()
     SWSS_LOG_ENTER();
 
     // this counter must be atomic since it can be independently accessed by
-    // sairedis and sycd
+    // sairedis and syncd
 
     return m_redisClient->incr(m_vidCounterName); // "VIDCOUNTER"
 }
