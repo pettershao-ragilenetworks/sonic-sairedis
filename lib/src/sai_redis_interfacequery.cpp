@@ -10,6 +10,7 @@
 
 #include "VirtualObjectIdManager.h"
 #include "RedisVidIndexGenerator.h"
+#include "RedisRemoteSaiInterface.h"
 
 using namespace sairedis;
 
@@ -32,6 +33,7 @@ std::shared_ptr<SwitchContainer>            g_switchContainer;
 std::shared_ptr<VirtualObjectIdManager>     g_virtualObjectIdManager;
 std::shared_ptr<RedisVidIndexGenerator>     g_redisVidIndexGenerator;
 std::shared_ptr<Recorder>                   g_recorder;
+std::shared_ptr<RemoteSaiInterface>         g_remoteSaiInterface;
 
 void clear_local_state()
 {
@@ -126,6 +128,9 @@ sai_status_t sai_api_initialize(
     g_redisVidIndexGenerator = std::make_shared<RedisVidIndexGenerator>(g_db, REDIS_KEY_VIDCOUNTER);
 
     g_recorder = std::make_shared<Recorder>();
+    g_remoteSaiInterface = std::make_shared<RedisRemoteSaiInterface>(
+            g_asicState,
+            g_redisGetConsumer); // possible tcp/shmem interfaces
 
     clear_local_state();
 

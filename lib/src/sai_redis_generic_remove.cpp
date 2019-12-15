@@ -31,11 +31,11 @@ sai_status_t redis_generic_remove(
 {
     SWSS_LOG_ENTER();
 
-    std::string str_object_id = sai_serialize_object_id(object_id);
+    g_recorder->recordGenericRemove(object_type, object_id);
 
-    sai_status_t status = internal_redis_generic_remove(
-            object_type,
-            str_object_id);
+    auto status = g_remoteSaiInterface->remove(object_type, object_id);
+
+    g_recorder->recordGenericRemoveResponse(status);
 
     if (object_type == SAI_OBJECT_TYPE_SWITCH &&
             status == SAI_STATUS_SUCCESS)

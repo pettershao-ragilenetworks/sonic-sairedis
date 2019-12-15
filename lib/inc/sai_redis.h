@@ -28,6 +28,7 @@ extern "C" {
 #include "SwitchContainer.h"
 #include "VirtualObjectIdManager.h"
 #include "Recorder.h"
+#include "RemoteSaiInterface.h"
 
 // if we don't receive response from syncd in 60 seconds
 // there is something wrong and we should fail
@@ -60,6 +61,7 @@ extern std::shared_ptr<sairedis::Recorder>          g_recorder;
 
 extern std::shared_ptr<sairedis::SwitchContainer>           g_switchContainer;
 extern std::shared_ptr<sairedis::VirtualObjectIdManager>    g_virtualObjectIdManager;
+extern std::shared_ptr<sairedis::RemoteSaiInterface>        g_remoteSaiInterface;
 
 
 extern const sai_acl_api_t              redis_acl_api;
