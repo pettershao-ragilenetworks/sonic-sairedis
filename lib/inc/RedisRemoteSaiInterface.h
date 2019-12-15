@@ -9,7 +9,7 @@
 
 /*
  * Asic state table commands. Those names are special and they will be used
- * inside swsscommon library LUA scripts to perfrom operations on redis
+ * inside swsscommon library LUA scripts to perform operations on redis
  * database.
  */
 
@@ -17,7 +17,7 @@
 #define REDIS_ASIC_STATE_COMMAND_GETRESPONSE "getresponse"
 
 /**
- * @brief Get response timeout in miliseconds.
+ * @brief Get response timeout in milliseconds.
  */
 #define REDIS_ASIC_STATE_COMMAND_GETRESPONSE_TIMEOUT_MS (60*1000)
 
@@ -49,7 +49,7 @@ namespace sairedis
             /**
              * @brief Wait for response.
              *
-             * Will wait for reponse from syncd. Method used only for single
+             * Will wait for response from syncd. Method used only for single
              * object create/remove/set since they have common output which is
              * sai_status_t.
              */

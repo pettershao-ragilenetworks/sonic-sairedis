@@ -15,6 +15,7 @@ ASICs
 asicSet
 asicview
 AsicView
+async
 attr
 ATTR
 ATTR
@@ -191,6 +192,7 @@ setPortCounterList
 setQueueCounterList
 sg
 SGs
+shmem
 sleeptime
 soAll
 SONiC
@@ -213,10 +215,12 @@ Switch
 switchid
 SwitchState
 swss
+swsscommon
 syncd
 sys
 syslog
 tapfd
+tcp
 temporaryObj
 temporaryVid
 temporaryView
