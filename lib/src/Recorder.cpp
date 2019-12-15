@@ -322,6 +322,18 @@ void Recorder::recordBulkGenericCreateResponse(
 }
 
 void Recorder::recordGenericRemove(
+        _In_ sai_object_type_t objectType,
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    auto key = sai_serialize_object_type(objectType) + ":" + sai_serialize_object_id(objectId);
+
+    // lower case 'r' stands for REMOVE api
+    recordLine("r|" + key);
+}
+
+void Recorder::recordGenericRemove(
         _In_ const std::string& key)
 {
     SWSS_LOG_ENTER();

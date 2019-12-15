@@ -55,6 +55,10 @@ namespace sairedis
                     _In_ sai_status_t status);
 
             void recordGenericRemove(
+                    _In_ sai_object_type_t objectType,
+                    _In_ sai_object_id_t objectId);
+
+            void recordGenericRemove(
                     _In_ const std::string& key);
 
             void recordGenericRemoveResponse(
