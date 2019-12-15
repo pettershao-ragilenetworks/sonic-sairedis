@@ -51,15 +51,6 @@ sai_status_t internal_api_wait_for_response(
             sai_status_t status;
             sai_deserialize_status(opkey, status);
 
-            if (g_record)
-            {
-                const std::string &str_status = kfvKey(kco);
-                const std::vector<swss::FieldValueTuple> &values = kfvFieldsValues(kco);
-
-                // first serialized is status
-                recordLine("G|" + str_status + "|" + joinFieldValues(values));
-            }
-
             SWSS_LOG_DEBUG("generic %d api status: %d", api, status);
 
             return status;
@@ -67,11 +58,6 @@ sai_status_t internal_api_wait_for_response(
 
         SWSS_LOG_ERROR("generic %d api failed due to SELECT operation result: %s", api, getSelectResultAsString(result).c_str());
         break;
-    }
-
-    if (g_record)
-    {
-        recordLine("G|SAI_STATUS_FAILURE");
     }
 
     SWSS_LOG_ERROR("generic %d api failed to get response", api);
@@ -98,14 +84,15 @@ sai_status_t internal_redis_generic_set(
 
     SWSS_LOG_DEBUG("generic set key: %s, fields: %lu", key.c_str(), entry.size());
 
-    if (g_record)
-    {
-        recordLine("s|" + key + "|" + joinFieldValues(entry));
-    }
+    g_recorder->recordGenericSet(key, entry);
 
     g_asicState->set(key, entry, "set");
 
-    return internal_api_wait_for_response(SAI_COMMON_API_SET);
+    auto status = internal_api_wait_for_response(SAI_COMMON_API_SET);
+
+    g_recorder->recordGenericSetResponse(status);
+
+    return status;
 }
 
 sai_status_t internal_redis_bulk_generic_set(
@@ -157,28 +144,12 @@ sai_status_t internal_redis_bulk_generic_set(
         entries.push_back(fvtNoStatus);
     }
 
+    g_recorder->recordBulkGenericSet(str_object_type, entries);
+
     /*
      * We are adding number of entries to actually add ':' to be compatible
      * with previous
      */
-
-    if (g_record)
-    {
-        std::string joined;
-
-        for (const auto &e: entriesWithStatus)
-        {
-            // ||obj_id|attr=val|attr=val|status||obj_id|attr=val|attr=val|status
-
-            joined += "||" + fvField(e) + "|" + fvValue(e);
-        }
-
-        /*
-         * Capital 'S' stands for bulk SET operation.
-         */
-
-        recordLine("S|" + str_object_type + joined);
-    }
 
     std::string key = str_object_type + ":" + std::to_string(entries.size());
 
@@ -187,7 +158,13 @@ sai_status_t internal_redis_bulk_generic_set(
         g_asicState->set(key, entries, "bulkset");
     }
 
-    return internal_api_wait_for_response(SAI_COMMON_API_BULK_SET);
+    auto status = internal_api_wait_for_response(SAI_COMMON_API_BULK_SET);
+
+    uint32_t objectCount = (uint32_t)serialized_object_ids.size();
+
+    g_recorder->recordBulkGenericSetResponse(status, objectCount, object_statuses);
+
+    return status;
 }
 
 

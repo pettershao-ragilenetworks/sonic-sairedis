@@ -21,10 +21,7 @@ sai_status_t internal_redis_flush_fdb_entries(
 
     SWSS_LOG_NOTICE("flush key: %s, fields: %lu", key.c_str(), entry.size());
 
-    if (g_record)
-    {
-        recordLine("f|" + key + "|" + joinFieldValues(entry));
-    }
+    g_recorder->recordFlushFdbEntries(key, entry);
 
     // flush is special, it will not put data
     // into asic view, only to message queue
@@ -68,13 +65,7 @@ sai_status_t internal_redis_flush_fdb_entries(
 
             sai_deserialize_status(str_sai_status, status);
 
-            if (g_record)
-            {
-                const std::string &str_status = kfvKey(kco);
-
-                // first serialized is status
-                recordLine("F|" + str_status);
-            }
+            g_recorder->recordFlushFdbEntriesResponse(status);
 
             SWSS_LOG_NOTICE("flush status: %d", status);
 
@@ -85,10 +76,7 @@ sai_status_t internal_redis_flush_fdb_entries(
         break;
     }
 
-    if (g_record)
-    {
-        recordLine("F|SAI_STATUS_FAILURE");
-    }
+    g_recorder->recordFlushFdbEntriesResponse(SAI_STATUS_FAILURE);
 
     SWSS_LOG_ERROR("flush failed to get response");
 

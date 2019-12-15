@@ -14,14 +14,15 @@ sai_status_t internal_redis_generic_remove(
 
     SWSS_LOG_DEBUG("generic remove key: %s", key.c_str());
 
-    if (g_record)
-    {
-        recordLine("r|" + key);
-    }
+    g_recorder->recordGenericRemove(key);
 
     g_asicState->del(key, "remove");
 
-    return internal_api_wait_for_response(SAI_COMMON_API_REMOVE);
+    auto status = internal_api_wait_for_response(SAI_COMMON_API_REMOVE);
+
+    g_recorder->recordGenericRemoveResponse(status);
+
+    return status;
 }
 
 sai_status_t redis_generic_remove(
@@ -85,13 +86,6 @@ sai_status_t internal_redis_bulk_generic_remove(
 
     std::vector<swss::FieldValueTuple> entries;
 
-    /*
-     * We are recording all entries and their statuses, but we send to sairedis
-     * only those that succeeded metadata check, since only those will be
-     * executed on syncd, so there is no need with bothering decoding statuses
-     * on syncd side.
-     */
-
     for (size_t idx = 0; idx < serialized_object_ids.size(); ++idx)
     {
         std::string str_attr = "";
@@ -101,28 +95,12 @@ sai_status_t internal_redis_bulk_generic_remove(
         entries.push_back(fvtNoStatus);
     }
 
+    g_recorder->recordBulkGenericRemove(str_object_type, entries);
+
     /*
      * We are adding number of entries to actually add ':' to be compatible
      * with previous
      */
-
-    if (g_record)
-    {
-        std::string joined;
-
-        for (const auto &e: entries)
-        {
-            // ||obj_id|attr=val|attr=val||obj_id|attr=val|attr=val
-
-            joined += "||" + fvField(e) + "|" + fvValue(e);
-        }
-
-        /*
-         * Capital 'R' stands for bulk REMOVE operation.
-         */
-
-        recordLine("R|" + str_object_type + joined);
-    }
 
     // key:         object_type:count
     // field:       object_id
@@ -134,7 +112,13 @@ sai_status_t internal_redis_bulk_generic_remove(
         g_asicState->set(key, entries, "bulkremove");
     }
 
-    return internal_api_wait_for_response(SAI_COMMON_API_REMOVE);
+    auto status = internal_api_wait_for_response(SAI_COMMON_API_REMOVE);
+
+    uint32_t objectCount = (uint32_t)serialized_object_ids.size();
+
+    g_recorder->recordBulkGenericRemoveResponse(status, objectCount, object_statuses);
+
+    return status;
 }
 
 

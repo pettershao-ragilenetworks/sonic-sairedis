@@ -22,10 +22,7 @@ sai_status_t sai_redis_internal_notify_syncd(
     // ASIC INIT/APPLY view with small letter 'a'
     // and response is recorded as capital letter 'A'
 
-    if (g_record)
-    {
-        recordLine("a|" + key);
-    }
+    g_recorder->recordNotifySyncd(key);
 
     g_asicState->set(key, entry, "notify");
 
@@ -57,13 +54,10 @@ sai_status_t sai_redis_internal_notify_syncd(
                 continue;
             }
 
-            if (g_record)
-            {
-                recordLine("A|" + opkey);
-            }
-
             sai_status_t status;
             sai_deserialize_status(opkey, status);
+
+            g_recorder->recordNotifySyncdResponse(status);
 
             return status;
         }
@@ -74,10 +68,7 @@ sai_status_t sai_redis_internal_notify_syncd(
 
     SWSS_LOG_ERROR("notify syncd failed to get response");
 
-    if (g_record)
-    {
-        recordLine("A|SAI_STATUS_FAILURE");
-    }
+    g_recorder->recordNotifySyncdResponse(SAI_STATUS_FAILURE);
 
     return SAI_STATUS_FAILURE;
 }
@@ -249,7 +240,12 @@ sai_status_t redis_set_switch_attribute(
          * actual set operation was called.
          */
 
-        g_logrotate = true;
+        auto rec = g_recorder; // make local to keep reference
+
+        if (rec)
+        {
+            rec->requestLogRotate();
+        }
 
         return SAI_STATUS_SUCCESS;
     }

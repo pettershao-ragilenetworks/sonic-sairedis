@@ -31,6 +31,7 @@ std::shared_ptr<swss::RedisPipeline>        g_redisPipeline;
 std::shared_ptr<SwitchContainer>            g_switchContainer;
 std::shared_ptr<VirtualObjectIdManager>     g_virtualObjectIdManager;
 std::shared_ptr<RedisVidIndexGenerator>     g_redisVidIndexGenerator;
+std::shared_ptr<Recorder>                   g_recorder;
 
 void clear_local_state()
 {
@@ -124,6 +125,8 @@ sai_status_t sai_api_initialize(
     g_redisNotifications = std::make_shared<swss::NotificationConsumer>(g_dbNtf.get(), "NOTIFICATIONS");
     g_redisVidIndexGenerator = std::make_shared<RedisVidIndexGenerator>(g_db, REDIS_KEY_VIDCOUNTER);
 
+    g_recorder = std::make_shared<Recorder>();
+
     clear_local_state();
 
     g_asicInitViewMode = false;
@@ -131,8 +134,6 @@ sai_status_t sai_api_initialize(
     g_useTempView = false;
 
     g_run = true;
-
-    setRecording(g_record);
 
     SWSS_LOG_DEBUG("creating notification thread");
 
@@ -299,10 +300,7 @@ static sai_status_t redis_sai_query_attribute_enum_values_capability(
             list_size.c_str()
     );
 
-    if (g_record)
-    {
-        recordLine("q|attribute_enum_values_capability|" + switch_id_str + "|" + joinFieldValues(query_arguments));
-    }
+    g_recorder->recordQueryAttributeEnumValuesCapability(switch_id_str, query_arguments);
 
     // This query will not put any data into the ASIC view, just into the
     // message queue
@@ -345,10 +343,7 @@ static sai_status_t redis_sai_query_attribute_enum_values_capability(
 
                 if (values.size() != 2)
                 {
-                    if (g_record)
-                    {
-                        recordLine("Q|attribute_enum_values_capability|SAI_STATUS_FAILURE");
-                    }
+                    g_recorder->recordQueryAttributeEnumValuesCapabilityResponse(SAI_STATUS_FAILURE, {});
 
                     SWSS_LOG_ERROR("Invalid response from syncd: expected 2 values, received %zu", values.size());
                     return SAI_STATUS_FAILURE;
@@ -384,17 +379,13 @@ static sai_status_t redis_sai_query_attribute_enum_values_capability(
                     position++;
                 }
 
-                if (g_record)
-                {
-                    recordLine("Q|attribute_enum_values_capability|" + status_str + "|" + joinFieldValues(values));
-                }
+                g_recorder->recordQueryAttributeEnumValuesCapabilityResponse(status, values);
             }
             else
             {
-                if (g_record)
-                {
-                    recordLine("Q|attribute_enum_values_capability|" + status_str);
-                }
+                // TODO on sai status overflow we should populate correct count on the list
+
+                g_recorder->recordQueryAttributeEnumValuesCapabilityResponse(status, {});
             }
 
             SWSS_LOG_DEBUG("Status: %s", status_str.c_str());
@@ -402,10 +393,7 @@ static sai_status_t redis_sai_query_attribute_enum_values_capability(
         }
     }
 
-    if (g_record)
-    {
-        recordLine("Q|attribute_enum_values_capability|SAI_STATUS_FAILURE");
-    }
+    g_recorder->recordQueryAttributeEnumValuesCapabilityResponse(SAI_STATUS_FAILURE, {});
 
     SWSS_LOG_ERROR("Failed to receive a response from syncd");
     return SAI_STATUS_FAILURE;
@@ -456,10 +444,7 @@ static sai_status_t redis_sai_object_type_get_availability(
     // Syncd will pop this argument off before trying to deserialize the attribute list
     query_arguments.push_back(swss::FieldValueTuple("OBJECT_TYPE", object_type_str));
 
-    if (g_record)
-    {
-        recordLine("q|object_type_get_availability|" + switch_id_str + "|" + joinFieldValues(query_arguments));
-    }
+    g_recorder->recordObjectTypeGetAvailability(switch_id_str, query_arguments);
 
     // This query will not put any data into the ASIC view, just into the
     // message queue
@@ -502,10 +487,7 @@ static sai_status_t redis_sai_object_type_get_availability(
 
                 if (values.size() != 1)
                 {
-                    if (g_record)
-                    {
-                        recordLine("Q|object_type_get_availability|SAI_STATUS_FAILURE");
-                    }
+                    g_recorder->recordObjectTypeGetAvailabilityResponse(SAI_STATUS_FAILURE, {});
 
                     SWSS_LOG_ERROR("Invalid response from syncd: expected 1 value, received %zu", values.size());
                     return SAI_STATUS_FAILURE;
@@ -516,17 +498,11 @@ static sai_status_t redis_sai_object_type_get_availability(
 
                 SWSS_LOG_DEBUG("Received payload: count = %lu", *count);
 
-                if (g_record)
-                {
-                    recordLine("Q|object_type_get_availability|" + status_str + "|" + joinFieldValues(values));
-                }
+                g_recorder->recordObjectTypeGetAvailabilityResponse(status, values);
             }
             else
             {
-                if (g_record)
-                {
-                    recordLine("Q|object_type_get_availability|" + status_str);
-                }
+                g_recorder->recordObjectTypeGetAvailabilityResponse(status, {});
             }
 
             SWSS_LOG_DEBUG("Status: %s", status_str.c_str());
@@ -534,10 +510,7 @@ static sai_status_t redis_sai_object_type_get_availability(
         }
     }
 
-    if (g_record)
-    {
-        recordLine("Q|object_type_get_availability|SAI_STATUS_FAILURE");
-    }
+    g_recorder->recordObjectTypeGetAvailabilityResponse(SAI_STATUS_FAILURE, {});
 
     SWSS_LOG_ERROR("Failed to receive a response from syncd");
     return SAI_STATUS_FAILURE;

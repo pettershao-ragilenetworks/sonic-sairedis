@@ -32,14 +32,15 @@ sai_status_t internal_redis_generic_create(
 
     SWSS_LOG_DEBUG("generic create key: %s, fields: %" PRIu64, key.c_str(), entry.size());
 
-    if (g_record)
-    {
-        recordLine("c|" + key + "|" + joinFieldValues(entry));
-    }
+    g_recorder->recordGenericCreate(key, entry);
 
     g_asicState->set(key, entry, "create");
 
-    return internal_api_wait_for_response(SAI_COMMON_API_CREATE);
+    auto status = internal_api_wait_for_response(SAI_COMMON_API_CREATE);
+
+    g_recorder->recordGenericCreateResponse(status);
+
+    return status;
 }
 
 sai_status_t redis_generic_create(
@@ -160,28 +161,12 @@ sai_status_t internal_redis_bulk_generic_create(
         entries.push_back(fvtNoStatus);
     }
 
+    g_recorder->recordBulkGenericCreate(str_object_type, entries);
+
     /*
      * We are adding number of entries to actually add ':' to be compatible
      * with previous
      */
-
-    if (g_record)
-    {
-        std::string joined;
-
-        for (const auto &e: entriesWithStatus)
-        {
-            // ||obj_id|attr=val|attr=val|status||obj_id|attr=val|attr=val|status
-
-            joined += "||" + fvField(e) + "|" + fvValue(e);
-        }
-
-        /*
-         * Capital 'C' stands for bulk CREATE operation.
-         */
-
-        recordLine("C|" + str_object_type + joined);
-    }
 
     // key:         object_type:count
     // field:       object_id
@@ -193,7 +178,15 @@ sai_status_t internal_redis_bulk_generic_create(
         g_asicState->set(key, entries, "bulkcreate");
     }
 
-    return internal_api_wait_for_response(SAI_COMMON_API_BULK_CREATE);
+    // TODO we need to get object statuses from syncd
+
+    auto status = internal_api_wait_for_response(SAI_COMMON_API_BULK_CREATE);
+
+    uint32_t objectCount = (uint32_t)serialized_object_ids.size();
+
+    g_recorder->recordBulkGenericCreateResponse(status, objectCount, object_statuses);
+
+    return status;
 }
 
 #define REDIS_ENTRY_CREATE(OT,ot)                       \

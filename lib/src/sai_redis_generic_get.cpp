@@ -181,10 +181,7 @@ sai_status_t internal_redis_generic_get(
 
     SWSS_LOG_DEBUG("generic get key: %s, fields: %lu", key.c_str(), entry.size());
 
-    if (g_record && !skipRecord)
-    {
-        recordLine("g|" + key + "|" + joinFieldValues(entry));
-    }
+    g_recorder->recordGenericGet(key, entry);
 
     // get is special, it will not put data
     // into asic view, only to message queue
@@ -226,14 +223,7 @@ sai_status_t internal_redis_generic_get(
                     attr_list,
                     kco);
 
-            if (g_record && !skipRecord)
-            {
-                const std::string &str_status = kfvKey(kco);
-                const std::vector<swss::FieldValueTuple> &values = kfvFieldsValues(kco);
-
-                // first serialized is status
-                recordLine("G|" + str_status + "|" + joinFieldValues(values));
-            }
+            g_recorder->recordGenericGetResponse(status, kfvFieldsValues(kco));
 
             SWSS_LOG_DEBUG("generic get status: %d", status);
 
@@ -244,10 +234,7 @@ sai_status_t internal_redis_generic_get(
         break;
     }
 
-    if (g_record && !skipRecord)
-    {
-        recordLine("G|SAI_STATUS_FAILURE");
-    }
+    g_recorder->recordGenericGetResponse(SAI_STATUS_FAILURE, {});
 
     SWSS_LOG_ERROR("generic get failed to get response");
 

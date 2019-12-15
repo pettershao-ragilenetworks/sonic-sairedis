@@ -84,10 +84,7 @@ void handle_notification(
 
     // TODO record should also be under api mutex, all other apis are
 
-    if (g_record)
-    {
-        recordLine("n|" + name + "|" + serializedNotification + "|" + joinFieldValues(values));
-    }
+    g_recorder->recordNotification(name, serializedNotification, values);
 
     auto notification = NotificationFactory::deserialize(name, serializedNotification);
 

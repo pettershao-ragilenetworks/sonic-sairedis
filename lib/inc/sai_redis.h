@@ -27,6 +27,7 @@ extern "C" {
 
 #include "SwitchContainer.h"
 #include "VirtualObjectIdManager.h"
+#include "Recorder.h"
 
 // if we don't receive response from syncd in 60 seconds
 // there is something wrong and we should fail
@@ -46,10 +47,8 @@ extern sai_status_t internal_api_wait_for_response(
 
 // other global declarations
 
-extern volatile bool g_record;
 extern volatile bool g_useTempView;
 extern volatile bool g_asicInitViewMode;
-extern volatile bool g_logrotate;
 extern volatile bool g_syncMode;
 extern volatile bool g_recordStats;
 
@@ -57,9 +56,11 @@ extern sai_service_method_table_t                   g_services;
 extern std::shared_ptr<swss::ProducerTable>         g_asicState;
 extern std::shared_ptr<swss::ConsumerTable>         g_redisGetConsumer;
 extern std::shared_ptr<swss::NotificationConsumer>  g_redisNotifications;
+extern std::shared_ptr<sairedis::Recorder>          g_recorder;
 
 extern std::shared_ptr<sairedis::SwitchContainer>           g_switchContainer;
 extern std::shared_ptr<sairedis::VirtualObjectIdManager>    g_virtualObjectIdManager;
+
 
 extern const sai_acl_api_t              redis_acl_api;
 extern const sai_bfd_api_t              redis_bfd_api;
