@@ -250,6 +250,24 @@ void Recorder::recordQueryAttributeEnumValuesCapabilityResponse(
     recordLine("Q|attribute_enum_values_capability|" + sai_serialize_status(status) + "|" + joinFieldValues(arguments));
 }
 
+void Recorder::recordObjectTypeGetAvailability(
+        _In_ const std::string& key,
+        _In_ const std::vector<swss::FieldValueTuple>& arguments)
+{
+    SWSS_LOG_ENTER();
+
+    recordLine("q|object_type_get_availability|" + key + "|" + joinFieldValues(arguments));
+}
+
+void Recorder::recordObjectTypeGetAvailabilityResponse(
+        _In_ sai_status_t status,
+        _In_ const std::vector<swss::FieldValueTuple>& arguments)
+{
+    SWSS_LOG_ENTER();
+
+    recordLine("Q|object_type_get_availability|" + sai_serialize_status(status) + "|" + joinFieldValues(arguments));
+}
+
 void Recorder::recordNotifySyncd(
         _In_ const std::string& key)
 {

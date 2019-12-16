@@ -264,7 +264,8 @@ sai_status_t redis_set_switch_attribute(
         switch (attr->id)
         {
             case SAI_REDIS_SWITCH_ATTR_RECORD:
-                setRecording(attr->value.booldata);
+                if (g_recorder)
+                    g_recorder->enableRecording(attr->value.booldata);
                 return SAI_STATUS_SUCCESS;
 
             case SAI_REDIS_SWITCH_ATTR_NOTIFY_SYNCD:
@@ -306,7 +307,9 @@ sai_status_t redis_set_switch_attribute(
                 return SAI_STATUS_SUCCESS;
 
             case SAI_REDIS_SWITCH_ATTR_RECORDING_OUTPUT_DIR:
-                return setRecordingOutputDir(*attr);
+                if (g_recorder && g_recorder->setRecordingOutputDirectory(*attr))
+                    return SAI_STATUS_SUCCESS;
+                return SAI_STATUS_FAILURE;
 
             default:
                 break;
