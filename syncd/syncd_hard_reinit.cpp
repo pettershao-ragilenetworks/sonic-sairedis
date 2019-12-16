@@ -1235,6 +1235,9 @@ void hardReinit()
         processRoutes(true);
         processRoutes(false);
         processNatEntries();
+
+        // TODO more objects to process
+        // TODO check if all objects were processed
     }
 
 #ifdef ENABLE_PERF
