@@ -168,6 +168,8 @@ std::vector<const sai_attr_metadata_t*> get_attributes_metadata(
     return attrs;
 }
 
+// TODO should we have this set per switch ?
+// to keep each switch in separate object?
 
 /**
  * @brief Port related objects set.
@@ -189,6 +191,10 @@ OidRefCounter g_oids;
 AttrKeyMap g_attrKeys;
 SaiObjectCollection g_saiObjectCollection;
 
+// TODO check on create switch if we have any oid objects passed -
+// is this necessary, we won't have any oids yet anyway
+//
+// TODO check if all oids passed belong to single switch
 
 // TODO to be removed
 void dump_object_reference()
@@ -2617,6 +2623,9 @@ void meta_generic_validation_post_remove(
         /*
          * If switch object was removed then meta db was cleared and there are
          * no other attributes, no need for reference counting.
+         *
+         * TODO we can have multiple switches, then we need to remove
+         * objects associated with specific switch!
          */
 
         return;
