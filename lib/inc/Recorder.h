@@ -9,6 +9,10 @@ extern "C" {
 #include <string>
 #include <vector>
 
+#define SAI_REDIS_RECORDER_DECLARE_RECORD_REMOVE(ot)    \
+    void recordRemove(                                  \
+            _In_ const sai_ ## ot ## _t* ot);
+
 namespace sairedis
 {
     class Recorder
@@ -81,6 +85,17 @@ namespace sairedis
             void recordGenericGetResponse(
                     _In_ sai_status_t status,
                     _In_ const std::vector<swss::FieldValueTuple>& arguments);
+
+        public: // remove ENTRY
+
+            SAI_REDIS_RECORDER_DECLARE_RECORD_REMOVE(fdb_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_REMOVE(inseg_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_REMOVE(ipmc_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_REMOVE(l2mc_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_REMOVE(mcast_fdb_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_REMOVE(neighbor_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_REMOVE(route_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_REMOVE(nat_entry);
 
         public: // SAI stats API
 
@@ -184,6 +199,12 @@ namespace sairedis
         public: // static helper functions
 
             static std::string getTimestamp();
+
+        private: // recording helpers
+
+            void recordRemove(
+                    _In_ sai_object_type_t objectType,
+                    _In_ const std::string& serializedObjectId);
 
         private:
 

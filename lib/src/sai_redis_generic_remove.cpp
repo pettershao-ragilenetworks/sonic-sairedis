@@ -25,6 +25,33 @@ sai_status_t internal_redis_generic_remove(
     return status;
 }
 
+//sai_status_t redis_generic_remove(
+//        _In_ sai_object_type_t object_type,
+//        _In_ sai_object_id_t object_id)
+//{
+//    SWSS_LOG_ENTER();
+//
+//    g_recorder->recordGenericRemove(object_type, object_id);
+//
+//    auto status = g_remoteSaiInterface->remove(object_type, object_id);
+//
+//    g_recorder->recordGenericRemoveResponse(status);
+//
+//    if (object_type == SAI_OBJECT_TYPE_SWITCH &&
+//            status == SAI_STATUS_SUCCESS)
+//    {
+//        SWSS_LOG_NOTICE("removing switch id %s", sai_serialize_object_id(object_id).c_str());
+//
+//        g_virtualObjectIdManager->releaseObjectId(object_id);
+//
+//        // TODO do we need some more actions here ? to clean all
+//        // objects that are in the same switch that were snooped
+//        // inside metadata ? should that be metadata job?
+//    }
+//
+//    return status;
+//}
+
 sai_status_t redis_bulk_generic_remove(
         _In_ sai_object_type_t object_type,
         _In_ uint32_t object_count,
@@ -106,11 +133,11 @@ sai_status_t internal_redis_bulk_generic_remove(
                     str);                                   \
         }
 
-REDIS_ENTRY_REMOVE(FDB_ENTRY,fdb_entry);
-REDIS_ENTRY_REMOVE(INSEG_ENTRY,inseg_entry);
-REDIS_ENTRY_REMOVE(IPMC_ENTRY,ipmc_entry);
-REDIS_ENTRY_REMOVE(L2MC_ENTRY,l2mc_entry);
-REDIS_ENTRY_REMOVE(MCAST_FDB_ENTRY,mcast_fdb_entry);
-REDIS_ENTRY_REMOVE(NEIGHBOR_ENTRY,neighbor_entry);
-REDIS_ENTRY_REMOVE(ROUTE_ENTRY,route_entry);
-REDIS_ENTRY_REMOVE(NAT_ENTRY,nat_entry);
+//REDIS_ENTRY_REMOVE(FDB_ENTRY,fdb_entry);
+//REDIS_ENTRY_REMOVE(INSEG_ENTRY,inseg_entry);
+//REDIS_ENTRY_REMOVE(IPMC_ENTRY,ipmc_entry);
+//REDIS_ENTRY_REMOVE(L2MC_ENTRY,l2mc_entry);
+//REDIS_ENTRY_REMOVE(MCAST_FDB_ENTRY,mcast_fdb_entry);
+//REDIS_ENTRY_REMOVE(NEIGHBOR_ENTRY,neighbor_entry);
+//REDIS_ENTRY_REMOVE(ROUTE_ENTRY,route_entry);
+//REDIS_ENTRY_REMOVE(NAT_ENTRY,nat_entry);

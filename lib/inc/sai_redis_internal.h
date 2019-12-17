@@ -92,9 +92,9 @@
     {                                                           \
         MUTEX();                                                \
         SWSS_LOG_ENTER();                                       \
-        return meta_sai_remove_ ## object_type(                 \
+        return g_meta->remove(                                  \
                 object_type,                                    \
-                &redis_generic_remove_ ## object_type);         \
+                *g_remoteSaiInterface);                         \
     }
 
 #define REDIS_SET_ENTRY(OBJECT_TYPE,object_type)                \
@@ -208,3 +208,14 @@
     redis_get_ ## ot ## _stats,        \
     redis_get_ ## ot ## _stats_ext,    \
     redis_clear_ ## ot ## _stats,
+
+#define REDIS_DECLARE_EVERY_ENTRY(_X)       \
+    _X(FDB_ENTRY,fdb_entry);                \
+    _X(INSEG_ENTRY,inseg_entry);            \
+    _X(IPMC_ENTRY,ipmc_entry);              \
+    _X(L2MC_ENTRY,l2mc_entry);              \
+    _X(MCAST_FDB_ENTRY,mcast_fdb_entry);    \
+    _X(NEIGHBOR_ENTRY,neighbor_entry);      \
+    _X(ROUTE_ENTRY,route_entry);            \
+    _X(NAT_ENTRY,nat_entry);                \
+
