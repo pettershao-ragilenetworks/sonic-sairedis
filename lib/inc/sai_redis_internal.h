@@ -79,11 +79,11 @@
     {                                                           \
         MUTEX();                                                \
         SWSS_LOG_ENTER();                                       \
-        return meta_sai_create_ ## object_type(                 \
+        return g_meta->create(                                  \
                 object_type,                                    \
                 attr_count,                                     \
                 attr_list,                                      \
-                &redis_generic_create_ ## object_type);         \
+                *g_remoteSaiInterface);                         \
     }
 
 #define REDIS_REMOVE_ENTRY(OBJECT_TYPE,object_type)             \

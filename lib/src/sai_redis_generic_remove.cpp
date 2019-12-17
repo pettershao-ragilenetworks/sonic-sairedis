@@ -2,28 +2,28 @@
 #include "meta/sai_serialize.h"
 #include "meta/saiattributelist.h"
 
-sai_status_t internal_redis_generic_remove(
-        _In_ sai_object_type_t object_type,
-        _In_ const std::string &serialized_object_id)
-{
-    SWSS_LOG_ENTER();
-
-    std::string str_object_type = sai_serialize_object_type(object_type);
-
-    std::string key = str_object_type + ":" + serialized_object_id;
-
-    SWSS_LOG_DEBUG("generic remove key: %s", key.c_str());
-
-    g_recorder->recordGenericRemove(key);
-
-    g_asicState->del(key, "remove");
-
-    auto status = internal_api_wait_for_response(SAI_COMMON_API_REMOVE);
-
-    g_recorder->recordGenericRemoveResponse(status);
-
-    return status;
-}
+//sai_status_t internal_redis_generic_remove(
+//        _In_ sai_object_type_t object_type,
+//        _In_ const std::string &serialized_object_id)
+//{
+//    SWSS_LOG_ENTER();
+//
+//    std::string str_object_type = sai_serialize_object_type(object_type);
+//
+//    std::string key = str_object_type + ":" + serialized_object_id;
+//
+//    SWSS_LOG_DEBUG("generic remove key: %s", key.c_str());
+//
+//    g_recorder->recordGenericRemove(key);
+//
+//    g_asicState->del(key, "remove");
+//
+//    auto status = internal_api_wait_for_response(SAI_COMMON_API_REMOVE);
+//
+//    g_recorder->recordGenericRemoveResponse(status);
+//
+//    return status;
+//}
 
 //sai_status_t redis_generic_remove(
 //        _In_ sai_object_type_t object_type,

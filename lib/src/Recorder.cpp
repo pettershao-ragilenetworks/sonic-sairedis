@@ -5,8 +5,10 @@
 #include "Recorder.h"
 
 #include "meta/sai_serialize.h"
+#include "meta/saiattributelist.h"
 
 #include <unistd.h>
+#include <inttypes.h>
 
 #include <cstring>
 
@@ -540,6 +542,38 @@ void Recorder::recordRemove(
     recordGenericRemove(key);
 }
 
+void Recorder::recordCreate(
+        _In_ sai_object_type_t objectType,
+        _In_ const std::string& serializedObjectId,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    std::vector<swss::FieldValueTuple> entry = SaiAttributeList::serialize_attr_list(
+            objectType,
+            attr_count,
+            attr_list,
+            false);
+
+    if (entry.size() == 0)
+    {
+        // make sure that we put object into db
+        // even if there are no attributes set
+        swss::FieldValueTuple null("NULL", "NULL");
+
+        entry.push_back(null);
+    }
+
+    std::string serializedObjectType = sai_serialize_object_type(objectType);
+
+    std::string key = serializedObjectType + ":" + serializedObjectId;
+
+    SWSS_LOG_DEBUG("generic create key: %s, fields: %" PRIu64, key.c_str(), entry.size());
+
+    recordGenericCreate(key, entry);
+}
+
 #define DECLARE_RECORD_REMOVE_ENTRY(OT,ot)                              \
 void Recorder::recordRemove(                                            \
         _In_ const sai_ ## ot ## _t* ot)                                \
@@ -560,12 +594,15 @@ void Recorder::recordRemove(                                            \
 
 
 REDIS_DECLARE_EVERY_ENTRY(DECLARE_RECORD_REMOVE_ENTRY)
-//DECLARE_RECORD_REMOVE_ENTRY(FDB_ENTRY,fdb_entry);
-//DECLARE_RECORD_REMOVE_ENTRY(INSEG_ENTRY,inseg_entry);
-//DECLARE_RECORD_REMOVE_ENTRY(IPMC_ENTRY,ipmc_entry);
-//DECLARE_RECORD_REMOVE_ENTRY(L2MC_ENTRY,l2mc_entry);
-//DECLARE_RECORD_REMOVE_ENTRY(MCAST_FDB_ENTRY,mcast_fdb_entry);
-//DECLARE_RECORD_REMOVE_ENTRY(NEIGHBOR_ENTRY,neighbor_entry);
-//DECLARE_RECORD_REMOVE_ENTRY(ROUTE_ENTRY,route_entry);
-//DECLARE_RECORD_REMOVE_ENTRY(NAT_ENTRY,nat_entry);
 
+#define DECLARE_RECORD_CREATE_ENTRY(OT,ot)                                                      \
+void Recorder::recordCreate(                                                                    \
+        _In_ const sai_ ## ot ## _t* ot,                                                        \
+        _In_ uint32_t attr_count,                                                               \
+        _In_ const sai_attribute_t *attr_list)                                                  \
+{                                                                                               \
+    SWSS_LOG_ENTER();                                                                           \
+    recordCreate(SAI_OBJECT_TYPE_ ## OT, sai_serialize_ ## ot(*ot), attr_count, attr_list);     \
+}
+
+REDIS_DECLARE_EVERY_ENTRY(DECLARE_RECORD_CREATE_ENTRY)

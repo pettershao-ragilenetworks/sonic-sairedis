@@ -204,11 +204,11 @@ sai_status_t internal_redis_bulk_generic_create(
                 attr_list);                             \
     }
 
-REDIS_ENTRY_CREATE(FDB_ENTRY,fdb_entry);
-REDIS_ENTRY_CREATE(INSEG_ENTRY,inseg_entry);
-REDIS_ENTRY_CREATE(IPMC_ENTRY,ipmc_entry);
-REDIS_ENTRY_CREATE(L2MC_ENTRY,l2mc_entry);
-REDIS_ENTRY_CREATE(MCAST_FDB_ENTRY,mcast_fdb_entry);
-REDIS_ENTRY_CREATE(NEIGHBOR_ENTRY,neighbor_entry);
-REDIS_ENTRY_CREATE(ROUTE_ENTRY,route_entry);
-REDIS_ENTRY_CREATE(NAT_ENTRY,nat_entry);
+//REDIS_ENTRY_CREATE(FDB_ENTRY,fdb_entry);
+//REDIS_ENTRY_CREATE(INSEG_ENTRY,inseg_entry);
+//REDIS_ENTRY_CREATE(IPMC_ENTRY,ipmc_entry);
+//REDIS_ENTRY_CREATE(L2MC_ENTRY,l2mc_entry);
+//REDIS_ENTRY_CREATE(MCAST_FDB_ENTRY,mcast_fdb_entry);
+//REDIS_ENTRY_CREATE(NEIGHBOR_ENTRY,neighbor_entry);
+//REDIS_ENTRY_CREATE(ROUTE_ENTRY,route_entry);
+//REDIS_ENTRY_CREATE(NAT_ENTRY,nat_entry);

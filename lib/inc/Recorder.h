@@ -13,6 +13,12 @@ extern "C" {
     void recordRemove(                                  \
             _In_ const sai_ ## ot ## _t* ot);
 
+#define SAI_REDIS_RECORDER_DECLARE_RECORD_CREATE(ot)    \
+    void recordCreate(                                  \
+            _In_ const sai_ ## ot ## _t* ot,            \
+            _In_ uint32_t attr_count,                   \
+            _In_ const sai_attribute_t *attr_list);
+
 namespace sairedis
 {
     class Recorder
@@ -85,6 +91,17 @@ namespace sairedis
             void recordGenericGetResponse(
                     _In_ sai_status_t status,
                     _In_ const std::vector<swss::FieldValueTuple>& arguments);
+
+        public: // create ENTRY
+
+            SAI_REDIS_RECORDER_DECLARE_RECORD_CREATE(fdb_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_CREATE(inseg_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_CREATE(ipmc_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_CREATE(l2mc_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_CREATE(mcast_fdb_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_CREATE(neighbor_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_CREATE(route_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_CREATE(nat_entry);
 
         public: // remove ENTRY
 
@@ -205,6 +222,12 @@ namespace sairedis
             void recordRemove(
                     _In_ sai_object_type_t objectType,
                     _In_ const std::string& serializedObjectId);
+
+            void recordCreate(
+                    _In_ sai_object_type_t objectType,
+                    _In_ const std::string& serializedObjectId,
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
 
         private:
 
