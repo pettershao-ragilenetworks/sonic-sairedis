@@ -83,7 +83,8 @@ libsaimetadata_la_SOURCES = \
 							Globals.cpp \
 							SaiObject.cpp \
 							SaiObjectCollection.cpp \
-							PortRelatedSet.cpp
+							PortRelatedSet.cpp \
+							Meta.cpp
 
 
 BUILT_SOURCES = $(top_srcdir)/SAI/meta/saimetadata.h $(top_srcdir)/SAI/meta/saimetadata.c

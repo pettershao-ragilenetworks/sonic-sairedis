@@ -4,7 +4,10 @@ extern "C" {
 #include "sai.h"
 }
 
+#include "swss/table.h"
+
 #include <string>
+#include <vector>
 
 namespace sairedis
 {

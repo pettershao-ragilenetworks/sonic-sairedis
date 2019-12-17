@@ -29,6 +29,7 @@ extern "C" {
 #include "VirtualObjectIdManager.h"
 #include "Recorder.h"
 #include "RemoteSaiInterface.h"
+#include "meta/Meta.h"
 
 // if we don't receive response from syncd in 60 seconds
 // there is something wrong and we should fail
@@ -58,6 +59,7 @@ extern std::shared_ptr<sairedis::Recorder>          g_recorder;
 extern std::shared_ptr<sairedis::SwitchContainer>           g_switchContainer;
 extern std::shared_ptr<sairedis::VirtualObjectIdManager>    g_virtualObjectIdManager;
 extern std::shared_ptr<sairedis::RemoteSaiInterface>        g_remoteSaiInterface;
+extern std::shared_ptr<saimeta::Meta>                       g_meta;
 
 
 extern const sai_acl_api_t              redis_acl_api;
@@ -110,10 +112,6 @@ sai_status_t redis_generic_create(
         _In_ sai_object_id_t switch_id,
         _In_ uint32_t attr_count,
         _In_ const sai_attribute_t *attr_list);
-
-sai_status_t redis_generic_remove(
-        _In_ sai_object_type_t object_type,
-        _In_ sai_object_id_t object_id);
 
 sai_status_t redis_generic_set(
         _In_ sai_object_type_t object_type,

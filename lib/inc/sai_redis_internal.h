@@ -27,10 +27,10 @@
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
-        return meta_sai_remove_oid(                                 \
+        return g_meta->remove(                                      \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
-                &redis_generic_remove);                             \
+                *g_remoteSaiInterface);                             \
     }
 
 #define REDIS_SET(OBJECT_TYPE,object_type)                          \

@@ -209,18 +209,10 @@ sai_status_t redis_remove_switch(
 
     SWSS_LOG_ENTER();
 
-    sai_status_t status = meta_sai_remove_oid(
+    return g_meta->remove(
             SAI_OBJECT_TYPE_SWITCH,
             switch_id,
-            &redis_generic_remove);
-
-    if (status == SAI_STATUS_SUCCESS)
-    {
-        // remove switch from container
-        g_switchContainer->removeSwitch(switch_id);
-    }
-
-    return status;
+            *g_remoteSaiInterface);
 }
 
 sai_status_t redis_set_switch_attribute(

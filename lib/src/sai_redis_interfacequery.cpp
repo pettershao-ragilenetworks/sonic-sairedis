@@ -11,8 +11,10 @@
 #include "VirtualObjectIdManager.h"
 #include "RedisVidIndexGenerator.h"
 #include "RedisRemoteSaiInterface.h"
+#include "WrapperRemoteSaiInterface.h"
 
 using namespace sairedis;
+using namespace saimeta;
 
 sai_service_method_table_t g_services;
 volatile bool          g_run = false;
@@ -34,6 +36,7 @@ std::shared_ptr<VirtualObjectIdManager>     g_virtualObjectIdManager;
 std::shared_ptr<RedisVidIndexGenerator>     g_redisVidIndexGenerator;
 std::shared_ptr<Recorder>                   g_recorder;
 std::shared_ptr<RemoteSaiInterface>         g_remoteSaiInterface;
+std::shared_ptr<Meta>                       g_meta;
 
 void clear_local_state()
 {
@@ -55,6 +58,8 @@ void clear_local_state()
     // TODO update global context when supporting multiple syncd instances
     g_virtualObjectIdManager = std::make_shared<VirtualObjectIdManager>(0, g_redisVidIndexGenerator);
 
+    // TODO same as meta init database, will be the same at the end
+    g_meta = std::make_shared<Meta>();
 }
 
 void ntf_thread()
@@ -128,9 +133,12 @@ sai_status_t sai_api_initialize(
     g_redisVidIndexGenerator = std::make_shared<RedisVidIndexGenerator>(g_db, REDIS_KEY_VIDCOUNTER);
 
     g_recorder = std::make_shared<Recorder>();
-    g_remoteSaiInterface = std::make_shared<RedisRemoteSaiInterface>(
+
+    auto impl = std::make_shared<RedisRemoteSaiInterface>(
             g_asicState,
             g_redisGetConsumer); // possible tcp/shmem interfaces
+
+    g_remoteSaiInterface = std::make_shared<WrapperRemoteSaiInterface>(impl);
 
     clear_local_state();
 
