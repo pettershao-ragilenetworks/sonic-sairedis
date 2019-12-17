@@ -46,6 +46,7 @@ currentObject
 currentView
 deallocate
 decap
+del
 deserialize
 deserialized
 deserializer
