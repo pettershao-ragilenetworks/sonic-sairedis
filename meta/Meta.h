@@ -14,6 +14,12 @@
             _In_ const sai_attribute_t *attr_list,              \
             _Inout_ sairedis::SaiInterface& saiInterface);
 
+#define SAIMETA_META_DECLARE_SET_ENTRY(ot)                  \
+    sai_status_t set(                                       \
+            _In_ const sai_ ## ot ## _t* ot,                \
+            _In_ const sai_attribute_t *attr,               \
+            _Inout_ sairedis::SaiInterface& saiInterface);
+
 namespace saimeta
 {
     class Meta
@@ -52,6 +58,17 @@ namespace saimeta
             SAIMETA_META_DECLARE_REMOVE_ENTRY(neighbor_entry);
             SAIMETA_META_DECLARE_REMOVE_ENTRY(route_entry);
             SAIMETA_META_DECLARE_REMOVE_ENTRY(nat_entry);
+
+        public: // set ENTRY
+
+            SAIMETA_META_DECLARE_SET_ENTRY(fdb_entry);
+            SAIMETA_META_DECLARE_SET_ENTRY(inseg_entry);
+            SAIMETA_META_DECLARE_SET_ENTRY(ipmc_entry);
+            SAIMETA_META_DECLARE_SET_ENTRY(l2mc_entry);
+            SAIMETA_META_DECLARE_SET_ENTRY(mcast_fdb_entry);
+            SAIMETA_META_DECLARE_SET_ENTRY(neighbor_entry);
+            SAIMETA_META_DECLARE_SET_ENTRY(route_entry);
+            SAIMETA_META_DECLARE_SET_ENTRY(nat_entry);
 
     };
 };
