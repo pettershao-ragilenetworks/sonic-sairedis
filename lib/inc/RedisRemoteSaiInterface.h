@@ -15,6 +15,8 @@
 
 #define REDIS_ASIC_STATE_COMMAND_CREATE "create"
 #define REDIS_ASIC_STATE_COMMAND_REMOVE "remove"
+#define REDIS_ASIC_STATE_COMMAND_SET    "set"
+
 #define REDIS_ASIC_STATE_COMMAND_GETRESPONSE "getresponse"
 
 /**
@@ -31,6 +33,11 @@
             _In_ const sai_ ## ot ## _t* ot,                        \
             _In_ uint32_t attr_count,                               \
             _In_ const sai_attribute_t *attr_list) override;
+
+#define SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_SET_ENTRY(ot)      \
+    virtual sai_status_t set(                                       \
+            _In_ const sai_ ## ot ## _t* ot,                        \
+            _In_ const sai_attribute_t *attr) override;
 
 namespace sairedis
 {
@@ -73,17 +80,33 @@ namespace sairedis
             SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_REMOVE_ENTRY(route_entry);
             SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_REMOVE_ENTRY(nat_entry);
 
+        public: // set ENTRY
+
+            SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_SET_ENTRY(fdb_entry);
+            SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_SET_ENTRY(inseg_entry);
+            SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_SET_ENTRY(ipmc_entry);
+            SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_SET_ENTRY(l2mc_entry);
+            SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_SET_ENTRY(mcast_fdb_entry);
+            SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_SET_ENTRY(neighbor_entry);
+            SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_SET_ENTRY(route_entry);
+            SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_SET_ENTRY(nat_entry);
+
         private:
 
             sai_status_t create(
-                    _In_ sai_object_type_t object_type,
+                    _In_ sai_object_type_t objectType,
                     _In_ const std::string& serializedObjectId,
                     _In_ uint32_t attr_count,
                     _In_ const sai_attribute_t *attr_list);
 
             sai_status_t remove(
-                    _In_ const std::string& serializedObjectType,
+                    _In_ sai_object_type_t objectType,
                     _In_ const std::string& serializedObjectId);
+
+            sai_status_t set(
+                    _In_ sai_object_type_t objectType,
+                    _In_ const std::string& serializedObjectId,
+                    _In_ const sai_attribute_t *attr);
 
             /**
              * @brief Wait for response.

@@ -574,6 +574,28 @@ void Recorder::recordCreate(
     recordGenericCreate(key, entry);
 }
 
+void Recorder::recordSet(
+        _In_ sai_object_type_t objectType,
+        _In_ const std::string &serializedObjectId,
+        _In_ const sai_attribute_t *attr)
+{
+    SWSS_LOG_ENTER();
+
+    std::vector<swss::FieldValueTuple> entry = SaiAttributeList::serialize_attr_list(
+            objectType,
+            1,
+            attr,
+            false);
+
+    auto serializedObjectType  = sai_serialize_object_type(objectType);
+
+    auto key = serializedObjectType + ":" + serializedObjectId;
+
+    SWSS_LOG_DEBUG("generic set key: %s, fields: %lu", key.c_str(), entry.size());
+
+    recordGenericSet(key, entry);
+}
+
 #define DECLARE_RECORD_REMOVE_ENTRY(OT,ot)                              \
 void Recorder::recordRemove(                                            \
         _In_ const sai_ ## ot ## _t* ot)                                \
@@ -606,3 +628,14 @@ void Recorder::recordCreate(                                                    
 }
 
 REDIS_DECLARE_EVERY_ENTRY(DECLARE_RECORD_CREATE_ENTRY)
+
+#define DECLARE_RECORD_SET_ENTRY(OT,ot)                                                         \
+void Recorder::recordSet(                                                                       \
+        _In_ const sai_ ## ot ## _t* ot,                                                        \
+        _In_ const sai_attribute_t *attr)                                                       \
+{                                                                                               \
+    SWSS_LOG_ENTER();                                                                           \
+    recordSet(SAI_OBJECT_TYPE_ ## OT, sai_serialize_ ## ot(*ot), attr);                         \
+}
+
+REDIS_DECLARE_EVERY_ENTRY(DECLARE_RECORD_SET_ENTRY)

@@ -14,6 +14,11 @@
             _In_ uint32_t attr_count,                               \
             _In_ const sai_attribute_t *attr_list) override;
 
+#define SAIREDIS_WRAPPERREMOTESAIINTERFACE_DECLARE_SET_ENTRY(ot)    \
+    virtual sai_status_t set(                                       \
+            _In_ const sai_ ## ot ## _t* ot,                        \
+            _In_ const sai_attribute_t *attr) override;
+
 namespace sairedis
 {
     /**
@@ -66,6 +71,16 @@ namespace sairedis
             SAIREDIS_WRAPPERREMOTESAIINTERFACE_DECLARE_REMOVE_ENTRY(route_entry);
             SAIREDIS_WRAPPERREMOTESAIINTERFACE_DECLARE_REMOVE_ENTRY(nat_entry);
 
+        public: // set ENTRY
+
+            SAIREDIS_WRAPPERREMOTESAIINTERFACE_DECLARE_SET_ENTRY(fdb_entry);
+            SAIREDIS_WRAPPERREMOTESAIINTERFACE_DECLARE_SET_ENTRY(inseg_entry);
+            SAIREDIS_WRAPPERREMOTESAIINTERFACE_DECLARE_SET_ENTRY(ipmc_entry);
+            SAIREDIS_WRAPPERREMOTESAIINTERFACE_DECLARE_SET_ENTRY(l2mc_entry);
+            SAIREDIS_WRAPPERREMOTESAIINTERFACE_DECLARE_SET_ENTRY(mcast_fdb_entry);
+            SAIREDIS_WRAPPERREMOTESAIINTERFACE_DECLARE_SET_ENTRY(neighbor_entry);
+            SAIREDIS_WRAPPERREMOTESAIINTERFACE_DECLARE_SET_ENTRY(route_entry);
+            SAIREDIS_WRAPPERREMOTESAIINTERFACE_DECLARE_SET_ENTRY(nat_entry);
 
         private:
 

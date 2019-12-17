@@ -15,6 +15,11 @@ extern "C" {
             _In_ uint32_t attr_count,                   \
             _In_ const sai_attribute_t *attr_list) = 0;
 
+#define SAIREDIS_SAIINTERFACE_DECLARE_SET_ENTRY(ot)     \
+    virtual sai_status_t set(                           \
+            _In_ const sai_ ## ot ## _t* ot,            \
+            _In_ const sai_attribute_t *attr) = 0;
+
 namespace sairedis
 {
     class SaiInterface
@@ -52,5 +57,16 @@ namespace sairedis
             SAIREDIS_SAIINTERFACE_DECLARE_REMOVE_ENTRY(neighbor_entry);
             SAIREDIS_SAIINTERFACE_DECLARE_REMOVE_ENTRY(route_entry);
             SAIREDIS_SAIINTERFACE_DECLARE_REMOVE_ENTRY(nat_entry);
+
+        public: // set ENTRY
+
+            SAIREDIS_SAIINTERFACE_DECLARE_SET_ENTRY(fdb_entry);
+            SAIREDIS_SAIINTERFACE_DECLARE_SET_ENTRY(inseg_entry);
+            SAIREDIS_SAIINTERFACE_DECLARE_SET_ENTRY(ipmc_entry);
+            SAIREDIS_SAIINTERFACE_DECLARE_SET_ENTRY(l2mc_entry);
+            SAIREDIS_SAIINTERFACE_DECLARE_SET_ENTRY(mcast_fdb_entry);
+            SAIREDIS_SAIINTERFACE_DECLARE_SET_ENTRY(neighbor_entry);
+            SAIREDIS_SAIINTERFACE_DECLARE_SET_ENTRY(route_entry);
+            SAIREDIS_SAIINTERFACE_DECLARE_SET_ENTRY(nat_entry);
     };
 }

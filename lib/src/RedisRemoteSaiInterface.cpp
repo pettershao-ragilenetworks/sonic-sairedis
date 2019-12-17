@@ -31,7 +31,7 @@ sai_status_t RedisRemoteSaiInterface::remove(
     SWSS_LOG_ENTER();
 
     return remove(
-            sai_serialize_object_type(objectType),
+            objectType,
             sai_serialize_object_id(objectId));
 }
 
@@ -41,7 +41,7 @@ sai_status_t RedisRemoteSaiInterface::remove(                   \
 {                                                               \
     SWSS_LOG_ENTER();                                           \
     return remove(                                              \
-            sai_serialize_object_type(SAI_OBJECT_TYPE_ ## OT),  \
+            SAI_OBJECT_TYPE_ ## OT,                             \
             sai_serialize_ ## ot(*ot));                         \
 }
 
@@ -76,6 +76,27 @@ DECLARE_CREATE_ENTRY(MCAST_FDB_ENTRY,mcast_fdb_entry);
 DECLARE_CREATE_ENTRY(NEIGHBOR_ENTRY,neighbor_entry);
 DECLARE_CREATE_ENTRY(ROUTE_ENTRY,route_entry);
 DECLARE_CREATE_ENTRY(NAT_ENTRY,nat_entry);
+
+#define DECLARE_SET_ENTRY(OT,ot)                                \
+sai_status_t RedisRemoteSaiInterface::set(                      \
+        _In_ const sai_ ## ot ## _t* ot,                        \
+        _In_ const sai_attribute_t *attr)                       \
+{                                                               \
+    SWSS_LOG_ENTER();                                           \
+    return set(                                                 \
+            SAI_OBJECT_TYPE_ ## OT,                             \
+            sai_serialize_ ## ot(*ot),                          \
+            attr);                                              \
+}
+
+DECLARE_SET_ENTRY(FDB_ENTRY,fdb_entry);
+DECLARE_SET_ENTRY(INSEG_ENTRY,inseg_entry);
+DECLARE_SET_ENTRY(IPMC_ENTRY,ipmc_entry);
+DECLARE_SET_ENTRY(L2MC_ENTRY,l2mc_entry);
+DECLARE_SET_ENTRY(MCAST_FDB_ENTRY,mcast_fdb_entry);
+DECLARE_SET_ENTRY(NEIGHBOR_ENTRY,neighbor_entry);
+DECLARE_SET_ENTRY(ROUTE_ENTRY,route_entry);
+DECLARE_SET_ENTRY(NAT_ENTRY,nat_entry);
 
 sai_status_t RedisRemoteSaiInterface::create(
         _In_ sai_object_type_t object_type,
@@ -112,10 +133,12 @@ sai_status_t RedisRemoteSaiInterface::create(
 }
 
 sai_status_t RedisRemoteSaiInterface::remove(
-        _In_ const std::string& serializedObjectType,
+        _In_ sai_object_type_t objectType,
         _In_ const std::string& serializedObjectId)
 {
     SWSS_LOG_ENTER();
+
+    auto serializedObjectType = sai_serialize_object_type(objectType);
 
     const std::string key = serializedObjectType + ":" + serializedObjectId;
 
@@ -124,6 +147,30 @@ sai_status_t RedisRemoteSaiInterface::remove(
     m_asicState->del(key, REDIS_ASIC_STATE_COMMAND_REMOVE);
 
     return waitForResponse(SAI_COMMON_API_REMOVE);
+}
+
+sai_status_t RedisRemoteSaiInterface::set(
+        _In_ sai_object_type_t objectType,
+        _In_ const std::string &serializedObjectId,
+        _In_ const sai_attribute_t *attr)
+{
+    SWSS_LOG_ENTER();
+
+    std::vector<swss::FieldValueTuple> entry = SaiAttributeList::serialize_attr_list(
+            objectType,
+            1,
+            attr,
+            false);
+
+    auto serializedObjectType = sai_serialize_object_type(objectType);
+
+    std::string key = serializedObjectType + ":" + serializedObjectId;
+
+    SWSS_LOG_DEBUG("generic set key: %s, fields: %lu", key.c_str(), entry.size());
+
+    m_asicState->set(key, entry, REDIS_ASIC_STATE_COMMAND_SET);
+
+    return waitForResponse(SAI_COMMON_API_SET);
 }
 
 sai_status_t RedisRemoteSaiInterface::waitForResponse(

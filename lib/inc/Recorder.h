@@ -19,6 +19,11 @@ extern "C" {
             _In_ uint32_t attr_count,                   \
             _In_ const sai_attribute_t *attr_list);
 
+#define SAI_REDIS_RECORDER_DECLARE_RECORD_SET(ot)       \
+    void recordSet(                                     \
+            _In_ const sai_ ## ot ## _t* ot,            \
+            _In_ const sai_attribute_t *attr);
+
 namespace sairedis
 {
     class Recorder
@@ -113,6 +118,17 @@ namespace sairedis
             SAI_REDIS_RECORDER_DECLARE_RECORD_REMOVE(neighbor_entry);
             SAI_REDIS_RECORDER_DECLARE_RECORD_REMOVE(route_entry);
             SAI_REDIS_RECORDER_DECLARE_RECORD_REMOVE(nat_entry);
+
+        public: // set ENTRY
+
+            SAI_REDIS_RECORDER_DECLARE_RECORD_SET(fdb_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_SET(inseg_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_SET(ipmc_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_SET(l2mc_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_SET(mcast_fdb_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_SET(neighbor_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_SET(route_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_SET(nat_entry);
 
         public: // SAI stats API
 
@@ -228,6 +244,11 @@ namespace sairedis
                     _In_ const std::string& serializedObjectId,
                     _In_ uint32_t attr_count,
                     _In_ const sai_attribute_t *attr_list);
+
+            void recordSet(
+                    _In_ sai_object_type_t objectType,
+                    _In_ const std::string& serializedObjectId,
+                    _In_ const sai_attribute_t *attr);
 
         private:
 

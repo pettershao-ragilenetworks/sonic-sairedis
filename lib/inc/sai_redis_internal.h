@@ -104,10 +104,10 @@
     {                                                           \
         MUTEX();                                                \
         SWSS_LOG_ENTER();                                       \
-        return meta_sai_set_ ## object_type(                    \
+        return g_meta->set(                                     \
                 object_type,                                    \
                 attr,                                           \
-                &redis_generic_set_ ## object_type);            \
+                 *g_remoteSaiInterface);                        \
     }
 
 #define REDIS_GET_ENTRY(OBJECT_TYPE,object_type)                \
