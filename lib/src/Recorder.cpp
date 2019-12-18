@@ -310,6 +310,16 @@ void Recorder::recordGenericCreateResponse(
     // synchronous mode, and we could use "G" from GET api as response
 }
 
+void Recorder::recordGenericCreateResponse(
+        _In_ sai_status_t status,
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO currently empty since used in async mode, but we should log this in
+    // synchronous mode, and we could use "G" from GET api as response
+}
+
 void Recorder::recordBulkGenericCreate(
         _In_ const std::string& objectType,
         _In_ const std::vector<swss::FieldValueTuple>& entriesWithStatus)
@@ -405,6 +415,16 @@ void Recorder::recordBulkGenericRemoveResponse(
 }
 
 void Recorder::recordGenericSet(
+        _In_ sai_object_type_t objectType,
+        _In_ sai_object_id_t objectId,
+        _In_ const sai_attribute_t *attr)
+{
+    SWSS_LOG_ENTER();
+
+    recordSet(objectType, sai_serialize_object_id(objectId), attr);
+}
+
+void Recorder::recordGenericSet(
         _In_ const std::string& key,
         _In_ const std::vector<swss::FieldValueTuple>& arguments)
 {
@@ -454,6 +474,21 @@ void Recorder::recordBulkGenericSetResponse(
 
     // TODO currently empty since used in async mode, but we should log this in
     // synchronous mode, and we could use "G" from GET api as response
+}
+
+void Recorder::recordGenericGet(
+        _In_ sai_object_type_t objectType,
+        _In_ sai_object_id_t objectId,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    recordGet(
+            objectType,
+            sai_serialize_object_id(objectId),
+            attr_count,
+            attr_list);
 }
 
 void Recorder::recordGenericGet(
@@ -540,6 +575,21 @@ void Recorder::recordRemove(
     auto key = sai_serialize_object_type(objectType) + ":" + serializedObjectId;
 
     recordGenericRemove(key);
+}
+
+void Recorder::recordGenericCreate(
+        _In_ sai_object_type_t objectType,
+        _In_ sai_object_id_t objectId, // already allocated
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    recordCreate(
+            objectType,
+            sai_serialize_object_id(objectId),
+            attr_count,
+            attr_list);
 }
 
 void Recorder::recordCreate(

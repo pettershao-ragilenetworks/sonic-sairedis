@@ -30,6 +30,59 @@ WrapperRemoteSaiInterface::WrapperRemoteSaiInterface(
     // empty
 }
 
+sai_status_t WrapperRemoteSaiInterface::create(
+        _In_ sai_object_type_t objectType,
+        _Out_ sai_object_id_t* objectId,
+        _In_ sai_object_id_t switchId,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    *objectId = SAI_NULL_OBJECT_ID;
+
+    // TODO allocating new object ID should be inside implementation but here
+    // we need it also for recording, if we move recording inside
+    // implementation then we don't need wrapper
+
+    // on create vid is put in db by syncd
+    *objectId = g_virtualObjectIdManager->allocateNewObjectId(objectType, switchId);
+
+    if (*objectId == SAI_NULL_OBJECT_ID)
+    {
+        SWSS_LOG_ERROR("failed to create %s, with switch id: %s",
+                sai_serialize_object_type(objectType).c_str(),
+                sai_serialize_object_id(switchId).c_str());
+
+        return SAI_STATUS_INSUFFICIENT_RESOURCES;
+    }
+
+    // objectId must be already allocated when we want to record operation
+
+    g_recorder->recordGenericCreate(objectType, *objectId, attr_count, attr_list);
+
+    auto status = m_implementation->create(objectType, objectId, switchId, attr_count, attr_list);
+
+    g_recorder->recordGenericCreateResponse(status, *objectId);
+
+    if (objectType == SAI_OBJECT_TYPE_SWITCH && status == SAI_STATUS_SUCCESS)
+    {
+        /*
+         * When doing CREATE operation user may want to update notification
+         * pointers, since notifications can be defined per switch we need to
+         * update them.
+         *
+         * TODO: should be moved inside to redis_generic_create
+         */
+
+        auto sw = std::make_shared<Switch>(*objectId, attr_count, attr_list);
+
+        g_switchContainer->insert(sw);
+    }
+
+    return status;
+}
+
 sai_status_t WrapperRemoteSaiInterface::remove(
         _In_ sai_object_type_t objectType,
         _In_ sai_object_id_t objectId)
@@ -55,6 +108,58 @@ sai_status_t WrapperRemoteSaiInterface::remove(
         // remove switch from container
         g_switchContainer->removeSwitch(objectId);
     }
+
+    return status;
+}
+
+sai_status_t WrapperRemoteSaiInterface::set(
+        _In_ sai_object_type_t objectType,
+        _In_ sai_object_id_t objectId,
+        _In_ const sai_attribute_t *attr)
+{
+    SWSS_LOG_ENTER();
+
+    g_recorder->recordGenericSet(objectType, objectId, attr);
+
+    auto status = m_implementation->set(objectType, objectId, attr);
+
+    g_recorder->recordGenericSetResponse(status);
+
+    if (objectType == SAI_OBJECT_TYPE_SWITCH && status == SAI_STATUS_SUCCESS)
+    {
+        auto sw = g_switchContainer->getSwitch(objectId);
+
+        if (!sw)
+        {
+            SWSS_LOG_THROW("failed to find switch %s in container",
+                    sai_serialize_object_id(objectId).c_str());
+        }
+
+        /*
+         * When doing SET operation user may want to update notification
+         * pointers.
+         */
+        sw->updateNotifications(1, attr);
+    }
+
+    return status;
+}
+
+sai_status_t WrapperRemoteSaiInterface::get(
+        _In_ sai_object_type_t objectType,
+        _In_ sai_object_id_t objectId,
+        _In_ uint32_t attr_count,
+        _Inout_ sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    clear_oid_values(objectType, attr_count, attr_list);
+
+    g_recorder->recordGenericGet(objectType, objectId, attr_count, attr_list);
+
+    auto status = m_implementation->get(objectType, objectId, attr_count, attr_list);
+
+    g_recorder->recordGenericGetResponse(status, objectType, attr_count, attr_list);
 
     return status;
 }

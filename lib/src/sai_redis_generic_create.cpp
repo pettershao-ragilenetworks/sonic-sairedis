@@ -3,80 +3,6 @@
 #include "meta/saiattributelist.h"
 #include <inttypes.h>
 
-sai_status_t internal_redis_generic_create(
-        _In_ sai_object_type_t object_type,
-        _In_ const std::string &serialized_object_id,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    std::vector<swss::FieldValueTuple> entry = SaiAttributeList::serialize_attr_list(
-            object_type,
-            attr_count,
-            attr_list,
-            false);
-
-    if (entry.size() == 0)
-    {
-        // make sure that we put object into db
-        // even if there are no attributes set
-        swss::FieldValueTuple null("NULL", "NULL");
-
-        entry.push_back(null);
-    }
-
-    std::string str_object_type = sai_serialize_object_type(object_type);
-
-    std::string key = str_object_type + ":" + serialized_object_id;
-
-    SWSS_LOG_DEBUG("generic create key: %s, fields: %" PRIu64, key.c_str(), entry.size());
-
-    g_recorder->recordGenericCreate(key, entry);
-
-    g_asicState->set(key, entry, "create");
-
-    auto status = internal_api_wait_for_response(SAI_COMMON_API_CREATE);
-
-    g_recorder->recordGenericCreateResponse(status);
-
-    return status;
-}
-
-sai_status_t redis_generic_create(
-        _In_ sai_object_type_t object_type,
-        _Out_ sai_object_id_t* object_id,
-        _In_ sai_object_id_t switch_id,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    // TODO should this be inside RedisRemoteSaInterfaceWrapper?
-    // since if we add some new implementation, can that implementation return actual value ?
-    // or this will be always replaced by virtual ID, and transferred to syncd then mapped there
-
-    // on create vid is put in db by syncd
-    *object_id = g_virtualObjectIdManager->allocateNewObjectId(object_type, switch_id);
-
-    if (*object_id == SAI_NULL_OBJECT_ID)
-    {
-        SWSS_LOG_ERROR("failed to create %s, with switch id: %s",
-                sai_serialize_object_type(object_type).c_str(),
-                sai_serialize_object_id(switch_id).c_str());
-
-        return SAI_STATUS_INSUFFICIENT_RESOURCES;
-    }
-
-    std::string str_object_id = sai_serialize_object_id(*object_id);
-
-    return internal_redis_generic_create(
-            object_type,
-            str_object_id,
-            attr_count,
-            attr_list);
-}
-
 sai_status_t redis_bulk_generic_create(
         _In_ sai_object_type_t object_type,
         _In_ uint32_t object_count,
@@ -193,26 +119,3 @@ sai_status_t internal_redis_bulk_generic_create(
     return status;
 }
 
-#define REDIS_ENTRY_CREATE(OT,ot)                       \
-    sai_status_t redis_generic_create_ ## ot(           \
-            _In_ const sai_ ## ot ## _t * entry,        \
-            _In_ uint32_t attr_count,                   \
-            _In_ const sai_attribute_t *attr_list)      \
-    {                                                   \
-        SWSS_LOG_ENTER();                               \
-        std::string str = sai_serialize_ ## ot(*entry); \
-        return internal_redis_generic_create(           \
-                SAI_OBJECT_TYPE_ ## OT,                 \
-                str,                                    \
-                attr_count,                             \
-                attr_list);                             \
-    }
-
-//REDIS_ENTRY_CREATE(FDB_ENTRY,fdb_entry);
-//REDIS_ENTRY_CREATE(INSEG_ENTRY,inseg_entry);
-//REDIS_ENTRY_CREATE(IPMC_ENTRY,ipmc_entry);
-//REDIS_ENTRY_CREATE(L2MC_ENTRY,l2mc_entry);
-//REDIS_ENTRY_CREATE(MCAST_FDB_ENTRY,mcast_fdb_entry);
-//REDIS_ENTRY_CREATE(NEIGHBOR_ENTRY,neighbor_entry);
-//REDIS_ENTRY_CREATE(ROUTE_ENTRY,route_entry);
-//REDIS_ENTRY_CREATE(NAT_ENTRY,nat_entry);

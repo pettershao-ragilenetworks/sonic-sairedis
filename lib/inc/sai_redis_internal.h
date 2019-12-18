@@ -12,13 +12,13 @@
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
-        return meta_sai_create_oid(                                 \
+        return g_meta->create(                                      \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
                 switch_id,                                          \
                 attr_count,                                         \
                 attr_list,                                          \
-                &redis_generic_create);                             \
+                *g_remoteSaiInterface);                             \
     }
 
 #define REDIS_REMOVE(OBJECT_TYPE,object_type)                       \
@@ -40,11 +40,11 @@
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
-        return meta_sai_set_oid(                                    \
+        return g_meta->set(                                         \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
                 attr,                                               \
-                &redis_generic_set);                                \
+                *g_remoteSaiInterface);                             \
     }
 
 #define REDIS_GET(OBJECT_TYPE,object_type)                          \
@@ -55,12 +55,12 @@
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
-        return meta_sai_get_oid(                                    \
+        return g_meta->get(                                         \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
                 attr_count,                                         \
                 attr_list,                                          \
-                &redis_generic_get);                                \
+                *g_remoteSaiInterface);                             \
     }
 
 #define REDIS_GENERIC_QUAD(OT,ot)  \

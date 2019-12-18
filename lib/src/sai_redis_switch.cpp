@@ -176,28 +176,13 @@ sai_status_t redis_create_switch(
         }
     }
 
-    sai_status_t status = meta_sai_create_oid(
+    auto status = g_meta->create(
             SAI_OBJECT_TYPE_SWITCH,
             switch_id,
             SAI_NULL_OBJECT_ID, // no switch id since we create switch
             attr_count,
             attr_list,
-            &redis_generic_create);
-
-    if (status == SAI_STATUS_SUCCESS)
-    {
-        /*
-         * When doing CREATE operation user may want to update notification
-         * pointers, since notifications can be defined per switch we need to
-         * update them.
-         *
-         * TODO: should be moved inside to redis_generic_create
-         */
-
-        auto sw = std::make_shared<Switch>(*switch_id, attr_count, attr_list);
-
-        g_switchContainer->insert(sw);
-    }
+            *g_remoteSaiInterface);
 
     return status;
 }
@@ -209,10 +194,12 @@ sai_status_t redis_remove_switch(
 
     SWSS_LOG_ENTER();
 
-    return g_meta->remove(
+    auto status = g_meta->remove(
             SAI_OBJECT_TYPE_SWITCH,
             switch_id,
             *g_remoteSaiInterface);
+
+    return status;
 }
 
 sai_status_t redis_set_switch_attribute(
@@ -308,28 +295,11 @@ sai_status_t redis_set_switch_attribute(
         }
     }
 
-    sai_status_t status = meta_sai_set_oid(
+    sai_status_t status = g_meta->set(
             SAI_OBJECT_TYPE_SWITCH,
             switch_id,
             attr,
-            &redis_generic_set);
-
-    if (status == SAI_STATUS_SUCCESS)
-    {
-        auto sw = g_switchContainer->getSwitch(switch_id);
-
-        if (!sw)
-        {
-            SWSS_LOG_THROW("failed to find switch %s in container",
-                    sai_serialize_object_id(switch_id).c_str());
-        }
-
-        /*
-         * When doing SET operation user may want to update notification
-         * pointers.
-         */
-        sw->updateNotifications(1, attr);
-    }
+            *g_remoteSaiInterface);
 
     return status;
 }
@@ -343,12 +313,12 @@ sai_status_t redis_get_switch_attribute(
 
     SWSS_LOG_ENTER();
 
-    return meta_sai_get_oid(
+    return g_meta->get(
             SAI_OBJECT_TYPE_SWITCH,
             switch_id,
             attr_count,
             attr_list,
-            &redis_generic_get);
+            *g_remoteSaiInterface);
 }
 
 /**

@@ -65,36 +65,6 @@ sai_status_t internal_api_wait_for_response(
     return SAI_STATUS_FAILURE;
 }
 
-sai_status_t internal_redis_generic_set(
-        _In_ sai_object_type_t object_type,
-        _In_ const std::string &serialized_object_id,
-        _In_ const sai_attribute_t *attr)
-{
-    SWSS_LOG_ENTER();
-
-    std::vector<swss::FieldValueTuple> entry = SaiAttributeList::serialize_attr_list(
-            object_type,
-            1,
-            attr,
-            false);
-
-    std::string str_object_type = sai_serialize_object_type(object_type);
-
-    std::string key = str_object_type + ":" + serialized_object_id;
-
-    SWSS_LOG_DEBUG("generic set key: %s, fields: %lu", key.c_str(), entry.size());
-
-    g_recorder->recordGenericSet(key, entry);
-
-    g_asicState->set(key, entry, "set");
-
-    auto status = internal_api_wait_for_response(SAI_COMMON_API_SET);
-
-    g_recorder->recordGenericSetResponse(status);
-
-    return status;
-}
-
 sai_status_t internal_redis_bulk_generic_set(
         _In_ sai_object_type_t object_type,
         _In_ const std::vector<std::string> &serialized_object_ids,
@@ -167,40 +137,3 @@ sai_status_t internal_redis_bulk_generic_set(
     return status;
 }
 
-
-sai_status_t redis_generic_set(
-        _In_ sai_object_type_t object_type,
-        _In_ sai_object_id_t object_id,
-        _In_ const sai_attribute_t *attr)
-{
-    SWSS_LOG_ENTER();
-
-    std::string str_object_id = sai_serialize_object_id(object_id);
-
-    return internal_redis_generic_set(
-            object_type,
-            str_object_id,
-            attr);
-}
-
-#define REDIS_ENTRY_SET(OT,ot)                          \
-sai_status_t redis_generic_set_ ## ot(                  \
-        _In_ const sai_ ## ot ## _t *entry,             \
-        _In_ const sai_attribute_t *attr)               \
-{                                                       \
-    SWSS_LOG_ENTER();                                   \
-    std::string str = sai_serialize_ ## ot(*entry);     \
-    return internal_redis_generic_set(                  \
-            SAI_OBJECT_TYPE_ ## OT,                     \
-            str,                                        \
-            attr);                                      \
-}
-
-//REDIS_ENTRY_SET(FDB_ENTRY,fdb_entry);
-//REDIS_ENTRY_SET(INSEG_ENTRY,inseg_entry);
-//REDIS_ENTRY_SET(IPMC_ENTRY,ipmc_entry);
-//REDIS_ENTRY_SET(L2MC_ENTRY,l2mc_entry);
-//REDIS_ENTRY_SET(MCAST_FDB_ENTRY,mcast_fdb_entry);
-//REDIS_ENTRY_SET(NEIGHBOR_ENTRY,neighbor_entry);
-//REDIS_ENTRY_SET(ROUTE_ENTRY,route_entry);
-//REDIS_ENTRY_SET(NAT_ENTRY,nat_entry);

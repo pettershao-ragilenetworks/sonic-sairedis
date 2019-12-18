@@ -29,6 +29,29 @@ RedisRemoteSaiInterface::RedisRemoteSaiInterface(
     // empty
 }
 
+sai_status_t RedisRemoteSaiInterface::create(
+        _In_ sai_object_type_t objectType,
+        _Out_ sai_object_id_t* objectId,
+        _In_ sai_object_id_t switchId,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    if (!objectId || *objectId == SAI_NULL_OBJECT_ID)
+    {
+        SWSS_LOG_THROW("forgot to allocate object id, FATAL");
+    }
+
+    // NOTE: objectId was allocated by the caller
+
+    return create(
+            objectType,
+            sai_serialize_object_id(*objectId),
+            attr_count,
+            attr_list);
+}
+
 sai_status_t RedisRemoteSaiInterface::remove(
         _In_ sai_object_type_t objectType,
         _In_ sai_object_id_t objectId)
@@ -39,6 +62,35 @@ sai_status_t RedisRemoteSaiInterface::remove(
             objectType,
             sai_serialize_object_id(objectId));
 }
+
+sai_status_t RedisRemoteSaiInterface::set(
+        _In_ sai_object_type_t objectType,
+        _In_ sai_object_id_t objectId,
+        _In_ const sai_attribute_t *attr)
+{
+    SWSS_LOG_ENTER();
+
+    return set(
+            objectType,
+            sai_serialize_object_id(objectId),
+            attr);
+}
+
+sai_status_t RedisRemoteSaiInterface::get(
+        _In_ sai_object_type_t objectType,
+        _In_ sai_object_id_t objectId,
+        _In_ uint32_t attr_count,
+        _Inout_ sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    return get(
+            objectType,
+            sai_serialize_object_id(objectId),
+            attr_count,
+            attr_list);
+}
+
 
 #define DECLARE_REMOVE_ENTRY(OT,ot)                             \
 sai_status_t RedisRemoteSaiInterface::remove(                   \
@@ -282,7 +334,7 @@ sai_status_t RedisRemoteSaiInterface::waitForGetResponse(
             }
 
             sai_status_t status;
-            sai_deserialize_status(op, status);
+            sai_deserialize_status(opkey, status);
 
             // we could deserialize directly to user data, but list is
             // allocated by deserializer we would need another method for that
