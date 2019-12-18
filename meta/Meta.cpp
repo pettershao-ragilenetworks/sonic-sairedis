@@ -4,6 +4,7 @@
 #include "swss/logger.h"
 #include "sai_serialize.h"
 #include "OidRefCounter.h"
+#include "Globals.h"
 
 #include <inttypes.h>
 
@@ -78,6 +79,12 @@ void meta_generic_validation_post_get(
         _In_ sai_object_id_t switch_id,
         _In_ const uint32_t attr_count,
         _In_ const sai_attribute_t *attr_list);
+
+sai_status_t meta_generic_validation_objlist(
+        _In_ const sai_attr_metadata_t& md,
+        _In_ sai_object_id_t switch_id,
+        _In_ uint32_t count,
+        _In_ const sai_object_id_t* list);
 
 sai_status_t Meta::remove(
         _In_ sai_object_type_t object_type,
@@ -1545,3 +1552,153 @@ sai_status_t Meta::get(
 
     return status;
 }
+
+sai_status_t Meta::flushFdbEntries(
+        _In_ sai_object_id_t switch_id,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    if (attr_count > MAX_LIST_COUNT)
+    {
+        SWSS_LOG_ERROR("create attribute count %u > max list count %u", attr_count, MAX_LIST_COUNT);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    if (attr_count != 0 && attr_list == NULL)
+    {
+        SWSS_LOG_ERROR("attribute list is NULL");
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    sai_object_type_t swot = sai_object_type_query(switch_id);
+
+    if (swot != SAI_OBJECT_TYPE_SWITCH)
+    {
+        SWSS_LOG_ERROR("object type for switch_id %s is %s",
+                sai_serialize_object_id(switch_id).c_str(),
+                sai_serialize_object_type(swot).c_str());
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    if (!g_oids.objectReferenceExists(switch_id))
+    {
+        SWSS_LOG_ERROR("switch id %s doesn't exist",
+                sai_serialize_object_id(switch_id).c_str());
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    // validate attributes
+    // - attribute list can be empty
+    // - validation is similar to "create" action but there is no
+    //   post create step and no references are updated
+    // - fdb entries are updated in fdb notification
+
+    std::unordered_map<sai_attr_id_t, const sai_attribute_t*> attrs;
+
+    SWSS_LOG_DEBUG("attr count = %u", attr_count);
+
+    for (uint32_t idx = 0; idx < attr_count; ++idx)
+    {
+        const sai_attribute_t* attr = &attr_list[idx];
+
+        auto mdp = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_FDB_FLUSH, attr->id);
+
+        if (mdp == NULL)
+        {
+            SWSS_LOG_ERROR("unable to find attribute metadata SAI_OBJECT_TYPE_FDB_FLUSH:%d", attr->id);
+
+            return SAI_STATUS_INVALID_PARAMETER;
+        }
+
+        const sai_attribute_value_t& value = attr->value;
+
+        const sai_attr_metadata_t& md = *mdp;
+
+        META_LOG_DEBUG(md, "(fdbflush)");
+
+        if (attrs.find(attr->id) != attrs.end())
+        {
+            META_LOG_ERROR(md, "attribute id (%u) is defined on attr list multiple times", attr->id);
+
+            return SAI_STATUS_INVALID_PARAMETER;
+        }
+
+        attrs[attr->id] = attr;
+
+        if (md.flags != SAI_ATTR_FLAGS_CREATE_ONLY)
+        {
+            META_LOG_ERROR(md, "attr is expected to be marked as CREATE_ONLY");
+
+            return SAI_STATUS_INVALID_PARAMETER;
+        }
+
+        if (md.isconditional || md.validonlylength > 0)
+        {
+            META_LOG_ERROR(md, "attr should not be conditional or validonly");
+
+            return SAI_STATUS_INVALID_PARAMETER;
+        }
+
+        switch (md.attrvaluetype)
+        {
+            case SAI_ATTR_VALUE_TYPE_UINT16:
+
+                if (md.isvlan && (value.u16 >= 0xFFF || value.u16 == 0))
+                {
+                    META_LOG_ERROR(md, "is vlan id but has invalid id %u", value.u16);
+
+                    return SAI_STATUS_INVALID_PARAMETER;
+                }
+
+                break;
+
+            case SAI_ATTR_VALUE_TYPE_INT32:
+
+                if (md.isenum && !sai_metadata_is_allowed_enum_value(&md, value.s32))
+                {
+                    META_LOG_ERROR(md, "is enum, but value %d not found on allowed values list", value.s32);
+
+                    return SAI_STATUS_INVALID_PARAMETER;
+                }
+
+                break;
+
+            case SAI_ATTR_VALUE_TYPE_OBJECT_ID:
+
+                {
+                    sai_status_t status = meta_generic_validation_objlist(md, switch_id, 1, &value.oid);
+
+                    if (status != SAI_STATUS_SUCCESS)
+                    {
+                        return status;
+                    }
+
+                    break;
+                }
+
+            default:
+
+                META_LOG_THROW(md, "serialization type is not supported yet FIXME");
+        }
+    }
+
+    // there are no mandatory attributes
+    // there are no conditional attributes
+
+    auto status = saiInterface.flushFdbEntries(switch_id, attr_count, attr_list);
+
+    if (status == SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_WARN("TODO, remove all matching fdb entries here, currently removed in FDB notification");
+    }
+
+    return status;
+}
+
