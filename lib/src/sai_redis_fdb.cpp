@@ -2,87 +2,6 @@
 #include "meta/sai_serialize.h"
 #include "meta/saiattributelist.h"
 
-sai_status_t internal_redis_flush_fdb_entries(
-        _In_ sai_object_id_t switch_id,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    std::vector<swss::FieldValueTuple> entry = SaiAttributeList::serialize_attr_list(
-            SAI_OBJECT_TYPE_FDB_FLUSH,
-            attr_count,
-            attr_list,
-            false);
-
-    std::string str_object_type = sai_serialize_object_type(SAI_OBJECT_TYPE_FDB_FLUSH);
-
-    std::string key = str_object_type + ":" + sai_serialize_object_id(switch_id);
-
-    SWSS_LOG_NOTICE("flush key: %s, fields: %lu", key.c_str(), entry.size());
-
-    g_recorder->recordFlushFdbEntries(key, entry);
-
-    // flush is special, it will not put data
-    // into asic view, only to message queue
-    g_asicState->set(key, entry, "flush");
-
-    // wait for response
-
-    swss::Select s;
-
-    // get consumer will be reused for flush
-
-    s.addSelectable(g_redisGetConsumer.get());
-
-    while (true)
-    {
-        SWSS_LOG_DEBUG("wait for response");
-
-        swss::Selectable *sel;
-
-        int result = s.select(&sel, GET_RESPONSE_TIMEOUT);
-
-        if (result == swss::Select::OBJECT)
-        {
-            swss::KeyOpFieldsValuesTuple kco;
-
-            g_redisGetConsumer->pop(kco);
-
-            const std::string &op = kfvOp(kco);
-            const std::string &opkey = kfvKey(kco);
-
-            SWSS_LOG_DEBUG("response: op = %s, key = %s", opkey.c_str(), op.c_str());
-
-            if (op != "flushresponse") // ignore non response messages
-            {
-                continue;
-            }
-
-            std::string str_sai_status = opkey;
-
-            sai_status_t status;
-
-            sai_deserialize_status(str_sai_status, status);
-
-            g_recorder->recordFlushFdbEntriesResponse(status);
-
-            SWSS_LOG_NOTICE("flush status: %d", status);
-
-            return status;
-        }
-
-        SWSS_LOG_ERROR("flush failed due to SELECT operation result: %s", getSelectResultAsString(result).c_str());
-        break;
-    }
-
-    g_recorder->recordFlushFdbEntriesResponse(SAI_STATUS_FAILURE);
-
-    SWSS_LOG_ERROR("flush failed to get response");
-
-    return SAI_STATUS_FAILURE;
-}
-
 sai_status_t redis_flush_fdb_entries(
         _In_ sai_object_id_t switch_id,
         _In_ uint32_t attr_count,
@@ -92,21 +11,12 @@ sai_status_t redis_flush_fdb_entries(
 
     SWSS_LOG_ENTER();
 
-    return meta_sai_flush_fdb_entries(
+    return g_meta->flushFdbEntries(
             switch_id,
             attr_count,
             attr_list,
-            internal_redis_flush_fdb_entries);
+            *g_remoteSaiInterface);
 }
-
-REDIS_GENERIC_QUAD_ENTRY(FDB_ENTRY,fdb_entry);
-
-const sai_fdb_api_t redis_fdb_api = {
-
-    REDIS_GENERIC_QUAD_API(fdb_entry)
-
-    redis_flush_fdb_entries,
-};
 
 sai_status_t redis_dummy_create_fdb_entry(
         _In_ const sai_fdb_entry_t *fdb_entry,
@@ -270,3 +180,12 @@ sai_status_t redis_bulk_remove_fdb_entry(
             mode,
             object_statuses);
 }
+
+REDIS_GENERIC_QUAD_ENTRY(FDB_ENTRY,fdb_entry);
+
+const sai_fdb_api_t redis_fdb_api = {
+
+    REDIS_GENERIC_QUAD_API(fdb_entry)
+
+    redis_flush_fdb_entries,
+};

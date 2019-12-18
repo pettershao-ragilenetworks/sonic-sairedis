@@ -249,6 +249,12 @@ namespace sairedis
         public: // SAI query interface API
 
             void recordFlushFdbEntries(
+                    _In_ sai_object_id_t switchId,
+                    _In_ uint32_t attrCount,
+                    _In_ const sai_attribute_t *attrList);
+
+            // TODO move to private
+            void recordFlushFdbEntries(
                     _In_ const std::string& key,
                     _In_ const std::vector<swss::FieldValueTuple>& arguments);
 

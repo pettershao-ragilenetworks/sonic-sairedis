@@ -218,6 +218,29 @@ std::string Recorder::getTimestamp()
 // SAI APIs record functions
 
 void Recorder::recordFlushFdbEntries(
+        _In_ sai_object_id_t switchId,
+        _In_ uint32_t attrCount,
+        _In_ const sai_attribute_t *attrList)
+{
+    SWSS_LOG_ENTER();
+
+    std::vector<swss::FieldValueTuple> entry = SaiAttributeList::serialize_attr_list(
+            SAI_OBJECT_TYPE_FDB_FLUSH,
+            attrCount,
+            attrList,
+            false);
+
+    std::string serializedObjectType = sai_serialize_object_type(SAI_OBJECT_TYPE_FDB_FLUSH);
+
+    // NOTE ! we actually give switch ID since FLUSH is not real object
+    std::string key = serializedObjectType + ":" + sai_serialize_object_id(switchId);
+
+    SWSS_LOG_NOTICE("flush key: %s, fields: %lu", key.c_str(), entry.size());
+
+    recordFlushFdbEntries(key, entry);
+}
+
+void Recorder::recordFlushFdbEntries(
         _In_ const std::string& key,
         _In_ const std::vector<swss::FieldValueTuple>& arguments)
 {

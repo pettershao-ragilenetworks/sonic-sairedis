@@ -18,7 +18,8 @@
 #define REDIS_ASIC_STATE_COMMAND_SET    "set"
 #define REDIS_ASIC_STATE_COMMAND_GET    "get"
 
-#define REDIS_ASIC_STATE_COMMAND_GETRESPONSE "getresponse"
+#define REDIS_ASIC_STATE_COMMAND_GETRESPONSE        "getresponse"
+#define REDIS_ASIC_STATE_COMMAND_FLUSHRESPONSE      "flushresponse"
 
 /**
  * @brief Get response timeout in milliseconds.
@@ -127,6 +128,13 @@ namespace sairedis
             SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_GET_ENTRY(route_entry);
             SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_GET_ENTRY(nat_entry);
 
+        public:
+
+            virtual sai_status_t flushFdbEntries(
+                    _In_ sai_object_id_t switchId,
+                    _In_ uint32_t attrCount,
+                    _In_ const sai_attribute_t *attrList) override;
+
         private:
 
             sai_status_t create(
@@ -174,6 +182,8 @@ namespace sairedis
                     _In_ sai_object_type_t objectType,
                     _In_ uint32_t attr_count,
                     _Inout_ sai_attribute_t *attr_list);
+
+            sai_status_t waitForFlushFdbEntriesResponse();
 
         private:
 

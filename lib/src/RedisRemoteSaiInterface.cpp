@@ -419,3 +419,79 @@ DECLARE_GET_ENTRY(NEIGHBOR_ENTRY,neighbor_entry);
 DECLARE_GET_ENTRY(ROUTE_ENTRY,route_entry);
 DECLARE_GET_ENTRY(NAT_ENTRY,nat_entry);
 
+sai_status_t RedisRemoteSaiInterface::waitForFlushFdbEntriesResponse()
+{
+    SWSS_LOG_ENTER();
+
+    swss::Select s;
+
+    // get consumer will be reused for flush
+
+    s.addSelectable(m_getConsumer.get());
+
+    while (true)
+    {
+        SWSS_LOG_DEBUG("wait for response");
+
+        swss::Selectable *sel;
+
+        int result = s.select(&sel, REDIS_ASIC_STATE_COMMAND_GETRESPONSE_TIMEOUT_MS);
+
+        if (result == swss::Select::OBJECT)
+        {
+            swss::KeyOpFieldsValuesTuple kco;
+
+            m_getConsumer->pop(kco);
+
+            const std::string &op = kfvOp(kco);
+            const std::string &opkey = kfvKey(kco);
+
+            SWSS_LOG_DEBUG("response: op = %s, key = %s", opkey.c_str(), op.c_str());
+
+            if (op != REDIS_ASIC_STATE_COMMAND_FLUSHRESPONSE) // ignore non response messages
+            {
+                continue;
+            }
+
+            sai_status_t status;
+            sai_deserialize_status(opkey, status);
+
+            SWSS_LOG_NOTICE("flush status: %s", opkey.c_str());
+
+            return status;
+        }
+
+        SWSS_LOG_ERROR("flush failed due to SELECT operation result: %s", getSelectResultAsString(result).c_str());
+        break;
+    }
+
+    SWSS_LOG_ERROR("flush failed to get response");
+
+    return SAI_STATUS_FAILURE;
+}
+
+sai_status_t RedisRemoteSaiInterface::flushFdbEntries(
+        _In_ sai_object_id_t switchId,
+        _In_ uint32_t attrCount,
+        _In_ const sai_attribute_t *attrList)
+{
+    SWSS_LOG_ENTER();
+
+    std::vector<swss::FieldValueTuple> entry = SaiAttributeList::serialize_attr_list(
+            SAI_OBJECT_TYPE_FDB_FLUSH,
+            attrCount,
+            attrList,
+            false);
+
+    std::string serializedObjectId = sai_serialize_object_type(SAI_OBJECT_TYPE_FDB_FLUSH);
+
+    // NOTE ! we actually give switch ID since FLUSH is not real object
+    std::string key = serializedObjectId + ":" + sai_serialize_object_id(switchId);
+
+    SWSS_LOG_NOTICE("flush key: %s, fields: %lu", key.c_str(), entry.size());
+
+    m_asicState->set(key, entry, "flush");
+
+    return waitForFlushFdbEntriesResponse();
+}
+

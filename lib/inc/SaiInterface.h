@@ -103,5 +103,13 @@ namespace sairedis
             SAIREDIS_SAIINTERFACE_DECLARE_GET_ENTRY(neighbor_entry);
             SAIREDIS_SAIINTERFACE_DECLARE_GET_ENTRY(route_entry);
             SAIREDIS_SAIINTERFACE_DECLARE_GET_ENTRY(nat_entry);
+
+        public:
+
+            virtual sai_status_t flushFdbEntries(
+                    _In_ sai_object_id_t switchId,
+                    _In_ uint32_t attrCount,
+                    _In_ const sai_attribute_t *attrList) = 0;
+
     };
 }
