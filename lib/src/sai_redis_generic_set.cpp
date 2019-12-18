@@ -140,3 +140,18 @@ sai_status_t internal_redis_bulk_generic_set(
     return status;
 }
 
+sai_status_t redis_bulk_set_entry_attribute(
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t object_count,
+        _In_ const void* entry,
+        _In_ const sai_attribute_t *attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses)
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_ERROR("not implemented");
+
+    return SAI_STATUS_NOT_IMPLEMENTED;
+}
+

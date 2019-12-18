@@ -87,7 +87,7 @@ static sai_status_t redis_create_ ## object_type(               \
     }
 
 #define REDIS_REMOVE_ENTRY(OBJECT_TYPE,object_type)             \
-    sai_status_t redis_remove_ ## object_type(                  \
+static sai_status_t redis_remove_ ## object_type(               \
             _In_ const sai_ ## object_type ## _t *object_type)  \
     {                                                           \
         MUTEX();                                                \
@@ -304,7 +304,7 @@ static sai_status_t redis_bulk_get_ ## fname(       \
 #define REDIS_BULK_CREATE_ENTRY(OT,ot)              \
 static sai_status_t redis_bulk_create_ ## ot(       \
         _In_ uint32_t object_count,                 \
-        _In_ const sau_ ## o ## _t *entry,          \
+        _In_ const sai_ ## ot ## _t *entry,         \
         _In_ const uint32_t *attr_count,            \
         _In_ const sai_attribute_t **attr_list,     \
         _In_ sai_bulk_op_error_mode_t mode,         \
@@ -352,7 +352,7 @@ static sai_status_t redis_bulk_set_ ## ot(          \
     return redis_bulk_set_entry_attribute(          \
             SAI_OBJECT_TYPE_ ## OT,                 \
             object_count,                           \
-            object_id,                              \
+            entry,                                  \
             attr_list,                              \
             mode,                                   \
             object_statuses);                       \
@@ -361,7 +361,7 @@ static sai_status_t redis_bulk_set_ ## ot(          \
 #define REDIS_BULK_GET_ENTRY(OT,ot)                 \
 static sai_status_t redis_bulk_get_ ## ot(          \
         _In_ uint32_t object_count,                 \
-        _In_ const sau_ ## o ## _t *entry,          \
+        _In_ const sai_ ## ot ## _t *entry,         \
         _In_ const uint32_t *attr_count,            \
         _Inout_ sai_attribute_t **attr_list,        \
         _In_ sai_bulk_op_error_mode_t mode,         \
@@ -378,4 +378,16 @@ static sai_status_t redis_bulk_get_ ## ot(          \
             mode,                                   \
             object_statuses);                       \
 }
+
+#define REDIS_BULK_QUAD_ENTRY(OT,ot)    \
+    REDIS_BULK_CREATE_ENTRY(OT,ot);     \
+    REDIS_BULK_REMOVE_ENTRY(OT,ot);     \
+    REDIS_BULK_SET_ENTRY(OT,ot);        \
+    REDIS_BULK_GET_ENTRY(OT,ot);
+
+#define REDIS_BULK_QUAD_API(ot)         \
+    redis_bulk_create_ ## ot,           \
+    redis_bulk_remove_ ## ot,           \
+    redis_bulk_set_ ## ot,              \
+    redis_bulk_get_ ## ot,
 
