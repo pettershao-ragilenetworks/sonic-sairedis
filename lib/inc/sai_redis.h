@@ -162,42 +162,100 @@ REDIS_ENTRY_QUAD(neighbor_entry);
 REDIS_ENTRY_QUAD(route_entry);
 REDIS_ENTRY_QUAD(nat_entry);
 
-// BULK
+// BULK OID
 
 sai_status_t redis_bulk_generic_create(
         _In_ sai_object_type_t object_type,
-        _In_ uint32_t object_count,
-        _Out_ sai_object_id_t *object_id, /* array */
         _In_ sai_object_id_t switch_id,
-        _In_ const uint32_t *attr_count, /* array */
-        _In_ const sai_attribute_t *const *attr_list, /* array */
-        _Inout_ sai_status_t *object_statuses); /* array */
-
-sai_status_t internal_redis_bulk_generic_create(
-        _In_ sai_object_type_t object_type,
-        _In_ const std::vector<std::string> &serialized_object_ids,
+        _In_ uint32_t object_count,
         _In_ const uint32_t *attr_count,
-        _In_ const sai_attribute_t *const *attr_list, /* array */
-        _Inout_ sai_status_t *object_statuses) /* array */;
+        _In_ const sai_attribute_t **attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_object_id_t *object_id,
+        _Out_ sai_status_t *object_statuses);
 
 sai_status_t redis_bulk_generic_remove(
         _In_ sai_object_type_t object_type,
         _In_ uint32_t object_count,
-        _In_ const sai_object_id_t *object_id, /* array */
-        _Inout_ sai_status_t *object_statuses) /* array */;
+        _In_ const sai_object_id_t *object_id,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses);
+
+sai_status_t redis_bulk_generic_set(
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t object_count,
+        _In_ const sai_object_id_t *object_id,
+        _In_ const sai_attribute_t *attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses);
+
+sai_status_t redis_bulk_generic_get(
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t object_count,
+        _In_ const sai_object_id_t *object_id,
+        _In_ const uint32_t *attr_count,
+        _Inout_ sai_attribute_t **attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses);
+
+sai_status_t internal_redis_bulk_generic_create(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::vector<std::string> &serialized_object_ids,
+        _In_ const uint32_t *attr_count,    // array
+        _In_ const sai_attribute_t *const *attr_list, // array of arrays
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Inout_ sai_status_t *object_statuses); // array
 
 sai_status_t internal_redis_bulk_generic_remove(
         _In_ sai_object_type_t object_type,
         _In_ const std::vector<std::string> &serialized_object_ids,
-        _Out_ sai_status_t *object_statuses); /* array */
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses); // array
 
 sai_status_t internal_redis_bulk_generic_set(
         _In_ sai_object_type_t object_type,
         _In_ const std::vector<std::string> &serialized_object_ids,
-        _In_ const sai_attribute_t *attr_list, /* array */
-        _In_ const sai_status_t *object_statuses); /* array */
+        _In_ const sai_attribute_t *attr_list, // array
+        _In_ sai_bulk_op_error_mode_t mode,
+        _In_ const sai_status_t *object_statuses); // array
 
-// get_stats
+// BULK ENTRY
+
+// instead of actual entry we have void*, and internal
+// function will know how to do the cast based on object_type
+
+sai_status_t redis_bulk_create_entry(
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t object_count,
+        _In_ const void *entry,
+        _In_ const uint32_t *attr_count,
+        _In_ const sai_attribute_t **attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses);
+
+sai_status_t redis_bulk_remove_entry(
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t object_count,
+        _In_ const void *entry,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses);
+
+sai_status_t redis_bulk_set_entry_attribute(
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t object_count,
+        _In_ const void* entry,
+        _In_ const sai_attribute_t *attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses);
+
+sai_status_t redis_bulk_get_entry_attribute(
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t object_count,
+        _In_ const void* entry,
+        _In_ const uint32_t *attr_count,
+        _Inout_ sai_attribute_t **attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses);
 
 template <typename T>
 sai_status_t redis_generic_get_stats(

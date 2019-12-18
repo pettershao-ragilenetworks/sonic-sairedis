@@ -131,6 +131,7 @@ sai_status_t redis_bulk_create_route_entry(
             serialized_object_ids,
             attr_count,
             attr_list,
+            mode,
             object_statuses);
 }
 
@@ -233,7 +234,11 @@ sai_status_t redis_bulk_remove_route_entry(
         }
     }
 
-    return internal_redis_bulk_generic_remove(SAI_OBJECT_TYPE_ROUTE_ENTRY, serialized_object_ids, object_statuses);
+    return internal_redis_bulk_generic_remove(
+            SAI_OBJECT_TYPE_ROUTE_ENTRY, 
+            serialized_object_ids, 
+            mode,
+            object_statuses);
 }
 
 sai_status_t redis_dummy_set_route_entry(
@@ -352,6 +357,7 @@ sai_status_t redis_bulk_set_route_entry_attribute(
             SAI_OBJECT_TYPE_ROUTE_ENTRY,
             serialized_object_ids,
             attr_list,
+            mode,
             object_statuses);
 }
 

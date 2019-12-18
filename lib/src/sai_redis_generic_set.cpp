@@ -69,9 +69,12 @@ sai_status_t internal_redis_bulk_generic_set(
         _In_ sai_object_type_t object_type,
         _In_ const std::vector<std::string> &serialized_object_ids,
         _In_ const sai_attribute_t *attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
         _In_ const sai_status_t *object_statuses)
 {
     SWSS_LOG_ENTER();
+
+    // TODO support mode
 
     std::string str_object_type = sai_serialize_object_type(object_type);
 

@@ -5,14 +5,17 @@
 
 sai_status_t redis_bulk_generic_create(
         _In_ sai_object_type_t object_type,
-        _In_ uint32_t object_count,
-        _Out_ sai_object_id_t *object_id, /* array */
         _In_ sai_object_id_t switch_id,
-        _In_ const uint32_t *attr_count, /* array */
-        _In_ const sai_attribute_t *const *attr_list, /* array */
-        _Inout_ sai_status_t *object_statuses) /* array */
+        _In_ uint32_t object_count,
+        _In_ const uint32_t *attr_count,
+        _In_ const sai_attribute_t **attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_object_id_t *object_id,
+        _Out_ sai_status_t *object_statuses)
 {
     SWSS_LOG_ENTER();
+
+    // TODO support mode
 
     std::vector<std::string> serialized_object_ids;
 
@@ -38,6 +41,7 @@ sai_status_t redis_bulk_generic_create(
             serialized_object_ids,
             attr_count,
             attr_list,
+            mode,
             object_statuses);
 }
 
@@ -46,9 +50,12 @@ sai_status_t internal_redis_bulk_generic_create(
         _In_ const std::vector<std::string> &serialized_object_ids,
         _In_ const uint32_t *attr_count,
         _In_ const sai_attribute_t *const *attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
         _Inout_ sai_status_t *object_statuses)
 {
     SWSS_LOG_ENTER();
+
+    // TODO support mode
 
     std::string str_object_type = sai_serialize_object_type(object_type);
 
@@ -117,5 +124,21 @@ sai_status_t internal_redis_bulk_generic_create(
     g_recorder->recordBulkGenericCreateResponse(status, objectCount, object_statuses);
 
     return status;
+}
+
+sai_status_t redis_bulk_create_entry(
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t object_count,
+        _In_ const void *entry,
+        _In_ const uint32_t *attr_count,
+        _In_ const sai_attribute_t **attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses)
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_ERROR("not implemented");
+
+    return SAI_STATUS_NOT_IMPLEMENTED;
 }
 

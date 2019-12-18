@@ -5,12 +5,15 @@
 sai_status_t redis_bulk_generic_remove(
         _In_ sai_object_type_t object_type,
         _In_ uint32_t object_count,
-        _In_ const sai_object_id_t *object_id, /* array */
-        _Out_ sai_status_t *object_statuses) /* array */
+        _In_ const sai_object_id_t *object_id,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses)
 {
     SWSS_LOG_ENTER();
 
     std::vector<std::string> serialized_object_ids;
+
+    // TODO support mode
 
     // on create vid is put in db by syncd
     for (uint32_t idx = 0; idx < object_count; idx++)
@@ -22,15 +25,19 @@ sai_status_t redis_bulk_generic_remove(
     return internal_redis_bulk_generic_remove(
             object_type,
             serialized_object_ids,
+            mode,
             object_statuses);
 }
 
 sai_status_t internal_redis_bulk_generic_remove(
         _In_ sai_object_type_t object_type,
         _In_ const std::vector<std::string> &serialized_object_ids,
+        _In_ sai_bulk_op_error_mode_t mode,
         _Out_ sai_status_t *object_statuses) /* array */
 {
     SWSS_LOG_ENTER();
+
+    // TODO support mode
 
     std::string str_object_type = sai_serialize_object_type(object_type);
 

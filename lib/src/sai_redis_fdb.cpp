@@ -232,10 +232,11 @@ sai_status_t redis_bulk_create_fdb_entry(
      */
 
     return internal_redis_bulk_generic_create(
-            SAI_OBJECT_TYPE_ROUTE_ENTRY,
+            SAI_OBJECT_TYPE_FDB_ENTRY,
             serialized_object_ids,
             attr_count,
             attr_list,
+            mode,
             object_statuses);
 }
 
@@ -263,5 +264,9 @@ sai_status_t redis_bulk_remove_fdb_entry(
                 sai_serialize_fdb_entry(fdb_entry[idx]));
     }
 
-    return internal_redis_bulk_generic_remove(SAI_OBJECT_TYPE_ROUTE_ENTRY, serialized_object_ids, object_statuses);
+    return internal_redis_bulk_generic_remove(
+            SAI_OBJECT_TYPE_FDB_ENTRY,
+            serialized_object_ids,
+            mode,
+            object_statuses);
 }
