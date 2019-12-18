@@ -39,9 +39,30 @@ namespace saimeta
 
         public:
 
+            sai_status_t create(
+                    _In_ sai_object_type_t objectType,
+                    _Out_ sai_object_id_t* objectId,
+                    _In_ sai_object_id_t switchId,
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list,
+                    _Inout_ sairedis::SaiInterface& saiInterface);
+
             sai_status_t remove(
+                    _In_ sai_object_type_t objectType,
+                    _In_ sai_object_id_t objectId,
+                    _Inout_ sairedis::SaiInterface& saiInterface);
+
+            sai_status_t set(
                     _In_ sai_object_type_t object_type,
                     _In_ sai_object_id_t object_id,
+                    _In_ const sai_attribute_t *attr,
+                    _Inout_ sairedis::SaiInterface& saiInterface);
+
+            sai_status_t get(
+                    _In_ sai_object_type_t objectType,
+                    _In_ sai_object_id_t objectId,
+                    _In_ uint32_t attr_count,
+                    _Inout_ sai_attribute_t *attr_list,
                     _Inout_ sairedis::SaiInterface& saiInterface);
 
         public: // create ENTRY

@@ -3,8 +3,13 @@
 
 #include "swss/logger.h"
 #include "sai_serialize.h"
+#include "OidRefCounter.h"
+
+#include <inttypes.h>
 
 using namespace saimeta;
+
+extern OidRefCounter g_oids;
 
 // TODO to be moved to private member methods
 sai_status_t meta_generic_validation_remove(
@@ -1393,6 +1398,149 @@ sai_status_t Meta::get(
     if (status == SAI_STATUS_SUCCESS)
     {
         meta_generic_validation_post_get(meta_key, nat_entry->switch_id, attr_count, attr_list);
+    }
+
+    return status;
+}
+
+sai_status_t Meta::create(
+        _In_ sai_object_type_t object_type,
+        _Out_ sai_object_id_t* object_id,
+        _In_ sai_object_id_t switch_id,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    sai_status_t status = meta_sai_validate_oid(object_type, object_id, switch_id, true);
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        return status;
+    }
+
+    sai_object_meta_key_t meta_key = { .objecttype = object_type, .objectkey = { .key = { .object_id  = SAI_NULL_OBJECT_ID } } };
+
+    status = meta_generic_validation_create(meta_key, switch_id, attr_count, attr_list);
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        return status;
+    }
+
+    status = saiInterface.create(object_type, object_id, switch_id, attr_count, attr_list);
+
+    if (status == SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_DEBUG("create status: %s", sai_serialize_status(status).c_str());
+    }
+    else
+    {
+        SWSS_LOG_ERROR("create status: %s", sai_serialize_status(status).c_str());
+    }
+
+    if (status == SAI_STATUS_SUCCESS)
+    {
+        meta_key.objectkey.key.object_id = *object_id;
+
+        if (meta_key.objecttype == SAI_OBJECT_TYPE_SWITCH)
+        {
+            /*
+             * We are creating switch object, so switch id must be the same as
+             * just created object. We could use SAI_NULL_OBJECT_ID in that
+             * case and do special switch inside post_create method.
+             */
+
+            switch_id = *object_id;
+        }
+
+        meta_generic_validation_post_create(meta_key, switch_id, attr_count, attr_list);
+    }
+
+    return status;
+}
+
+sai_status_t Meta::set(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ const sai_attribute_t *attr,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    sai_status_t status = meta_sai_validate_oid(object_type, &object_id, SAI_NULL_OBJECT_ID, false);
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        return status;
+    }
+
+    sai_object_meta_key_t meta_key = { .objecttype = object_type, .objectkey = { .key = { .object_id  = object_id } } };
+
+    status = meta_generic_validation_set(meta_key, attr);
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        return status;
+    }
+
+    status = saiInterface.set(object_type, object_id, attr);
+
+    if (status == SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_DEBUG("set status: %s", sai_serialize_status(status).c_str());
+    }
+    else
+    {
+        SWSS_LOG_ERROR("set status: %s", sai_serialize_status(status).c_str());
+    }
+
+    if (status == SAI_STATUS_SUCCESS)
+    {
+        meta_generic_validation_post_set(meta_key, attr);
+    }
+
+    return status;
+}
+
+sai_status_t Meta::get(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ uint32_t attr_count,
+        _Inout_ sai_attribute_t *attr_list,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    sai_status_t status = meta_sai_validate_oid(object_type, &object_id, SAI_NULL_OBJECT_ID, false);
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        return status;
+    }
+
+    sai_object_meta_key_t meta_key = { .objecttype = object_type, .objectkey = { .key = { .object_id  = object_id } } };
+
+    status = meta_generic_validation_get(meta_key, attr_count, attr_list);
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        return status;
+    }
+
+    status = saiInterface.get(object_type, object_id, attr_count, attr_list);
+
+    if (status == SAI_STATUS_SUCCESS)
+    {
+        sai_object_id_t switch_id = sai_switch_id_query(object_id);
+
+        if (!g_oids.objectReferenceExists(switch_id))
+        {
+            SWSS_LOG_ERROR("switch id 0x%" PRIx64 " doesn't exist", switch_id);
+        }
+
+        meta_generic_validation_post_get(meta_key, switch_id, attr_count, attr_list);
     }
 
     return status;
