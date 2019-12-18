@@ -16,6 +16,11 @@ extern std::shared_ptr<SwitchContainer>            g_switchContainer;
 extern std::shared_ptr<VirtualObjectIdManager>     g_virtualObjectIdManager;
 extern std::shared_ptr<Recorder>                   g_recorder;
 
+void clear_oid_values(
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t attr_count,
+        _Out_ sai_attribute_t *attr_list);
+
 WrapperRemoteSaiInterface::WrapperRemoteSaiInterface(
         _In_ std::shared_ptr<RemoteSaiInterface> impl):
     m_implementation(impl)
@@ -117,4 +122,37 @@ DECLARE_SET_ENTRY(MCAST_FDB_ENTRY,mcast_fdb_entry);
 DECLARE_SET_ENTRY(NEIGHBOR_ENTRY,neighbor_entry);
 DECLARE_SET_ENTRY(ROUTE_ENTRY,route_entry);
 DECLARE_SET_ENTRY(NAT_ENTRY,nat_entry);
+
+    /*
+     * Since user may reuse buffers, then oid list buffers maybe not cleared
+     * and contain some garbage, let's clean them so we send all oids as null to
+     * syncd.
+     */
+
+#define DECLARE_GET_ENTRY(OT,ot)                                            \
+sai_status_t WrapperRemoteSaiInterface::get(                                \
+        _In_ const sai_ ## ot ## _t* ot,                                    \
+        _In_ uint32_t attr_count,                                           \
+        _Inout_ sai_attribute_t *attr_list)                                 \
+{                                                                           \
+    SWSS_LOG_ENTER();                                                       \
+    clear_oid_values(SAI_OBJECT_TYPE_ ## OT, attr_count, attr_list);        \
+    g_recorder->recordGet(ot, attr_count, attr_list);                       \
+    auto status = m_implementation->get(ot, attr_count, attr_list);         \
+    g_recorder->recordGenericGetResponse(                                   \
+            status,                                                         \
+            SAI_OBJECT_TYPE_ ## OT,                                         \
+            attr_count,                                                     \
+            attr_list);                                                     \
+    return status;                                                          \
+}
+
+DECLARE_GET_ENTRY(FDB_ENTRY,fdb_entry);
+DECLARE_GET_ENTRY(INSEG_ENTRY,inseg_entry);
+DECLARE_GET_ENTRY(IPMC_ENTRY,ipmc_entry);
+DECLARE_GET_ENTRY(L2MC_ENTRY,l2mc_entry);
+DECLARE_GET_ENTRY(MCAST_FDB_ENTRY,mcast_fdb_entry);
+DECLARE_GET_ENTRY(NEIGHBOR_ENTRY,neighbor_entry);
+DECLARE_GET_ENTRY(ROUTE_ENTRY,route_entry);
+DECLARE_GET_ENTRY(NAT_ENTRY,nat_entry);
 

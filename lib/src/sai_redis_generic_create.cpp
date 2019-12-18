@@ -52,6 +52,10 @@ sai_status_t redis_generic_create(
 {
     SWSS_LOG_ENTER();
 
+    // TODO should this be inside RedisRemoteSaInterfaceWrapper?
+    // since if we add some new implementation, can that implementation return actual value ?
+    // or this will be always replaced by virtual ID, and transferred to syncd then mapped there
+
     // on create vid is put in db by syncd
     *object_id = g_virtualObjectIdManager->allocateNewObjectId(object_type, switch_id);
 

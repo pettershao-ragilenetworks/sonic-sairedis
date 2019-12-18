@@ -596,6 +596,66 @@ void Recorder::recordSet(
     recordGenericSet(key, entry);
 }
 
+void Recorder::recordGet(
+        _In_ sai_object_type_t objectType,
+        _In_ const std::string &serializedObjectId,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    std::vector<swss::FieldValueTuple> entry = SaiAttributeList::serialize_attr_list(
+            objectType,
+            attr_count,
+            attr_list,
+            false);
+
+    std::string serializedObjectType = sai_serialize_object_type(objectType);
+
+    std::string key = serializedObjectType + ":" + serializedObjectId;
+
+    SWSS_LOG_DEBUG("generic get key: %s, fields: %lu", key.c_str(), entry.size());
+
+    recordGenericGet(key, entry);
+}
+
+void Recorder::recordGenericGetResponse(
+        _In_ sai_status_t status,
+        _In_ sai_object_type_t objectType,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    if (status == SAI_STATUS_SUCCESS)
+    {
+        auto entry = SaiAttributeList::serialize_attr_list(
+            objectType,
+            attr_count,
+            attr_list,
+            false);
+
+        recordGenericGetResponse(status, entry);
+    }
+    else if (status == SAI_STATUS_BUFFER_OVERFLOW)
+    {
+        // will only record COUNT values for lists, since count is expected
+        // values, and user buffer is not enough to return all from SAI
+
+        auto entry = SaiAttributeList::serialize_attr_list(
+            objectType,
+            attr_count,
+            attr_list,
+            true);
+
+        recordGenericGetResponse(status, entry);
+    }
+    else
+    {
+        recordGenericGetResponse(status, {});
+    }
+}
+
 #define DECLARE_RECORD_REMOVE_ENTRY(OT,ot)                              \
 void Recorder::recordRemove(                                            \
         _In_ const sai_ ## ot ## _t* ot)                                \
@@ -639,3 +699,16 @@ void Recorder::recordSet(                                                       
 }
 
 REDIS_DECLARE_EVERY_ENTRY(DECLARE_RECORD_SET_ENTRY)
+
+#define DECLARE_RECORD_GET_ENTRY(OT,ot)                                                         \
+void Recorder::recordGet(                                                                       \
+        _In_ const sai_ ## ot ## _t* ot,                                                        \
+        _In_ uint32_t attr_count,                                                               \
+        _In_ const sai_attribute_t *attr_list)                                                  \
+{                                                                                               \
+    SWSS_LOG_ENTER();                                                                           \
+    recordGet(SAI_OBJECT_TYPE_ ## OT, sai_serialize_ ## ot(*ot), attr_count, attr_list);        \
+}
+
+REDIS_DECLARE_EVERY_ENTRY(DECLARE_RECORD_GET_ENTRY)
+

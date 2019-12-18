@@ -273,11 +273,11 @@ sai_status_t redis_generic_get_ ## ot(                  \
             attr_list);                                 \
 }
 
-REDIS_ENTRY_GET(FDB_ENTRY,fdb_entry);
-REDIS_ENTRY_GET(INSEG_ENTRY,inseg_entry);
-REDIS_ENTRY_GET(IPMC_ENTRY,ipmc_entry);
-REDIS_ENTRY_GET(L2MC_ENTRY,l2mc_entry);
-REDIS_ENTRY_GET(MCAST_FDB_ENTRY,mcast_fdb_entry);
-REDIS_ENTRY_GET(NEIGHBOR_ENTRY,neighbor_entry);
-REDIS_ENTRY_GET(ROUTE_ENTRY,route_entry);
-REDIS_ENTRY_GET(NAT_ENTRY,nat_entry);
+//REDIS_ENTRY_GET(FDB_ENTRY,fdb_entry);
+//REDIS_ENTRY_GET(INSEG_ENTRY,inseg_entry);
+//REDIS_ENTRY_GET(IPMC_ENTRY,ipmc_entry);
+//REDIS_ENTRY_GET(L2MC_ENTRY,l2mc_entry);
+//REDIS_ENTRY_GET(MCAST_FDB_ENTRY,mcast_fdb_entry);
+//REDIS_ENTRY_GET(NEIGHBOR_ENTRY,neighbor_entry);
+//REDIS_ENTRY_GET(ROUTE_ENTRY,route_entry);
+//REDIS_ENTRY_GET(NAT_ENTRY,nat_entry);

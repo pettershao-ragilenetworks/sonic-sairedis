@@ -118,11 +118,11 @@
     {                                                           \
         MUTEX();                                                \
         SWSS_LOG_ENTER();                                       \
-        return meta_sai_get_ ## object_type(                    \
+        return g_meta->get(                                     \
                 object_type,                                    \
                 attr_count,                                     \
                 attr_list,                                      \
-                &redis_generic_get_ ## object_type);            \
+                *g_remoteSaiInterface);                         \
     }
 
 #define REDIS_GENERIC_QUAD_ENTRY(OT,ot)  \

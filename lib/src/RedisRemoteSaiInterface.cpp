@@ -13,6 +13,11 @@ using namespace sairedis;
 extern bool g_syncMode;  // TODO make member
 extern std::string getSelectResultAsString(int result);
 
+void clear_oid_values(
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t attr_count,
+        _Out_ sai_attribute_t *attr_list);
+
 RedisRemoteSaiInterface::RedisRemoteSaiInterface(
         _In_ std::shared_ptr<swss::ProducerTable> asicState,
         _In_ std::shared_ptr<swss::ConsumerTable> getConsumer):
@@ -235,3 +240,130 @@ sai_status_t RedisRemoteSaiInterface::waitForResponse(
 
     return SAI_STATUS_FAILURE;
 }
+
+sai_status_t RedisRemoteSaiInterface::waitForGetResponse(
+        _In_ sai_object_type_t objectType,
+        _In_ uint32_t attr_count,
+        _Inout_ sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    // NOTE since the same channel is used by all QUAD api part of this
+    // function can be combined with waitForResponse and extra work would be
+    // needed to process results
+
+    swss::Select s;
+
+    s.addSelectable(m_getConsumer.get());
+
+    while (true)
+    {
+        SWSS_LOG_DEBUG("wait for response");
+
+        swss::Selectable *sel;
+
+        int result = s.select(&sel, REDIS_ASIC_STATE_COMMAND_GETRESPONSE_TIMEOUT_MS);
+
+        if (result == swss::Select::OBJECT)
+        {
+            swss::KeyOpFieldsValuesTuple kco;
+
+            m_getConsumer->pop(kco);
+
+            const std::string &op = kfvOp(kco);
+            const std::string &opkey = kfvKey(kco);
+            const auto& values = kfvFieldsValues(kco);
+
+            SWSS_LOG_INFO("response: op = %s, key = %s", opkey.c_str(), op.c_str());
+
+            if (op != REDIS_ASIC_STATE_COMMAND_GETRESPONSE) // ignore non response messages
+            {
+                continue;
+            }
+
+            sai_status_t status;
+            sai_deserialize_status(op, status);
+
+            // we could deserialize directly to user data, but list is
+            // allocated by deserializer we would need another method for that
+
+            if (status == SAI_STATUS_SUCCESS)
+            {
+                SaiAttributeList list(objectType, values, false);
+
+                transfer_attributes(objectType, attr_count, list.get_attr_list(), attr_list, false);
+            }
+            else if (status == SAI_STATUS_BUFFER_OVERFLOW)
+            {
+                SaiAttributeList list(objectType, values, true);
+
+                // no need for id fix since this is overflow
+                transfer_attributes(objectType, attr_count, list.get_attr_list(), attr_list, true);
+            }
+
+            SWSS_LOG_DEBUG("generic get status: %d", status);
+
+            return status;
+        }
+
+        SWSS_LOG_ERROR("generic get failed due to SELECT operation result: %s", getSelectResultAsString(result).c_str());
+        break;
+    }
+
+    SWSS_LOG_ERROR("generic get failed to get response");
+
+    return SAI_STATUS_FAILURE;
+}
+
+sai_status_t RedisRemoteSaiInterface::get(
+        _In_ sai_object_type_t objectType,
+        _In_ const std::string& serializedObjectId,
+        _In_ uint32_t attr_count,
+        _Inout_ sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    clear_oid_values(objectType, attr_count, attr_list);
+
+    std::vector<swss::FieldValueTuple> entry = SaiAttributeList::serialize_attr_list(
+            objectType,
+            attr_count,
+            attr_list,
+            false);
+
+    std::string serializedObjectType = sai_serialize_object_type(objectType);
+
+    std::string key = serializedObjectType + ":" + serializedObjectId;
+
+    SWSS_LOG_DEBUG("generic get key: %s, fields: %lu", key.c_str(), entry.size());
+
+    // get is special, it will not put data
+    // into asic view, only to message queue
+    m_asicState->set(key, entry, REDIS_ASIC_STATE_COMMAND_GET);
+
+    return waitForGetResponse(objectType, attr_count, attr_list);
+}
+
+#define DECLARE_GET_ENTRY(OT,ot)                                \
+sai_status_t RedisRemoteSaiInterface::get(                      \
+        _In_ const sai_ ## ot ## _t* ot,                        \
+        _In_ uint32_t attr_count,                               \
+        _Inout_ sai_attribute_t *attr_list)                     \
+{                                                               \
+    SWSS_LOG_ENTER();                                           \
+    return get(                                                 \
+            SAI_OBJECT_TYPE_ ## OT,                             \
+            sai_serialize_ ## ot(*ot),                          \
+            attr_count,                                         \
+            attr_list);                                         \
+}
+
+DECLARE_GET_ENTRY(FDB_ENTRY,fdb_entry);
+DECLARE_GET_ENTRY(INSEG_ENTRY,inseg_entry);
+DECLARE_GET_ENTRY(IPMC_ENTRY,ipmc_entry);
+DECLARE_GET_ENTRY(L2MC_ENTRY,l2mc_entry);
+DECLARE_GET_ENTRY(MCAST_FDB_ENTRY,mcast_fdb_entry);
+DECLARE_GET_ENTRY(NEIGHBOR_ENTRY,neighbor_entry);
+DECLARE_GET_ENTRY(ROUTE_ENTRY,route_entry);
+DECLARE_GET_ENTRY(NAT_ENTRY,nat_entry);
+

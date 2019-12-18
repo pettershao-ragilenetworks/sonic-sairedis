@@ -24,6 +24,12 @@ extern "C" {
             _In_ const sai_ ## ot ## _t* ot,            \
             _In_ const sai_attribute_t *attr);
 
+#define SAI_REDIS_RECORDER_DECLARE_RECORD_GET(ot)       \
+    void recordGet(                                     \
+            _In_ const sai_ ## ot ## _t* ot,            \
+            _In_ uint32_t attr_count,                   \
+            _In_ const sai_attribute_t *attr_list);
+
 namespace sairedis
 {
     class Recorder
@@ -65,6 +71,7 @@ namespace sairedis
 
         public: // SAI quad API
 
+            // TODO to be private
             void recordGenericCreate(
                     _In_ const std::string& key,
                     _In_ const std::vector<swss::FieldValueTuple>& arguments);
@@ -82,6 +89,7 @@ namespace sairedis
             void recordGenericRemoveResponse(
                     _In_ sai_status_t status);
 
+            // TODO to be private
             void recordGenericSet(
                     _In_ const std::string& key,
                     _In_ const std::vector<swss::FieldValueTuple>& arguments);
@@ -89,10 +97,18 @@ namespace sairedis
             void recordGenericSetResponse(
                     _In_ sai_status_t status);
 
+            // TODO to be private
             void recordGenericGet(
                     _In_ const std::string& key,
                     _In_ const std::vector<swss::FieldValueTuple>& arguments);
 
+            void recordGenericGetResponse(
+                    _In_ sai_status_t status,
+                    _In_ sai_object_type_t objectType,
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
+
+            // TODO to be private
             void recordGenericGetResponse(
                     _In_ sai_status_t status,
                     _In_ const std::vector<swss::FieldValueTuple>& arguments);
@@ -129,6 +145,18 @@ namespace sairedis
             SAI_REDIS_RECORDER_DECLARE_RECORD_SET(neighbor_entry);
             SAI_REDIS_RECORDER_DECLARE_RECORD_SET(route_entry);
             SAI_REDIS_RECORDER_DECLARE_RECORD_SET(nat_entry);
+
+        public: // get ENTRY
+
+            SAI_REDIS_RECORDER_DECLARE_RECORD_GET(fdb_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_GET(inseg_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_GET(ipmc_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_GET(l2mc_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_GET(mcast_fdb_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_GET(neighbor_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_GET(route_entry);
+            SAI_REDIS_RECORDER_DECLARE_RECORD_GET(nat_entry);
+
 
         public: // SAI stats API
 
@@ -235,20 +263,26 @@ namespace sairedis
 
         private: // recording helpers
 
-            void recordRemove(
-                    _In_ sai_object_type_t objectType,
-                    _In_ const std::string& serializedObjectId);
-
             void recordCreate(
                     _In_ sai_object_type_t objectType,
                     _In_ const std::string& serializedObjectId,
                     _In_ uint32_t attr_count,
                     _In_ const sai_attribute_t *attr_list);
 
+            void recordRemove(
+                    _In_ sai_object_type_t objectType,
+                    _In_ const std::string& serializedObjectId);
+
             void recordSet(
                     _In_ sai_object_type_t objectType,
                     _In_ const std::string& serializedObjectId,
                     _In_ const sai_attribute_t *attr);
+
+            void recordGet(
+                    _In_ sai_object_type_t object_type,
+                    _In_ const std::string &serializedObjectId,
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
 
         private:
 
