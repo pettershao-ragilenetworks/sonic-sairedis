@@ -145,13 +145,13 @@
     sai_status_t redis_get_ ## object_type ## _stats(               \
             _In_ sai_object_id_t object_type ## _id,                \
             _In_ uint32_t number_of_counters,                       \
-            _In_ const sai_stat_id_t *counter_ids, \
+            _In_ const sai_stat_id_t *counter_ids,                  \
             _Out_ uint64_t *counters)                               \
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
         return meta_sai_get_stats_oid(                              \
-                SAI_OBJECT_TYPE_ ## OBJECT_TYPE,                    \
+                (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
                 &sai_metadata_enum_sai_ ## object_type ## _stat_t,  \
                 number_of_counters,                                 \
@@ -164,14 +164,14 @@
     sai_status_t redis_get_ ## object_type ## _stats_ext(           \
             _In_ sai_object_id_t object_type ## _id,                \
             _In_ uint32_t number_of_counters,                       \
-            _In_ const sai_stat_id_t *counter_ids, \
+            _In_ const sai_stat_id_t *counter_ids,                  \
             _In_ sai_stats_mode_t mode,                             \
             _Out_ uint64_t *counters)                               \
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
         return redis_generic_get_stats_ext(                         \
-                SAI_OBJECT_TYPE_ ## OBJECT_TYPE,                    \
+                (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
                 &sai_metadata_enum_sai_ ## object_type ## _stat_t,  \
                 number_of_counters,                                 \
@@ -184,12 +184,12 @@
     sai_status_t redis_clear_ ## object_type ## _stats(             \
             _In_ sai_object_id_t object_type ## _id,                \
             _In_ uint32_t number_of_counters,                       \
-            _In_ const sai_stat_id_t *counter_ids) \
+            _In_ const sai_stat_id_t *counter_ids)                  \
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
         return meta_sai_clear_stats_oid(                            \
-                SAI_OBJECT_TYPE_ ## OBJECT_TYPE,                    \
+                (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
                 &sai_metadata_enum_sai_ ## object_type ## _stat_t,  \
                 number_of_counters,                                 \
