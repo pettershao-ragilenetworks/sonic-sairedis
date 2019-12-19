@@ -267,7 +267,7 @@ void Recorder::recordQueryAttributeEnumValuesCapability(
 }
 
 void Recorder::recordQueryAttributeEnumValuesCapabilityResponse(
-        _In_ sai_status_t status, 
+        _In_ sai_status_t status,
         _In_ const std::vector<swss::FieldValueTuple>& arguments)
 {
     SWSS_LOG_ENTER();
@@ -576,7 +576,7 @@ void Recorder::recordGenericClearStatsResponse(
 {
     SWSS_LOG_ENTER();
 
-    recordLine("Q|clear_stats|" + sai_serialize_status(status)); 
+    recordLine("Q|clear_stats|" + sai_serialize_status(status));
 }
 
 void Recorder::recordNotification(
@@ -785,3 +785,109 @@ void Recorder::recordGet(                                                       
 
 REDIS_DECLARE_EVERY_ENTRY(DECLARE_RECORD_GET_ENTRY)
 
+void Recorder::recordObjectTypeGetAvailability(
+        _In_ sai_object_id_t switchId,
+        _In_ sai_object_type_t objectType,
+        _In_ uint32_t attrCount,
+        _In_ const sai_attribute_t *attrList)
+{
+    SWSS_LOG_ENTER();
+
+    auto key = sai_serialize_object_type(SAI_OBJECT_TYPE_SWITCH) + ":" + sai_serialize_object_id(switchId);
+
+    auto values = SaiAttributeList::serialize_attr_list(
+        objectType,
+        attrCount,
+        attrList,
+        false);
+
+    SWSS_LOG_DEBUG("Query arguments: switch: %s, attributes: %s", key.c_str(), joinFieldValues(values).c_str());
+
+    recordObjectTypeGetAvailability(key, values);
+}
+
+void Recorder::recordObjectTypeGetAvailabilityResponse(
+        _In_ sai_status_t status,
+        _In_ const uint64_t *count)
+{
+    SWSS_LOG_ENTER();
+
+    std::vector<swss::FieldValueTuple> values;
+
+    values.push_back(swss::FieldValueTuple("COUNT", std::to_string(*count)));
+
+    recordObjectTypeGetAvailabilityResponse(status, values);
+}
+
+void Recorder::recordQueryAattributeEnumValuesCapability(
+        _In_ sai_object_id_t switchId,
+        _In_ sai_object_type_t objectType,
+        _In_ sai_attr_id_t attrId,
+        _Inout_ sai_s32_list_t *enumValuesCapability)
+{
+    SWSS_LOG_ENTER();
+
+    auto meta = sai_metadata_get_attr_metadata(objectType, attrId);
+
+    if (meta == NULL)
+    {
+        SWSS_LOG_ERROR("Failed to find attribute metadata: object type %s, attr id %d",
+                sai_serialize_object_type(objectType).c_str(), attrId);
+        return;
+    }
+
+    auto key = sai_serialize_object_type(SAI_OBJECT_TYPE_SWITCH) + ":" + sai_serialize_object_id(switchId);
+
+    sai_attribute_t attr;
+
+    attr.id = attrId;
+    attr.value.s32list = *enumValuesCapability;
+
+    auto values = SaiAttributeList::serialize_attr_list(objectType, 1, &attr, true); // we only need to serialize count
+
+    SWSS_LOG_DEBUG("Query arguments: switch %s, attribute: %s, count: %u", key.c_str(), meta->attridname, enumValuesCapability->count);
+
+    recordQueryAttributeEnumValuesCapability(key, values);
+}
+
+void Recorder::recordQueryAattributeEnumValuesCapabilityResponse(
+        _In_ sai_status_t status,
+        _In_ sai_object_type_t objectType,
+        _In_ sai_attr_id_t attrId,
+        _In_ const sai_s32_list_t* enumValuesCapability)
+{
+    SWSS_LOG_ENTER();
+
+    auto meta = sai_metadata_get_attr_metadata(objectType, attrId);
+
+    if (meta == NULL)
+    {
+        SWSS_LOG_ERROR("Failed to find attribute metadata: object type %s, attr id %d",
+                sai_serialize_object_type(objectType).c_str(), attrId);
+        return;
+    }
+
+    if (!meta->enummetadata)
+    {
+        SWSS_LOG_ERROR("Attribute %s is not enum/enumlist!", meta->attridname);
+        return;
+    }
+
+    std::vector<swss::FieldValueTuple> values;
+
+    sai_attribute_t attr;
+
+    attr.id = attrId;
+    attr.value.s32list = *enumValuesCapability;
+
+    if (status == SAI_STATUS_SUCCESS)
+    {
+        values = SaiAttributeList::serialize_attr_list(objectType, 1, &attr, false);
+    }
+    else if (status == SAI_STATUS_BUFFER_OVERFLOW)
+    {
+        values = SaiAttributeList::serialize_attr_list(objectType, 1, &attr, true);
+    }
+
+    recordQueryAttributeEnumValuesCapabilityResponse(status, values);
+}

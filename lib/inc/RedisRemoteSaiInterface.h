@@ -21,6 +21,12 @@
 #define REDIS_ASIC_STATE_COMMAND_GETRESPONSE        "getresponse"
 #define REDIS_ASIC_STATE_COMMAND_FLUSHRESPONSE      "flushresponse"
 
+#define REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_QUERY      "attr_enum_values_capability_query"
+#define REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_RESPONSE   "attr_enum_values_capability_response"
+
+#define REDIS_ASIC_STATE_COMMAND_OBJECT_TYPE_GET_AVAILABILITY_QUERY     "object_type_get_availability_query"
+#define REDIS_ASIC_STATE_COMMAND_OBJECT_TYPE_GET_AVAILABILITY_RESPONSE  "object_type_get_availability_response"
+
 /**
  * @brief Get response timeout in milliseconds.
  */
@@ -128,14 +134,29 @@ namespace sairedis
             SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_GET_ENTRY(route_entry);
             SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_GET_ENTRY(nat_entry);
 
-        public:
+        public: // non QUAD API
 
             virtual sai_status_t flushFdbEntries(
                     _In_ sai_object_id_t switchId,
                     _In_ uint32_t attrCount,
                     _In_ const sai_attribute_t *attrList) override;
 
-        private:
+        public: // SAI API
+
+            virtual sai_status_t objectTypeGetAvailability(
+                    _In_ sai_object_id_t switchId,
+                    _In_ sai_object_type_t objectType,
+                    _In_ uint32_t attrCount,
+                    _In_ const sai_attribute_t *attrList,
+                    _Out_ uint64_t *count) override;
+
+            virtual sai_status_t queryAattributeEnumValuesCapability(
+                    _In_ sai_object_id_t switch_id,
+                    _In_ sai_object_type_t object_type,
+                    _In_ sai_attr_id_t attr_id,
+                    _Inout_ sai_s32_list_t *enum_values_capability) override;
+
+        private: // QUAD API helpers
 
             sai_status_t create(
                     _In_ sai_object_type_t objectType,
@@ -157,6 +178,8 @@ namespace sairedis
                     _In_ const std::string& serializedObjectId,
                     _In_ uint32_t attr_count,
                     _Inout_ sai_attribute_t *attr_list);
+
+        private: // QUAD API response
 
             /**
              * @brief Wait for response.
@@ -183,7 +206,17 @@ namespace sairedis
                     _In_ uint32_t attr_count,
                     _Inout_ sai_attribute_t *attr_list);
 
+        private: // non QUAD API response
+
             sai_status_t waitForFlushFdbEntriesResponse();
+
+        private: // SAI API response
+
+            sai_status_t waitForQueryAattributeEnumValuesCapabilityResponse(
+                    _Inout_ sai_s32_list_t* enumValuesCapability);
+
+            sai_status_t waitForObjectTypeGetAvailabilityResponse(
+                    _In_ uint64_t *count);
 
         private:
 

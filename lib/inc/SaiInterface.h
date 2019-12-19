@@ -104,12 +104,27 @@ namespace sairedis
             SAIREDIS_SAIINTERFACE_DECLARE_GET_ENTRY(route_entry);
             SAIREDIS_SAIINTERFACE_DECLARE_GET_ENTRY(nat_entry);
 
-        public:
+        public: // non QUAD API
 
             virtual sai_status_t flushFdbEntries(
                     _In_ sai_object_id_t switchId,
                     _In_ uint32_t attrCount,
                     _In_ const sai_attribute_t *attrList) = 0;
+
+        public: // SAI API
+
+            virtual sai_status_t objectTypeGetAvailability(
+                    _In_ sai_object_id_t switchId,
+                    _In_ sai_object_type_t objectType,
+                    _In_ uint32_t attrCount,
+                    _In_ const sai_attribute_t *attrList,
+                    _Out_ uint64_t *count) = 0;
+
+            virtual sai_status_t queryAattributeEnumValuesCapability(
+                    _In_ sai_object_id_t switch_id,
+                    _In_ sai_object_type_t object_type,
+                    _In_ sai_attr_id_t attr_id,
+                    _Inout_ sai_s32_list_t *enum_values_capability) = 0;
 
     };
 }

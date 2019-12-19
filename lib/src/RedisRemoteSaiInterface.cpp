@@ -13,6 +13,9 @@ using namespace sairedis;
 extern bool g_syncMode;  // TODO make member
 extern std::string getSelectResultAsString(int result);
 
+std::string joinFieldValues(
+        _In_ const std::vector<swss::FieldValueTuple> &values);
+
 void clear_oid_values(
         _In_ sai_object_type_t object_type,
         _In_ uint32_t attr_count,
@@ -271,7 +274,7 @@ sai_status_t RedisRemoteSaiInterface::waitForResponse(
             SWSS_LOG_INFO("response: op = %s, key = %s", opkey.c_str(), op.c_str());
 
             if (op != REDIS_ASIC_STATE_COMMAND_GETRESPONSE)
-            { 
+            {
                 // ignore non response messages
                 continue;
             }
@@ -493,5 +496,250 @@ sai_status_t RedisRemoteSaiInterface::flushFdbEntries(
     m_asicState->set(key, entry, "flush");
 
     return waitForFlushFdbEntriesResponse();
+}
+
+sai_status_t RedisRemoteSaiInterface::objectTypeGetAvailability(
+        _In_ sai_object_id_t switchId,
+        _In_ sai_object_type_t objectType,
+        _In_ uint32_t attrCount,
+        _In_ const sai_attribute_t *attrList,
+        _Out_ uint64_t *count)
+{
+    SWSS_LOG_ENTER();
+
+    const std::string switch_id_str = sai_serialize_object_id(switchId);
+    const std::string object_type_str = sai_serialize_object_type(objectType);
+
+    std::vector<swss::FieldValueTuple> query_arguments =
+        SaiAttributeList::serialize_attr_list(
+                objectType,
+                attrCount,
+                attrList,
+                false);
+
+    SWSS_LOG_DEBUG(
+            "Query arguments: switch: %s, object type: %s, attributes: %s",
+            switch_id_str.c_str(),
+            object_type_str.c_str(),
+            joinFieldValues(query_arguments).c_str()
+    );
+
+    // Syncd will pop this argument off before trying to deserialize the attribute list
+    query_arguments.push_back(swss::FieldValueTuple("OBJECT_TYPE", object_type_str));
+
+    // This query will not put any data into the ASIC view, just into the
+    // message queue
+    m_asicState->set(switch_id_str, query_arguments, REDIS_ASIC_STATE_COMMAND_OBJECT_TYPE_GET_AVAILABILITY_QUERY);
+
+    return waitForObjectTypeGetAvailabilityResponse(count);
+}
+
+sai_status_t RedisRemoteSaiInterface::waitForObjectTypeGetAvailabilityResponse(
+        _Inout_ uint64_t *count)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO could be combined with the rest methods
+
+    swss::Select s;
+
+    s.addSelectable(m_getConsumer.get());
+
+    while (true)
+    {
+        SWSS_LOG_DEBUG("Waiting for a response");
+
+        swss::Selectable *sel;
+
+        auto result = s.select(&sel, REDIS_ASIC_STATE_COMMAND_GETRESPONSE_TIMEOUT_MS);
+
+        if (result == swss::Select::OBJECT)
+        {
+            swss::KeyOpFieldsValuesTuple kco;
+
+            m_getConsumer->pop(kco);
+
+            const std::string &message_type = kfvOp(kco);
+            const std::string &status_str = kfvKey(kco);
+
+            SWSS_LOG_DEBUG("Received response: op = %s, key = %s", message_type.c_str(), status_str.c_str());
+
+            // Ignore messages that are not in response to our query
+            if (message_type != REDIS_ASIC_STATE_COMMAND_OBJECT_TYPE_GET_AVAILABILITY_RESPONSE)
+            {
+                continue;
+            }
+
+            sai_status_t status;
+            sai_deserialize_status(status_str, status);
+
+            if (status == SAI_STATUS_SUCCESS)
+            {
+                const std::vector<swss::FieldValueTuple> &values = kfvFieldsValues(kco);
+
+                if (values.size() != 1)
+                {
+                    SWSS_LOG_ERROR("Invalid response from syncd: expected 1 value, received %zu", values.size());
+                    return SAI_STATUS_FAILURE;
+                }
+
+                const std::string &availability_str = fvValue(values[0]);
+                *count = std::stol(availability_str);
+
+                SWSS_LOG_DEBUG("Received payload: count = %lu", *count);
+            }
+            else
+
+            SWSS_LOG_DEBUG("Status: %s", status_str.c_str());
+            return status;
+        }
+    }
+
+    SWSS_LOG_ERROR("Failed to receive a response from syncd");
+
+    return SAI_STATUS_FAILURE;
+}
+
+sai_status_t RedisRemoteSaiInterface::queryAattributeEnumValuesCapability(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_object_type_t object_type,
+        _In_ sai_attr_id_t attr_id,
+        _Inout_ sai_s32_list_t *enum_values_capability)
+{
+    SWSS_LOG_ENTER();
+
+    const std::string switch_id_str = sai_serialize_object_id(switch_id);
+    const std::string object_type_str = sai_serialize_object_type(object_type);
+
+    auto meta = sai_metadata_get_attr_metadata(object_type, attr_id);
+
+    if (meta == NULL)
+    {
+        SWSS_LOG_ERROR("Failed to find attribute metadata: object type %s, attr id %d", object_type_str.c_str(), attr_id);
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    const std::string attr_id_str = sai_serialize_attr_id(*meta);
+    const std::string list_size = std::to_string(enum_values_capability->count);
+
+    const std::vector<swss::FieldValueTuple> query_arguments =
+    {
+        swss::FieldValueTuple("OBJECT_TYPE", object_type_str),
+        swss::FieldValueTuple("ATTR_ID", attr_id_str),
+        swss::FieldValueTuple("LIST_SIZE", list_size)
+    };
+
+    SWSS_LOG_DEBUG(
+            "Query arguments: switch %s, object type: %s, attribute: %s, count: %s",
+            switch_id_str.c_str(),
+            object_type_str.c_str(),
+            attr_id_str.c_str(),
+            list_size.c_str()
+    );
+
+    // This query will not put any data into the ASIC view, just into the
+    // message queue
+
+    m_asicState->set(switch_id_str, query_arguments, REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_QUERY);
+
+    return waitForQueryAattributeEnumValuesCapabilityResponse(enum_values_capability);
+}
+
+sai_status_t RedisRemoteSaiInterface::waitForQueryAattributeEnumValuesCapabilityResponse(
+        _Inout_ sai_s32_list_t* enumValuesCapability)
+{
+    SWSS_LOG_ENTER();
+
+    swss::Select s;
+
+    // TODO could be unified to get response
+
+    s.addSelectable(m_getConsumer.get());
+
+    while (true)
+    {
+        SWSS_LOG_DEBUG("Waiting for a response");
+
+        swss::Selectable *sel;
+
+        auto result = s.select(&sel, REDIS_ASIC_STATE_COMMAND_GETRESPONSE_TIMEOUT_MS);
+
+        if (result == swss::Select::OBJECT)
+        {
+            swss::KeyOpFieldsValuesTuple kco;
+
+            m_getConsumer->pop(kco);
+
+            const std::string &message_type = kfvOp(kco);
+            const std::string &status_str = kfvKey(kco);
+
+            SWSS_LOG_DEBUG("Received response: op = %s, key = %s", message_type.c_str(), status_str.c_str());
+
+            // Ignore messages that are not in response to our query
+            if (message_type != REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_RESPONSE)
+            {
+                continue;
+            }
+
+            sai_status_t status;
+            sai_deserialize_status(status_str, status);
+
+            if (status == SAI_STATUS_SUCCESS)
+            {
+                const std::vector<swss::FieldValueTuple> &values = kfvFieldsValues(kco);
+
+                if (values.size() != 2)
+                {
+                    SWSS_LOG_ERROR("Invalid response from syncd: expected 2 values, received %zu", values.size());
+
+                    return SAI_STATUS_FAILURE;
+                }
+
+                const std::string &capability_str = fvValue(values[0]);
+                const uint32_t num_capabilities = std::stoi(fvValue(values[1]));
+
+                SWSS_LOG_DEBUG("Received payload: capabilites = '%s', count = %d", capability_str.c_str(), num_capabilities);
+
+                enumValuesCapability->count = num_capabilities;
+
+                size_t position = 0;
+                for (uint32_t i = 0; i < num_capabilities; i++)
+                {
+                    size_t old_position = position;
+                    position = capability_str.find(",", old_position);
+                    std::string capability = capability_str.substr(old_position, position - old_position);
+                    enumValuesCapability->list[i] = std::stoi(capability);
+
+                    // We have run out of values to add to our list
+                    if (position == std::string::npos)
+                    {
+                        if (num_capabilities != i + 1)
+                        {
+                            SWSS_LOG_WARN("Query returned less attributes than expected: expected %d, recieved %d", num_capabilities, i+1);
+                        }
+
+                        break;
+                    }
+
+                    // Skip the commas
+                    position++;
+                }
+            }
+            else if (status ==  SAI_STATUS_BUFFER_OVERFLOW)
+            {
+                // TODO on sai status overflow we should populate correct count on the list
+
+                SWSS_LOG_ERROR("TODO need to handle SAI_STATUS_BUFFER_OVERFLOW, FIXME");
+            }
+
+            SWSS_LOG_DEBUG("Status: %s", status_str.c_str());
+
+            return status;
+        }
+    }
+
+    SWSS_LOG_ERROR("Failed to receive a response from syncd");
+
+    return SAI_STATUS_FAILURE;
 }
 

@@ -233,6 +233,7 @@ sai_status_t sai_api_query(
         API_CASE(BMTOR,bmtor);
         API_CASE(BRIDGE,bridge);
         API_CASE(BUFFER,buffer);
+        API_CASE(DEBUG_COUNTER,debug_counter);
         API_CASE(DTEL,dtel);
         API_CASE(FDB,fdb);
         API_CASE(HASH,hash);
@@ -246,6 +247,7 @@ sai_status_t sai_api_query(
         API_CASE(MCAST_FDB,mcast_fdb);
         API_CASE(MIRROR,mirror);
         API_CASE(MPLS,mpls);
+        API_CASE(NAT,nat);
         API_CASE(NEIGHBOR,neighbor);
         API_CASE(NEXT_HOP_GROUP,next_hop_group);
         API_CASE(NEXT_HOP,next_hop);
@@ -268,148 +270,11 @@ sai_status_t sai_api_query(
         API_CASE(VIRTUAL_ROUTER,virtual_router);
         API_CASE(VLAN,vlan);
         API_CASE(WRED,wred);
-        API_CASE(DEBUG_COUNTER,debug_counter);
-        API_CASE(NAT,nat);
 
         default:
             SWSS_LOG_ERROR("Invalid API type %d", sai_api_id);
             return SAI_STATUS_INVALID_PARAMETER;
     }
-}
-
-static sai_status_t redis_sai_query_attribute_enum_values_capability(
-        _In_ sai_object_id_t switch_id,
-        _In_ sai_object_type_t object_type,
-        _In_ sai_attr_id_t attr_id,
-        _Inout_ sai_s32_list_t *enum_values_capability)
-{
-    SWSS_LOG_ENTER();
-
-    const std::string switch_id_str = sai_serialize_object_id(switch_id);
-    const std::string object_type_str = sai_serialize_object_type(object_type);
-
-    auto meta = sai_metadata_get_attr_metadata(object_type, attr_id);
-    if (meta == NULL)
-    {
-        SWSS_LOG_ERROR("Failed to find attribute metadata: object type %s, attr id %d", object_type_str.c_str(), attr_id);
-        return SAI_STATUS_INVALID_PARAMETER;
-    }
-
-    const std::string attr_id_str = sai_serialize_attr_id(*meta);
-    const std::string list_size = std::to_string(enum_values_capability->count);
-
-    const std::vector<swss::FieldValueTuple> query_arguments =
-    {
-        swss::FieldValueTuple("OBJECT_TYPE", object_type_str),
-        swss::FieldValueTuple("ATTR_ID", attr_id_str),
-        swss::FieldValueTuple("LIST_SIZE", list_size)
-    };
-
-    SWSS_LOG_DEBUG(
-            "Query arguments: switch %s, object type: %s, attribute: %s, count: %s",
-            switch_id_str.c_str(),
-            object_type_str.c_str(),
-            attr_id_str.c_str(),
-            list_size.c_str()
-    );
-
-    g_recorder->recordQueryAttributeEnumValuesCapability(switch_id_str, query_arguments);
-
-    // This query will not put any data into the ASIC view, just into the
-    // message queue
-    g_asicState->set(switch_id_str, query_arguments, STRING_ATTR_ENUM_VALUES_CAPABILITY_QUERY);
-
-    swss::Select callback;
-    callback.addSelectable(g_redisGetConsumer.get());
-
-    while (true)
-    {
-        SWSS_LOG_DEBUG("Waiting for a response");
-
-        swss::Selectable *sel;
-
-        auto result = callback.select(&sel, GET_RESPONSE_TIMEOUT);
-
-        if (result == swss::Select::OBJECT)
-        {
-            swss::KeyOpFieldsValuesTuple kco;
-
-            g_redisGetConsumer->pop(kco);
-
-            const std::string &message_type = kfvOp(kco);
-            const std::string &status_str = kfvKey(kco);
-
-            SWSS_LOG_DEBUG("Received response: op = %s, key = %s", message_type.c_str(), status_str.c_str());
-
-            // Ignore messages that are not in response to our query
-            if (message_type != STRING_ATTR_ENUM_VALUES_CAPABILITY_RESPONSE)
-            {
-                continue;
-            }
-
-            sai_status_t status;
-            sai_deserialize_status(status_str, status);
-
-            if (status == SAI_STATUS_SUCCESS)
-            {
-                const std::vector<swss::FieldValueTuple> &values = kfvFieldsValues(kco);
-
-                if (values.size() != 2)
-                {
-                    g_recorder->recordQueryAttributeEnumValuesCapabilityResponse(SAI_STATUS_FAILURE, {});
-
-                    SWSS_LOG_ERROR("Invalid response from syncd: expected 2 values, received %zu", values.size());
-                    return SAI_STATUS_FAILURE;
-                }
-
-                const std::string &capability_str = fvValue(values[0]);
-                const uint32_t num_capabilities = std::stoi(fvValue(values[1]));
-
-                SWSS_LOG_DEBUG("Received payload: capabilites = '%s', count = %d", capability_str.c_str(), num_capabilities);
-
-                enum_values_capability->count = num_capabilities;
-
-                size_t position = 0;
-                for (uint32_t i = 0; i < num_capabilities; i++)
-                {
-                    size_t old_position = position;
-                    position = capability_str.find(",", old_position);
-                    std::string capability = capability_str.substr(old_position, position - old_position);
-                    enum_values_capability->list[i] = std::stoi(capability);
-
-                    // We have run out of values to add to our list
-                    if (position == std::string::npos)
-                    {
-                        if (num_capabilities != i + 1)
-                        {
-                            SWSS_LOG_WARN("Query returned less attributes than expected: expected %d, recieved %d", num_capabilities, i+1);
-                        }
-
-                        break;
-                    }
-
-                    // Skip the commas
-                    position++;
-                }
-
-                g_recorder->recordQueryAttributeEnumValuesCapabilityResponse(status, values);
-            }
-            else
-            {
-                // TODO on sai status overflow we should populate correct count on the list
-
-                g_recorder->recordQueryAttributeEnumValuesCapabilityResponse(status, {});
-            }
-
-            SWSS_LOG_DEBUG("Status: %s", status_str.c_str());
-            return status;
-        }
-    }
-
-    g_recorder->recordQueryAttributeEnumValuesCapabilityResponse(SAI_STATUS_FAILURE, {});
-
-    SWSS_LOG_ERROR("Failed to receive a response from syncd");
-    return SAI_STATUS_FAILURE;
 }
 
 sai_status_t sai_query_attribute_enum_values_capability(
@@ -422,111 +287,12 @@ sai_status_t sai_query_attribute_enum_values_capability(
 
     SWSS_LOG_ENTER();
 
-    return meta_sai_query_attribute_enum_values_capability(
+    return g_meta->queryAattributeEnumValuesCapability(
             switch_id,
             object_type,
             attr_id,
             enum_values_capability,
-            &redis_sai_query_attribute_enum_values_capability);
-}
-
-static sai_status_t redis_sai_object_type_get_availability(
-        _In_ sai_object_id_t switch_id,
-        _In_ sai_object_type_t object_type,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list,
-        _Out_ uint64_t *count)
-{
-    SWSS_LOG_ENTER();
-
-    const std::string switch_id_str = sai_serialize_object_id(switch_id);
-    const std::string object_type_str = sai_serialize_object_type(object_type);
-    std::vector<swss::FieldValueTuple> query_arguments = SaiAttributeList::serialize_attr_list(
-        object_type,
-        attr_count,
-        attr_list,
-        false);
-
-    SWSS_LOG_DEBUG(
-            "Query arguments: switch: %s, object type: %s, attributes: %s",
-            switch_id_str.c_str(),
-            object_type_str.c_str(),
-            joinFieldValues(query_arguments).c_str()
-    );
-
-    // Syncd will pop this argument off before trying to deserialize the attribute list
-    query_arguments.push_back(swss::FieldValueTuple("OBJECT_TYPE", object_type_str));
-
-    g_recorder->recordObjectTypeGetAvailability(switch_id_str, query_arguments);
-
-    // This query will not put any data into the ASIC view, just into the
-    // message queue
-    g_asicState->set(switch_id_str, query_arguments, STRING_OBJECT_TYPE_GET_AVAILABILITY_QUERY);
-
-    swss::Select callback;
-    callback.addSelectable(g_redisGetConsumer.get());
-
-    while (true)
-    {
-        SWSS_LOG_DEBUG("Waiting for a response");
-
-        swss::Selectable *sel;
-
-        auto result = callback.select(&sel, GET_RESPONSE_TIMEOUT);
-
-        if (result == swss::Select::OBJECT)
-        {
-            swss::KeyOpFieldsValuesTuple kco;
-
-            g_redisGetConsumer->pop(kco);
-
-            const std::string &message_type = kfvOp(kco);
-            const std::string &status_str = kfvKey(kco);
-
-            SWSS_LOG_DEBUG("Received response: op = %s, key = %s", message_type.c_str(), status_str.c_str());
-
-            // Ignore messages that are not in response to our query
-            if (message_type != STRING_OBJECT_TYPE_GET_AVAILABILITY_RESPONSE)
-            {
-                continue;
-            }
-
-            sai_status_t status;
-            sai_deserialize_status(status_str, status);
-
-            if (status == SAI_STATUS_SUCCESS)
-            {
-                const std::vector<swss::FieldValueTuple> &values = kfvFieldsValues(kco);
-
-                if (values.size() != 1)
-                {
-                    g_recorder->recordObjectTypeGetAvailabilityResponse(SAI_STATUS_FAILURE, {});
-
-                    SWSS_LOG_ERROR("Invalid response from syncd: expected 1 value, received %zu", values.size());
-                    return SAI_STATUS_FAILURE;
-                }
-
-                const std::string &availability_str = fvValue(values[0]);
-                *count = std::stol(availability_str);
-
-                SWSS_LOG_DEBUG("Received payload: count = %lu", *count);
-
-                g_recorder->recordObjectTypeGetAvailabilityResponse(status, values);
-            }
-            else
-            {
-                g_recorder->recordObjectTypeGetAvailabilityResponse(status, {});
-            }
-
-            SWSS_LOG_DEBUG("Status: %s", status_str.c_str());
-            return status;
-        }
-    }
-
-    g_recorder->recordObjectTypeGetAvailabilityResponse(SAI_STATUS_FAILURE, {});
-
-    SWSS_LOG_ERROR("Failed to receive a response from syncd");
-    return SAI_STATUS_FAILURE;
+            *g_remoteSaiInterface);
 }
 
 sai_status_t sai_object_type_get_availability(
@@ -540,13 +306,13 @@ sai_status_t sai_object_type_get_availability(
 
     SWSS_LOG_ENTER();
 
-    return meta_sai_object_type_get_availability(
+    return g_meta->objectTypeGetAvailability(
             switch_id,
             object_type,
             attr_count,
             attr_list,
             count,
-            &redis_sai_object_type_get_availability);
+            *g_remoteSaiInterface);
 }
 
 sai_object_type_t sai_object_type_query(

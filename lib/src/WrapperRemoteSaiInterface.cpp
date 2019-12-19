@@ -277,3 +277,45 @@ sai_status_t WrapperRemoteSaiInterface::flushFdbEntries(
 
     return status;
 }
+
+sai_status_t WrapperRemoteSaiInterface::objectTypeGetAvailability(
+        _In_ sai_object_id_t switchId,
+        _In_ sai_object_type_t objectType,
+        _In_ uint32_t attrCount,
+        _In_ const sai_attribute_t *attrList,
+        _Out_ uint64_t *count)
+{
+    SWSS_LOG_ENTER();
+
+    g_recorder->recordObjectTypeGetAvailability(switchId, objectType, attrCount, attrList);
+
+    auto status = m_implementation->objectTypeGetAvailability(switchId, objectType, attrCount, attrList, count);
+
+    g_recorder->recordObjectTypeGetAvailabilityResponse(status, count);
+
+    return status;
+}
+
+sai_status_t WrapperRemoteSaiInterface::queryAattributeEnumValuesCapability(
+        _In_ sai_object_id_t switchId,
+        _In_ sai_object_type_t objectType,
+        _In_ sai_attr_id_t attrId,
+        _Inout_ sai_s32_list_t *enumValuesCapability)
+{
+    SWSS_LOG_ENTER();
+
+    if (enumValuesCapability && enumValuesCapability->list)
+    {
+        // clear input list, since we use serialize to transfer values
+        for (uint32_t idx = 0; idx < enumValuesCapability->count; idx++)
+            enumValuesCapability->list[idx] = 0;
+    }
+
+    g_recorder->recordQueryAattributeEnumValuesCapability(switchId, objectType, attrId, enumValuesCapability);
+
+    auto status = m_implementation->queryAattributeEnumValuesCapability(switchId, objectType, attrId, enumValuesCapability);
+
+    g_recorder->recordQueryAattributeEnumValuesCapabilityResponse(status, objectType, attrId, enumValuesCapability);
+
+    return status;
+}
