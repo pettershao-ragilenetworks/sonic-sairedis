@@ -117,6 +117,29 @@ namespace sairedis
             SAIREDIS_WRAPPERREMOTESAIINTERFACE_DECLARE_GET_ENTRY(route_entry);
             SAIREDIS_WRAPPERREMOTESAIINTERFACE_DECLARE_GET_ENTRY(nat_entry);
 
+        public: // stats API
+
+            virtual sai_status_t getStats(
+                    _In_ sai_object_type_t object_type,
+                    _In_ sai_object_id_t object_id,
+                    _In_ uint32_t number_of_counters,
+                    _In_ const sai_stat_id_t *counter_ids,
+                    _Out_ uint64_t *counters) override;
+
+            virtual sai_status_t getStatsExt(
+                    _In_ sai_object_type_t object_type,
+                    _In_ sai_object_id_t object_id,
+                    _In_ uint32_t number_of_counters,
+                    _In_ const sai_stat_id_t *counter_ids,
+                    _In_ sai_stats_mode_t mode,
+                    _Out_ uint64_t *counters) override;
+
+            virtual sai_status_t clearStats(
+                    _In_ sai_object_type_t object_type,
+                    _In_ sai_object_id_t object_id,
+                    _In_ uint32_t number_of_counters,
+                    _In_ const sai_stat_id_t *counter_ids) override;
+
         public: // non QUAD API
 
             virtual sai_status_t flushFdbEntries(

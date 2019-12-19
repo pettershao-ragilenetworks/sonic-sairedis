@@ -202,6 +202,13 @@ namespace sairedis
         public: // SAI stats API
 
             void recordGenericGetStats(
+                    _In_ sai_object_type_t object_type,
+                    _In_ sai_object_id_t object_id,
+                    _In_ uint32_t number_of_counters,
+                    _In_ const sai_stat_id_t *counter_ids);
+
+            // TODO to private
+            void recordGenericGetStats(
                     _In_ const std::string& key,
                     _In_ const std::vector<swss::FieldValueTuple>& arguments);
 
@@ -210,6 +217,13 @@ namespace sairedis
                     _In_ uint32_t count,
                     _In_ const uint64_t *counters);
 
+            void recordGenericClearStats(
+                    _In_ sai_object_type_t object_type,
+                    _In_ sai_object_id_t object_id,
+                    _In_ uint32_t number_of_counters,
+                    _In_ const sai_stat_id_t *counter_ids);
+
+            // TODO to private
             void recordGenericClearStats(
                     _In_ const std::string& key,
                     _In_ const std::vector<swss::FieldValueTuple>& arguments);

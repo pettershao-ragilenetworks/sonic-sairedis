@@ -21,6 +21,11 @@ void clear_oid_values(
         _In_ uint32_t attr_count,
         _Out_ sai_attribute_t *attr_list);
 
+std::vector<swss::FieldValueTuple> serialize_counter_id_list(
+        _In_ const sai_enum_metadata_t *stats_enum,
+        _In_ uint32_t count,
+        _In_ const sai_stat_id_t *counter_id_list);
+
 RedisRemoteSaiInterface::RedisRemoteSaiInterface(
         _In_ std::shared_ptr<swss::ProducerTable> asicState,
         _In_ std::shared_ptr<swss::ConsumerTable> getConsumer):
@@ -739,6 +744,199 @@ sai_status_t RedisRemoteSaiInterface::waitForQueryAattributeEnumValuesCapability
     }
 
     SWSS_LOG_ERROR("Failed to receive a response from syncd");
+
+    return SAI_STATUS_FAILURE;
+}
+
+sai_status_t RedisRemoteSaiInterface::getStats(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ uint32_t number_of_counters,
+        _In_ const sai_stat_id_t *counter_ids,
+        _Out_ uint64_t *counters)
+{
+    SWSS_LOG_ENTER();
+
+    auto stats_enum = sai_metadata_get_object_type_info(object_type)->statenum;
+
+    auto entry = serialize_counter_id_list(stats_enum, number_of_counters, counter_ids);
+
+    std::string str_object_type = sai_serialize_object_type(object_type);
+
+    std::string key = str_object_type + ":" + sai_serialize_object_id(object_id);
+
+    SWSS_LOG_DEBUG("generic get stats key: %s, fields: %lu", key.c_str(), entry.size());
+
+    // get_stats will not put data to asic view, only to message queue
+
+    m_asicState->set(key, entry, REDIS_ASIC_STATE_COMMAND_GET_STATS);
+
+    return waitForGetStatsResponse(number_of_counters, counters);
+}
+
+sai_status_t RedisRemoteSaiInterface::waitForGetStatsResponse(
+        _In_ uint32_t number_of_counters,
+        _Out_ uint64_t *counters)
+{
+    SWSS_LOG_ENTER();
+
+    // wait for response
+
+    swss::Select s;
+
+    s.addSelectable(m_getConsumer.get());
+
+    while (true)
+    {
+        SWSS_LOG_DEBUG("wait for get_stats response");
+
+        swss::Selectable *sel;
+
+        int result = s.select(&sel, REDIS_ASIC_STATE_COMMAND_GETRESPONSE_TIMEOUT_MS);
+
+        if (result == swss::Select::OBJECT)
+        {
+            swss::KeyOpFieldsValuesTuple kco;
+
+            m_getConsumer->pop(kco);
+
+            const std::string &opkey = kfvKey(kco);
+            const std::string &op = kfvOp(kco);
+
+            SWSS_LOG_DEBUG("response: op = %s, key = %s", opkey.c_str(), op.c_str());
+
+            if (op != REDIS_ASIC_STATE_COMMAND_GET_STATS) // ignore non response messages
+            {
+                continue;
+            }
+
+            // key:         sai_status
+            // field:       stat_id
+            // value:       stat_value
+
+            auto &values = kfvFieldsValues(kco);
+
+            sai_status_t status;
+            sai_deserialize_status(opkey, status);
+
+            if (status == SAI_STATUS_SUCCESS)
+            {
+                if (values.size () != number_of_counters)
+                {
+                    SWSS_LOG_ERROR("wrong number of counters, got %zu, expected %u", values.size(), number_of_counters);
+                }
+                else
+                {
+                    for (uint32_t idx = 0; idx < number_of_counters; idx++)
+                    {
+                        counters[idx] = stoull(fvValue(values[idx]));
+                    }
+                }
+            }
+
+            SWSS_LOG_DEBUG("generic get status: %s", sai_serialize_object_id(status).c_str());
+
+            return status;
+        }
+
+        SWSS_LOG_ERROR("generic get failed due to SELECT operation result");
+        break;
+    }
+
+    SWSS_LOG_ERROR("generic get stats failed to get response");
+
+    return SAI_STATUS_FAILURE;
+}
+
+sai_status_t RedisRemoteSaiInterface::getStatsExt(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ uint32_t number_of_counters,
+        _In_ const sai_stat_id_t *counter_ids,
+        _In_ sai_stats_mode_t mode,
+        _Out_ uint64_t *counters)
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_ERROR("not implemented");
+
+    // TODO could be the same as getStats but put mode at first argument
+
+    return SAI_STATUS_NOT_IMPLEMENTED;
+}
+
+sai_status_t RedisRemoteSaiInterface::clearStats(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ uint32_t number_of_counters,
+        _In_ const sai_stat_id_t *counter_ids)
+{
+    SWSS_LOG_ENTER();
+
+    auto stats_enum = sai_metadata_get_object_type_info(object_type)->statenum;
+
+    auto values = serialize_counter_id_list(stats_enum, number_of_counters, counter_ids);
+
+    auto str_object_type = sai_serialize_object_type(object_type);
+
+    auto key = str_object_type + ":" + sai_serialize_object_id(object_id);
+
+    SWSS_LOG_DEBUG("generic clear stats key: %s, fields: %lu", key.c_str(), values.size());
+
+    // clear_stats will not put data into asic view, only to message queue
+
+    m_asicState->set(key, values, REDIS_ASIC_STATE_COMMAND_CLEAR_STATS);
+
+    return waitForClearStatsResponse();
+}
+
+sai_status_t RedisRemoteSaiInterface::waitForClearStatsResponse()
+{
+    SWSS_LOG_ENTER();
+
+    // wait for response
+
+    swss::Select s;
+
+    s.addSelectable(m_getConsumer.get());
+
+    while (true)
+    {
+        SWSS_LOG_DEBUG("wait for clear_stats response");
+
+        swss::Selectable *sel;
+
+        int result = s.select(&sel, REDIS_ASIC_STATE_COMMAND_GETRESPONSE_TIMEOUT_MS);
+
+        if (result == swss::Select::OBJECT)
+        {
+            swss::KeyOpFieldsValuesTuple kco;
+
+            m_getConsumer->pop(kco);
+
+            const std::string &respKey = kfvKey(kco);
+            const std::string &respOp = kfvOp(kco);
+
+            SWSS_LOG_DEBUG("response: key = %s, op = %s", respKey.c_str(), respOp.c_str());
+
+            if (respOp != REDIS_ASIC_STATE_COMMAND_GETRESPONSE) // ignore non response messages
+            {
+                continue;
+            }
+
+            sai_status_t status;
+            sai_deserialize_status(respKey, status);
+
+            SWSS_LOG_DEBUG("generic clear stats status: %s", sai_serialize_status(status).c_str());
+
+            return status;
+        }
+
+        SWSS_LOG_ERROR("generic clear stats failed due to SELECT operation result");
+        break;
+    }
+
+    SWSS_LOG_ERROR("generic clear stats failed to get response");
 
     return SAI_STATUS_FAILURE;
 }

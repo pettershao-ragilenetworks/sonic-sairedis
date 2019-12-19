@@ -319,3 +319,54 @@ sai_status_t WrapperRemoteSaiInterface::queryAattributeEnumValuesCapability(
 
     return status;
 }
+
+sai_status_t WrapperRemoteSaiInterface::getStats(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ uint32_t number_of_counters,
+        _In_ const sai_stat_id_t *counter_ids,
+        _Out_ uint64_t *counters)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO add recording
+
+    auto status = m_implementation->getStats(object_type, object_id, number_of_counters, counter_ids, counters);
+
+    return status;
+}
+
+sai_status_t WrapperRemoteSaiInterface::getStatsExt(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ uint32_t number_of_counters,
+        _In_ const sai_stat_id_t *counter_ids,
+        _In_ sai_stats_mode_t mode,
+        _Out_ uint64_t *counters)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO add recording
+
+    auto status = m_implementation->getStatsExt(object_type, object_id, number_of_counters, counter_ids, mode, counters);
+
+    return status;
+}
+
+sai_status_t WrapperRemoteSaiInterface::clearStats(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ uint32_t number_of_counters,
+        _In_ const sai_stat_id_t *counter_ids)
+{
+    SWSS_LOG_ENTER();
+
+    g_recorder->recordGenericClearStats(object_type, object_id, number_of_counters, counter_ids);
+
+    auto status = m_implementation->clearStats(object_type, object_id, number_of_counters, counter_ids);
+
+    g_recorder->recordGenericClearStatsResponse(status);
+
+    return status;
+}
+

@@ -150,14 +150,13 @@ static sai_status_t redis_get_ ## object_type ## _stats(            \
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
-        return meta_sai_get_stats_oid(                              \
+        return g_meta->getStats(                                    \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
-                &sai_metadata_enum_sai_ ## object_type ## _stat_t,  \
                 number_of_counters,                                 \
-                (const int32_t*)counter_ids,                        \
+                counter_ids,                                        \
                 counters,                                           \
-                &redis_generic_get_stats);                          \
+                *g_remoteSaiInterface);                             \
     }
 
 #define REDIS_GET_STATS_EXT(OBJECT_TYPE,object_type)                \
@@ -170,14 +169,14 @@ static sai_status_t redis_get_ ## object_type ## _stats_ext(        \
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
-        return redis_generic_get_stats_ext(                         \
+        return g_meta->getStatsExt(                                 \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
-                &sai_metadata_enum_sai_ ## object_type ## _stat_t,  \
                 number_of_counters,                                 \
-                (const int32_t*)counter_ids,                        \
+                counter_ids,                                        \
                 mode,                                               \
-                counters);                                          \
+                counters,                                           \
+                *g_remoteSaiInterface);                             \
     }
 
 #define REDIS_CLEAR_STATS(OBJECT_TYPE,object_type)                  \
@@ -188,13 +187,12 @@ static sai_status_t redis_clear_ ## object_type ## _stats(          \
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
-        return meta_sai_clear_stats_oid(                            \
+        return g_meta->clearStats(                                  \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
-                &sai_metadata_enum_sai_ ## object_type ## _stat_t,  \
                 number_of_counters,                                 \
-                (const int32_t*)counter_ids,                        \
-                &redis_generic_clear_stats);                        \
+                counter_ids,                                        \
+                *g_remoteSaiInterface);                             \
     }
 
 #define REDIS_GENERIC_STATS(OT, ot)    \

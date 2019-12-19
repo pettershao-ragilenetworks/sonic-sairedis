@@ -17,6 +17,11 @@ using namespace sairedis;
 std::string joinFieldValues(
         _In_ const std::vector<swss::FieldValueTuple> &values);
 
+std::vector<swss::FieldValueTuple> serialize_counter_id_list(
+        _In_ const sai_enum_metadata_t *stats_enum,
+        _In_ uint32_t count,
+        _In_ const sai_stat_id_t *counter_id_list);
+
 #define MUTEX() std::lock_guard<std::mutex> _lock(m_mutex)
 
 Recorder::Recorder()
@@ -537,6 +542,27 @@ void Recorder::recordGenericGetResponse(
 }
 
 void Recorder::recordGenericGetStats(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ uint32_t number_of_counters,
+        _In_ const sai_stat_id_t *counter_ids)
+{
+    SWSS_LOG_ENTER();
+
+    auto stats_enum = sai_metadata_get_object_type_info(object_type)->statenum;
+
+    auto entry = serialize_counter_id_list(stats_enum, number_of_counters, counter_ids);
+
+    std::string str_object_type = sai_serialize_object_type(object_type);
+
+    std::string key = str_object_type + ":" + sai_serialize_object_id(object_id);
+
+    SWSS_LOG_DEBUG("generic get stats key: %s, fields: %lu", key.c_str(), entry.size());
+
+    recordGenericGetStats(key, entry);
+}
+
+void Recorder::recordGenericGetStats(
         _In_ const std::string& key,
         _In_ const std::vector<swss::FieldValueTuple>& arguments)
 {
@@ -560,6 +586,26 @@ void Recorder::recordGenericGetStatsResponse(
     }
 
     recordLine("Q|get_stats|" + sai_serialize_status(status) + joined);
+}
+
+void Recorder::recordGenericClearStats(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ uint32_t number_of_counters,
+        _In_ const sai_stat_id_t *counter_ids)
+{
+    SWSS_LOG_ENTER();
+
+    auto stats_enum = sai_metadata_get_object_type_info(object_type)->statenum;
+
+    auto values = serialize_counter_id_list(stats_enum, number_of_counters, counter_ids);
+
+    std::string str_object_type = sai_serialize_object_type(object_type);
+    std::string key = str_object_type + ":" + sai_serialize_object_id(object_id);
+
+    SWSS_LOG_DEBUG("generic clear stats key: %s, fields: %lu", key.c_str(), values.size());
+
+    recordGenericClearStats(key, values);
 }
 
 void Recorder::recordGenericClearStats(
