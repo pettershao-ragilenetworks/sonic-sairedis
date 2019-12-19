@@ -1916,7 +1916,7 @@ void matchOids(
  * Exception of this rule is when orchagent will be restarted and it will add
  * some more objects or remove some objects.
  *
- * We take special care here about INGRESS_PRIORIRITY_GROUPS, SCHEDULER_GROUPS
+ * We take special care here about INGRESS_PRIORITY_GROUPS, SCHEDULER_GROUPS
  * and QUEUES, since those are internal objects created by vendor when switch
  * is instantiated.
  *
@@ -7639,7 +7639,7 @@ void createPreMatchMap(
      * object that was fount in object A attributes, because we need to make
      * sure all objects are matched before actually processing object A.  For
      * example before processing ROUTE_ENTRY, we process first NEXT_HOP and
-     * before that REOUTER_INTERFACE and before that PORT. Object processing
+     * before that ROUTER_INTERFACE and before that PORT. Object processing
      * could be described going from down to top. But figuring out for top
      * object ex. WRED could be hard since we would need to check not matched
      * yet buffer profile and buffer pool before we use QUEUE or IPG as an
