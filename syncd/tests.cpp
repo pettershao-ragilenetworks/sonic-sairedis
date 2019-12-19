@@ -45,6 +45,8 @@ sai_status_t redis_bulk_remove_fdb_entry(
         SWSS_LOG_THROW(format ": %s", ##__VA_ARGS__, sai_serialize_status(status).c_str());
 
 using namespace saimeta;
+extern std::shared_ptr<swss::RedisClient>   g_redisClient;
+std::shared_ptr<swss::DBConnector> g_db;
 
 static sai_next_hop_group_api_t test_next_hop_group_api;
 static std::vector<std::tuple<sai_object_id_t, sai_object_id_t, std::vector<sai_attribute_t>>> created_next_hop_group_member;
@@ -70,8 +72,10 @@ void clearDB()
 {
     SWSS_LOG_ENTER();
 
-    swss::DBConnector db("ASIC_DB", 0, true);
-    swss::RedisReply r(&db, "FLUSHALL", REDIS_REPLY_STATUS);
+    g_db = std::make_shared<swss::DBConnector>(ASIC_DB, "localhost", 6379, 0);
+    swss::RedisReply r(g_db.get(), "FLUSHALL", REDIS_REPLY_STATUS);
+    g_redisClient = std::make_shared<swss::RedisClient>(g_db.get());
+
     r.checkStatusOK();
 }
 
@@ -229,7 +233,6 @@ void test_bulk_next_hop_group_member_create()
 
   // auto consumerThreads = new std::thread(bulk_nhgm_consumer_worker);
 
-    swss::Logger::getInstance().setMinPrio(swss::Logger::SWSS_DEBUG);
 
     sai_status_t    status;
 
@@ -263,7 +266,9 @@ void test_bulk_next_hop_group_member_create()
     g_oids.objectReferenceInsert(hopgroup);
     sai_object_meta_key_t meta_key_hopgruop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP_GROUP, .objectkey = { .key = { .object_id = hopgroup } } };
     g_saiObjectCollection.createObject(meta_key_hopgruop);
+    swss::Logger::getInstance().setMinPrio(swss::Logger::SWSS_DEBUG);
     sai_object_id_t hopgroup_vid = translate_rid_to_vid(hopgroup, switch_id);
+    sai_api_uninitialize();return;
 
     for (uint32_t i = 0; i <  count; ++i)
     {
