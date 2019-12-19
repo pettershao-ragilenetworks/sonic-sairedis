@@ -233,6 +233,7 @@ void test_bulk_next_hop_group_member_create()
 
   // auto consumerThreads = new std::thread(bulk_nhgm_consumer_worker);
 
+    swss::Logger::getInstance().setMinPrio(swss::Logger::SWSS_DEBUG);
 
     sai_status_t    status;
 
@@ -266,9 +267,7 @@ void test_bulk_next_hop_group_member_create()
     g_oids.objectReferenceInsert(hopgroup);
     sai_object_meta_key_t meta_key_hopgruop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP_GROUP, .objectkey = { .key = { .object_id = hopgroup } } };
     g_saiObjectCollection.createObject(meta_key_hopgruop);
-    swss::Logger::getInstance().setMinPrio(swss::Logger::SWSS_DEBUG);
     sai_object_id_t hopgroup_vid = translate_rid_to_vid(hopgroup, switch_id);
-    sai_api_uninitialize();return;
 
     for (uint32_t i = 0; i <  count; ++i)
     {
