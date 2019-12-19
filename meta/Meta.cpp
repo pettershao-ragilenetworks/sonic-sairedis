@@ -5,14 +5,19 @@
 #include "sai_serialize.h"
 #include "OidRefCounter.h"
 #include "Globals.h"
+#include "SaiObjectCollection.h"
 
 #include <inttypes.h>
 
 #include <set>
 
+#define CHECK_STATUS_SUCCESS(s) { if ((s) != SAI_STATUS_SUCCESS) return (s); }
+
 using namespace saimeta;
 
 extern OidRefCounter g_oids;
+extern SaiObjectCollection g_saiObjectCollection;
+
 
 // TODO to be moved to private member methods
 sai_status_t meta_generic_validation_remove(
@@ -1716,10 +1721,11 @@ sai_status_t Meta::flushFdbEntries(
 
 #define PARAMETER_CHECK_OID_OBJECT_TYPE(param, OT) {                                        \
     sai_object_type_t _ot = sai_object_type_query(param);                                   \
-    if (_ot != OT) {                                                                        \
-        SWSS_LOG_ERROR("parameter " # param " %s object type is %s, but expected " # OT,    \
+    if (_ot != (OT)) {                                                                      \
+        SWSS_LOG_ERROR("parameter " # param " %s object type is %s, but expected %s",       \
                 sai_serialize_object_id(param).c_str(),                                     \
-                sai_serialize_object_type(_ot).c_str());                                    \
+                sai_serialize_object_type(_ot).c_str(),                                     \
+                sai_serialize_object_type(OT).c_str());                                     \
         return SAI_STATUS_INVALID_PARAMETER; } }
 
 #define PARAMETER_CHECK_OBJECT_TYPE_VALID(ot) {                                             \
@@ -1729,8 +1735,14 @@ sai_status_t Meta::flushFdbEntries(
 
 #define PARAMETER_CHECK_POSITIVE(param) {                                                   \
     if ((param) <= 0) {                                                                     \
-        SWSS_LOG_ERROR("parameter " #param " must be positive, but is " #param);            \
+        SWSS_LOG_ERROR("parameter " #param " must be positive");                            \
         return SAI_STATUS_INVALID_PARAMETER; } }
+
+#define PARAMETER_CHECK_OID_EXISTS(oid, OT) {                                               \
+    sai_object_meta_key_t _key = {                                                          \
+        .objecttype = (OT), .objectkey = { .key = { .object_id = (oid) } } };               \
+    if (!g_saiObjectCollection.objectExists(_key)) {                                        \
+        SWSS_LOG_ERROR("object %s don't exists", sai_serialize_object_id(oid).c_str()); } }
 
 sai_status_t Meta::objectTypeGetAvailability(
         _In_ sai_object_id_t switchId,
@@ -1743,6 +1755,7 @@ sai_status_t Meta::objectTypeGetAvailability(
     SWSS_LOG_ENTER();
 
     PARAMETER_CHECK_OID_OBJECT_TYPE(switchId, SAI_OBJECT_TYPE_SWITCH);
+    PARAMETER_CHECK_OID_EXISTS(switchId, SAI_OBJECT_TYPE_SWITCH);
     PARAMETER_CHECK_OBJECT_TYPE_VALID(objectType);
     PARAMETER_CHECK_POSITIVE(attrCount);
     PARAMETER_CHECK_IF_NOT_NULL(attrList);
@@ -1809,7 +1822,7 @@ sai_status_t Meta::objectTypeGetAvailability(
 
     auto status = saiInterface.objectTypeGetAvailability(switchId, objectType, attrCount, attrList, count);
 
-    // no post validataion required
+    // no post validation required
 
     return status;
 }
@@ -1824,6 +1837,7 @@ sai_status_t Meta::queryAattributeEnumValuesCapability(
     SWSS_LOG_ENTER();
 
     PARAMETER_CHECK_OID_OBJECT_TYPE(switchId, SAI_OBJECT_TYPE_SWITCH);
+    PARAMETER_CHECK_OID_EXISTS(switchId, objectType);
     PARAMETER_CHECK_OBJECT_TYPE_VALID(objectType);
 
     auto mdp = sai_metadata_get_attr_metadata(objectType, attrId);
@@ -1874,3 +1888,133 @@ sai_status_t Meta::queryAattributeEnumValuesCapability(
     return status;
 }
 
+#define META_COUNTERS_COUNT_MSB (0x80000000)
+
+static sai_status_t meta_validate_stats(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ uint32_t number_of_counters,
+        _In_ const sai_stat_id_t *counter_ids,
+        _Out_ uint64_t *counters,
+        _In_ sai_stats_mode_t mode)
+{
+    SWSS_LOG_ENTER();
+
+    /*
+     * If last bit of counters count is set to high, and unittests are enabled,
+     * then this api can be used to SET counter values by user for debugging purposes.
+     */
+    number_of_counters &= ~(META_COUNTERS_COUNT_MSB);
+
+    PARAMETER_CHECK_OBJECT_TYPE_VALID(object_type);
+    PARAMETER_CHECK_OID_OBJECT_TYPE(object_id, object_type);
+    PARAMETER_CHECK_OID_EXISTS(object_id, object_type);
+    PARAMETER_CHECK_POSITIVE(number_of_counters);
+    PARAMETER_CHECK_IF_NOT_NULL(counter_ids);
+    PARAMETER_CHECK_IF_NOT_NULL(counters);
+
+    sai_object_id_t switch_id = sai_switch_id_query(object_id);
+
+    // checks also if object type is OID
+    sai_status_t status = meta_sai_validate_oid(object_type, &object_id, switch_id, false);
+
+    CHECK_STATUS_SUCCESS(status);
+
+    auto info = sai_metadata_get_object_type_info(object_type);
+
+    PARAMETER_CHECK_IF_NOT_NULL(info);
+
+    if (info->statenum == nullptr)
+    {
+        SWSS_LOG_ERROR("%s does not support stats", info->objecttypename);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    // check if all counter ids are in enum range
+
+    for (uint32_t idx = 0; idx < number_of_counters; idx++)
+    {
+        if (sai_metadata_get_enum_value_name(info->statenum, counter_ids[idx]) == nullptr)
+        {
+            SWSS_LOG_ERROR("vlaue %d is not in range on %s", counter_ids[idx], info->statenum->name);
+
+            return SAI_STATUS_INVALID_PARAMETER;
+        }
+    }
+
+    // check mode
+
+    if (sai_metadata_get_enum_value_name(&sai_metadata_enum_sai_stats_mode_t, mode) == nullptr)
+    {
+        SWSS_LOG_ERROR("mode vlaue %d is not in range on %s", mode, sai_metadata_enum_sai_stats_mode_t.name);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t Meta::getStats(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ uint32_t number_of_counters,
+        _In_ const sai_stat_id_t *counter_ids,
+        _Out_ uint64_t *counters,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    auto status = meta_validate_stats(object_type, object_id, number_of_counters, counter_ids, counters, SAI_STATS_MODE_READ);
+
+    CHECK_STATUS_SUCCESS(status);
+
+    status = saiInterface.getStats(object_type, object_id, number_of_counters, counter_ids, counters);
+
+    // no post validation required
+
+    return status;
+}
+
+sai_status_t Meta::getStatsExt(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ uint32_t number_of_counters,
+        _In_ const sai_stat_id_t *counter_ids,
+        _In_ sai_stats_mode_t mode,
+        _Out_ uint64_t *counters,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    auto status = meta_validate_stats(object_type, object_id, number_of_counters, counter_ids, counters, mode);
+
+    CHECK_STATUS_SUCCESS(status);
+
+    status = saiInterface.getStatsExt(object_type, object_id, number_of_counters, counter_ids, mode, counters);
+
+    // no post validation required
+
+    return status;
+}
+
+sai_status_t Meta::clearStats(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ uint32_t number_of_counters,
+        _In_ const sai_stat_id_t *counter_ids,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    uint64_t counters;
+    auto status = meta_validate_stats(object_type, object_id, number_of_counters, counter_ids, &counters, SAI_STATS_MODE_READ);
+
+    CHECK_STATUS_SUCCESS(status);
+
+    status = saiInterface.clearStats(object_type, object_id, number_of_counters, counter_ids);
+
+    // no post validation required
+
+    return status;
+}

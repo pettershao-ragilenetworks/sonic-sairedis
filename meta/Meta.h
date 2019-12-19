@@ -133,5 +133,31 @@ namespace saimeta
                     _In_ sai_attr_id_t attr_id,
                     _Inout_ sai_s32_list_t *enum_values_capability,
                     _Inout_ sairedis::SaiInterface& saiInterface);
+
+        public: // stats API
+
+            sai_status_t getStats(
+                    _In_ sai_object_type_t object_type,
+                    _In_ sai_object_id_t object_id,
+                    _In_ uint32_t number_of_counters,
+                    _In_ const sai_stat_id_t *counter_ids,
+                    _Out_ uint64_t *counters,
+                    _Inout_ sairedis::SaiInterface& saiInterface);
+
+            sai_status_t getStatsExt(
+                    _In_ sai_object_type_t object_type,
+                    _In_ sai_object_id_t object_id,
+                    _In_ uint32_t number_of_counters,
+                    _In_ const sai_stat_id_t *counter_ids,
+                    _In_ sai_stats_mode_t mode,
+                    _Out_ uint64_t *counters,
+                    _Inout_ sairedis::SaiInterface& saiInterface);
+
+            sai_status_t clearStats(
+                    _In_ sai_object_type_t object_type,
+                    _In_ sai_object_id_t object_id,
+                    _In_ uint32_t number_of_counters,
+                    _In_ const sai_stat_id_t *counter_ids,
+                    _Inout_ sairedis::SaiInterface& saiInterface);
     };
-};
+}
