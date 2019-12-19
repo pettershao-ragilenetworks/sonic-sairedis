@@ -1837,6 +1837,13 @@ sai_status_t Meta::queryAattributeEnumValuesCapability(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
+    if (!mdp->isenum && !mdp->isenumlist)
+    {
+        SWSS_LOG_ERROR("%s is not enum/enum list", mdp->attridname);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
     PARAMETER_CHECK_IF_NOT_NULL(enumValuesCapability);
 
     if (meta_genetic_validation_list(*mdp, enumValuesCapability->count, enumValuesCapability->list)
@@ -1849,7 +1856,19 @@ sai_status_t Meta::queryAattributeEnumValuesCapability(
 
     if (status == SAI_STATUS_SUCCESS)
     {
-        // TODO check enums on list
+        if (enumValuesCapability->list)
+        {
+            // check if all returned values are members of defined enum
+            for (uint32_t idx = 0; idx < enumValuesCapability->count; idx++)
+            {
+                int val = enumValuesCapability->list[idx];
+
+                if (!sai_metadata_is_allowed_enum_value(mdp, val))
+                {
+                    SWSS_LOG_ERROR("returned value %d is not allowed on %s", val, mdp->attridname);
+                }
+            }
+        }
     }
 
     return status;
