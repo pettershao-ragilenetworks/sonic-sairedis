@@ -237,7 +237,7 @@ bool meta_unittests_enabled();
  *
  * TestCase:
  * 1. meta_unittests_allow_readonly_set_once(x,y);
- * 2. object_x_api->set_attribyte(object_id, attr, foo); // attr.id == y
+ * 2. object_x_api->set_attribute(object_id, attr, foo); // attr.id == y
  * 3. object_x_api->get_attribute(object_id, 1, attr); // attr.id == y
  * 4. check if get result is equal to set result.
  *

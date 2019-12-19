@@ -8,6 +8,8 @@
 
 #include <inttypes.h>
 
+#include <set>
+
 using namespace saimeta;
 
 extern OidRefCounter g_oids;
@@ -85,6 +87,11 @@ sai_status_t meta_generic_validation_objlist(
         _In_ sai_object_id_t switch_id,
         _In_ uint32_t count,
         _In_ const sai_object_id_t* list);
+
+sai_status_t meta_genetic_validation_list(
+        _In_ const sai_attr_metadata_t& md,
+        _In_ uint32_t count,
+        _In_ const void* list);
 
 sai_status_t Meta::remove(
         _In_ sai_object_type_t object_type,
@@ -1697,6 +1704,152 @@ sai_status_t Meta::flushFdbEntries(
     if (status == SAI_STATUS_SUCCESS)
     {
         SWSS_LOG_WARN("TODO, remove all matching fdb entries here, currently removed in FDB notification");
+    }
+
+    return status;
+}
+
+#define PARAMETER_CHECK_IF_NOT_NULL(param) {                                                \
+    if ((param) == nullptr) {                                                               \
+        SWSS_LOG_ERROR("parameter " # param " is NULL");                                    \
+        return SAI_STATUS_INVALID_PARAMETER; } }
+
+#define PARAMETER_CHECK_OID_OBJECT_TYPE(param, OT) {                                        \
+    sai_object_type_t _ot = sai_object_type_query(param);                                   \
+    if (_ot != OT) {                                                                        \
+        SWSS_LOG_ERROR("parameter " # param " %s object type is %s, but expected " # OT,    \
+                sai_serialize_object_id(param).c_str(),                                     \
+                sai_serialize_object_type(_ot).c_str());                                    \
+        return SAI_STATUS_INVALID_PARAMETER; } }
+
+#define PARAMETER_CHECK_OBJECT_TYPE_VALID(ot) {                                             \
+    if (!sai_metadata_is_object_type_valid(ot)) {                                           \
+        SWSS_LOG_ERROR("parameter " # ot " object type %d is invalid", (ot));               \
+        return SAI_STATUS_INVALID_PARAMETER; } }
+
+#define PARAMETER_CHECK_POSITIVE(param) {                                                   \
+    if ((param) <= 0) {                                                                     \
+        SWSS_LOG_ERROR("parameter " #param " must be positive, but is " #param);            \
+        return SAI_STATUS_INVALID_PARAMETER; } }
+
+sai_status_t Meta::objectTypeGetAvailability(
+        _In_ sai_object_id_t switchId,
+        _In_ sai_object_type_t objectType,
+        _In_ uint32_t attrCount,
+        _In_ const sai_attribute_t *attrList,
+        _Out_ uint64_t *count,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    PARAMETER_CHECK_OID_OBJECT_TYPE(switchId, SAI_OBJECT_TYPE_SWITCH);
+    PARAMETER_CHECK_OBJECT_TYPE_VALID(objectType);
+    PARAMETER_CHECK_POSITIVE(attrCount);
+    PARAMETER_CHECK_IF_NOT_NULL(attrList);
+    PARAMETER_CHECK_IF_NOT_NULL(count);
+
+    auto info = sai_metadata_get_object_type_info(objectType);
+
+    PARAMETER_CHECK_IF_NOT_NULL(info);
+
+    std::set<sai_attr_id_t> attrs;
+
+    for (uint32_t idx = 0; idx < attrCount; idx++)
+    {
+        auto id = attrList[idx].id;
+
+        auto mdp = sai_metadata_get_attr_metadata(objectType, id);
+
+        if (mdp == nullptr)
+        {
+            SWSS_LOG_ERROR("can't find attribute %s:%d",
+                    info->objecttypename,
+                    attrList[idx].id);
+
+            return SAI_STATUS_INVALID_PARAMETER;
+        }
+
+        if (attrs.find(id) != attrs.end())
+        {
+            SWSS_LOG_ERROR("attr %s already defined on list", mdp->attridname);
+
+            return SAI_STATUS_INVALID_PARAMETER;
+        }
+
+        attrs.insert(id);
+
+        if (!mdp->isresourcetype)
+        {
+            SWSS_LOG_ERROR("attr %s is not resource type", mdp->attridname);
+
+            return SAI_STATUS_INVALID_PARAMETER;
+        }
+
+        switch (mdp->attrvaluetype)
+        {
+            case SAI_ATTR_VALUE_TYPE_INT32:
+
+                if (mdp->isenum && !sai_metadata_is_allowed_enum_value(mdp, attrList[idx].value.s32))
+                {
+                    SWSS_LOG_ERROR("%s is enum, but value %d not found on allowed values list",
+                            mdp->attridname,
+                            attrList[idx].value.s32);
+
+                    return SAI_STATUS_INVALID_PARAMETER;
+                }
+
+                break;
+
+            default:
+
+                SWSS_LOG_THROW("value type %s not supported yet, FIXME!",
+                        sai_serialize_attr_value_type(mdp->attrvaluetype).c_str());
+        }
+    }
+
+    auto status = saiInterface.objectTypeGetAvailability(switchId, objectType, attrCount, attrList, count);
+
+    // no post validataion required
+
+    return status;
+}
+
+sai_status_t Meta::queryAattributeEnumValuesCapability(
+        _In_ sai_object_id_t switchId,
+        _In_ sai_object_type_t objectType,
+        _In_ sai_attr_id_t attrId,
+        _Inout_ sai_s32_list_t *enumValuesCapability,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    PARAMETER_CHECK_OID_OBJECT_TYPE(switchId, SAI_OBJECT_TYPE_SWITCH);
+    PARAMETER_CHECK_OBJECT_TYPE_VALID(objectType);
+
+    auto mdp = sai_metadata_get_attr_metadata(objectType, attrId);
+
+    if (!mdp)
+    {
+        SWSS_LOG_ERROR("unable to find attribute: %s:%d",
+                sai_serialize_object_type(objectType).c_str(),
+                attrId);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    PARAMETER_CHECK_IF_NOT_NULL(enumValuesCapability);
+
+    if (meta_genetic_validation_list(*mdp, enumValuesCapability->count, enumValuesCapability->list)
+            != SAI_STATUS_SUCCESS)
+    {
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    auto status = saiInterface.queryAattributeEnumValuesCapability(switchId, objectType, attrId, enumValuesCapability);
+
+    if (status == SAI_STATUS_SUCCESS)
+    {
+        // TODO check enums on list
     }
 
     return status;
