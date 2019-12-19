@@ -1,6 +1,6 @@
 #include "sai_redis.h"
 
-sai_status_t redis_recv_hostif_packet(
+static sai_status_t redis_recv_hostif_packet(
         _In_ sai_object_id_t hostif_id,
         _Inout_ sai_size_t *buffer_size,
         _Out_ void *buffer,
@@ -14,7 +14,7 @@ sai_status_t redis_recv_hostif_packet(
     return SAI_STATUS_NOT_IMPLEMENTED;
 }
 
-sai_status_t redis_send_hostif_packet(
+static sai_status_t redis_send_hostif_packet(
         _In_ sai_object_id_t hostif_id,
         _In_ sai_size_t buffer_size,
         _In_ const void *buffer,

@@ -1,6 +1,6 @@
 #include "sai_redis.h"
 
-sai_status_t redis_clear_port_all_stats(
+static sai_status_t redis_clear_port_all_stats(
         _In_ sai_object_id_t port_id)
 {
     MUTEX();

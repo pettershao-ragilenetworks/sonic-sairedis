@@ -12,7 +12,7 @@ volatile bool g_asicInitViewMode = false; // default mode is apply mode
 volatile bool g_useTempView = false;
 volatile bool g_syncMode = false;
 
-sai_status_t sai_redis_internal_notify_syncd(
+static sai_status_t sai_redis_internal_notify_syncd(
         _In_ const std::string& key)
 {
     SWSS_LOG_ENTER();
@@ -73,7 +73,7 @@ sai_status_t sai_redis_internal_notify_syncd(
     return SAI_STATUS_FAILURE;
 }
 
-sai_status_t sai_redis_notify_syncd(
+static sai_status_t sai_redis_notify_syncd(
         _In_ const sai_attribute_t *attr)
 {
     SWSS_LOG_ENTER();
@@ -141,7 +141,7 @@ sai_status_t sai_redis_notify_syncd(
 // a switch map/set/container yet and notification won't find
 // it
 
-sai_status_t redis_create_switch(
+static sai_status_t redis_create_switch(
         _Out_ sai_object_id_t* switch_id,
         _In_ uint32_t attr_count,
         _In_ const sai_attribute_t *attr_list)
@@ -187,7 +187,7 @@ sai_status_t redis_create_switch(
     return status;
 }
 
-sai_status_t redis_remove_switch(
+static sai_status_t redis_remove_switch(
         _In_ sai_object_id_t switch_id)
 {
     MUTEX();
@@ -202,7 +202,7 @@ sai_status_t redis_remove_switch(
     return status;
 }
 
-sai_status_t redis_set_switch_attribute(
+static sai_status_t redis_set_switch_attribute(
         _In_ sai_object_id_t switch_id,
         _In_ const sai_attribute_t *attr)
 {
@@ -304,7 +304,7 @@ sai_status_t redis_set_switch_attribute(
     return status;
 }
 
-sai_status_t redis_get_switch_attribute(
+static sai_status_t redis_get_switch_attribute(
         _In_ sai_object_id_t switch_id,
         _In_ sai_uint32_t attr_count,
         _Inout_ sai_attribute_t *attr_list)

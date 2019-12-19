@@ -1,6 +1,6 @@
 #include "sai_redis.h"
 
-sai_status_t redis_remove_all_neighbor_entries(
+static sai_status_t redis_remove_all_neighbor_entries(
         _In_ sai_object_id_t switch_id)
 {
     MUTEX();

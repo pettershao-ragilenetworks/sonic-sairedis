@@ -2,7 +2,7 @@
 #include "meta/sai_serialize.h"
 #include "meta/saiattributelist.h"
 
-sai_status_t redis_flush_fdb_entries(
+static sai_status_t redis_flush_fdb_entries(
         _In_ sai_object_id_t switch_id,
         _In_ uint32_t attr_count,
         _In_ const sai_attribute_t *attr_list)
