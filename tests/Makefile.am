@@ -28,4 +28,4 @@ vssyncd_SOURCES = \
 vssyncd_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON) $(SAIFLAGS)
 vssyncd_LDADD = -lhiredis -lswsscommon $(SAILIB) -lpthread -L$(top_srcdir)/meta/.libs -lsaimetadata -lsaimeta -ldl
 
-TESTS = aspellcheck.pl mlnx.pl brcm.pl swsslogentercheck.sh
+TESTS = aspellcheck.pl conflictnames.pl mlnx.pl brcm.pl swsslogentercheck.sh
