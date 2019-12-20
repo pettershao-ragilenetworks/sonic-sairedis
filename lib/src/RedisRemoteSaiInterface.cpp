@@ -823,14 +823,12 @@ sai_status_t RedisRemoteSaiInterface::waitForGetStatsResponse(
             {
                 if (values.size () != number_of_counters)
                 {
-                    SWSS_LOG_ERROR("wrong number of counters, got %zu, expected %u", values.size(), number_of_counters);
+                    SWSS_LOG_THROW("wrong number of counters, got %zu, expected %u", values.size(), number_of_counters);
                 }
-                else
+
+                for (uint32_t idx = 0; idx < number_of_counters; idx++)
                 {
-                    for (uint32_t idx = 0; idx < number_of_counters; idx++)
-                    {
-                        counters[idx] = stoull(fvValue(values[idx]));
-                    }
+                    counters[idx] = stoull(fvValue(values[idx]));
                 }
             }
 
@@ -939,5 +937,149 @@ sai_status_t RedisRemoteSaiInterface::waitForClearStatsResponse()
     SWSS_LOG_ERROR("generic clear stats failed to get response");
 
     return SAI_STATUS_FAILURE;
+}
+
+sai_status_t RedisRemoteSaiInterface::bulkRemove(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::vector<std::string> &serialized_object_ids,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO support mode, this will need to go as extra parameter and needs to
+    // be supported by LUA script passed as first or last entry in values,
+    // currently mode is ignored
+
+    std::string serializedObjectType = sai_serialize_object_type(object_type);
+
+    std::vector<swss::FieldValueTuple> entries;
+
+    for (size_t idx = 0; idx < serialized_object_ids.size(); ++idx)
+    {
+        std::string str_attr = "";
+
+        swss::FieldValueTuple fvtNoStatus(serialized_object_ids[idx], str_attr);
+
+        entries.push_back(fvtNoStatus);
+    }
+
+    /*
+     * We are adding number of entries to actually add ':' to be compatible
+     * with previous
+     */
+
+    // key:         object_type:count
+    // field:       object_id
+    // value:       object_attrs
+    std::string key = serializedObjectType + ":" + std::to_string(entries.size());
+
+    m_asicState->set(key, entries, REDIS_ASIC_STATE_COMMAND_BULK_REMOVE);
+
+    return waitForBulkResponse(SAI_COMMON_API_BULK_REMOVE, (uint32_t)serialized_object_ids.size(), object_statuses);
+}
+
+sai_status_t RedisRemoteSaiInterface::waitForBulkResponse(
+        _In_ sai_common_api_t api,
+        _In_ uint32_t object_count,
+        _Out_ sai_status_t *object_statuses)
+{
+    SWSS_LOG_ENTER();
+
+    if (!g_syncMode)
+    {
+        /*
+         * By default sync mode is disabled and all bulk create/set/remove are
+         * considered success operations.
+         */
+
+        for (uint32_t idx = 0; idx < object_count; idx++)
+        {
+            object_statuses[idx] = SAI_STATUS_SUCCESS;
+        }
+
+        return SAI_STATUS_SUCCESS;
+    }
+
+    // similar to waitForResponse
+
+    auto strApi = sai_serialize_common_api(api);
+
+    swss::Select s;
+
+    s.addSelectable(m_getConsumer.get());
+
+    while (true)
+    {
+        SWSS_LOG_INFO("wait for %s response", strApi.c_str());
+
+        swss::Selectable *sel;
+
+        int result = s.select(&sel, REDIS_ASIC_STATE_COMMAND_GETRESPONSE_TIMEOUT_MS);
+
+        if (result == swss::Select::OBJECT)
+        {
+            swss::KeyOpFieldsValuesTuple kco;
+
+            m_getConsumer->pop(kco);
+
+            const std::string &op = kfvOp(kco);
+            const std::string &opkey = kfvKey(kco);
+            auto &values = kfvFieldsValues(kco);
+
+            SWSS_LOG_INFO("response: op = %s, key = %s", opkey.c_str(), op.c_str());
+
+            if (op != REDIS_ASIC_STATE_COMMAND_GETRESPONSE)
+            {
+                // ignore non response messages
+                continue;
+            }
+
+            sai_status_t status;
+            sai_deserialize_status(opkey, status);
+
+            SWSS_LOG_DEBUG("generic %s status: %s", strApi.c_str(), opkey.c_str());
+
+            if (values.size () != object_count)
+            {
+                SWSS_LOG_THROW("wrong number of counters, got %zu, expected %u", values.size(), object_count);
+            }
+
+            // deserialize statuses for all objects
+
+            for (uint32_t idx = 0; idx < object_count; idx++)
+            {
+                sai_deserialize_status(fvField(values[idx]), object_statuses[idx]);
+            }
+
+            return status;
+        }
+
+        SWSS_LOG_ERROR("generic %d api failed due to SELECT operation result: %s", api, getSelectResultAsString(result).c_str());
+        break;
+    }
+
+    SWSS_LOG_ERROR("generic %s failed to get response", strApi.c_str());
+
+    return SAI_STATUS_FAILURE;
+}
+
+sai_status_t RedisRemoteSaiInterface::bulkRemove(
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t object_count,
+        _In_ const sai_object_id_t *object_id,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses)
+{
+    SWSS_LOG_ENTER();
+
+    std::vector<std::string> serializedObjectIds;
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        serializedObjectIds.emplace_back(sai_serialize_object_id(object_id[idx]));
+    }
+
+    return bulkRemove(object_type, serializedObjectIds, mode, object_statuses);
 }
 

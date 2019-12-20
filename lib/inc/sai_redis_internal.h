@@ -251,12 +251,13 @@ static sai_status_t redis_bulk_remove_ ## fname(    \
 {                                                   \
     MUTEX();                                        \
     SWSS_LOG_ENTER();                               \
-    return redis_bulk_generic_remove(               \
+    return g_meta->bulkRemove(                      \
             SAI_OBJECT_TYPE_ ## OT,                 \
             object_count,                           \
             object_id,                              \
             mode,                                   \
-            object_statuses);                       \
+            object_statuses,                        \
+            *g_remoteSaiInterface);                 \
 }
 
 #define REDIS_BULK_SET(OT,fname)                    \

@@ -18,6 +18,11 @@
 #define REDIS_ASIC_STATE_COMMAND_SET    "set"
 #define REDIS_ASIC_STATE_COMMAND_GET    "get"
 
+#define REDIS_ASIC_STATE_COMMAND_BULK_CREATE "bulkcreate"
+#define REDIS_ASIC_STATE_COMMAND_BULK_REMOVE "bulkremove"
+#define REDIS_ASIC_STATE_COMMAND_BULK_SET    "bulkset"
+#define REDIS_ASIC_STATE_COMMAND_BULK_GET    "bulkget"
+
 #define REDIS_ASIC_STATE_COMMAND_GETRESPONSE        "getresponse"
 #define REDIS_ASIC_STATE_COMMAND_FLUSHRESPONSE      "flushresponse"
 
@@ -137,6 +142,15 @@ namespace sairedis
             SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_GET_ENTRY(route_entry);
             SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_GET_ENTRY(nat_entry);
 
+        public: // bulk QUAD oid
+
+            virtual sai_status_t bulkRemove(
+                    _In_ sai_object_type_t object_type,
+                    _In_ uint32_t object_count,
+                    _In_ const sai_object_id_t *object_id,
+                    _In_ sai_bulk_op_error_mode_t mode,
+                    _Out_ sai_status_t *object_statuses) override;
+
         public: // stats API
 
             virtual sai_status_t getStats(
@@ -205,6 +219,14 @@ namespace sairedis
                     _In_ uint32_t attr_count,
                     _Inout_ sai_attribute_t *attr_list);
 
+        private: // bulk QUAD API helpers
+
+            sai_status_t bulkRemove(
+                    _In_ sai_object_type_t object_type,
+                    _In_ const std::vector<std::string> &serialized_object_ids,
+                    _In_ sai_bulk_op_error_mode_t mode,
+                    _Out_ sai_status_t *object_statuses);
+
         private: // QUAD API response
 
             /**
@@ -231,6 +253,20 @@ namespace sairedis
                     _In_ sai_object_type_t objectType,
                     _In_ uint32_t attr_count,
                     _Inout_ sai_attribute_t *attr_list);
+
+        private: // bulk QUAD API response
+
+            /**
+             * @brief Wait for bulk response.
+             *
+             * Will wait for response from syncd. Method used only for bulk
+             * object create/remove/set since they have common output which is
+             * sai_status_t and object_statuses.
+             */
+            sai_status_t waitForBulkResponse(
+                    _In_ sai_common_api_t api,
+                    _In_ uint32_t object_count,
+                    _Out_ sai_status_t *object_statuses);
 
         private: // stats API response
 
