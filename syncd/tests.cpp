@@ -25,20 +25,7 @@ extern "C" {
 #include <thread>
 #include <tuple>
 
-// TODO remove when SAI will introduce bulk APIs to those objects
-sai_status_t redis_bulk_create_fdb_entry(
-        _In_ uint32_t object_count,
-        _In_ const sai_fdb_entry_t *fdb_entry,
-        _In_ const uint32_t *attr_count,
-        _In_ const sai_attribute_t *const *attr_list,
-        _In_ sai_bulk_op_error_mode_t mode,
-        _Out_ sai_status_t *object_statuses);
-
-sai_status_t redis_bulk_remove_fdb_entry(
-        _In_ uint32_t object_count,
-        _In_ const sai_fdb_entry_t *fdb_entry,
-        _In_ sai_bulk_op_error_mode_t mode,
-        _Out_ sai_status_t *object_statuses);
+extern bool g_syncMode;
 
 #define ASSERT_SUCCESS(format,...) \
     if ((status)!=SAI_STATUS_SUCCESS) \
@@ -423,12 +410,12 @@ void test_bulk_fdb_create()
     for (size_t j = 0; j < statuses.size(); j++)
     {
         status = statuses[j];
-        ASSERT_SUCCESS("Failed to create route # %zu", j);
+        ASSERT_SUCCESS("Failed to create fdb # %zu", j);
     }
 
     // Remove fdb entry
     status = sai_bulk_remove_fdb_entry(count, fdbs.data(), SAI_BULK_OP_ERROR_MODE_IGNORE_ERROR, statuses.data());
-    ASSERT_SUCCESS("Failed to bulk remove route entry");
+    ASSERT_SUCCESS("Failed to bulk remove fdb entry");
 }
 
 void test_bulk_route_set()
@@ -562,6 +549,7 @@ void test_bulk_route_set()
     // TODO we need to add consumer producer test here to see
     // if after consume we get pop we get expected parameters
 
+    // TODO in async mode this api will always return success
     // Remove route entry
     status = sai_route_api->remove_route_entries(count, routes.data(), SAI_BULK_OP_ERROR_MODE_IGNORE_ERROR, statuses.data());
     ASSERT_SUCCESS("Failed to bulk remove route entry");
@@ -578,6 +566,8 @@ int main()
     try
     {
         test_sai_initialize();
+
+        // g_syncMode = true;
 
         test_enable_recording();
 
