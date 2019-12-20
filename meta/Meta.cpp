@@ -2019,6 +2019,9 @@ sai_status_t Meta::clearStats(
     return status;
 }
 
+// for bulk operations actually we could make copy of current db and actually
+// execute to see if all will succeed
+
 sai_status_t Meta::bulkRemove(
         _In_ sai_object_type_t object_type,
         _In_ uint32_t object_count,
@@ -2051,8 +2054,6 @@ sai_status_t Meta::bulkRemove(
     }
 
     std::vector<sai_object_meta_key_t> vmk;
-
-    // actually we could make copy of current db and actually execute to see if all will succeed
 
     for (uint32_t idx = 0; idx < object_count; idx++)
     {
@@ -2114,8 +2115,6 @@ sai_status_t Meta::bulkRemove(
 
     std::vector<sai_object_meta_key_t> vmk;
 
-    // actually we could make copy of current db and actually execute to see if all will succeed
-
     for (uint32_t idx = 0; idx < object_count; idx++)
     {
         sai_status_t status = meta_sai_validate_route_entry(&route_entry[idx], false);
@@ -2175,8 +2174,6 @@ sai_status_t Meta::bulkRemove(
     }
 
     std::vector<sai_object_meta_key_t> vmk;
-
-    // actually we could make copy of current db and actually execute to see if all will succeed
 
     for (uint32_t idx = 0; idx < object_count; idx++)
     {
@@ -2238,8 +2235,6 @@ sai_status_t Meta::bulkRemove(
 
     std::vector<sai_object_meta_key_t> vmk;
 
-    // actually we could make copy of current db and actually execute to see if all will succeed
-
     for (uint32_t idx = 0; idx < object_count; idx++)
     {
         sai_status_t status = meta_sai_validate_fdb_entry(&fdb_entry[idx], false);
@@ -2268,9 +2263,247 @@ sai_status_t Meta::bulkRemove(
     return status;
 }
 
-//
-//
-//
+sai_status_t Meta::bulkSet(
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t object_count,
+        _In_ const sai_object_id_t *object_id,
+        _In_ const sai_attribute_t *attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    // all objects must be same type and come from the same switch
+    // TODO check multiple switches
+
+    PARAMETER_CHECK_IF_NOT_NULL(object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        object_statuses[idx] = SAI_STATUS_NOT_EXECUTED;
+    }
+
+    PARAMETER_CHECK_OBJECT_TYPE_VALID(object_type);
+    PARAMETER_CHECK_POSITIVE(object_count);
+    PARAMETER_CHECK_IF_NOT_NULL(object_id);
+    PARAMETER_CHECK_IF_NOT_NULL(attr_list);
+
+    if (sai_metadata_get_enum_value_name(&sai_metadata_enum_sai_stats_mode_t, mode) == nullptr)
+    {
+        SWSS_LOG_ERROR("mode vlaue %d is not in range on %s", mode, sai_metadata_enum_sai_stats_mode_t.name);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    std::vector<sai_object_meta_key_t> vmk;
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        sai_status_t status = meta_sai_validate_oid(object_type, &object_id[idx], SAI_NULL_OBJECT_ID, false);
+
+        CHECK_STATUS_SUCCESS(status);
+
+        sai_object_meta_key_t meta_key = { .objecttype = object_type, .objectkey = { .key = { .object_id  = object_id[idx] } } };
+
+        vmk.push_back(meta_key);
+
+        status = meta_generic_validation_set(meta_key, &attr_list[idx]);
+
+        CHECK_STATUS_SUCCESS(status);
+    }
+
+    auto status = saiInterface.bulkSet(object_type, object_count, object_id, attr_list, mode, object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        if (object_statuses[idx] == SAI_STATUS_SUCCESS)
+        {
+            meta_generic_validation_post_set(vmk[idx], &attr_list[idx]);
+        }
+    }
+
+    return status;
+}
+
+sai_status_t Meta::bulkSet(
+        _In_ uint32_t object_count,
+        _In_ const sai_route_entry_t *route_entry,
+        _In_ const sai_attribute_t *attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    PARAMETER_CHECK_IF_NOT_NULL(object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        object_statuses[idx] = SAI_STATUS_NOT_EXECUTED;
+    }
+
+    //PARAMETER_CHECK_OBJECT_TYPE_VALID(object_type);
+    PARAMETER_CHECK_POSITIVE(object_count);
+    PARAMETER_CHECK_IF_NOT_NULL(route_entry);
+    PARAMETER_CHECK_IF_NOT_NULL(attr_list);
+
+    if (sai_metadata_get_enum_value_name(&sai_metadata_enum_sai_stats_mode_t, mode) == nullptr)
+    {
+        SWSS_LOG_ERROR("mode vlaue %d is not in range on %s", mode, sai_metadata_enum_sai_stats_mode_t.name);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    std::vector<sai_object_meta_key_t> vmk;
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        sai_status_t status = meta_sai_validate_route_entry(&route_entry[idx], false);
+
+        CHECK_STATUS_SUCCESS(status);
+
+        sai_object_meta_key_t meta_key = { .objecttype = SAI_OBJECT_TYPE_ROUTE_ENTRY, .objectkey = { .key = { .route_entry = route_entry[idx] } } };
+
+        vmk.push_back(meta_key);
+
+        status = meta_generic_validation_set(meta_key, &attr_list[idx]);
+
+        CHECK_STATUS_SUCCESS(status);
+    }
+
+    auto status = saiInterface.bulkSet(object_count, route_entry, attr_list, mode, object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        if (object_statuses[idx] == SAI_STATUS_SUCCESS)
+        {
+            meta_generic_validation_post_set(vmk[idx], &attr_list[idx]);
+        }
+    }
+
+    return status;
+}
+
+sai_status_t Meta::bulkSet(
+        _In_ uint32_t object_count,
+        _In_ const sai_nat_entry_t *nat_entry,
+        _In_ const sai_attribute_t *attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    PARAMETER_CHECK_IF_NOT_NULL(object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        object_statuses[idx] = SAI_STATUS_NOT_EXECUTED;
+    }
+
+    //PARAMETER_CHECK_OBJECT_TYPE_VALID(object_type);
+    PARAMETER_CHECK_POSITIVE(object_count);
+    PARAMETER_CHECK_IF_NOT_NULL(nat_entry);
+    PARAMETER_CHECK_IF_NOT_NULL(attr_list);
+
+    if (sai_metadata_get_enum_value_name(&sai_metadata_enum_sai_stats_mode_t, mode) == nullptr)
+    {
+        SWSS_LOG_ERROR("mode vlaue %d is not in range on %s", mode, sai_metadata_enum_sai_stats_mode_t.name);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    std::vector<sai_object_meta_key_t> vmk;
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        sai_status_t status = meta_sai_validate_nat_entry(&nat_entry[idx], false);
+
+        CHECK_STATUS_SUCCESS(status);
+
+        sai_object_meta_key_t meta_key = { .objecttype = SAI_OBJECT_TYPE_NAT_ENTRY, .objectkey = { .key = { .nat_entry = nat_entry[idx] } } };
+
+        vmk.push_back(meta_key);
+
+        status = meta_generic_validation_set(meta_key, &attr_list[idx]);
+
+        CHECK_STATUS_SUCCESS(status);
+    }
+
+    auto status = saiInterface.bulkSet(object_count, nat_entry, attr_list, mode, object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        if (object_statuses[idx] == SAI_STATUS_SUCCESS)
+        {
+            meta_generic_validation_post_set(vmk[idx], &attr_list[idx]);
+        }
+    }
+
+    return status;
+}
+
+sai_status_t Meta::bulkSet(
+        _In_ uint32_t object_count,
+        _In_ const sai_fdb_entry_t *fdb_entry,
+        _In_ const sai_attribute_t *attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    PARAMETER_CHECK_IF_NOT_NULL(object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        object_statuses[idx] = SAI_STATUS_NOT_EXECUTED;
+    }
+
+    //PARAMETER_CHECK_OBJECT_TYPE_VALID(object_type);
+    PARAMETER_CHECK_POSITIVE(object_count);
+    PARAMETER_CHECK_IF_NOT_NULL(fdb_entry);
+    PARAMETER_CHECK_IF_NOT_NULL(attr_list);
+
+    if (sai_metadata_get_enum_value_name(&sai_metadata_enum_sai_stats_mode_t, mode) == nullptr)
+    {
+        SWSS_LOG_ERROR("mode vlaue %d is not in range on %s", mode, sai_metadata_enum_sai_stats_mode_t.name);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    std::vector<sai_object_meta_key_t> vmk;
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        sai_status_t status = meta_sai_validate_fdb_entry(&fdb_entry[idx], false);
+
+        CHECK_STATUS_SUCCESS(status);
+
+        sai_object_meta_key_t meta_key = { .objecttype = SAI_OBJECT_TYPE_FDB_ENTRY, .objectkey = { .key = { .fdb_entry = fdb_entry[idx] } } };
+
+        vmk.push_back(meta_key);
+
+        status = meta_generic_validation_set(meta_key, &attr_list[idx]);
+
+        CHECK_STATUS_SUCCESS(status);
+    }
+
+    auto status = saiInterface.bulkSet(object_count, fdb_entry, attr_list, mode, object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        if (object_statuses[idx] == SAI_STATUS_SUCCESS)
+        {
+            meta_generic_validation_post_set(vmk[idx], &attr_list[idx]);
+        }
+    }
+
+    return status;
+}
+
+
 //sai_status_t (*sai_bulk_object_create_fn)(
 //        _In_ sai_object_id_t switch_id,
 //        _In_ uint32_t object_count,
