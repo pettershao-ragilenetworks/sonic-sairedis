@@ -5404,7 +5404,7 @@ sai_status_t meta_sai_get_inseg_entry(
 
 sai_status_t meta_sai_validate_oid(
         _In_ sai_object_type_t object_type,
-        _In_ sai_object_id_t* object_id,
+        _In_ const sai_object_id_t* object_id,
         _In_ sai_object_id_t switch_id,
         _In_ bool create)
 {
