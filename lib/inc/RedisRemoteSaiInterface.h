@@ -68,6 +68,14 @@
             _In_ sai_bulk_op_error_mode_t mode,                         \
             _Out_ sai_status_t *object_statuses) override;
 
+#define SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_BULK_SET_ENTRY(ot)     \
+    virtual sai_status_t bulkSet(                                       \
+            _In_ uint32_t object_count,                                 \
+            _In_ const sai_ ## ot ## _t *ot,                            \
+            _In_ const sai_attribute_t *attr_list,                      \
+            _In_ sai_bulk_op_error_mode_t mode,                         \
+            _Out_ sai_status_t *object_statuses) override;
+
 namespace sairedis
 {
     class RedisRemoteSaiInterface:
@@ -158,11 +166,25 @@ namespace sairedis
                     _In_ sai_bulk_op_error_mode_t mode,
                     _Out_ sai_status_t *object_statuses) override;
 
+            virtual sai_status_t bulkSet(
+                    _In_ sai_object_type_t object_type,
+                    _In_ uint32_t object_count,
+                    _In_ const sai_object_id_t *object_id,
+                    _In_ const sai_attribute_t *attr_list,
+                    _In_ sai_bulk_op_error_mode_t mode,
+                    _Out_ sai_status_t *object_statuses) override;
+
         public: // bulk remove ENTRY
 
             SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_BULK_REMOVE_ENTRY(fdb_entry);
             SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_BULK_REMOVE_ENTRY(nat_entry);
             SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_BULK_REMOVE_ENTRY(route_entry);
+
+        public: // bulk set ENTRY
+
+            SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_BULK_SET_ENTRY(fdb_entry);
+            SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_BULK_SET_ENTRY(nat_entry);
+            SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_BULK_SET_ENTRY(route_entry);
 
         public: // stats API
 
@@ -237,6 +259,13 @@ namespace sairedis
             sai_status_t bulkRemove(
                     _In_ sai_object_type_t object_type,
                     _In_ const std::vector<std::string> &serialized_object_ids,
+                    _In_ sai_bulk_op_error_mode_t mode,
+                    _Out_ sai_status_t *object_statuses);
+
+            sai_status_t bulkSet(
+                    _In_ sai_object_type_t object_type,
+                    _In_ const std::vector<std::string> &serialized_object_ids,
+                    _In_ const sai_attribute_t *attr_list,
                     _In_ sai_bulk_op_error_mode_t mode,
                     _Out_ sai_status_t *object_statuses);
 

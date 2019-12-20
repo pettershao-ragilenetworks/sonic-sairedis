@@ -270,13 +270,14 @@ static sai_status_t redis_bulk_set_ ## fname(       \
 {                                                   \
     MUTEX();                                        \
     SWSS_LOG_ENTER();                               \
-    return redis_bulk_generic_set(                  \
+    return g_meta->bulkSet(                         \
             SAI_OBJECT_TYPE_ ## OT,                 \
             object_count,                           \
             object_id,                              \
             attr_list,                              \
             mode,                                   \
-            object_statuses);                       \
+            object_statuses,                        \
+            *g_remoteSaiInterface);                 \
 }
 
 #define REDIS_BULK_GET(OT,fname)                    \
@@ -348,13 +349,13 @@ static sai_status_t redis_bulk_set_ ## ot(          \
 {                                                   \
     MUTEX();                                        \
     SWSS_LOG_ENTER();                               \
-    return redis_bulk_set_entry_attribute(          \
-            SAI_OBJECT_TYPE_ ## OT,                 \
+    return g_meta->bulkSet(                         \
             object_count,                           \
             entry,                                  \
             attr_list,                              \
             mode,                                   \
-            object_statuses);                       \
+            object_statuses,                        \
+            *g_remoteSaiInterface);                 \
 }
 
 #define REDIS_BULK_GET_ENTRY(OT,ot)                 \
@@ -368,14 +369,8 @@ static sai_status_t redis_bulk_get_ ## ot(          \
 {                                                   \
     MUTEX();                                        \
     SWSS_LOG_ENTER();                               \
-    return redis_bulk_get_entry_attribute(          \
-            SAI_OBJECT_TYPE_ ## OT,                 \
-            object_count,                           \
-            entry,                                  \
-            attr_count,                             \
-            attr_list,                              \
-            mode,                                   \
-            object_statuses);                       \
+    SWSS_LOG_ERROR("not implemented");              \
+    return SAI_STATUS_NOT_IMPLEMENTED;              \
 }
 
 #define REDIS_BULK_QUAD_ENTRY(OT,ot)    \

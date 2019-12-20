@@ -37,6 +37,7 @@ sai_status_t vs_create_port(
                 &vs_generic_create));
 
     // TODO needs to be revisited
+    // TODO attributes must be considered
 
     if (g_vs_switch_type == SAI_VS_SWITCH_TYPE_BCM56850)
     {

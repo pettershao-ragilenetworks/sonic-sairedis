@@ -440,3 +440,77 @@ sai_status_t WrapperRemoteSaiInterface::bulkRemove(
 
     return status;
 }
+
+
+sai_status_t WrapperRemoteSaiInterface::bulkSet(
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t object_count,
+        _In_ const sai_object_id_t *object_id,
+        _In_ const sai_attribute_t *attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO record
+
+    auto status = m_implementation->bulkSet(object_type, object_count, object_id, attr_list, mode, object_statuses);
+
+    // TODO record response
+
+    return status;
+}
+
+sai_status_t WrapperRemoteSaiInterface::bulkSet(
+        _In_ uint32_t object_count,
+        _In_ const sai_route_entry_t *route_entry,
+        _In_ const sai_attribute_t *attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO record
+
+    auto status = m_implementation->bulkSet(object_count, route_entry, attr_list, mode, object_statuses);
+
+    // TODO record response
+
+    return status;
+}
+
+sai_status_t WrapperRemoteSaiInterface::bulkSet(
+        _In_ uint32_t object_count,
+        _In_ const sai_nat_entry_t *nat_entry,
+        _In_ const sai_attribute_t *attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO record
+
+    auto status = m_implementation->bulkSet(object_count, nat_entry, attr_list, mode, object_statuses);
+
+    // TODO record response
+
+    return status;
+}
+
+sai_status_t WrapperRemoteSaiInterface::bulkSet(
+        _In_ uint32_t object_count,
+        _In_ const sai_fdb_entry_t *fdb_entry,
+        _In_ const sai_attribute_t *attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO record
+
+    auto status = m_implementation->bulkSet(object_count, fdb_entry, attr_list, mode, object_statuses);
+
+    // TODO record response
+
+    return status;
+}
