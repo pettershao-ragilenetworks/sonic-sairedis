@@ -25,7 +25,7 @@ sai_status_t meta_generic_validation_remove(
 
 sai_status_t meta_sai_validate_oid(
         _In_ sai_object_type_t object_type,
-        _In_ sai_object_id_t* object_id,
+        _In_ const sai_object_id_t* object_id,
         _In_ sai_object_id_t switch_id,
         _In_ bool create);
 
@@ -2018,3 +2018,93 @@ sai_status_t Meta::clearStats(
 
     return status;
 }
+
+sai_status_t Meta::bulkRemove(
+        _In_ sai_object_type_t object_type,
+        _In_ uint32_t object_count,
+        _In_ const sai_object_id_t *object_id,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    // all objects must be same type and come from the same switch
+    // TODO check multiple switches
+
+    PARAMETER_CHECK_IF_NOT_NULL(object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        object_statuses[idx] = SAI_STATUS_NOT_EXECUTED;
+    }
+
+    PARAMETER_CHECK_OBJECT_TYPE_VALID(object_type);
+    PARAMETER_CHECK_POSITIVE(object_count);
+    PARAMETER_CHECK_IF_NOT_NULL(object_id);
+
+    if (sai_metadata_get_enum_value_name(&sai_metadata_enum_sai_stats_mode_t, mode) == nullptr)
+    {
+        SWSS_LOG_ERROR("mode vlaue %d is not in range on %s", mode, sai_metadata_enum_sai_stats_mode_t.name);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    std::vector<sai_object_meta_key_t> vmk;
+
+    // actually we could make copy of current db and actually execute to see if all will succeed
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        sai_status_t status = meta_sai_validate_oid(object_type, &object_id[idx], SAI_NULL_OBJECT_ID, false);
+
+        CHECK_STATUS_SUCCESS(status);
+
+        sai_object_meta_key_t meta_key = { .objecttype = object_type, .objectkey = { .key = { .object_id  = object_id[idx] } } };
+
+        vmk.push_back(meta_key);
+
+        status = meta_generic_validation_remove(meta_key);
+
+        CHECK_STATUS_SUCCESS(status);
+    }
+
+    auto status = saiInterface.bulkRemove(object_type, object_count, object_id, mode, object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        if (object_statuses[idx] == SAI_STATUS_SUCCESS)
+        {
+            meta_generic_validation_post_remove(vmk[idx]);
+        }
+    }
+
+    return status;
+}
+
+//sai_status_t (*sai_bulk_remove_route_entry_fn)(
+//        _In_ uint32_t object_count,
+//        _In_ const sai_route_entry_t *route_entry,
+//        _In_ sai_bulk_op_error_mode_t mode,
+//        _Out_ sai_status_t *object_statuses);
+//
+//
+//
+//sai_status_t (*sai_bulk_object_create_fn)(
+//        _In_ sai_object_id_t switch_id,
+//        _In_ uint32_t object_count,
+//        _In_ const uint32_t *attr_count,
+//        _In_ const sai_attribute_t **attr_list,
+//        _In_ sai_bulk_op_error_mode_t mode,
+//        _Out_ sai_object_id_t *object_id,
+//        _Out_ sai_status_t *object_statuses);
+//
+//
+//sai_status_t (*sai_bulk_create_route_entry_fn)(
+//        _In_ uint32_t object_count,
+//        _In_ const sai_route_entry_t *route_entry,
+//        _In_ const uint32_t *attr_count,
+//        _In_ const sai_attribute_t **attr_list,
+//        _In_ sai_bulk_op_error_mode_t mode,
+//        _Out_ sai_status_t *object_statuses);
+//

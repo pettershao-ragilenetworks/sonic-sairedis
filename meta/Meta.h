@@ -109,6 +109,16 @@ namespace saimeta
             SAIMETA_META_DECLARE_GET_ENTRY(route_entry);
             SAIMETA_META_DECLARE_GET_ENTRY(nat_entry);
 
+        public: // bulk quad API
+
+            sai_status_t bulkRemove(
+                    _In_ sai_object_type_t object_type,
+                    _In_ uint32_t object_count,
+                    _In_ const sai_object_id_t *object_id,
+                    _In_ sai_bulk_op_error_mode_t mode,
+                    _Out_ sai_status_t *object_statuses,
+                    _Inout_ sairedis::SaiInterface& saiInterface);
+
         public: // non quad API
 
             sai_status_t flushFdbEntries(
