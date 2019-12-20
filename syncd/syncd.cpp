@@ -979,9 +979,19 @@ void internal_syncd_get_send(
     SWSS_LOG_INFO("response for GET api was send");
 }
 
+/**
+ * @brief Internal syncd api send response.
+ *
+ * This funcion should be use to send response to sairedis for
+ * create/remove/set API as well as their corresponding bulk versions.
+ *
+ * Should not be used on GET api.
+ */
 void internal_syncd_api_send_response(
         _In_ sai_common_api_t api,
-        _In_ sai_status_t status)
+        _In_ sai_status_t status,
+        _In_ uint32_t object_count = 0,
+        _In_ sai_status_t * object_statuses = NULL)
 {
     SWSS_LOG_ENTER();
 
@@ -996,6 +1006,13 @@ void internal_syncd_api_send_response(
         return;
 
     std::vector<swss::FieldValueTuple> entry;
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        swss::FieldValueTuple fvt(sai_serialize_status(object_statuses[idx]), "");
+
+        entry.push_back(fvt);
+    }
 
     std::string str_status = sai_serialize_status(status);
 
@@ -2666,6 +2683,10 @@ sai_status_t handle_bulk_generic(
      * one.
      */
 
+    std::vector<sai_status_t> statuses(object_ids.size());
+
+    sai_status_t all = SAI_STATUS_SUCCESS;
+
     for (size_t idx = 0; idx < object_ids.size(); ++idx)
     {
         sai_status_t status = SAI_STATUS_FAILURE;
@@ -2705,12 +2726,21 @@ sai_status_t handle_bulk_generic(
 
         if (status != SAI_STATUS_SUCCESS)
         {
-            internal_syncd_api_send_response(api, status);
-            return status;
+            if (!options.syncMode)
+            {
+                SWSS_LOG_THROW("operation failed in async mode!");
+            }
+
+            all = SAI_STATUS_FAILURE;
         }
+
+        statuses[idx] = status;
     }
 
-    return SAI_STATUS_SUCCESS;
+    // all can be success if all has been success
+    internal_syncd_api_send_response(api, all, (uint32_t)object_ids.size(), statuses.data());
+
+    return all;
 }
 
 sai_status_t handle_bulk_non_object_id(
@@ -2732,6 +2762,10 @@ sai_status_t handle_bulk_non_object_id(
      * Since we don't have asic support yet for bulk api, just execute one by
      * one.
      */
+
+    std::vector<sai_status_t> statuses(object_ids.size());
+
+    sai_status_t all = SAI_STATUS_SUCCESS;
 
     for (size_t idx = 0; idx < object_ids.size(); ++idx)
     {
@@ -2775,14 +2809,22 @@ sai_status_t handle_bulk_non_object_id(
 
         if (status != SAI_STATUS_SUCCESS)
         {
-            internal_syncd_api_send_response(api, status);
-            return status;
+            if (!options.syncMode)
+            {
+                SWSS_LOG_THROW("operation failed in async mode!");
+            }
+
+            all = SAI_STATUS_FAILURE;
         }
+
+        statuses[idx] = status;
     }
 
-    return SAI_STATUS_SUCCESS;
-}
+    // all can be success if all has been success
+    internal_syncd_api_send_response(api, all, (uint32_t)object_ids.size(), statuses.data());
 
+    return all;
+}
 
 sai_status_t processBulkEvent(
         _In_ sai_common_api_t api,
@@ -2881,13 +2923,14 @@ sai_status_t processBulkEvent(
                     sai_serialize_object_type(object_type).c_str());
     }
 
-    if (status != SAI_STATUS_SUCCESS)
+    if (status != SAI_STATUS_SUCCESS && !options.syncMode)
     {
         SWSS_LOG_THROW("failed to execute bulk api: %s",
                 sai_serialize_status(status).c_str());
     }
 
-    internal_syncd_api_send_response(api, status);
+    // response was already sent in handle_bulk*
+    // TODO we can extract it here
 
     return status;
 }
