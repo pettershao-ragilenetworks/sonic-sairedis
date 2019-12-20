@@ -2082,11 +2082,192 @@ sai_status_t Meta::bulkRemove(
     return status;
 }
 
-//sai_status_t (*sai_bulk_remove_route_entry_fn)(
-//        _In_ uint32_t object_count,
-//        _In_ const sai_route_entry_t *route_entry,
-//        _In_ sai_bulk_op_error_mode_t mode,
-//        _Out_ sai_status_t *object_statuses);
+sai_status_t Meta::bulkRemove(
+        _In_ uint32_t object_count,
+        _In_ const sai_route_entry_t *route_entry,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    // all objects must be same type and come from the same switch
+    // TODO check multiple switches
+
+    PARAMETER_CHECK_IF_NOT_NULL(object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        object_statuses[idx] = SAI_STATUS_NOT_EXECUTED;
+    }
+
+    //PARAMETER_CHECK_OBJECT_TYPE_VALID(object_type);
+    PARAMETER_CHECK_POSITIVE(object_count);
+    PARAMETER_CHECK_IF_NOT_NULL(route_entry);
+
+    if (sai_metadata_get_enum_value_name(&sai_metadata_enum_sai_stats_mode_t, mode) == nullptr)
+    {
+        SWSS_LOG_ERROR("mode vlaue %d is not in range on %s", mode, sai_metadata_enum_sai_stats_mode_t.name);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    std::vector<sai_object_meta_key_t> vmk;
+
+    // actually we could make copy of current db and actually execute to see if all will succeed
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        sai_status_t status = meta_sai_validate_route_entry(&route_entry[idx], false);
+
+        CHECK_STATUS_SUCCESS(status);
+
+        sai_object_meta_key_t meta_key = { .objecttype = SAI_OBJECT_TYPE_ROUTE_ENTRY, .objectkey = { .key = { .route_entry = route_entry[idx] } } };
+
+        vmk.push_back(meta_key);
+
+        status = meta_generic_validation_remove(meta_key);
+
+        CHECK_STATUS_SUCCESS(status);
+    }
+
+    auto status = saiInterface.bulkRemove(object_count, route_entry, mode, object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        if (object_statuses[idx] == SAI_STATUS_SUCCESS)
+        {
+            meta_generic_validation_post_remove(vmk[idx]);
+        }
+    }
+
+    return status;
+}
+
+sai_status_t Meta::bulkRemove(
+        _In_ uint32_t object_count,
+        _In_ const sai_nat_entry_t *nat_entry,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    // all objects must be same type and come from the same switch
+    // TODO check multiple switches
+
+    PARAMETER_CHECK_IF_NOT_NULL(object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        object_statuses[idx] = SAI_STATUS_NOT_EXECUTED;
+    }
+
+    //PARAMETER_CHECK_OBJECT_TYPE_VALID(object_type);
+    PARAMETER_CHECK_POSITIVE(object_count);
+    PARAMETER_CHECK_IF_NOT_NULL(nat_entry);
+
+    if (sai_metadata_get_enum_value_name(&sai_metadata_enum_sai_stats_mode_t, mode) == nullptr)
+    {
+        SWSS_LOG_ERROR("mode vlaue %d is not in range on %s", mode, sai_metadata_enum_sai_stats_mode_t.name);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    std::vector<sai_object_meta_key_t> vmk;
+
+    // actually we could make copy of current db and actually execute to see if all will succeed
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        sai_status_t status = meta_sai_validate_nat_entry(&nat_entry[idx], false);
+
+        CHECK_STATUS_SUCCESS(status);
+
+        sai_object_meta_key_t meta_key = { .objecttype = SAI_OBJECT_TYPE_NAT_ENTRY, .objectkey = { .key = { .nat_entry = nat_entry[idx] } } };
+
+        vmk.push_back(meta_key);
+
+        status = meta_generic_validation_remove(meta_key);
+
+        CHECK_STATUS_SUCCESS(status);
+    }
+
+    auto status = saiInterface.bulkRemove(object_count, nat_entry, mode, object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        if (object_statuses[idx] == SAI_STATUS_SUCCESS)
+        {
+            meta_generic_validation_post_remove(vmk[idx]);
+        }
+    }
+
+    return status;
+}
+
+sai_status_t Meta::bulkRemove(
+        _In_ uint32_t object_count,
+        _In_ const sai_fdb_entry_t *fdb_entry,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    // all objects must be same type and come from the same switch
+    // TODO check multiple switches
+
+    PARAMETER_CHECK_IF_NOT_NULL(object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        object_statuses[idx] = SAI_STATUS_NOT_EXECUTED;
+    }
+
+    //PARAMETER_CHECK_OBJECT_TYPE_VALID(object_type);
+    PARAMETER_CHECK_POSITIVE(object_count);
+    PARAMETER_CHECK_IF_NOT_NULL(fdb_entry);
+
+    if (sai_metadata_get_enum_value_name(&sai_metadata_enum_sai_stats_mode_t, mode) == nullptr)
+    {
+        SWSS_LOG_ERROR("mode vlaue %d is not in range on %s", mode, sai_metadata_enum_sai_stats_mode_t.name);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    std::vector<sai_object_meta_key_t> vmk;
+
+    // actually we could make copy of current db and actually execute to see if all will succeed
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        sai_status_t status = meta_sai_validate_fdb_entry(&fdb_entry[idx], false);
+
+        CHECK_STATUS_SUCCESS(status);
+
+        sai_object_meta_key_t meta_key = { .objecttype = SAI_OBJECT_TYPE_FDB_ENTRY, .objectkey = { .key = { .fdb_entry = fdb_entry[idx] } } };
+
+        vmk.push_back(meta_key);
+
+        status = meta_generic_validation_remove(meta_key);
+
+        CHECK_STATUS_SUCCESS(status);
+    }
+
+    auto status = saiInterface.bulkRemove(object_count, fdb_entry, mode, object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        if (object_statuses[idx] == SAI_STATUS_SUCCESS)
+        {
+            meta_generic_validation_post_remove(vmk[idx]);
+        }
+    }
+
+    return status;
+}
+
 //
 //
 //

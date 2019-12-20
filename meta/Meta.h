@@ -27,6 +27,14 @@
             _Out_ sai_attribute_t *attr_list,                   \
             _Inout_ sairedis::SaiInterface& saiInterface);
 
+#define SAIMETA_META_DECALRE_BULK_REMOVE_ENTRY(ot)              \
+    sai_status_t bulkRemove(                                    \
+            _In_ uint32_t object_count,                         \
+            _In_ const sai_ ## ot ## _t * ot,                   \
+            _In_ sai_bulk_op_error_mode_t mode,                 \
+            _Out_ sai_status_t *object_statuses,                \
+            _Inout_ sairedis::SaiInterface& saiInterface);
+
 namespace saimeta
 {
     class Meta
@@ -118,6 +126,12 @@ namespace saimeta
                     _In_ sai_bulk_op_error_mode_t mode,
                     _Out_ sai_status_t *object_statuses,
                     _Inout_ sairedis::SaiInterface& saiInterface);
+
+        public: // bulk remove ENTRY
+
+            SAIMETA_META_DECALRE_BULK_REMOVE_ENTRY(fdb_entry);
+            SAIMETA_META_DECALRE_BULK_REMOVE_ENTRY(nat_entry);
+            SAIMETA_META_DECALRE_BULK_REMOVE_ENTRY(route_entry);
 
         public: // non quad API
 
