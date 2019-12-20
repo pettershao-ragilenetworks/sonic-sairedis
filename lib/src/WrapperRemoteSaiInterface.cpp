@@ -389,3 +389,54 @@ sai_status_t WrapperRemoteSaiInterface::bulkRemove(
 
     return status;
 }
+
+sai_status_t WrapperRemoteSaiInterface::bulkRemove(
+        _In_ uint32_t object_count,
+        _In_ const sai_route_entry_t *route_entry,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO record
+
+    auto status = m_implementation->bulkRemove(object_count, route_entry, mode, object_statuses);
+
+    // TODO record response
+
+    return status;
+}
+
+sai_status_t WrapperRemoteSaiInterface::bulkRemove(
+        _In_ uint32_t object_count,
+        _In_ const sai_nat_entry_t *nat_entry,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO record
+
+    auto status = m_implementation->bulkRemove(object_count, nat_entry, mode, object_statuses);
+
+    // TODO record response
+
+    return status;
+}
+
+sai_status_t WrapperRemoteSaiInterface::bulkRemove(
+        _In_ uint32_t object_count,
+        _In_ const sai_fdb_entry_t *fdb_entry,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO record
+
+    auto status = m_implementation->bulkRemove(object_count, fdb_entry, mode, object_statuses);
+
+    // TODO record response
+
+    return status;
+}

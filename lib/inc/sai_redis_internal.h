@@ -330,12 +330,12 @@ static sai_status_t redis_bulk_remove_ ## ot(       \
 {                                                   \
     MUTEX();                                        \
     SWSS_LOG_ENTER();                               \
-    return redis_bulk_remove_entry(                 \
-            SAI_OBJECT_TYPE_ ## OT,                 \
+    return g_meta->bulkRemove(                      \
             object_count,                           \
             entry,                                  \
             mode,                                   \
-            object_statuses);                       \
+            object_statuses,                        \
+            *g_remoteSaiInterface);                 \
 }
 
 #define REDIS_BULK_SET_ENTRY(OT,ot)                 \

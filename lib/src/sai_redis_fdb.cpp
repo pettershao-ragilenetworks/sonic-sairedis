@@ -150,38 +150,20 @@ sai_status_t redis_bulk_create_fdb_entry(
             object_statuses);
 }
 
-sai_status_t redis_bulk_remove_fdb_entry(
+REDIS_GENERIC_QUAD_ENTRY(FDB_ENTRY,fdb_entry);
+
+REDIS_BULK_REMOVE_ENTRY(FDB_ENTRY,fdb_entry);
+
+sai_status_t sai_bulk_remove_fdb_entry(
         _In_ uint32_t object_count,
         _In_ const sai_fdb_entry_t *fdb_entry,
         _In_ sai_bulk_op_error_mode_t mode,
         _Out_ sai_status_t *object_statuses)
 {
-    MUTEX();
-
     SWSS_LOG_ENTER();
 
-    std::vector<std::string> serialized_object_ids;
-
-    for (uint32_t idx = 0; idx < object_count; ++idx)
-    {
-        /*
-         * At the beginning set all statuses to not executed.
-         */
-
-        object_statuses[idx] = SAI_STATUS_NOT_EXECUTED;
-
-        serialized_object_ids.push_back(
-                sai_serialize_fdb_entry(fdb_entry[idx]));
-    }
-
-    return internal_redis_bulk_generic_remove(
-            SAI_OBJECT_TYPE_FDB_ENTRY,
-            serialized_object_ids,
-            mode,
-            object_statuses);
+    return redis_bulk_remove_fdb_entry(object_count, fdb_entry, mode, object_statuses);
 }
-
-REDIS_GENERIC_QUAD_ENTRY(FDB_ENTRY,fdb_entry);
 
 const sai_fdb_api_t redis_fdb_api = {
 

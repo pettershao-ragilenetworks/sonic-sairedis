@@ -26,6 +26,13 @@ extern "C" {
             _In_ uint32_t attr_count,                   \
             _Out_ sai_attribute_t *attr_list) = 0;      \
 
+#define SAIREDIS_SAIINTERFACE_DECLARE_BULK_REMOVE_ENTRY(ot) \
+    virtual sai_status_t bulkRemove(                        \
+            _In_ uint32_t object_count,                     \
+            _In_ const sai_ ## ot ## _t *ot,                \
+            _In_ sai_bulk_op_error_mode_t mode,             \
+            _Out_ sai_status_t *object_statuses) = 0;
+
 namespace sairedis
 {
     class SaiInterface
@@ -112,6 +119,12 @@ namespace sairedis
                     _In_ const sai_object_id_t *object_id,
                     _In_ sai_bulk_op_error_mode_t mode,
                     _Out_ sai_status_t *object_statuses) = 0;
+
+        public: // bulk remove ENTRY
+
+            SAIREDIS_SAIINTERFACE_DECLARE_BULK_REMOVE_ENTRY(fdb_entry);
+            SAIREDIS_SAIINTERFACE_DECLARE_BULK_REMOVE_ENTRY(nat_entry);
+            SAIREDIS_SAIINTERFACE_DECLARE_BULK_REMOVE_ENTRY(route_entry);
 
         public: // stats API
 
