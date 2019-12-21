@@ -202,7 +202,7 @@ sai_status_t internal_redis_bulk_generic_create(
         _In_ sai_object_type_t object_type,
         _In_ const std::vector<std::string> &serialized_object_ids,
         _In_ const uint32_t *attr_count,    // array
-        _In_ const sai_attribute_t *const *attr_list, // array of arrays
+        _In_ const sai_attribute_t **attr_list, // array of arrays
         _In_ sai_bulk_op_error_mode_t mode,
         _Inout_ sai_status_t *object_statuses); // array
 

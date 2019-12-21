@@ -304,22 +304,7 @@ static sai_status_t redis_set_switch_attribute(
     return status;
 }
 
-static sai_status_t redis_get_switch_attribute(
-        _In_ sai_object_id_t switch_id,
-        _In_ sai_uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list)
-{
-    MUTEX();
-
-    SWSS_LOG_ENTER();
-
-    return g_meta->get(
-            SAI_OBJECT_TYPE_SWITCH,
-            switch_id,
-            attr_count,
-            attr_list,
-            *g_remoteSaiInterface);
-}
+REDIS_GET(SWITCH,switch);
 
 /**
  * @brief Switch method table retrieved with sai_api_query()

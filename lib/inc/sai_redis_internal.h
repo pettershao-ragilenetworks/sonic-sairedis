@@ -231,7 +231,7 @@ static sai_status_t redis_bulk_create_ ## fname(    \
 {                                                   \
     MUTEX();                                        \
     SWSS_LOG_ENTER();                               \
-    return redis_bulk_generic_create(               \
+    return g_meta->bulkCreate(                      \
             SAI_OBJECT_TYPE_ ## OT,                 \
             switch_id,                              \
             object_count,                           \
@@ -239,7 +239,8 @@ static sai_status_t redis_bulk_create_ ## fname(    \
             attr_list,                              \
             mode,                                   \
             object_id,                              \
-            object_statuses);                       \
+            object_statuses,                        \
+            *g_remoteSaiInterface);                 \
 }
 
 #define REDIS_BULK_REMOVE(OT,fname)                 \
@@ -291,14 +292,8 @@ static sai_status_t redis_bulk_get_ ## fname(       \
 {                                                   \
     MUTEX();                                        \
     SWSS_LOG_ENTER();                               \
-    return redis_bulk_generic_get(a                 \
-            SAI_OBJECT_TYPE_ ## OT,                 \
-            object_count,                           \
-            object_id,                              \
-            attr_count,                             \
-            attr_list,                              \
-            mode,                                   \
-            object_statuses);                       \
+    SWSS_LOG_ERROR("not implemented");              \
+    return SAI_STATUS_NOT_IMPLEMENTED;              \
 }
 
 #define REDIS_BULK_CREATE_ENTRY(OT,ot)              \
@@ -312,14 +307,14 @@ static sai_status_t redis_bulk_create_ ## ot(       \
 {                                                   \
     MUTEX();                                        \
     SWSS_LOG_ENTER();                               \
-    return redis_bulk_create_entry(                 \
-            SAI_OBJECT_TYPE_ ## OT,                 \
+    return g_meta->bulkCreate(                      \
             object_count,                           \
             entry,                                  \
             attr_count,                             \
             attr_list,                              \
             mode,                                   \
-            object_statuses);                       \
+            object_statuses,                        \
+            *g_remoteSaiInterface);                 \
 }
 
 #define REDIS_BULK_REMOVE_ENTRY(OT,ot)              \

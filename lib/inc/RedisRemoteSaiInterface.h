@@ -23,11 +23,13 @@
 #define REDIS_ASIC_STATE_COMMAND_BULK_SET    "bulkset"
 #define REDIS_ASIC_STATE_COMMAND_BULK_GET    "bulkget"
 
-#define REDIS_ASIC_STATE_COMMAND_GETRESPONSE        "getresponse"
-#define REDIS_ASIC_STATE_COMMAND_FLUSHRESPONSE      "flushresponse"
-
 #define REDIS_ASIC_STATE_COMMAND_GET_STATS          "get_stats"
 #define REDIS_ASIC_STATE_COMMAND_CLEAR_STATS        "clear_stats"
+
+#define REDIS_ASIC_STATE_COMMAND_GETRESPONSE        "getresponse"
+
+#define REDIS_ASIC_STATE_COMMAND_FLUSH              "flush"
+#define REDIS_ASIC_STATE_COMMAND_FLUSHRESPONSE      "flushresponse"
 
 #define REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_QUERY      "attr_enum_values_capability_query"
 #define REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_RESPONSE   "attr_enum_values_capability_response"
@@ -60,6 +62,15 @@
             _In_ const sai_ ## ot ## _t* ot,                        \
             _In_ uint32_t attr_count,                               \
             _Out_ sai_attribute_t *attr_list) override;
+
+#define SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_BULK_CREATE_ENTRY(ot)  \
+    virtual sai_status_t bulkCreate(                                    \
+            _In_ uint32_t object_count,                                 \
+            _In_ const sai_ ## ot ## _t *ot,                            \
+            _In_ const uint32_t *attr_count,                            \
+            _In_ const sai_attribute_t **attr_list,                     \
+            _In_ sai_bulk_op_error_mode_t mode,                         \
+            _Out_ sai_status_t *object_statuses) override;
 
 #define SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_BULK_REMOVE_ENTRY(ot)  \
     virtual sai_status_t bulkRemove(                                    \
@@ -159,6 +170,16 @@ namespace sairedis
 
         public: // bulk QUAD oid
 
+            virtual sai_status_t bulkCreate(
+                    _In_ sai_object_type_t object_type,
+                    _In_ sai_object_id_t switch_id,
+                    _In_ uint32_t object_count,
+                    _In_ const uint32_t *attr_count,
+                    _In_ const sai_attribute_t **attr_list,
+                    _In_ sai_bulk_op_error_mode_t mode,
+                    _Out_ sai_object_id_t *object_id,
+                    _Out_ sai_status_t *object_statuses) override;
+
             virtual sai_status_t bulkRemove(
                     _In_ sai_object_type_t object_type,
                     _In_ uint32_t object_count,
@@ -173,6 +194,12 @@ namespace sairedis
                     _In_ const sai_attribute_t *attr_list,
                     _In_ sai_bulk_op_error_mode_t mode,
                     _Out_ sai_status_t *object_statuses) override;
+
+        public: // bulk create ENTRY
+
+            SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_BULK_CREATE_ENTRY(fdb_entry);
+            SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_BULK_CREATE_ENTRY(nat_entry);
+            SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_BULK_CREATE_ENTRY(route_entry);
 
         public: // bulk remove ENTRY
 
@@ -255,6 +282,14 @@ namespace sairedis
                     _Inout_ sai_attribute_t *attr_list);
 
         private: // bulk QUAD API helpers
+
+            sai_status_t bulkCreate(
+                    _In_ sai_object_type_t object_type,
+                    _In_ const std::vector<std::string> &serialized_object_ids,
+                    _In_ const uint32_t *attr_count,
+                    _In_ const sai_attribute_t **attr_list,
+                    _In_ sai_bulk_op_error_mode_t mode,
+                    _Inout_ sai_status_t *object_statuses);
 
             sai_status_t bulkRemove(
                     _In_ sai_object_type_t object_type,

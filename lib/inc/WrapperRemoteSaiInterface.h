@@ -25,6 +25,15 @@
             _In_ uint32_t attr_count,                               \
             _Out_ sai_attribute_t *attr_list) override;
 
+#define SAIREDIS_WRAPPERREMOTESAIINTERFACE_DECLARE_BULK_CREATE_ENTRY(ot)    \
+    virtual sai_status_t bulkCreate(                                        \
+            _In_ uint32_t object_count,                                     \
+            _In_ const sai_ ## ot ## _t *ot,                                \
+            _In_ const uint32_t *attr_count,                                \
+            _In_ const sai_attribute_t **attr_list,                         \
+            _In_ sai_bulk_op_error_mode_t mode,                             \
+            _Out_ sai_status_t *object_statuses) override;
+
 #define SAIREDIS_WRAPPERREMOTESAIINTERFACE_DECLARE_BULK_REMOVE_ENTRY(ot)    \
     virtual sai_status_t bulkRemove(                                        \
             _In_ uint32_t object_count,                                     \
@@ -134,6 +143,16 @@ namespace sairedis
 
         public: // bulk QUAD oid
 
+            virtual sai_status_t bulkCreate(
+                    _In_ sai_object_type_t object_type,
+                    _In_ sai_object_id_t switch_id,
+                    _In_ uint32_t object_count,
+                    _In_ const uint32_t *attr_count,
+                    _In_ const sai_attribute_t **attr_list,
+                    _In_ sai_bulk_op_error_mode_t mode,
+                    _Out_ sai_object_id_t *object_id,
+                    _Out_ sai_status_t *object_statuses) override;
+
             virtual sai_status_t bulkRemove(
                     _In_ sai_object_type_t object_type,
                     _In_ uint32_t object_count,
@@ -148,6 +167,12 @@ namespace sairedis
                     _In_ const sai_attribute_t *attr_list,
                     _In_ sai_bulk_op_error_mode_t mode,
                     _Out_ sai_status_t *object_statuses) override;
+
+        public: // bulk create ENTRY
+
+            SAIREDIS_WRAPPERREMOTESAIINTERFACE_DECLARE_BULK_CREATE_ENTRY(fdb_entry);
+            SAIREDIS_WRAPPERREMOTESAIINTERFACE_DECLARE_BULK_CREATE_ENTRY(nat_entry);
+            SAIREDIS_WRAPPERREMOTESAIINTERFACE_DECLARE_BULK_CREATE_ENTRY(route_entry);
 
         public: // bulk remove ENTRY
 

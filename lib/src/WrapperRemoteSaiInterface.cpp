@@ -514,3 +514,96 @@ sai_status_t WrapperRemoteSaiInterface::bulkSet(
 
     return status;
 }
+
+sai_status_t WrapperRemoteSaiInterface::bulkCreate(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t switch_id,
+        _In_ uint32_t object_count,
+        _In_ const uint32_t *attr_count,
+        _In_ const sai_attribute_t **attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_object_id_t *object_id,
+        _Out_ sai_status_t *object_statuses)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO record
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        object_id[idx] = g_virtualObjectIdManager->allocateNewObjectId(object_type, switch_id);
+
+        if (object_id[idx] == SAI_NULL_OBJECT_ID)
+        {
+            SWSS_LOG_ERROR("failed to create %s, with switch id: %s",
+                    sai_serialize_object_type(object_type).c_str(),
+                    sai_serialize_object_id(switch_id).c_str());
+
+            return SAI_STATUS_INSUFFICIENT_RESOURCES;
+        }
+    }
+
+    auto status = m_implementation->bulkCreate(object_type, switch_id, object_count, attr_count, attr_list, mode, object_id, object_statuses);
+
+    // TODO record response
+
+    return status;
+}
+
+sai_status_t WrapperRemoteSaiInterface::bulkCreate(
+        _In_ uint32_t object_count,
+        _In_ const sai_route_entry_t *route_entry,
+        _In_ const uint32_t *attr_count,
+        _In_ const sai_attribute_t **attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO record
+
+    auto status = m_implementation->bulkCreate(object_count, route_entry, attr_count, attr_list, mode, object_statuses);
+
+    // TODO record response
+
+    return status;
+}
+
+sai_status_t WrapperRemoteSaiInterface::bulkCreate(
+        _In_ uint32_t object_count,
+        _In_ const sai_fdb_entry_t *fdb_entry,
+        _In_ const uint32_t *attr_count,
+        _In_ const sai_attribute_t **attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO record
+
+    auto status = m_implementation->bulkCreate(object_count, fdb_entry, attr_count, attr_list, mode, object_statuses);
+
+    // TODO record response
+
+    return status;
+}
+
+sai_status_t WrapperRemoteSaiInterface::bulkCreate(
+        _In_ uint32_t object_count,
+        _In_ const sai_nat_entry_t *nat_entry,
+        _In_ const uint32_t *attr_count,
+        _In_ const sai_attribute_t **attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO record
+
+    auto status = m_implementation->bulkCreate(object_count, nat_entry, attr_count, attr_list, mode, object_statuses);
+
+    // TODO record response
+
+    return status;
+}
+
