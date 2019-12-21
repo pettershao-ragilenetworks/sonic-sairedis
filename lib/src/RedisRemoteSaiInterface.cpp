@@ -1,4 +1,5 @@
 #include "RedisRemoteSaiInterface.h"
+#include "Utils.h"
 
 #include "sairediscommon.h"
 #include "meta/sai_serialize.h"
@@ -15,11 +16,6 @@ extern std::string getSelectResultAsString(int result);
 
 std::string joinFieldValues(
         _In_ const std::vector<swss::FieldValueTuple> &values);
-
-void clear_oid_values(
-        _In_ sai_object_type_t object_type,
-        _In_ uint32_t attr_count,
-        _Out_ sai_attribute_t *attr_list);
 
 std::vector<swss::FieldValueTuple> serialize_counter_id_list(
         _In_ const sai_enum_metadata_t *stats_enum,
@@ -383,7 +379,7 @@ sai_status_t RedisRemoteSaiInterface::get(
 {
     SWSS_LOG_ENTER();
 
-    clear_oid_values(objectType, attr_count, attr_list);
+    Utils::clearOidValues(objectType, attr_count, attr_list);
 
     std::vector<swss::FieldValueTuple> entry = SaiAttributeList::serialize_attr_list(
             objectType,
@@ -1415,4 +1411,30 @@ sai_status_t RedisRemoteSaiInterface::bulkCreate(
             mode,
             object_statuses);
 }
+
+std::string RedisRemoteSaiInterface::getSelectResultAsString(int result)
+{
+    SWSS_LOG_ENTER();
+
+    std::string res;
+
+    switch (result)
+    {
+        case swss::Select::ERROR:
+            res = "ERROR";
+            break;
+
+        case swss::Select::TIMEOUT:
+            res = "TIMEOUT";
+            break;
+
+        default:
+            SWSS_LOG_WARN("non recognized select result: %d", result);
+            res = std::to_string(result);
+            break;
+    }
+
+    return res;
+}
+
 

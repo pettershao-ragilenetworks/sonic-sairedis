@@ -365,6 +365,11 @@ namespace sairedis
             sai_status_t waitForObjectTypeGetAvailabilityResponse(
                     _In_ uint64_t *count);
 
+        private: // helpers
+
+            // TODO to be removed when swss-common pointer will be advanced
+            static std::string getSelectResultAsString(int result);
+
         private:
 
             /**

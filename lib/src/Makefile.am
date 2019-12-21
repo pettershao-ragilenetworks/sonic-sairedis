@@ -55,8 +55,6 @@ libsairedis_la_SOURCES = \
 						 sai_redis_wred.cpp \
 						 sai_redis_generic_create.cpp \
 						 sai_redis_generic_remove.cpp \
-						 sai_redis_generic_set.cpp \
-						 sai_redis_generic_get.cpp \
 						 sai_redis_generic_stats.cpp \
 						 sai_redis_notifications.cpp \
 						 sai_redis_record.cpp \
@@ -75,6 +73,7 @@ libsairedis_la_SOURCES = \
 						 RedisVidIndexGenerator.cpp \
 						 Recorder.cpp \
 						 RedisRemoteSaiInterface.cpp \
+						 Utils.cpp \
 						 WrapperRemoteSaiInterface.cpp
 
 

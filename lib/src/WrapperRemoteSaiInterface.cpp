@@ -1,4 +1,5 @@
 #include "WrapperRemoteSaiInterface.h"
+#include "Utils.h"
 
 #include "swss/logger.h"
 #include "meta/sai_serialize.h"
@@ -15,11 +16,6 @@ using namespace sairedis;
 extern std::shared_ptr<SwitchContainer>            g_switchContainer;
 extern std::shared_ptr<VirtualObjectIdManager>     g_virtualObjectIdManager;
 extern std::shared_ptr<Recorder>                   g_recorder;
-
-void clear_oid_values(
-        _In_ sai_object_type_t object_type,
-        _In_ uint32_t attr_count,
-        _Out_ sai_attribute_t *attr_list);
 
 WrapperRemoteSaiInterface::WrapperRemoteSaiInterface(
         _In_ std::shared_ptr<RemoteSaiInterface> impl):
@@ -153,7 +149,7 @@ sai_status_t WrapperRemoteSaiInterface::get(
 {
     SWSS_LOG_ENTER();
 
-    clear_oid_values(objectType, attr_count, attr_list);
+    Utils::clearOidValues(objectType, attr_count, attr_list);
 
     g_recorder->recordGenericGet(objectType, objectId, attr_count, attr_list);
 
@@ -241,7 +237,7 @@ sai_status_t WrapperRemoteSaiInterface::get(                                \
         _Inout_ sai_attribute_t *attr_list)                                 \
 {                                                                           \
     SWSS_LOG_ENTER();                                                       \
-    clear_oid_values(SAI_OBJECT_TYPE_ ## OT, attr_count, attr_list);        \
+    Utils::clearOidValues(SAI_OBJECT_TYPE_ ## OT, attr_count, attr_list);   \
     g_recorder->recordGet(ot, attr_count, attr_list);                       \
     auto status = m_implementation->get(ot, attr_count, attr_list);         \
     g_recorder->recordGenericGetResponse(                                   \
