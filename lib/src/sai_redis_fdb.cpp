@@ -23,7 +23,8 @@ REDIS_GENERIC_QUAD_ENTRY(FDB_ENTRY,fdb_entry);
 REDIS_BULK_CREATE_ENTRY(FDB_ENTRY,fdb_entry);
 REDIS_BULK_REMOVE_ENTRY(FDB_ENTRY,fdb_entry);
 
-// TODO remove when test corrected
+// TODO remove when test corrected (SAI pointer must be advanced for this)
+
 sai_status_t sai_bulk_create_fdb_entry(
         _In_ uint32_t object_count,
         _In_ const sai_fdb_entry_t *fdb_entry,

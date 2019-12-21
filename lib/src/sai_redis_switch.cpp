@@ -20,6 +20,20 @@ static sai_status_t sai_redis_notify_syncd(
 
     auto redisNotifySyncd = (sai_redis_notify_syncd_t)attr->value.s32;
 
+    switch(redisNotifySyncd)
+    {
+        case SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW:
+        case SAI_REDIS_NOTIFY_SYNCD_APPLY_VIEW:
+        case SAI_REDIS_NOTIFY_SYNCD_INSPECT_ASIC:
+            break;
+
+        default:
+
+            SWSS_LOG_ERROR("invalid notify syncd attr value %s", sai_serialize(redisNotifySyncd).c_str());
+
+            return SAI_STATUS_FAILURE;
+    }
+
     auto status = g_remoteSaiInterface->notifySyncd(switchId, redisNotifySyncd);
 
     if (status == SAI_STATUS_SUCCESS)
@@ -44,6 +58,12 @@ static sai_status_t sai_redis_notify_syncd(
                 SWSS_LOG_NOTICE("switched ASIC to APPLY VIEW");
 
                 g_asicInitViewMode = false;
+
+                break;
+
+            case SAI_REDIS_NOTIFY_SYNCD_INSPECT_ASIC:
+
+                SWSS_LOG_NOTICE("inspec ASIC SUCCEEDED");
 
                 break;
 

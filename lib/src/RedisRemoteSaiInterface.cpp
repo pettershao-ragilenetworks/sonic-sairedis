@@ -1445,36 +1445,9 @@ sai_status_t RedisRemoteSaiInterface::notifySyncd(
 
     std::vector<swss::FieldValueTuple> entry;
 
-    std::string key;
+    auto key = sai_serialize(redisNotifySyncd);
 
-    switch(redisNotifySyncd)
-    {
-        // TODO move this validation to metadata remote
-
-        case SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW:
-
-            SWSS_LOG_NOTICE("sending syncd INIT view");
-            key = SYNCD_INIT_VIEW;
-            break;
-
-        case SAI_REDIS_NOTIFY_SYNCD_APPLY_VIEW:
-
-            SWSS_LOG_NOTICE("sending syncd APPLY view");
-            key = SYNCD_APPLY_VIEW;
-            break;
-
-        case SAI_REDIS_NOTIFY_SYNCD_INSPECT_ASIC:
-
-            SWSS_LOG_NOTICE("sending syncd INSPECT ASIC");
-            key = SYNCD_INSPECT_ASIC;
-            break;
-
-        default:
-
-            SWSS_LOG_ERROR("invalid notify syncd attr value %d", redisNotifySyncd);
-
-            return SAI_STATUS_FAILURE;
-    }
+    SWSS_LOG_NOTICE("sending syncd: %s", key.c_str());
 
     // we need to use "GET" channel to be sure that
     // all previous operations were applied, if we don't

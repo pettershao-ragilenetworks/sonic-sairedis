@@ -944,31 +944,6 @@ void Recorder::recordNotifySyncd(
 {
     SWSS_LOG_ENTER();
 
-    // TODO we should use serialize of those values
-
-    switch(redisNotifySyncd)
-    {
-        case SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW:
-
-            recordNotifySyncd(SYNCD_INIT_VIEW);
-            break;
-
-        case SAI_REDIS_NOTIFY_SYNCD_APPLY_VIEW:
-
-            recordNotifySyncd(SYNCD_APPLY_VIEW);
-            break;
-
-        case SAI_REDIS_NOTIFY_SYNCD_INSPECT_ASIC:
-
-            recordNotifySyncd(SYNCD_INSPECT_ASIC);
-            break;
-
-        default:
-
-            SWSS_LOG_WARN("unhandled sai_redis_notify_syncd_t value: %d", redisNotifySyncd);
-
-            recordNotifySyncd(std::to_string(redisNotifySyncd));
-            break;
-    }
+    recordNotifySyncd(sai_serialize(redisNotifySyncd));
 }
 
