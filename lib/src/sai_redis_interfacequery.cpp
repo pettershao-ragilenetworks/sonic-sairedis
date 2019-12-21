@@ -110,7 +110,7 @@ sai_status_t sai_api_initialize(
 
     if (Globals::apiInitialized)
     {
-        SWSS_LOG_ERROR("api already initialized");
+        SWSS_LOG_ERROR("%s: api already initialized", __PRETTY_FUNCTION__);
 
         return SAI_STATUS_FAILURE;
     }
@@ -162,15 +162,8 @@ sai_status_t sai_api_initialize(
 sai_status_t sai_api_uninitialize(void)
 {
     MUTEX();
-
     SWSS_LOG_ENTER();
-
-    if (!Globals::apiInitialized)
-    {
-        SWSS_LOG_ERROR("api not initialized");
-
-        return SAI_STATUS_FAILURE;
-    }
+    REDIS_CHECK_API_INITIALIZED();
 
     g_run = false;
 
@@ -193,8 +186,8 @@ sai_status_t sai_log_set(
         _In_ sai_log_level_t log_level)
 {
     MUTEX();
-
     SWSS_LOG_ENTER();
+    REDIS_CHECK_API_INITIALIZED();
 
     SWSS_LOG_NOTICE("not implemented");
 
@@ -211,8 +204,8 @@ sai_status_t sai_api_query(
         _Out_ void** api_method_table)
 {
     MUTEX();
-
     SWSS_LOG_ENTER();
+    REDIS_CHECK_API_INITIALIZED();
 
     if (api_method_table == NULL)
     {
@@ -284,8 +277,8 @@ sai_status_t sai_query_attribute_enum_values_capability(
         _Inout_ sai_s32_list_t *enum_values_capability)
 {
     MUTEX();
-
     SWSS_LOG_ENTER();
+    REDIS_CHECK_API_INITIALIZED();
 
     return g_meta->queryAattributeEnumValuesCapability(
             switch_id,
@@ -303,8 +296,8 @@ sai_status_t sai_object_type_get_availability(
         _Out_ uint64_t *count)
 {
     MUTEX();
-
     SWSS_LOG_ENTER();
+    REDIS_CHECK_API_INITIALIZED();
 
     return g_meta->objectTypeGetAvailability(
             switch_id,
@@ -324,7 +317,8 @@ sai_object_type_t sai_object_type_query(
 
     if (!Globals::apiInitialized)
     {
-        SWSS_LOG_ERROR("SAI API not initialized before calling sai_object_type_query");
+        SWSS_LOG_ERROR("%s: api not initialized", __PRETTY_FUNCTION__);
+
         return SAI_OBJECT_TYPE_NULL;
     }
 
@@ -342,7 +336,8 @@ sai_object_id_t sai_switch_id_query(
 
     if (!Globals::apiInitialized)
     {
-        SWSS_LOG_ERROR("SAI API not initialized before calling sai_switch_id_query");
+        SWSS_LOG_ERROR("%s: api not initialized", __PRETTY_FUNCTION__);
+
         return SAI_OBJECT_TYPE_NULL;
     }
 

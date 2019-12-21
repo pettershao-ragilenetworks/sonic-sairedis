@@ -8,8 +8,8 @@ static sai_status_t redis_flush_fdb_entries(
         _In_ const sai_attribute_t *attr_list)
 {
     MUTEX();
-
     SWSS_LOG_ENTER();
+    REDIS_CHECK_API_INITIALIZED();
 
     return g_meta->flushFdbEntries(
             switch_id,

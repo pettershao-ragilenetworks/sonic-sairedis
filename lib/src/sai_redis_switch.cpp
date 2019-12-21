@@ -147,8 +147,8 @@ static sai_status_t redis_create_switch(
         _In_ const sai_attribute_t *attr_list)
 {
     MUTEX();
-
     SWSS_LOG_ENTER();
+    REDIS_CHECK_API_INITIALIZED();
 
     /*
      * Creating switch can't have any object attributes set on it, need to be
@@ -187,21 +187,6 @@ static sai_status_t redis_create_switch(
     return status;
 }
 
-static sai_status_t redis_remove_switch(
-        _In_ sai_object_id_t switch_id)
-{
-    MUTEX();
-
-    SWSS_LOG_ENTER();
-
-    auto status = g_meta->remove(
-            SAI_OBJECT_TYPE_SWITCH,
-            switch_id,
-            *g_remoteSaiInterface);
-
-    return status;
-}
-
 static sai_status_t redis_set_switch_attribute(
         _In_ sai_object_id_t switch_id,
         _In_ const sai_attribute_t *attr)
@@ -230,8 +215,8 @@ static sai_status_t redis_set_switch_attribute(
     }
 
     MUTEX();
-
     SWSS_LOG_ENTER();
+    REDIS_CHECK_API_INITIALIZED();
 
     if (attr != NULL)
     {
@@ -304,6 +289,7 @@ static sai_status_t redis_set_switch_attribute(
     return status;
 }
 
+REDIS_REMOVE(SWITCH,switch);
 REDIS_GET(SWITCH,switch);
 
 /**
@@ -312,9 +298,7 @@ REDIS_GET(SWITCH,switch);
 REDIS_GENERIC_STATS(SWITCH, switch);
 
 const sai_switch_api_t redis_switch_api = {
-    redis_create_switch,
-    redis_remove_switch,
-    redis_set_switch_attribute,
-    redis_get_switch_attribute,
+
+    REDIS_GENERIC_QUAD_API(switch)
     REDIS_GENERIC_STATS_API(switch)
 };

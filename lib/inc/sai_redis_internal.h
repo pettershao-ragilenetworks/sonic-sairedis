@@ -1,6 +1,11 @@
 
 #define MUTEX() std::lock_guard<std::mutex> _lock(sairedis::Globals::apimutex)
 
+#define REDIS_CHECK_API_INITIALIZED()                                       \
+    if (!sairedis::Globals::apiInitialized) {                               \
+        SWSS_LOG_ERROR("%s: api not initialized", __PRETTY_FUNCTION__);     \
+        return SAI_STATUS_FAILURE; }
+
 // object id
 
 #define REDIS_CREATE(OBJECT_TYPE,object_type)                       \
@@ -12,6 +17,7 @@ static sai_status_t redis_create_ ## object_type(                   \
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
+        REDIS_CHECK_API_INITIALIZED();                              \
         return g_meta->create(                                      \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
@@ -27,6 +33,7 @@ static sai_status_t redis_remove_ ## object_type(                   \
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
+        REDIS_CHECK_API_INITIALIZED();                              \
         return g_meta->remove(                                      \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
@@ -40,6 +47,7 @@ static sai_status_t redis_set_ ##object_type ## _attribute(         \
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
+        REDIS_CHECK_API_INITIALIZED();                              \
         return g_meta->set(                                         \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
@@ -55,6 +63,7 @@ static sai_status_t redis_get_ ##object_type ## _attribute(         \
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
+        REDIS_CHECK_API_INITIALIZED();                              \
         return g_meta->get(                                         \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
@@ -79,6 +88,7 @@ static sai_status_t redis_create_ ## object_type(               \
     {                                                           \
         MUTEX();                                                \
         SWSS_LOG_ENTER();                                       \
+        REDIS_CHECK_API_INITIALIZED();                          \
         return g_meta->create(                                  \
                 object_type,                                    \
                 attr_count,                                     \
@@ -92,6 +102,7 @@ static sai_status_t redis_remove_ ## object_type(               \
     {                                                           \
         MUTEX();                                                \
         SWSS_LOG_ENTER();                                       \
+        REDIS_CHECK_API_INITIALIZED();                          \
         return g_meta->remove(                                  \
                 object_type,                                    \
                 *g_remoteSaiInterface);                         \
@@ -104,6 +115,7 @@ static sai_status_t redis_set_ ## object_type ## _attribute(    \
     {                                                           \
         MUTEX();                                                \
         SWSS_LOG_ENTER();                                       \
+        REDIS_CHECK_API_INITIALIZED();                          \
         return g_meta->set(                                     \
                 object_type,                                    \
                 attr,                                           \
@@ -118,6 +130,7 @@ static sai_status_t redis_get_ ## object_type ## _attribute(    \
     {                                                           \
         MUTEX();                                                \
         SWSS_LOG_ENTER();                                       \
+        REDIS_CHECK_API_INITIALIZED();                          \
         return g_meta->get(                                     \
                 object_type,                                    \
                 attr_count,                                     \
@@ -150,6 +163,7 @@ static sai_status_t redis_get_ ## object_type ## _stats(            \
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
+        REDIS_CHECK_API_INITIALIZED();                              \
         return g_meta->getStats(                                    \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
@@ -169,6 +183,7 @@ static sai_status_t redis_get_ ## object_type ## _stats_ext(        \
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
+        REDIS_CHECK_API_INITIALIZED();                              \
         return g_meta->getStatsExt(                                 \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
@@ -187,6 +202,7 @@ static sai_status_t redis_clear_ ## object_type ## _stats(          \
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
+        REDIS_CHECK_API_INITIALIZED();                              \
         return g_meta->clearStats(                                  \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
@@ -231,6 +247,7 @@ static sai_status_t redis_bulk_create_ ## fname(    \
 {                                                   \
     MUTEX();                                        \
     SWSS_LOG_ENTER();                               \
+    REDIS_CHECK_API_INITIALIZED();                  \
     return g_meta->bulkCreate(                      \
             SAI_OBJECT_TYPE_ ## OT,                 \
             switch_id,                              \
@@ -252,6 +269,7 @@ static sai_status_t redis_bulk_remove_ ## fname(    \
 {                                                   \
     MUTEX();                                        \
     SWSS_LOG_ENTER();                               \
+    REDIS_CHECK_API_INITIALIZED();                  \
     return g_meta->bulkRemove(                      \
             SAI_OBJECT_TYPE_ ## OT,                 \
             object_count,                           \
@@ -271,6 +289,7 @@ static sai_status_t redis_bulk_set_ ## fname(       \
 {                                                   \
     MUTEX();                                        \
     SWSS_LOG_ENTER();                               \
+    REDIS_CHECK_API_INITIALIZED();                  \
     return g_meta->bulkSet(                         \
             SAI_OBJECT_TYPE_ ## OT,                 \
             object_count,                           \
@@ -292,6 +311,7 @@ static sai_status_t redis_bulk_get_ ## fname(       \
 {                                                   \
     MUTEX();                                        \
     SWSS_LOG_ENTER();                               \
+    REDIS_CHECK_API_INITIALIZED();                  \
     SWSS_LOG_ERROR("not implemented");              \
     return SAI_STATUS_NOT_IMPLEMENTED;              \
 }
@@ -307,6 +327,7 @@ static sai_status_t redis_bulk_create_ ## ot(       \
 {                                                   \
     MUTEX();                                        \
     SWSS_LOG_ENTER();                               \
+    REDIS_CHECK_API_INITIALIZED();                  \
     return g_meta->bulkCreate(                      \
             object_count,                           \
             entry,                                  \
@@ -326,6 +347,7 @@ static sai_status_t redis_bulk_remove_ ## ot(       \
 {                                                   \
     MUTEX();                                        \
     SWSS_LOG_ENTER();                               \
+    REDIS_CHECK_API_INITIALIZED();                  \
     return g_meta->bulkRemove(                      \
             object_count,                           \
             entry,                                  \
@@ -344,6 +366,7 @@ static sai_status_t redis_bulk_set_ ## ot(          \
 {                                                   \
     MUTEX();                                        \
     SWSS_LOG_ENTER();                               \
+    REDIS_CHECK_API_INITIALIZED();                  \
     return g_meta->bulkSet(                         \
             object_count,                           \
             entry,                                  \
@@ -364,6 +387,7 @@ static sai_status_t redis_bulk_get_ ## ot(          \
 {                                                   \
     MUTEX();                                        \
     SWSS_LOG_ENTER();                               \
+    REDIS_CHECK_API_INITIALIZED();                  \
     SWSS_LOG_ERROR("not implemented");              \
     return SAI_STATUS_NOT_IMPLEMENTED;              \
 }
