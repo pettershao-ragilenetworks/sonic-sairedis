@@ -625,6 +625,30 @@ sai_status_t meta_generic_validation_create(
         // we are creating switch
 
         switch_id = SAI_NULL_OBJECT_ID;
+
+        /*
+         * Creating switch can't have any object attributes set on it, OID
+         * attributes must be applied on switch using SET API.
+         */
+
+        for (uint32_t i = 0; i < attr_count; ++i)
+        {
+            auto meta = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_SWITCH, attr_list[i].id);
+
+            if (meta == NULL)
+            {
+                SWSS_LOG_ERROR("attribute %d not found", attr_list[i].id);
+
+                return SAI_STATUS_INVALID_PARAMETER;
+            }
+
+            if (meta->isoidattribute)
+            {
+                SWSS_LOG_ERROR("%s is OID attribute, not allowed on create switch", meta->attridname);
+
+                return SAI_STATUS_INVALID_PARAMETER;
+            }
+        }
     }
     else
     {
