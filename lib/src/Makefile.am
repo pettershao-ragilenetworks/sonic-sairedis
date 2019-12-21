@@ -14,6 +14,7 @@ libsairedis_la_SOURCES = \
 						 sai_redis_bmtor.cpp \
 						 sai_redis_bridge.cpp \
 						 sai_redis_buffer.cpp \
+						 sai_redis_counter.cpp \
 						 sai_redis_debug_counter.cpp \
 						 sai_redis_dtel.cpp \
 						 sai_redis_fdb.cpp \
@@ -22,12 +23,14 @@ libsairedis_la_SOURCES = \
 						 sai_redis_interfacequery.cpp \
 						 sai_redis_ipmc.cpp \
 						 sai_redis_ipmc_group.cpp \
+						 sai_redis_isolation_group.cpp \
 						 sai_redis_l2mc.cpp \
 						 sai_redis_l2mcgroup.cpp \
 						 sai_redis_lag.cpp \
 						 sai_redis_mcastfdb.cpp \
 						 sai_redis_mirror.cpp \
 						 sai_redis_mpls.cpp \
+						 sai_redis_nat.cpp \
 						 sai_redis_neighbor.cpp \
 						 sai_redis_nexthop.cpp \
 						 sai_redis_nexthopgroup.cpp \
@@ -50,7 +53,6 @@ libsairedis_la_SOURCES = \
 						 sai_redis_virtual_router.cpp \
 						 sai_redis_vlan.cpp \
 						 sai_redis_wred.cpp \
-						 sai_redis_nat.cpp \
 						 sai_redis_generic_create.cpp \
 						 sai_redis_generic_remove.cpp \
 						 sai_redis_generic_set.cpp \

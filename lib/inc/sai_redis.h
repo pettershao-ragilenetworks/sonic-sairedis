@@ -103,6 +103,8 @@ extern const sai_vlan_api_t             redis_vlan_api;
 extern const sai_wred_api_t             redis_wred_api;
 extern const sai_debug_counter_api_t    redis_debug_counter_api;
 extern const sai_nat_api_t              redis_nat_api;
+extern const sai_counter_api_t          redis_counter_api;
+extern const sai_isolation_group_api_t  redis_isolation_group_api;
 
 // OID QUAD
 

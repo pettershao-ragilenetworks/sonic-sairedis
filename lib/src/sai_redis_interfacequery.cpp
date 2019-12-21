@@ -220,6 +220,7 @@ sai_status_t sai_api_query(
         API_CASE(BMTOR,bmtor);
         API_CASE(BRIDGE,bridge);
         API_CASE(BUFFER,buffer);
+        API_CASE(COUNTER,counter);
         API_CASE(DEBUG_COUNTER,debug_counter);
         API_CASE(DTEL,dtel);
         API_CASE(FDB,fdb);
@@ -227,7 +228,7 @@ sai_status_t sai_api_query(
         API_CASE(HOSTIF,hostif);
         API_CASE(IPMC_GROUP,ipmc_group);
         API_CASE(IPMC,ipmc);
-        //API_CASE(ISOLATION_GROUP,isolation_group);
+        API_CASE(ISOLATION_GROUP,isolation_group);
         API_CASE(L2MC_GROUP,l2mc_group);
         API_CASE(L2MC,l2mc);
         API_CASE(LAG,lag);
