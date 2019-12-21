@@ -1837,7 +1837,7 @@ sai_status_t Meta::queryAattributeEnumValuesCapability(
     SWSS_LOG_ENTER();
 
     PARAMETER_CHECK_OID_OBJECT_TYPE(switchId, SAI_OBJECT_TYPE_SWITCH);
-    PARAMETER_CHECK_OID_EXISTS(switchId, objectType);
+    PARAMETER_CHECK_OID_EXISTS(switchId, SAI_OBJECT_TYPE_SWITCH);
     PARAMETER_CHECK_OBJECT_TYPE_VALID(objectType);
 
     auto mdp = sai_metadata_get_attr_metadata(objectType, attrId);
@@ -2503,22 +2503,271 @@ sai_status_t Meta::bulkSet(
     return status;
 }
 
+sai_status_t Meta::bulkCreate(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t switchId,
+        _In_ uint32_t object_count,
+        _In_ const uint32_t *attr_count,
+        _In_ const sai_attribute_t **attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_object_id_t *object_id,
+        _Out_ sai_status_t *object_statuses,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
 
-//sai_status_t (*sai_bulk_object_create_fn)(
-//        _In_ sai_object_id_t switch_id,
-//        _In_ uint32_t object_count,
-//        _In_ const uint32_t *attr_count,
-//        _In_ const sai_attribute_t **attr_list,
-//        _In_ sai_bulk_op_error_mode_t mode,
-//        _Out_ sai_object_id_t *object_id,
-//        _Out_ sai_status_t *object_statuses);
-//
-//
-//sai_status_t (*sai_bulk_create_route_entry_fn)(
-//        _In_ uint32_t object_count,
-//        _In_ const sai_route_entry_t *route_entry,
-//        _In_ const uint32_t *attr_count,
-//        _In_ const sai_attribute_t **attr_list,
-//        _In_ sai_bulk_op_error_mode_t mode,
-//        _Out_ sai_status_t *object_statuses);
-//
+    // all objects must be same type and come from the same switch
+    // TODO check multiple switches
+
+    PARAMETER_CHECK_IF_NOT_NULL(object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        object_statuses[idx] = SAI_STATUS_NOT_EXECUTED;
+    }
+
+    PARAMETER_CHECK_OBJECT_TYPE_VALID(object_type);
+    PARAMETER_CHECK_OID_OBJECT_TYPE(switchId, SAI_OBJECT_TYPE_SWITCH);
+    PARAMETER_CHECK_POSITIVE(object_count);
+    PARAMETER_CHECK_IF_NOT_NULL(attr_count);
+    PARAMETER_CHECK_IF_NOT_NULL(attr_list);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        if (attr_list[idx] == nullptr)
+        {
+            SWSS_LOG_ERROR("pointer to attr list at ondex %u is NULL", idx);
+
+            return SAI_STATUS_INVALID_PARAMETER;
+        }
+    }
+
+    PARAMETER_CHECK_IF_NOT_NULL(object_id);
+
+    if (sai_metadata_get_enum_value_name(&sai_metadata_enum_sai_stats_mode_t, mode) == nullptr)
+    {
+        SWSS_LOG_ERROR("mode vlaue %d is not in range on %s", mode, sai_metadata_enum_sai_stats_mode_t.name);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    std::vector<sai_object_meta_key_t> vmk;
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        sai_status_t status = meta_sai_validate_oid(object_type, &object_id[idx], switchId, true);
+
+        CHECK_STATUS_SUCCESS(status);
+
+        // this is create, oid's dont exist yet
+
+        sai_object_meta_key_t meta_key = { .objecttype = object_type, .objectkey = { .key = { .object_id  = SAI_NULL_OBJECT_ID } } };
+
+        vmk.push_back(meta_key);
+
+        status = meta_generic_validation_create(meta_key, switchId, attr_count[idx], attr_list[idx]);
+
+        CHECK_STATUS_SUCCESS(status);
+    }
+
+    auto status = saiInterface.bulkCreate(object_type, switchId, object_count, attr_count, attr_list, mode, object_id, object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        if (object_statuses[idx] == SAI_STATUS_SUCCESS)
+        {
+            vmk[idx].objectkey.key.object_id = object_id[idx]; // assign new created object id
+
+            if (vmk[idx].objecttype == SAI_OBJECT_TYPE_SWITCH)
+            {
+                SWSS_LOG_THROW("create bulk switch not supported");
+            }
+
+            meta_generic_validation_post_create(vmk[idx], switchId, attr_count[idx], attr_list[idx]);
+        }
+    }
+
+    return status;
+}
+
+sai_status_t Meta::bulkCreate(
+        _In_ uint32_t object_count,
+        _In_ const sai_route_entry_t *route_entry,
+        _In_ const uint32_t *attr_count,
+        _In_ const sai_attribute_t **attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    PARAMETER_CHECK_IF_NOT_NULL(object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        object_statuses[idx] = SAI_STATUS_NOT_EXECUTED;
+    }
+
+    //PARAMETER_CHECK_OBJECT_TYPE_VALID(object_type);
+    PARAMETER_CHECK_POSITIVE(object_count);
+    PARAMETER_CHECK_IF_NOT_NULL(route_entry);
+    PARAMETER_CHECK_IF_NOT_NULL(attr_count);
+    PARAMETER_CHECK_IF_NOT_NULL(attr_list);
+
+    if (sai_metadata_get_enum_value_name(&sai_metadata_enum_sai_stats_mode_t, mode) == nullptr)
+    {
+        SWSS_LOG_ERROR("mode vlaue %d is not in range on %s", mode, sai_metadata_enum_sai_stats_mode_t.name);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    std::vector<sai_object_meta_key_t> vmk;
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        sai_status_t status = meta_sai_validate_route_entry(&route_entry[idx], true);
+
+        CHECK_STATUS_SUCCESS(status);
+
+        sai_object_meta_key_t meta_key = { .objecttype = SAI_OBJECT_TYPE_ROUTE_ENTRY, .objectkey = { .key = { .route_entry = route_entry[idx] } } };
+
+        vmk.push_back(meta_key);
+
+        status = meta_generic_validation_create(meta_key, route_entry[idx].switch_id, attr_count[idx], attr_list[idx]);
+
+        CHECK_STATUS_SUCCESS(status);
+    }
+
+    auto status = saiInterface.bulkCreate(object_count, route_entry, attr_count, attr_list, mode, object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        if (object_statuses[idx] == SAI_STATUS_SUCCESS)
+        {
+            meta_generic_validation_post_create(vmk[idx], route_entry[idx].switch_id, attr_count[idx], attr_list[idx]);
+        }
+    }
+
+    return status;
+}
+
+sai_status_t Meta::bulkCreate(
+        _In_ uint32_t object_count,
+        _In_ const sai_fdb_entry_t *fdb_entry,
+        _In_ const uint32_t *attr_count,
+        _In_ const sai_attribute_t **attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    PARAMETER_CHECK_IF_NOT_NULL(object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        object_statuses[idx] = SAI_STATUS_NOT_EXECUTED;
+    }
+
+    //PARAMETER_CHECK_OBJECT_TYPE_VALID(object_type);
+    PARAMETER_CHECK_POSITIVE(object_count);
+    PARAMETER_CHECK_IF_NOT_NULL(fdb_entry);
+    PARAMETER_CHECK_IF_NOT_NULL(attr_count);
+    PARAMETER_CHECK_IF_NOT_NULL(attr_list);
+
+    if (sai_metadata_get_enum_value_name(&sai_metadata_enum_sai_stats_mode_t, mode) == nullptr)
+    {
+        SWSS_LOG_ERROR("mode vlaue %d is not in range on %s", mode, sai_metadata_enum_sai_stats_mode_t.name);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    std::vector<sai_object_meta_key_t> vmk;
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        sai_status_t status = meta_sai_validate_fdb_entry(&fdb_entry[idx], true);
+
+        CHECK_STATUS_SUCCESS(status);
+
+        sai_object_meta_key_t meta_key = { .objecttype = SAI_OBJECT_TYPE_FDB_ENTRY, .objectkey = { .key = { .fdb_entry = fdb_entry[idx] } } };
+
+        vmk.push_back(meta_key);
+
+        status = meta_generic_validation_create(meta_key, fdb_entry[idx].switch_id, attr_count[idx], attr_list[idx]);
+
+        CHECK_STATUS_SUCCESS(status);
+    }
+
+    auto status = saiInterface.bulkCreate(object_count, fdb_entry, attr_count, attr_list, mode, object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        if (object_statuses[idx] == SAI_STATUS_SUCCESS)
+        {
+            meta_generic_validation_post_create(vmk[idx], fdb_entry[idx].switch_id, attr_count[idx], attr_list[idx]);
+        }
+    }
+
+    return status;
+}
+sai_status_t Meta::bulkCreate(
+        _In_ uint32_t object_count,
+        _In_ const sai_nat_entry_t *nat_entry,
+        _In_ const uint32_t *attr_count,
+        _In_ const sai_attribute_t **attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses,
+        _Inout_ sairedis::SaiInterface& saiInterface)
+{
+    SWSS_LOG_ENTER();
+
+    PARAMETER_CHECK_IF_NOT_NULL(object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        object_statuses[idx] = SAI_STATUS_NOT_EXECUTED;
+    }
+
+    //PARAMETER_CHECK_OBJECT_TYPE_VALID(object_type);
+    PARAMETER_CHECK_POSITIVE(object_count);
+    PARAMETER_CHECK_IF_NOT_NULL(nat_entry);
+    PARAMETER_CHECK_IF_NOT_NULL(attr_count);
+    PARAMETER_CHECK_IF_NOT_NULL(attr_list);
+
+    if (sai_metadata_get_enum_value_name(&sai_metadata_enum_sai_stats_mode_t, mode) == nullptr)
+    {
+        SWSS_LOG_ERROR("mode vlaue %d is not in range on %s", mode, sai_metadata_enum_sai_stats_mode_t.name);
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
+    std::vector<sai_object_meta_key_t> vmk;
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        sai_status_t status = meta_sai_validate_nat_entry(&nat_entry[idx], true);
+
+        CHECK_STATUS_SUCCESS(status);
+
+        sai_object_meta_key_t meta_key = { .objecttype = SAI_OBJECT_TYPE_NAT_ENTRY, .objectkey = { .key = { .nat_entry = nat_entry[idx] } } };
+
+        vmk.push_back(meta_key);
+
+        status = meta_generic_validation_create(meta_key, nat_entry[idx].switch_id, attr_count[idx], attr_list[idx]);
+
+        CHECK_STATUS_SUCCESS(status);
+    }
+
+    auto status = saiInterface.bulkCreate(object_count, nat_entry, attr_count, attr_list, mode, object_statuses);
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        if (object_statuses[idx] == SAI_STATUS_SUCCESS)
+        {
+            meta_generic_validation_post_create(vmk[idx], nat_entry[idx].switch_id, attr_count[idx], attr_list[idx]);
+        }
+    }
+
+    return status;
+}

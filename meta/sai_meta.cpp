@@ -543,7 +543,9 @@ sai_status_t meta_generic_validate_non_object_on_create(
 
         if (!g_oids.objectReferenceExists(oid))
         {
-            SWSS_LOG_ERROR("object don't exist 0x%" PRIx64 " (%s)", oid, m->membername);
+            SWSS_LOG_ERROR("object don't exist %s (%s)",
+                    sai_serialize_object_id(oid).c_str(),
+                    m->membername);
 
             return SAI_STATUS_INVALID_PARAMETER;
         }

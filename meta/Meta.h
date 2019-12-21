@@ -27,6 +27,16 @@
             _Out_ sai_attribute_t *attr_list,                   \
             _Inout_ sairedis::SaiInterface& saiInterface);
 
+#define SAIMETA_META_DECLARE_BULK_CREATE_ENTRY(ot)              \
+    virtual sai_status_t bulkCreate(                            \
+            _In_ uint32_t object_count,                         \
+            _In_ const sai_ ## ot ## _t *ot,                    \
+            _In_ const uint32_t *attr_count,                    \
+            _In_ const sai_attribute_t **attr_list,             \
+            _In_ sai_bulk_op_error_mode_t mode,                 \
+            _Out_ sai_status_t *object_statuses,                \
+            _Inout_ sairedis::SaiInterface& saiInterface);
+
 #define SAIMETA_META_DECLARE_BULK_REMOVE_ENTRY(ot)              \
     sai_status_t bulkRemove(                                    \
             _In_ uint32_t object_count,                         \
@@ -128,6 +138,17 @@ namespace saimeta
 
         public: // bulk quad API
 
+            sai_status_t bulkCreate(
+                    _In_ sai_object_type_t object_type,
+                    _In_ sai_object_id_t switch_id,
+                    _In_ uint32_t object_count,
+                    _In_ const uint32_t *attr_count,
+                    _In_ const sai_attribute_t **attr_list,
+                    _In_ sai_bulk_op_error_mode_t mode,
+                    _Out_ sai_object_id_t *object_id,
+                    _Out_ sai_status_t *object_statuses,
+                    _Inout_ sairedis::SaiInterface& saiInterface);
+
             sai_status_t bulkRemove(
                     _In_ sai_object_type_t object_type,
                     _In_ uint32_t object_count,
@@ -144,6 +165,12 @@ namespace saimeta
                     _In_ sai_bulk_op_error_mode_t mode,
                     _Out_ sai_status_t *object_statuses,
                     _Inout_ sairedis::SaiInterface& saiInterface);
+
+        public: // bulk create ENTRY
+
+            SAIMETA_META_DECLARE_BULK_CREATE_ENTRY(fdb_entry);
+            SAIMETA_META_DECLARE_BULK_CREATE_ENTRY(nat_entry);
+            SAIMETA_META_DECLARE_BULK_CREATE_ENTRY(route_entry);
 
         public: // bulk remove ENTRY
 
