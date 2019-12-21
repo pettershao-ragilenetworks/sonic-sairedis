@@ -135,11 +135,20 @@ static sai_status_t sai_redis_notify_syncd(
     return SAI_STATUS_SUCCESS;
 }
 
-// Also it's possible that when we create switch we will
-// immediately start getting notifications from it, and
-// it may happen that this switch will not be put to
-// a switch map/set/container yet and notification won't find
-// it
+/*
+ * NOTE: Notifications during switch create and switch remove.
+ *
+ * It is possible that when we create switch we will immediately start getting
+ * notifications from it, and it may happen that this switch will not be yet
+ * put to switch container and notification won't find it. But before
+ * notification will be processed it will first try to acquire mutex, so create
+ * switch function will end and switch will be put inside container.
+ *
+ * Similar it can happen that we receive notification when we are removing
+ * switch, then switch will be removed from switch container and notification
+ * will not find existing switch, but that's ok since switch was removed, and
+ * notification can be ignored.
+ */
 
 static sai_status_t redis_create_switch(
         _Out_ sai_object_id_t* switch_id,
@@ -150,41 +159,13 @@ static sai_status_t redis_create_switch(
     SWSS_LOG_ENTER();
     REDIS_CHECK_API_INITIALIZED();
 
-    /*
-     * Creating switch can't have any object attributes set on it, need to be
-     * set on separate api.
-     *
-     * TODO: This check should be moved to metadata.
-     */
-
-    for (uint32_t i = 0; i < attr_count; ++i)
-    {
-        auto meta = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_SWITCH, attr_list[i].id);
-
-        if (meta == NULL)
-        {
-            SWSS_LOG_ERROR("attribute %d not found", attr_list[i].id);
-
-            return SAI_STATUS_INVALID_PARAMETER;
-        }
-
-        if (meta->allowedobjecttypeslength > 0)
-        {
-            SWSS_LOG_ERROR("attribute %s is object id attribute, not allowed on create", meta->attridname);
-
-            return SAI_STATUS_INVALID_PARAMETER;
-        }
-    }
-
-    auto status = g_meta->create(
+    return g_meta->create(
             SAI_OBJECT_TYPE_SWITCH,
             switch_id,
             SAI_NULL_OBJECT_ID, // no switch id since we create switch
             attr_count,
             attr_list,
             *g_remoteSaiInterface);
-
-    return status;
 }
 
 static sai_status_t redis_set_switch_attribute(
