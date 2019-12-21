@@ -2559,7 +2559,7 @@ sai_status_t Meta::bulkCreate(
 
         CHECK_STATUS_SUCCESS(status);
 
-        // this is create, oid's dont exist yet
+        // this is create, oid's don't exist yet
 
         sai_object_meta_key_t meta_key = { .objecttype = object_type, .objectkey = { .key = { .object_id  = SAI_NULL_OBJECT_ID } } };
 

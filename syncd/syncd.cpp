@@ -982,7 +982,7 @@ void internal_syncd_get_send(
 /**
  * @brief Internal syncd api send response.
  *
- * This funcion should be use to send response to sairedis for
+ * This function should be use to send response to sairedis for
  * create/remove/set API as well as their corresponding bulk versions.
  *
  * Should not be used on GET api.
