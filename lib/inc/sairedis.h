@@ -126,6 +126,8 @@ typedef enum _sai_redis_switch_attr_t
     SAI_REDIS_SWITCH_ATTR_RECORD_STATS,
 
 } sai_redis_switch_attr_t;
+
+// TODO to be removed
 sai_status_t sai_bulk_create_fdb_entry(
         _In_ uint32_t object_count,
         _In_ const sai_fdb_entry_t *fdb_entry,

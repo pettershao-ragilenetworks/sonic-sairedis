@@ -603,3 +603,19 @@ sai_status_t WrapperRemoteSaiInterface::bulkCreate(
     return status;
 }
 
+sai_status_t WrapperRemoteSaiInterface::notifySyncd(
+        _In_ sai_object_id_t switchId,
+        _In_ sai_redis_notify_syncd_t redisNotifySyncd)
+{
+    SWSS_LOG_ENTER();
+
+    g_recorder->recordNotifySyncd(switchId, redisNotifySyncd);
+
+    auto status = m_implementation->notifySyncd(switchId, redisNotifySyncd);
+
+    g_recorder->recordNotifySyncdResponse(status);
+
+    return status;
+}
+
+

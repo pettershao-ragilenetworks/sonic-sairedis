@@ -1437,4 +1437,104 @@ std::string RedisRemoteSaiInterface::getSelectResultAsString(int result)
     return res;
 }
 
+sai_status_t RedisRemoteSaiInterface::notifySyncd(
+        _In_ sai_object_id_t switchId,
+        _In_ sai_redis_notify_syncd_t redisNotifySyncd)
+{
+    SWSS_LOG_ENTER();
+
+    std::vector<swss::FieldValueTuple> entry;
+
+    std::string key;
+
+    switch(redisNotifySyncd)
+    {
+        // TODO move this validation to metadata remote
+
+        case SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW:
+
+            SWSS_LOG_NOTICE("sending syncd INIT view");
+            key = SYNCD_INIT_VIEW;
+            break;
+
+        case SAI_REDIS_NOTIFY_SYNCD_APPLY_VIEW:
+
+            SWSS_LOG_NOTICE("sending syncd APPLY view");
+            key = SYNCD_APPLY_VIEW;
+            break;
+
+        case SAI_REDIS_NOTIFY_SYNCD_INSPECT_ASIC:
+
+            SWSS_LOG_NOTICE("sending syncd INSPECT ASIC");
+            key = SYNCD_INSPECT_ASIC;
+            break;
+
+        default:
+
+            SWSS_LOG_ERROR("invalid notify syncd attr value %d", redisNotifySyncd);
+
+            return SAI_STATUS_FAILURE;
+    }
+
+    // we need to use "GET" channel to be sure that
+    // all previous operations were applied, if we don't
+    // use GET channel then we may hit race condition
+    // on syncd side where syncd will start compare view
+    // when there are still objects in op queue
+    //
+    // other solution can be to use notify event
+    // and then on syncd side read all the asic state queue
+    // and apply changes before switching to init/apply mode
+
+    m_asicState->set(key, entry, REDIS_ASIC_STATE_COMMAND_NOTIFY);
+
+    return waitForNotifySyncdResponse();
+}
+
+sai_status_t RedisRemoteSaiInterface::waitForNotifySyncdResponse()
+{
+    SWSS_LOG_ENTER();
+
+    swss::Select s;
+
+    s.addSelectable(m_getConsumer.get());
+
+    while (true)
+    {
+        SWSS_LOG_NOTICE("wait for notify response");
+
+        swss::Selectable *sel;
+
+        int result = s.select(&sel, REDIS_ASIC_STATE_COMMAND_GETRESPONSE_TIMEOUT_MS);
+
+        if (result == swss::Select::OBJECT)
+        {
+            swss::KeyOpFieldsValuesTuple kco;
+
+            m_getConsumer->pop(kco);
+
+            const std::string &op = kfvOp(kco);
+            const std::string &opkey = kfvKey(kco);
+
+            SWSS_LOG_NOTICE("notify response: %s", opkey.c_str());
+
+            if (op != REDIS_ASIC_STATE_COMMAND_NOTIFY) // response is the same name as query
+            {
+                continue;
+            }
+
+            sai_status_t status;
+            sai_deserialize_status(opkey, status);
+
+            return status;
+        }
+
+        SWSS_LOG_ERROR("notify syncd failed to get response result from select: %s", getSelectResultAsString(result).c_str());
+        break;
+    }
+
+    SWSS_LOG_ERROR("notify syncd failed to get response");
+
+    return SAI_STATUS_FAILURE;
+}
 

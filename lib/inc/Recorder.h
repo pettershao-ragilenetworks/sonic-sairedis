@@ -6,6 +6,8 @@ extern "C" {
 
 #include "swss/table.h"
 
+#include "sairedis.h"
+
 #include <string>
 #include <vector>
 
@@ -324,6 +326,10 @@ namespace sairedis
                     _In_ const std::vector<swss::FieldValueTuple> &values);
 
         public: // sairedis/syncd internal API
+
+            void recordNotifySyncd(
+                    _In_ sai_object_id_t switchId,
+                    _In_ sai_redis_notify_syncd_t redisNotifySyncd);
 
             void recordNotifySyncd(
                     _In_ const std::string& key);

@@ -23,6 +23,8 @@
 #define REDIS_ASIC_STATE_COMMAND_BULK_SET    "bulkset"
 #define REDIS_ASIC_STATE_COMMAND_BULK_GET    "bulkget"
 
+#define REDIS_ASIC_STATE_COMMAND_NOTIFY      "notify"
+
 #define REDIS_ASIC_STATE_COMMAND_GET_STATS          "get_stats"
 #define REDIS_ASIC_STATE_COMMAND_CLEAR_STATS        "clear_stats"
 
@@ -258,6 +260,12 @@ namespace sairedis
                     _In_ sai_attr_id_t attr_id,
                     _Inout_ sai_s32_list_t *enum_values_capability) override;
 
+        public: // notify syncd
+
+            virtual sai_status_t notifySyncd(
+                    _In_ sai_object_id_t switchId,
+                    _In_ sai_redis_notify_syncd_t redisNotifySyncd) override;
+
         private: // QUAD API helpers
 
             sai_status_t create(
@@ -364,6 +372,10 @@ namespace sairedis
 
             sai_status_t waitForObjectTypeGetAvailabilityResponse(
                     _In_ uint64_t *count);
+
+        private: // notify syncd response
+
+            sai_status_t waitForNotifySyncdResponse();
 
         private: // helpers
 

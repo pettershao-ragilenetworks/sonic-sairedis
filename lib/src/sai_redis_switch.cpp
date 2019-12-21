@@ -12,127 +12,47 @@ volatile bool g_asicInitViewMode = false; // default mode is apply mode
 volatile bool g_useTempView = false;
 volatile bool g_syncMode = false;
 
-static sai_status_t sai_redis_internal_notify_syncd(
-        _In_ const std::string& key)
-{
-    SWSS_LOG_ENTER();
-
-    std::vector<swss::FieldValueTuple> entry;
-
-    // ASIC INIT/APPLY view with small letter 'a'
-    // and response is recorded as capital letter 'A'
-
-    g_recorder->recordNotifySyncd(key);
-
-    g_asicState->set(key, entry, "notify");
-
-    swss::Select s;
-
-    s.addSelectable(g_redisGetConsumer.get());
-
-    while (true)
-    {
-        SWSS_LOG_NOTICE("wait for notify response");
-
-        swss::Selectable *sel;
-
-        int result = s.select(&sel, GET_RESPONSE_TIMEOUT);
-
-        if (result == swss::Select::OBJECT)
-        {
-            swss::KeyOpFieldsValuesTuple kco;
-
-            g_redisGetConsumer->pop(kco);
-
-            const std::string &op = kfvOp(kco);
-            const std::string &opkey = kfvKey(kco);
-
-            SWSS_LOG_NOTICE("notify response: %s", opkey.c_str());
-
-            if (op != "notify")
-            {
-                continue;
-            }
-
-            sai_status_t status;
-            sai_deserialize_status(opkey, status);
-
-            g_recorder->recordNotifySyncdResponse(status);
-
-            return status;
-        }
-
-        SWSS_LOG_ERROR("notify syncd failed to get response result from select: %d", result);
-        break;
-    }
-
-    SWSS_LOG_ERROR("notify syncd failed to get response");
-
-    g_recorder->recordNotifySyncdResponse(SAI_STATUS_FAILURE);
-
-    return SAI_STATUS_FAILURE;
-}
-
 static sai_status_t sai_redis_notify_syncd(
+        _In_ sai_object_id_t switchId,
         _In_ const sai_attribute_t *attr)
 {
     SWSS_LOG_ENTER();
 
-    // we need to use "GET" channel to be sure that
-    // all previous operations were applied, if we don't
-    // use GET channel then we may hit race condition
-    // on syncd side where syncd will start compare view
-    // when there are still objects in op queue
-    //
-    // other solution can be to use notify event
-    // and then on syncd side read all the asic state queue
-    // and apply changes before switching to init/apply mode
+    auto redisNotifySyncd = (sai_redis_notify_syncd_t)attr->value.s32;
 
-    std::string op;
+    auto status = g_remoteSaiInterface->notifySyncd(switchId, redisNotifySyncd);
 
-    switch (attr->value.s32)
+    if (status == SAI_STATUS_SUCCESS)
     {
-        case SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW:
-            SWSS_LOG_NOTICE("sending syncd INIT view");
-            op = SYNCD_INIT_VIEW;
-            g_asicInitViewMode = true;
-            break;
+        switch (redisNotifySyncd)
+        {
+            case SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW:
 
-        case SAI_REDIS_NOTIFY_SYNCD_APPLY_VIEW:
-            SWSS_LOG_NOTICE("sending syncd APPLY view");
-            op = SYNCD_APPLY_VIEW;
-            g_asicInitViewMode = false;
-            break;
+                SWSS_LOG_NOTICE("switched ASIC to INIT VIEW");
 
-        case SAI_REDIS_NOTIFY_SYNCD_INSPECT_ASIC:
-            SWSS_LOG_NOTICE("sending syncd INSPECT ASIC");
-            op = SYNCD_INSPECT_ASIC;
-            break;
+                g_asicInitViewMode = true;
 
-        default:
-            SWSS_LOG_ERROR("invalid notify syncd attr value %d", attr->value.s32);
-            return SAI_STATUS_FAILURE;
+                SWSS_LOG_NOTICE("clearing current local state since init view is called on initialized switch");
+
+                // TODO this must be per syncd instance
+                clear_local_state();
+
+                break;
+
+            case SAI_REDIS_NOTIFY_SYNCD_APPLY_VIEW:
+
+                SWSS_LOG_NOTICE("switched ASIC to APPLY VIEW");
+
+                g_asicInitViewMode = false;
+
+                break;
+
+            default:
+                break;
+        }
     }
 
-    sai_status_t status = sai_redis_internal_notify_syncd(op);
-
-    if (status != SAI_STATUS_SUCCESS)
-    {
-        SWSS_LOG_ERROR("notify syncd failed: %s", sai_serialize_status(status).c_str());
-        return status;
-    }
-
-    SWSS_LOG_NOTICE("notify syncd succeeded");
-
-    if (attr->value.s32 == SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW)
-    {
-        SWSS_LOG_NOTICE("clearing current local state since init view is called on initialized switch");
-
-        // TODO this must be per syncd instance
-        clear_local_state();
-    }
-
-    return SAI_STATUS_SUCCESS;
+    return status;
 }
 
 /*
@@ -208,13 +128,18 @@ static sai_status_t redis_set_switch_attribute(
 
         switch (attr->id)
         {
+            case SAI_REDIS_SWITCH_ATTR_PERFORM_LOG_ROTATE:
+                if (g_recorder)
+                    g_recorder->requestLogRotate();
+                return SAI_STATUS_SUCCESS;
+
             case SAI_REDIS_SWITCH_ATTR_RECORD:
                 if (g_recorder)
                     g_recorder->enableRecording(attr->value.booldata);
                 return SAI_STATUS_SUCCESS;
 
             case SAI_REDIS_SWITCH_ATTR_NOTIFY_SYNCD:
-                return sai_redis_notify_syncd(attr);
+                return sai_redis_notify_syncd(switch_id, attr);
 
             case SAI_REDIS_SWITCH_ATTR_USE_TEMP_VIEW:
                 g_useTempView = attr->value.booldata;

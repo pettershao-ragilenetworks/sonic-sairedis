@@ -231,6 +231,12 @@ namespace sairedis
                     _In_ sai_attr_id_t attr_id,
                     _Inout_ sai_s32_list_t *enum_values_capability) override;
 
+        public: // Remote
+
+            virtual sai_status_t notifySyncd(
+                    _In_ sai_object_id_t switchId,
+                    _In_ sai_redis_notify_syncd_t redisNotifySyncd) override;
+
         private:
 
             std::shared_ptr<RemoteSaiInterface> m_implementation;

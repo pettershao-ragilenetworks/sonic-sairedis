@@ -15,6 +15,11 @@ namespace sairedis
 
         public:
 
-            // TODO notify syncd methods
+            /**
+             * @brief Notify syncd API.
+             */
+            virtual sai_status_t notifySyncd(
+                    _In_ sai_object_id_t switchId,
+                    _In_ sai_redis_notify_syncd_t redisNotifySyncd) = 0;
     };
 }
