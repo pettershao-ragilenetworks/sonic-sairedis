@@ -345,7 +345,7 @@ void test_bulk_fdb_create()
     ASSERT_SUCCESS("Failed to create switch");
 
     std::vector<std::vector<sai_attribute_t>> fdb_attrs;
-    std::vector<sai_attribute_t *> fdb_attrs_array;
+    std::vector<const sai_attribute_t *> fdb_attrs_array;
     std::vector<uint32_t> fdb_attrs_count;
 
     for (uint32_t i = index; i < index + count; ++i)
@@ -404,7 +404,7 @@ void test_bulk_fdb_create()
     }
 
     std::vector<sai_status_t> statuses(count);
-    status = redis_bulk_create_fdb_entry(count, fdbs.data(), fdb_attrs_count.data(), fdb_attrs_array.data()
+    status = sai_bulk_create_fdb_entry(count, fdbs.data(), fdb_attrs_count.data(), (const sai_attribute_t**)fdb_attrs_array.data()
         , SAI_BULK_OP_ERROR_MODE_IGNORE_ERROR, statuses.data());
     ASSERT_SUCCESS("Failed to create fdb");
     for (size_t j = 0; j < statuses.size(); j++)
