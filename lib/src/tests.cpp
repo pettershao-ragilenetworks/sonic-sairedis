@@ -32,6 +32,8 @@ sai_object_id_t sai_switch_id_query(
 
 sai_route_entry_t get_route_entry()
 {
+    SWSS_LOG_ENTER();
+
     sai_route_entry_t route_entry = { };
 
     route_entry.vr_id = 0x123456789abcdef;

@@ -46,7 +46,7 @@ static sai_switch_notifications_t processNotification(
 {
     MUTEX();
 
-    SWSS_LOG_ERROR();
+    SWSS_LOG_ENTER();
 
     // NOTE: process metadata must be executed under sairedis API mutex since
     // it will access meta database and notification comes from different
