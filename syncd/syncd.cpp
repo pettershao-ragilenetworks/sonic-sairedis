@@ -1908,7 +1908,9 @@ sai_status_t notifySyncd(
 
     static bool firstInitWasPerformed = false;
 
-    if (g_veryFirstRun && firstInitWasPerformed && op == SYNCD_INIT_VIEW)
+    auto redisNotifySyncd = sai_deserialize_redis_notify_syncd(op);
+
+    if (g_veryFirstRun && firstInitWasPerformed && redisNotifySyncd == SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW)
     {
         /*
          * Make sure that when second INIT view arrives, then we will jump
@@ -1931,7 +1933,7 @@ sai_status_t notifySyncd(
          * later on when we restart orch agent.
          */
 
-        if (op == SYNCD_INIT_VIEW)
+        if (redisNotifySyncd == SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW)
         {
             /*
              * On first start we just do "apply" directly on asic so we set
@@ -1948,7 +1950,7 @@ sai_status_t notifySyncd(
 
             clearTempView();
         }
-        else if (op == SYNCD_APPLY_VIEW)
+        else if (redisNotifySyncd == SAI_REDIS_NOTIFY_SYNCD_APPLY_VIEW)
         {
             g_veryFirstRun = false;
 
@@ -1972,7 +1974,7 @@ sai_status_t notifySyncd(
         return status;
     }
 
-    if (op == SYNCD_INIT_VIEW)
+    if (redisNotifySyncd == SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW)
     {
         if (g_asicInitViewMode)
         {
@@ -1991,7 +1993,7 @@ sai_status_t notifySyncd(
 
         sendNotifyResponse(SAI_STATUS_SUCCESS);
     }
-    else if (op == SYNCD_APPLY_VIEW)
+    else if (redisNotifySyncd == SAI_REDIS_NOTIFY_SYNCD_APPLY_VIEW)
     {
         g_asicInitViewMode = false;
 
@@ -2027,7 +2029,7 @@ sai_status_t notifySyncd(
             return status;
         }
     }
-    else if (op == SYNCD_INSPECT_ASIC)
+    else if (redisNotifySyncd == SAI_REDIS_NOTIFY_SYNCD_INSPECT_ASIC)
     {
         SWSS_LOG_NOTICE("syncd switched to INSPECT ASIC mode");
 
