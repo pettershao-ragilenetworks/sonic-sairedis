@@ -213,12 +213,6 @@ sai_status_t sai_api_query(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    if (!Globals::apiInitialized)
-    {
-        SWSS_LOG_ERROR("SAI API not initialized before calling API query");
-        return SAI_STATUS_UNINITIALIZED;
-    }
-
     switch (sai_api_id)
     {
         API_CASE(ACL,acl);
