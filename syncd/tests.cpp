@@ -322,10 +322,8 @@ void test_bulk_fdb_create()
 
     sai_status_t    status;
 
-    sai_route_api_t  *sai_fdb_api = NULL;
     sai_switch_api_t *sai_switch_api = NULL;
 
-    sai_api_query(SAI_API_FDB, (void**)&sai_fdb_api);
     sai_api_query(SAI_API_SWITCH, (void**)&sai_switch_api);
 
     uint32_t count = 3;
