@@ -815,21 +815,7 @@ void performNotifySyncd(const std::string& request, const std::string response)
     // tell syncd that we are compiling new view
     sai_attribute_t attr;
     attr.id = SAI_REDIS_SWITCH_ATTR_NOTIFY_SYNCD;
-
-    const std::string requestAction = r[2];
-
-    if (requestAction == SYNCD_INIT_VIEW)
-    {
-        attr.value.s32 = SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW;
-    }
-    else if (requestAction == SYNCD_APPLY_VIEW)
-    {
-        attr.value.s32 = SAI_REDIS_NOTIFY_SYNCD_APPLY_VIEW;
-    }
-    else
-    {
-        SWSS_LOG_THROW("invalid syncd notify request: %s", request.c_str());
-    }
+    attr.value.s32 = sai_deserialize_redis_notify_syncd(r[2]);
 
     /*
      * NOTE: We don't need actual switch to set those attributes.
