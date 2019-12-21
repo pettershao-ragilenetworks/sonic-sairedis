@@ -26,6 +26,8 @@ extern "C" {
  * values set at creation time.
  */
 
+sai_apis_t apis;
+
 std::map<std::string, std::string> profile_map;
 
 const char *test_profile_get_value (
@@ -1610,7 +1612,6 @@ int main(int argc, char **argv)
 
     EXIT_ON_ERROR(sai_api_initialize(0, (const sai_service_method_table_t *)&test_services));
 
-    sai_apis_t apis;
     sai_metadata_apis_query(sai_api_query, &apis);
 
     sai_attribute_t attr;
