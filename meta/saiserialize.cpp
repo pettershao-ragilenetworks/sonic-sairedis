@@ -1755,6 +1755,34 @@ std::string sai_serialize_object_meta_key(
     return key;
 }
 
+#define SYNCD_INIT_VIEW     "INIT_VIEW"
+#define SYNCD_APPLY_VIEW    "APPLY_VIEW"
+#define SYNCD_INSPECT_ASIC  "SYNCD_INSPECT_ASIC"
+
+std::string sai_serialize(
+        _In_ const sai_redis_notify_syncd_t& value)
+{
+    SWSS_LOG_ENTER();
+
+    switch (value)
+    {
+        case SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW:
+            return SYNCD_INIT_VIEW;
+
+        case SAI_REDIS_NOTIFY_SYNCD_APPLY_VIEW:
+            return SYNCD_APPLY_VIEW;
+
+        case SAI_REDIS_NOTIFY_SYNCD_INSPECT_ASIC:
+            return SYNCD_INSPECT_ASIC;
+
+        default:
+
+            SWSS_LOG_WARN("unknown value on sai_redis_notify_syncd_t: %d", value);
+
+            return std::to_string(value);
+    }
+}
+
 // deserialize
 
 void sai_deserialize_bool(
@@ -2754,7 +2782,7 @@ void sai_deserialize_nat_entry_data(
     sai_deserialize_nat_entry_key(j["key"], nat_entry_data.key);
     sai_deserialize_nat_entry_mask(j["mask"], nat_entry_data.mask);
 }
- 
+
 void sai_deserialize_nat_entry(
         _In_ const std::string &s,
         _Out_ sai_nat_entry_t& nat_entry)
@@ -3151,4 +3179,44 @@ void sai_deserialize_queue_attr(
     SWSS_LOG_ENTER();
 
     sai_deserialize_enum(s, &sai_metadata_enum_sai_queue_attr_t, (int32_t&)attr);
+}
+
+// sairedis
+
+void sai_deserialize(
+        _In_ const std::string& s,
+        _Out_ sai_redis_notify_syncd_t& value)
+{
+    SWSS_LOG_ENTER();
+
+    if (s == SYNCD_INIT_VIEW)
+    {
+        value = SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW;
+    }
+    else if (s == SYNCD_APPLY_VIEW)
+    {
+        value = SAI_REDIS_NOTIFY_SYNCD_APPLY_VIEW;
+    }
+    else if (s == SYNCD_INSPECT_ASIC)
+    {
+        value = SAI_REDIS_NOTIFY_SYNCD_INSPECT_ASIC;
+    }
+    else
+    {
+        SWSS_LOG_WARN("enum %s not found in sai_redis_notify_syncd_t", s.c_str());
+
+        sai_deserialize_number(s, value);
+    }
+}
+
+sai_redis_notify_syncd_t sai_deserialize_redis_notify_syncd(
+        _In_ const std::string& s)
+{
+    SWSS_LOG_ENTER();
+
+    sai_redis_notify_syncd_t value;
+
+    sai_deserialize(s,value);
+
+    return value;
 }

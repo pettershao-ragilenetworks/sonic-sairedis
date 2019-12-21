@@ -18,6 +18,8 @@ extern "C" {
 
 #include "swss/logger.h"
 
+#include "lib/inc/sairedis.h"
+
 // util
 
 sai_status_t transfer_attributes(
@@ -171,6 +173,11 @@ std::string sai_serialize_queue_deadlock_ntf(
         _In_ uint32_t count,
         _In_ const sai_queue_deadlock_notification_data_t* deadlock_data);
 
+// sairedis
+
+std::string sai_serialize(
+        _In_ const sai_redis_notify_syncd_t& value);
+
 // deserialize
 
 void sai_deserialize_number(
@@ -297,5 +304,14 @@ void sai_deserialize_ingress_priority_group_attr(
 void sai_deserialize_queue_attr(
         _In_ const std::string& s,
         _Out_ sai_queue_attr_t& attr);
+
+// sairedis
+
+void sai_deserialize(
+        _In_ const std::string& s,
+        _Out_ sai_redis_notify_syncd_t& value);
+
+sai_redis_notify_syncd_t sai_deserialize_redis_notify_syncd(
+        _In_ const std::string& s);
 
 #endif // __SAI_SERIALIZE__
