@@ -78,7 +78,7 @@ sai_status_t WrapperRemoteSaiInterface::create(
     else if (status != SAI_STATUS_SUCCESS)
     {
         // if create failed, then release allocated object
-        g_virtualObjectIdManager->releaseObjectId(objectId);
+        g_virtualObjectIdManager->releaseObjectId(*objectId);
     }
 
     return status;
