@@ -333,7 +333,7 @@ sai_object_id_t sai_switch_id_query(
     {
         SWSS_LOG_ERROR("%s: api not initialized", __PRETTY_FUNCTION__);
 
-        return SAI_OBJECT_TYPE_NULL;
+        return SAI_NULL_OBJECT_ID;
     }
 
     // TODO support global context
