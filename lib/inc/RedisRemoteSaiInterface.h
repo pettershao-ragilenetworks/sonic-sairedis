@@ -266,6 +266,20 @@ namespace sairedis
                     _In_ sai_object_id_t switchId,
                     _In_ sai_redis_notify_syncd_t redisNotifySyncd) override;
 
+        public:
+
+            /**
+             * @brief Checks whether attribute is custom SAI_REDIS_SWITCH attribute.
+             *
+             * This function should only be used on switch_api set function.
+             */
+            static bool isRedisAttribute(
+                    _In_ const sai_attribute_t* attr);
+
+            sai_status_t setRedisAttribute(
+                    _In_ sai_object_id_t switchId,
+                    _In_ const sai_attribute_t* attr);
+
         private: // QUAD API helpers
 
             sai_status_t create(

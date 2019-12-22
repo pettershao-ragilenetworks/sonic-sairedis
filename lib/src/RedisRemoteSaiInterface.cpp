@@ -1511,3 +1511,15 @@ sai_status_t RedisRemoteSaiInterface::waitForNotifySyncdResponse()
     return SAI_STATUS_FAILURE;
 }
 
+bool RedisRemoteSaiInterface::isRedisAttribute(
+        _In_ const sai_attribute_t* attr)
+{
+    SWSS_LOG_ENTER();
+
+    if (attr == nullptr || (attr->id < SAI_SWITCH_ATTR_CUSTOM_RANGE_START))
+    {
+        return false;
+    }
+
+    return true;
+}
