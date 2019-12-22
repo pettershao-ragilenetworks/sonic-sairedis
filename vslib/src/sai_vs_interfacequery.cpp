@@ -989,8 +989,6 @@ sai_status_t sai_object_type_get_availability(
 sai_object_type_t sai_object_type_query(
         _In_ sai_object_id_t objectId)
 {
-    MUTEX();
-
     SWSS_LOG_ENTER();
 
     if (!Globals::apiInitialized)
@@ -1005,8 +1003,6 @@ sai_object_type_t sai_object_type_query(
 sai_object_id_t sai_switch_id_query(
         _In_ sai_object_id_t objectId)
 {
-    MUTEX();
-
     SWSS_LOG_ENTER();
 
     if (!Globals::apiInitialized)
