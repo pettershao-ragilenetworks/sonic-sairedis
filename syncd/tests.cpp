@@ -33,7 +33,7 @@ extern bool g_syncMode;
 
 using namespace saimeta;
 extern std::shared_ptr<swss::RedisClient>   g_redisClient;
-std::shared_ptr<swss::DBConnector> g_db;
+static std::shared_ptr<swss::DBConnector> g_db1;
 
 static sai_next_hop_group_api_t test_next_hop_group_api;
 static std::vector<std::tuple<sai_object_id_t, sai_object_id_t, std::vector<sai_attribute_t>>> created_next_hop_group_member;
@@ -59,9 +59,9 @@ void clearDB()
 {
     SWSS_LOG_ENTER();
 
-    g_db = std::make_shared<swss::DBConnector>(ASIC_DB, "localhost", 6379, 0);
-    swss::RedisReply r(g_db.get(), "FLUSHALL", REDIS_REPLY_STATUS);
-    g_redisClient = std::make_shared<swss::RedisClient>(g_db.get());
+    g_db1 = std::make_shared<swss::DBConnector>(ASIC_DB, "localhost", 6379, 0);
+    swss::RedisReply r(g_db1.get(), "FLUSHALL", REDIS_REPLY_STATUS);
+    g_redisClient = std::make_shared<swss::RedisClient>(g_db1.get());
 
     r.checkStatusOK();
 }
