@@ -13,7 +13,7 @@
 #define SAI_SWITCH_NOTIFICATION_NAME_PORT_STATE_CHANGE          "port_state_change"
 #define SAI_SWITCH_NOTIFICATION_NAME_QUEUE_PFC_DEADLOCK         "queue_deadlock"
 #define SAI_SWITCH_NOTIFICATION_NAME_SWITCH_SHUTDOWN_REQUEST    "switch_shutdown_request"
-#define SAI_SWITCH_NOTIFICATION_NAME_SWITCH_STATE_CHAENE        "switch_state_change"
+#define SAI_SWITCH_NOTIFICATION_NAME_SWITCH_STATE_CHANGE        "switch_state_change"
 #define SAI_SWITCH_NOTIFICATION_NAME_TAM_EVENT                  "tam_event"
 
 /**
