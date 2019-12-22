@@ -1,5 +1,7 @@
 #include "RedisRemoteSaiInterface.h"
 #include "Utils.h"
+#include "NotificationFactory.h"
+#include "Recorder.h"
 
 #include "sairediscommon.h"
 #include "meta/sai_serialize.h"
@@ -13,6 +15,7 @@ using namespace sairedis;
 
 extern bool g_syncMode;  // TODO make member
 extern std::string getSelectResultAsString(int result);
+extern std::shared_ptr<Recorder> g_recorder;
 
 std::string joinFieldValues(
         _In_ const std::vector<swss::FieldValueTuple> &values);
@@ -24,13 +27,38 @@ std::vector<swss::FieldValueTuple> serialize_counter_id_list(
 
 RedisRemoteSaiInterface::RedisRemoteSaiInterface(
         _In_ std::shared_ptr<swss::ProducerTable> asicState,
-        _In_ std::shared_ptr<swss::ConsumerTable> getConsumer):
+        _In_ std::shared_ptr<swss::ConsumerTable> getConsumer,
+        _In_ std::function<void(std::shared_ptr<Notification>)> notificationCallback):
     m_asicState(asicState),
-    m_getConsumer(getConsumer)
+    m_getConsumer(getConsumer),
+    m_notificationCallback(notificationCallback)
 {
     SWSS_LOG_ENTER();
 
-    // empty
+    // TODO ASIC DB and connector socket must be obtained from config database json
+
+    m_dbNtf = std::make_shared<swss::DBConnector>(ASIC_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+    m_notificationConsumer = std::make_shared<swss::NotificationConsumer>(m_dbNtf.get(), REDIS_TABLE_NOTIFICATIONS);
+
+    // TODO what will happen when we receive notification in init view mode ?
+
+    m_runNotificationThread = true;
+
+    SWSS_LOG_NOTICE("creating notification thread");
+
+    m_notificationThread = std::make_shared<std::thread>(&RedisRemoteSaiInterface::notificationThreadFunction, this);
+}
+
+RedisRemoteSaiInterface::~RedisRemoteSaiInterface()
+{
+    SWSS_LOG_ENTER();
+
+    m_runNotificationThread = false;
+
+    // notify thread that it should end
+    m_notificationThreadShouldEndEvent.notify();
+
+    m_notificationThread->join();
 }
 
 sai_status_t RedisRemoteSaiInterface::create(
@@ -1523,3 +1551,79 @@ bool RedisRemoteSaiInterface::isRedisAttribute(
 
     return true;
 }
+
+void RedisRemoteSaiInterface::notificationThreadFunction()
+{
+    SWSS_LOG_ENTER();
+
+    swss::Select s;
+
+    s.addSelectable(m_notificationConsumer.get());
+    s.addSelectable(&m_notificationThreadShouldEndEvent);
+
+    while (m_runNotificationThread)
+    {
+        swss::Selectable *sel;
+
+        int result = s.select(&sel);
+
+        if (sel == &m_notificationThreadShouldEndEvent)
+        {
+            // user requested shutdown_switch
+            break;
+        }
+
+        if (result == swss::Select::OBJECT)
+        {
+            swss::KeyOpFieldsValuesTuple kco;
+
+            std::string op;
+            std::string data;
+            std::vector<swss::FieldValueTuple> values;
+
+            m_notificationConsumer->pop(op, data, values);
+
+            SWSS_LOG_DEBUG("notification: op = %s, data = %s", op.c_str(), data.c_str());
+
+            handleNotification(op, data, values);
+        }
+        else
+        {
+            SWSS_LOG_ERROR("select failed: %s", getSelectResultAsString(result).c_str());
+        }
+    }
+}
+
+void RedisRemoteSaiInterface::handleNotification(
+        _In_ const std::string &name,
+        _In_ const std::string &serializedNotification,
+        _In_ const std::vector<swss::FieldValueTuple> &values)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO to pass switch_id for every notification we could add it to values
+    // at syncd side
+    //
+    // Each global context (syncd) will have it's own notification thread
+    // handler, so we will know at which context notification arrived, but we
+    // also need to know at which switch id generated this notification. For
+    // that we will assign separate notification handlers in syncd itself, and
+    // each of those notifications will know to which switch id it belongs.
+    // Then later we could also check whether oids in notification actually
+    // belongs to given switch id.  This way we could find vendor bugs like
+    // sending notifications from one switch to another switch handler.
+    //
+    // But before that we will extract switch id from notification itself.
+
+    // TODO record should also be under api mutex, all other apis are
+
+    g_recorder->recordNotification(name, serializedNotification, values);
+
+    auto notification = NotificationFactory::deserialize(name, serializedNotification);
+
+    if (notification && m_notificationCallback)
+    {
+        m_notificationCallback(notification);
+    }
+}
+

@@ -62,31 +62,9 @@ static sai_switch_notifications_t processNotification(
 }
 
 void handle_notification(
-        _In_ const std::string &name,
-        _In_ const std::string &serializedNotification,
-        _In_ const std::vector<swss::FieldValueTuple> &values)
+        _In_ std::shared_ptr<Notification> notification)
 {
     SWSS_LOG_ENTER();
-
-    // TODO to pass switch_id for every notification we could add it to values
-    // at syncd side
-    //
-    // Each global context (syncd) will have it's own notification thread
-    // handler, so we will know at which context notification arrived, but we
-    // also need to know at which switch id generated this notification. For
-    // that we will assign separate notification handlers in syncd itself, and
-    // each of those notifications will know to which switch id it belongs.
-    // Then later we could also check whether oids in notification actually
-    // belongs to given switch id.  This way we could find vendor bugs like
-    // sending notifications from one switch to another switch handler.
-    //
-    // But before that we will extract switch id from notification itself.
-
-    // TODO record should also be under api mutex, all other apis are
-
-    g_recorder->recordNotification(name, serializedNotification, values);
-
-    auto notification = NotificationFactory::deserialize(name, serializedNotification);
 
     if (notification)
     {

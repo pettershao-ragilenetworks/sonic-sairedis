@@ -27,3 +27,8 @@
  */
 #define REDIS_KEY_VIDCOUNTER "VIDCOUNTER"
 
+/**
+ * @brief Table which will be used to forward notifications from syncd.
+ */
+#define REDIS_TABLE_NOTIFICATIONS "NOTIFICATIONS"
+

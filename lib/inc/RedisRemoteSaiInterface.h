@@ -1,11 +1,15 @@
 #pragma once
 
 #include "RemoteSaiInterface.h"
+#include "Notification.h"
 
 #include "swss/producertable.h"
 #include "swss/consumertable.h"
+#include "swss/notificationconsumer.h"
+#include "swss/selectableevent.h"
 
 #include <memory>
+#include <functional>
 
 /*
  * Asic state table commands. Those names are special and they will be used
@@ -98,9 +102,10 @@ namespace sairedis
 
             RedisRemoteSaiInterface(
                     _In_ std::shared_ptr<swss::ProducerTable> asicState,
-                    _In_ std::shared_ptr<swss::ConsumerTable> getConsumer);
+                    _In_ std::shared_ptr<swss::ConsumerTable> getConsumer,
+                    _In_ std::function<void(std::shared_ptr<Notification>)> notificationCallback);
 
-            virtual ~RedisRemoteSaiInterface() = default;
+            virtual ~RedisRemoteSaiInterface();
 
         public: // SAI interface overrides
 
@@ -396,6 +401,15 @@ namespace sairedis
             // TODO to be removed when swss-common pointer will be advanced
             static std::string getSelectResultAsString(int result);
 
+        private: // notification
+
+            void notificationThreadFunction();
+
+            void handleNotification(
+                    _In_ const std::string &name,
+                    _In_ const std::string &serializedNotification,
+                    _In_ const std::vector<swss::FieldValueTuple> &values);
+
         private:
 
             /**
@@ -411,5 +425,34 @@ namespace sairedis
              * Channel used to receive responses from syncd.
              */
             std::shared_ptr<swss::ConsumerTable> m_getConsumer;
+
+        private: // notification
+
+            std::function<void(std::shared_ptr<Notification>)> m_notificationCallback;
+
+            /**
+             * @brief Indicates whether notification thread should be running.
+             */
+            volatile bool m_runNotificationThread;
+
+            /**
+             * @brief Database connector used for notifications.
+             */
+            std::shared_ptr<swss::DBConnector> m_dbNtf;
+
+            /**
+             * @brief Notification consumer.
+             */
+            std::shared_ptr<swss::NotificationConsumer> m_notificationConsumer;
+
+            /**
+             * @brief Event used to nice end notifications thread.
+             */
+            swss::SelectableEvent m_notificationThreadShouldEndEvent;
+
+            /**
+             * @brief Notification thread
+             */
+            std::shared_ptr<std::thread> m_notificationThread;
     };
 }

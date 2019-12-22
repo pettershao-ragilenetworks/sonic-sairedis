@@ -9,6 +9,29 @@ endif
 lib_LTLIBRARIES = libsairedis.la
 
 libsairedis_la_SOURCES = \
+						 sai_redis_interfacequery.cpp \
+						 sai_redis_switch.cpp \
+						 sai_redis_generic_create.cpp \
+						 sai_redis_generic_remove.cpp \
+						 sai_redis_generic_stats.cpp \
+						 sai_redis_notifications.cpp \
+						 sai_redis_record.cpp \
+						 Globals.cpp \
+						 Switch.cpp \
+						 SwitchContainer.cpp \
+						 VirtualObjectIdManager.cpp \
+						 Notification.cpp \
+						 NotificationSwitchShutdownRequest.cpp \
+						 NotificationPortStateChange.cpp \
+						 NotificationSwitchStateChange.cpp \
+						 NotificationFdbEvent.cpp \
+						 NotificationQueuePfcDeadlock.cpp \
+						 NotificationFactory.cpp \
+						 RedisVidIndexGenerator.cpp \
+						 Recorder.cpp \
+						 RedisRemoteSaiInterface.cpp \
+						 Utils.cpp \
+						 WrapperRemoteSaiInterface.cpp \
 						 sai_redis_acl.cpp \
 						 sai_redis_bfd.cpp \
 						 sai_redis_bmtor.cpp \
@@ -20,7 +43,6 @@ libsairedis_la_SOURCES = \
 						 sai_redis_fdb.cpp \
 						 sai_redis_hash.cpp \
 						 sai_redis_hostintf.cpp \
-						 sai_redis_interfacequery.cpp \
 						 sai_redis_ipmc.cpp \
 						 sai_redis_ipmc_group.cpp \
 						 sai_redis_isolation_group.cpp \
@@ -46,35 +68,12 @@ libsairedis_la_SOURCES = \
 						 sai_redis_schedulergroup.cpp \
 						 sai_redis_segmentroute.cpp \
 						 sai_redis_stp.cpp \
-						 sai_redis_switch.cpp \
 						 sai_redis_tam.cpp \
 						 sai_redis_tunnel.cpp \
 						 sai_redis_udf.cpp \
 						 sai_redis_virtual_router.cpp \
 						 sai_redis_vlan.cpp \
-						 sai_redis_wred.cpp \
-						 sai_redis_generic_create.cpp \
-						 sai_redis_generic_remove.cpp \
-						 sai_redis_generic_stats.cpp \
-						 sai_redis_notifications.cpp \
-						 sai_redis_record.cpp \
-						 Globals.cpp \
-						 SkipRecordAttrContainer.cpp \
-						 Switch.cpp \
-						 SwitchContainer.cpp \
-						 VirtualObjectIdManager.cpp \
-						 Notification.cpp \
-						 NotificationSwitchShutdownRequest.cpp \
-						 NotificationPortStateChange.cpp \
-						 NotificationSwitchStateChange.cpp \
-						 NotificationFdbEvent.cpp \
-						 NotificationQueuePfcDeadlock.cpp \
-						 NotificationFactory.cpp \
-						 RedisVidIndexGenerator.cpp \
-						 Recorder.cpp \
-						 RedisRemoteSaiInterface.cpp \
-						 Utils.cpp \
-						 WrapperRemoteSaiInterface.cpp
+						 sai_redis_wred.cpp
 
 
 libsairedis_la_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON)

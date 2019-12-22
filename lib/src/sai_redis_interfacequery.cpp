@@ -19,15 +19,9 @@ using namespace saimeta;
 sai_service_method_table_t g_services;
 volatile bool          g_run = false;
 
-// this event is used to nice end notifications thread
-swss::SelectableEvent g_redisNotificationThreadEvent;
-std::shared_ptr<std::thread> notification_thread;
-
 std::shared_ptr<swss::DBConnector>          g_db;
-std::shared_ptr<swss::DBConnector>          g_dbNtf;
 std::shared_ptr<swss::ProducerTable>        g_asicState;
 std::shared_ptr<swss::ConsumerTable>        g_redisGetConsumer;
-std::shared_ptr<swss::NotificationConsumer> g_redisNotifications;
 std::shared_ptr<swss::RedisPipeline>        g_redisPipeline;
 
 // TODO must be per syncd instance
@@ -37,6 +31,9 @@ std::shared_ptr<RedisVidIndexGenerator>     g_redisVidIndexGenerator;
 std::shared_ptr<Recorder>                   g_recorder;
 std::shared_ptr<RemoteSaiInterface>         g_remoteSaiInterface;
 std::shared_ptr<Meta>                       g_meta;
+
+extern void handle_notification(
+        _In_ std::shared_ptr<Notification> notification);
 
 void clear_local_state()
 {
@@ -60,44 +57,6 @@ void clear_local_state()
 
     // TODO same as meta init database, will be the same at the end
     g_meta = std::make_shared<Meta>();
-}
-
-void ntf_thread()
-{
-    SWSS_LOG_ENTER();
-
-    swss::Select s;
-
-    s.addSelectable(g_redisNotifications.get());
-    s.addSelectable(&g_redisNotificationThreadEvent);
-
-    while (g_run)
-    {
-        swss::Selectable *sel;
-
-        int result = s.select(&sel);
-
-        if (sel == &g_redisNotificationThreadEvent)
-        {
-            // user requested shutdown_switch
-            break;
-        }
-
-        if (result == swss::Select::OBJECT)
-        {
-            swss::KeyOpFieldsValuesTuple kco;
-
-            std::string op;
-            std::string data;
-            std::vector<swss::FieldValueTuple> values;
-
-            g_redisNotifications->pop(op, data, values);
-
-            SWSS_LOG_DEBUG("notification: op = %s, data = %s", op.c_str(), data.c_str());
-
-            handle_notification(op, data, values);
-        }
-    }
 }
 
 sai_status_t sai_api_initialize(
@@ -124,21 +83,13 @@ sai_status_t sai_api_initialize(
 
     memcpy(&g_services, services, sizeof(g_services));
 
-    g_db                 = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
-    g_dbNtf              = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
+    g_db                 = std::make_shared<swss::DBConnector>(ASIC_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
     g_redisPipeline      = std::make_shared<swss::RedisPipeline>(g_db.get()); //enable default pipeline 128
     g_asicState          = std::make_shared<swss::ProducerTable>(g_redisPipeline.get(), ASIC_STATE_TABLE, true);
     g_redisGetConsumer   = std::make_shared<swss::ConsumerTable>(g_db.get(), "GETRESPONSE");
-    g_redisNotifications = std::make_shared<swss::NotificationConsumer>(g_dbNtf.get(), "NOTIFICATIONS");
     g_redisVidIndexGenerator = std::make_shared<RedisVidIndexGenerator>(g_db, REDIS_KEY_VIDCOUNTER);
 
     g_recorder = std::make_shared<Recorder>();
-
-    auto impl = std::make_shared<RedisRemoteSaiInterface>(
-            g_asicState,
-            g_redisGetConsumer); // possible tcp/shmem interfaces
-
-    g_remoteSaiInterface = std::make_shared<WrapperRemoteSaiInterface>(impl);
 
     clear_local_state();
 
@@ -146,13 +97,13 @@ sai_status_t sai_api_initialize(
 
     g_useTempView = false;
 
-    g_run = true;
+    // will create notification thread
+    auto impl = std::make_shared<RedisRemoteSaiInterface>(
+            g_asicState,
+            g_redisGetConsumer,
+            std::bind<void(std::shared_ptr<Notification>)>(&handle_notification, std::placeholders::_1)); // possible tcp/shmem interfaces
 
-    SWSS_LOG_DEBUG("creating notification thread");
-
-    // TODO what will happen when we receive notification in init view mode ?
-
-    notification_thread = std::make_shared<std::thread>(ntf_thread);
+    g_remoteSaiInterface = std::make_shared<WrapperRemoteSaiInterface>(impl);
 
     Globals::apiInitialized = true;
 
@@ -165,12 +116,15 @@ sai_status_t sai_api_uninitialize(void)
     SWSS_LOG_ENTER();
     REDIS_CHECK_API_INITIALIZED();
 
-    g_run = false;
+    // TODO: possible deadlock: user called uninitialize, and obtained lock and
+    // call destructor on SAI interface, which in destructor will try to join
+    // thread, but then notification arrived, and notification thread tries to
+    // process it, and tries to acquire lock, but lock is taken by uninitialize
 
-    // notify thread that it should end
-    g_redisNotificationThreadEvent.notify();
+    // will stop notification thread
+    g_remoteSaiInterface = nullptr;
 
-    notification_thread->join();
+    g_recorder = nullptr;
 
     // clear everything after stopping notification thread
     clear_local_state();
