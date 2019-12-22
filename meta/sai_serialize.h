@@ -18,7 +18,7 @@ extern "C" {
 
 #include "swss/logger.h"
 
-#include "lib/inc/sairedis.h"
+#include "sairedis.h"
 
 // util
 
