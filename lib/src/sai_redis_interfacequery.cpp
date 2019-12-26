@@ -55,8 +55,8 @@ void clear_local_state()
     // TODO update global context when supporting multiple syncd instances
     g_virtualObjectIdManager = std::make_shared<VirtualObjectIdManager>(0, g_redisVidIndexGenerator);
 
-    // TODO same as meta init database, will be the same at the end
-    g_meta = std::make_shared<Meta>();
+    if (g_meta)
+        g_meta->clear();
 }
 
 sai_status_t sai_api_initialize(
@@ -105,6 +105,8 @@ sai_status_t sai_api_initialize(
 
     g_remoteSaiInterface = std::make_shared<WrapperRemoteSaiInterface>(impl);
 
+    g_meta = std::make_shared<Meta>(g_remoteSaiInterface);
+
     Globals::apiInitialized = true;
 
     return SAI_STATUS_SUCCESS;
@@ -120,6 +122,8 @@ sai_status_t sai_api_uninitialize(void)
     // call destructor on SAI interface, which in destructor will try to join
     // thread, but then notification arrived, and notification thread tries to
     // process it, and tries to acquire lock, but lock is taken by uninitialize
+
+    g_meta = nullptr;
 
     // will stop notification thread
     g_remoteSaiInterface = nullptr;
@@ -233,8 +237,7 @@ sai_status_t sai_query_attribute_enum_values_capability(
             switch_id,
             object_type,
             attr_id,
-            enum_values_capability,
-            *g_remoteSaiInterface);
+            enum_values_capability);
 }
 
 sai_status_t sai_object_type_get_availability(
@@ -253,8 +256,7 @@ sai_status_t sai_object_type_get_availability(
             object_type,
             attr_count,
             attr_list,
-            count,
-            *g_remoteSaiInterface);
+            count);
 }
 
 sai_object_type_t sai_object_type_query(

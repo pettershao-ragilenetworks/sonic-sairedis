@@ -23,8 +23,7 @@ static sai_status_t redis_create_ ## object_type(                   \
                 object_type ## _id,                                 \
                 switch_id,                                          \
                 attr_count,                                         \
-                attr_list,                                          \
-                *g_remoteSaiInterface);                             \
+                attr_list);                                         \
     }
 
 #define REDIS_REMOVE(OBJECT_TYPE,object_type)                       \
@@ -36,8 +35,7 @@ static sai_status_t redis_remove_ ## object_type(                   \
         REDIS_CHECK_API_INITIALIZED();                              \
         return g_meta->remove(                                      \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
-                object_type ## _id,                                 \
-                *g_remoteSaiInterface);                             \
+                object_type ## _id);                                \
     }
 
 #define REDIS_SET(OBJECT_TYPE,object_type)                          \
@@ -51,8 +49,7 @@ static sai_status_t redis_set_ ##object_type ## _attribute(         \
         return g_meta->set(                                         \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
-                attr,                                               \
-                *g_remoteSaiInterface);                             \
+                attr);                                              \
     }
 
 #define REDIS_GET(OBJECT_TYPE,object_type)                          \
@@ -68,8 +65,7 @@ static sai_status_t redis_get_ ##object_type ## _attribute(         \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
                 attr_count,                                         \
-                attr_list,                                          \
-                *g_remoteSaiInterface);                             \
+                attr_list);                                         \
     }
 
 #define REDIS_GENERIC_QUAD(OT,ot)  \
@@ -92,8 +88,7 @@ static sai_status_t redis_create_ ## object_type(               \
         return g_meta->create(                                  \
                 object_type,                                    \
                 attr_count,                                     \
-                attr_list,                                      \
-                *g_remoteSaiInterface);                         \
+                attr_list);                                     \
     }
 
 #define REDIS_REMOVE_ENTRY(OBJECT_TYPE,object_type)             \
@@ -104,8 +99,7 @@ static sai_status_t redis_remove_ ## object_type(               \
         SWSS_LOG_ENTER();                                       \
         REDIS_CHECK_API_INITIALIZED();                          \
         return g_meta->remove(                                  \
-                object_type,                                    \
-                *g_remoteSaiInterface);                         \
+                object_type);                                   \
     }
 
 #define REDIS_SET_ENTRY(OBJECT_TYPE,object_type)                \
@@ -118,8 +112,7 @@ static sai_status_t redis_set_ ## object_type ## _attribute(    \
         REDIS_CHECK_API_INITIALIZED();                          \
         return g_meta->set(                                     \
                 object_type,                                    \
-                attr,                                           \
-                 *g_remoteSaiInterface);                        \
+                attr);                                          \
     }
 
 #define REDIS_GET_ENTRY(OBJECT_TYPE,object_type)                \
@@ -134,8 +127,7 @@ static sai_status_t redis_get_ ## object_type ## _attribute(    \
         return g_meta->get(                                     \
                 object_type,                                    \
                 attr_count,                                     \
-                attr_list,                                      \
-                *g_remoteSaiInterface);                         \
+                attr_list);                                     \
     }
 
 #define REDIS_GENERIC_QUAD_ENTRY(OT,ot)  \
@@ -169,8 +161,7 @@ static sai_status_t redis_get_ ## object_type ## _stats(            \
                 object_type ## _id,                                 \
                 number_of_counters,                                 \
                 counter_ids,                                        \
-                counters,                                           \
-                *g_remoteSaiInterface);                             \
+                counters);                                          \
     }
 
 #define REDIS_GET_STATS_EXT(OBJECT_TYPE,object_type)                \
@@ -190,8 +181,7 @@ static sai_status_t redis_get_ ## object_type ## _stats_ext(        \
                 number_of_counters,                                 \
                 counter_ids,                                        \
                 mode,                                               \
-                counters,                                           \
-                *g_remoteSaiInterface);                             \
+                counters);                                          \
     }
 
 #define REDIS_CLEAR_STATS(OBJECT_TYPE,object_type)                  \
@@ -207,8 +197,7 @@ static sai_status_t redis_clear_ ## object_type ## _stats(          \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
                 number_of_counters,                                 \
-                counter_ids,                                        \
-                *g_remoteSaiInterface);                             \
+                counter_ids);                                       \
     }
 
 #define REDIS_GENERIC_STATS(OT, ot)    \
@@ -256,8 +245,7 @@ static sai_status_t redis_bulk_create_ ## fname(    \
             attr_list,                              \
             mode,                                   \
             object_id,                              \
-            object_statuses,                        \
-            *g_remoteSaiInterface);                 \
+            object_statuses);                       \
 }
 
 #define REDIS_BULK_REMOVE(OT,fname)                 \
@@ -275,8 +263,7 @@ static sai_status_t redis_bulk_remove_ ## fname(    \
             object_count,                           \
             object_id,                              \
             mode,                                   \
-            object_statuses,                        \
-            *g_remoteSaiInterface);                 \
+            object_statuses);                       \
 }
 
 #define REDIS_BULK_SET(OT,fname)                    \
@@ -296,8 +283,7 @@ static sai_status_t redis_bulk_set_ ## fname(       \
             object_id,                              \
             attr_list,                              \
             mode,                                   \
-            object_statuses,                        \
-            *g_remoteSaiInterface);                 \
+            object_statuses);                       \
 }
 
 #define REDIS_BULK_GET(OT,fname)                    \
@@ -334,8 +320,7 @@ static sai_status_t redis_bulk_create_ ## ot(       \
             attr_count,                             \
             attr_list,                              \
             mode,                                   \
-            object_statuses,                        \
-            *g_remoteSaiInterface);                 \
+            object_statuses);                       \
 }
 
 #define REDIS_BULK_REMOVE_ENTRY(OT,ot)              \
@@ -352,8 +337,7 @@ static sai_status_t redis_bulk_remove_ ## ot(       \
             object_count,                           \
             entry,                                  \
             mode,                                   \
-            object_statuses,                        \
-            *g_remoteSaiInterface);                 \
+            object_statuses);                       \
 }
 
 #define REDIS_BULK_SET_ENTRY(OT,ot)                 \
@@ -372,8 +356,7 @@ static sai_status_t redis_bulk_set_ ## ot(          \
             entry,                                  \
             attr_list,                              \
             mode,                                   \
-            object_statuses,                        \
-            *g_remoteSaiInterface);                 \
+            object_statuses);                       \
 }
 
 #define REDIS_BULK_GET_ENTRY(OT,ot)                 \

@@ -14,8 +14,7 @@ static sai_status_t redis_flush_fdb_entries(
     return g_meta->flushFdbEntries(
             switch_id,
             attr_count,
-            attr_list,
-            *g_remoteSaiInterface);
+            attr_list);
 }
 
 REDIS_GENERIC_QUAD_ENTRY(FDB_ENTRY,fdb_entry);
