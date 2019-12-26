@@ -2,143 +2,136 @@
 
 #include "lib/inc/SaiInterface.h"
 
-#define SAIMETA_META_DECLARE_REMOVE_ENTRY(ot)                   \
-    sai_status_t remove(                                        \
-            _In_ const sai_ ## ot ## _t* ot,                    \
-            _Inout_ sairedis::SaiInterface& saiInterface);
+#include <memory>
 
-#define SAIMETA_META_DECLARE_CREATE_ENTRY(ot)                   \
-    sai_status_t create(                                        \
-            _In_ const sai_ ## ot ## _t* ot,                    \
-            _In_ uint32_t attr_count,                           \
-            _In_ const sai_attribute_t *attr_list,              \
-            _Inout_ sairedis::SaiInterface& saiInterface);
+#define SAIREDIS_META_DECLARE_REMOVE_ENTRY(ot) \
+    virtual sai_status_t remove(                                    \
+            _In_ const sai_ ## ot ## _t* ot) override;
 
-#define SAIMETA_META_DECLARE_SET_ENTRY(ot)                      \
-    sai_status_t set(                                           \
-            _In_ const sai_ ## ot ## _t* ot,                    \
-            _In_ const sai_attribute_t *attr,                   \
-            _Inout_ sairedis::SaiInterface& saiInterface);
+#define SAIREDIS_META_DECLARE_CREATE_ENTRY(ot) \
+    virtual sai_status_t create(                                    \
+            _In_ const sai_ ## ot ## _t* ot,                        \
+            _In_ uint32_t attr_count,                               \
+            _In_ const sai_attribute_t *attr_list) override;
 
-#define SAIMETA_META_DECLARE_GET_ENTRY(ot)                      \
-    sai_status_t get(                                           \
-            _In_ const sai_ ## ot ## _t* ot,                    \
-            _In_ uint32_t attr_count,                           \
-            _Out_ sai_attribute_t *attr_list,                   \
-            _Inout_ sairedis::SaiInterface& saiInterface);
+#define SAIREDIS_META_DECLARE_SET_ENTRY(ot)    \
+    virtual sai_status_t set(                                       \
+            _In_ const sai_ ## ot ## _t* ot,                        \
+            _In_ const sai_attribute_t *attr) override;
 
-#define SAIMETA_META_DECLARE_BULK_CREATE_ENTRY(ot)              \
-    virtual sai_status_t bulkCreate(                            \
-            _In_ uint32_t object_count,                         \
-            _In_ const sai_ ## ot ## _t *ot,                    \
-            _In_ const uint32_t *attr_count,                    \
-            _In_ const sai_attribute_t **attr_list,             \
-            _In_ sai_bulk_op_error_mode_t mode,                 \
-            _Out_ sai_status_t *object_statuses,                \
-            _Inout_ sairedis::SaiInterface& saiInterface);
+#define SAIREDIS_META_DECLARE_GET_ENTRY(ot)    \
+    virtual sai_status_t get(                                       \
+            _In_ const sai_ ## ot ## _t* ot,                        \
+            _In_ uint32_t attr_count,                               \
+            _Out_ sai_attribute_t *attr_list) override;
 
-#define SAIMETA_META_DECLARE_BULK_REMOVE_ENTRY(ot)              \
-    sai_status_t bulkRemove(                                    \
-            _In_ uint32_t object_count,                         \
-            _In_ const sai_ ## ot ## _t * ot,                   \
-            _In_ sai_bulk_op_error_mode_t mode,                 \
-            _Out_ sai_status_t *object_statuses,                \
-            _Inout_ sairedis::SaiInterface& saiInterface);
+#define SAIREDIS_META_DECLARE_BULK_CREATE_ENTRY(ot)    \
+    virtual sai_status_t bulkCreate(                                        \
+            _In_ uint32_t object_count,                                     \
+            _In_ const sai_ ## ot ## _t *ot,                                \
+            _In_ const uint32_t *attr_count,                                \
+            _In_ const sai_attribute_t **attr_list,                         \
+            _In_ sai_bulk_op_error_mode_t mode,                             \
+            _Out_ sai_status_t *object_statuses) override;
 
-#define SAIMETA_META_DECLARE_BULK_SET_ENTRY(ot)                 \
-    sai_status_t bulkSet(                                       \
-            _In_ uint32_t object_count,                         \
-            _In_ const sai_ ## ot ## _t * ot,                   \
-            _In_ const sai_attribute_t *attr_list,              \
-            _In_ sai_bulk_op_error_mode_t mode,                 \
-            _Out_ sai_status_t *object_statuses,                \
-            _Inout_ sairedis::SaiInterface& saiInterface);
+#define SAIREDIS_META_DECLARE_BULK_REMOVE_ENTRY(ot)    \
+    virtual sai_status_t bulkRemove(                                        \
+            _In_ uint32_t object_count,                                     \
+            _In_ const sai_ ## ot ## _t *ot,                                \
+            _In_ sai_bulk_op_error_mode_t mode,                             \
+            _Out_ sai_status_t *object_statuses) override;
+
+#define SAIREDIS_META_DECLARE_BULK_SET_ENTRY(ot)       \
+    virtual sai_status_t bulkSet(                                           \
+            _In_ uint32_t object_count,                                     \
+            _In_ const sai_ ## ot ## _t *ot,                                \
+            _In_ const sai_attribute_t *attr_list,                          \
+            _In_ sai_bulk_op_error_mode_t mode,                             \
+            _Out_ sai_status_t *object_statuses) override;
 
 namespace saimeta
 {
-    class Meta
+    class Meta:
+        public sairedis::SaiInterface
     {
         public:
 
-            Meta() = default;
+            Meta(
+                    _In_ std::shared_ptr<SaiInterface> impl);
 
             virtual ~Meta() = default;
 
-        public: // quad API
+        public: // SAI interface overrides
 
-            sai_status_t create(
+            virtual sai_status_t create(
                     _In_ sai_object_type_t objectType,
                     _Out_ sai_object_id_t* objectId,
                     _In_ sai_object_id_t switchId,
                     _In_ uint32_t attr_count,
-                    _In_ const sai_attribute_t *attr_list,
-                    _Inout_ sairedis::SaiInterface& saiInterface);
+                    _In_ const sai_attribute_t *attr_list) override;
 
-            sai_status_t remove(
+            virtual sai_status_t remove(
+                    _In_ sai_object_type_t objectType,
+                    _In_ sai_object_id_t objectId) override;
+
+            virtual sai_status_t set(
                     _In_ sai_object_type_t objectType,
                     _In_ sai_object_id_t objectId,
-                    _Inout_ sairedis::SaiInterface& saiInterface);
+                    _In_ const sai_attribute_t *attr) override;
 
-            sai_status_t set(
-                    _In_ sai_object_type_t object_type,
-                    _In_ sai_object_id_t object_id,
-                    _In_ const sai_attribute_t *attr,
-                    _Inout_ sairedis::SaiInterface& saiInterface);
-
-            sai_status_t get(
+            virtual sai_status_t get(
                     _In_ sai_object_type_t objectType,
                     _In_ sai_object_id_t objectId,
                     _In_ uint32_t attr_count,
-                    _Inout_ sai_attribute_t *attr_list,
-                    _Inout_ sairedis::SaiInterface& saiInterface);
+                    _Inout_ sai_attribute_t *attr_list) override;
 
         public: // create ENTRY
 
-            SAIMETA_META_DECLARE_CREATE_ENTRY(fdb_entry);
-            SAIMETA_META_DECLARE_CREATE_ENTRY(inseg_entry);
-            SAIMETA_META_DECLARE_CREATE_ENTRY(ipmc_entry);
-            SAIMETA_META_DECLARE_CREATE_ENTRY(l2mc_entry);
-            SAIMETA_META_DECLARE_CREATE_ENTRY(mcast_fdb_entry);
-            SAIMETA_META_DECLARE_CREATE_ENTRY(neighbor_entry);
-            SAIMETA_META_DECLARE_CREATE_ENTRY(route_entry);
-            SAIMETA_META_DECLARE_CREATE_ENTRY(nat_entry);
+            SAIREDIS_META_DECLARE_CREATE_ENTRY(fdb_entry);
+            SAIREDIS_META_DECLARE_CREATE_ENTRY(inseg_entry);
+            SAIREDIS_META_DECLARE_CREATE_ENTRY(ipmc_entry);
+            SAIREDIS_META_DECLARE_CREATE_ENTRY(l2mc_entry);
+            SAIREDIS_META_DECLARE_CREATE_ENTRY(mcast_fdb_entry);
+            SAIREDIS_META_DECLARE_CREATE_ENTRY(neighbor_entry);
+            SAIREDIS_META_DECLARE_CREATE_ENTRY(route_entry);
+            SAIREDIS_META_DECLARE_CREATE_ENTRY(nat_entry);
 
         public: // remove ENTRY
 
-            SAIMETA_META_DECLARE_REMOVE_ENTRY(fdb_entry);
-            SAIMETA_META_DECLARE_REMOVE_ENTRY(inseg_entry);
-            SAIMETA_META_DECLARE_REMOVE_ENTRY(ipmc_entry);
-            SAIMETA_META_DECLARE_REMOVE_ENTRY(l2mc_entry);
-            SAIMETA_META_DECLARE_REMOVE_ENTRY(mcast_fdb_entry);
-            SAIMETA_META_DECLARE_REMOVE_ENTRY(neighbor_entry);
-            SAIMETA_META_DECLARE_REMOVE_ENTRY(route_entry);
-            SAIMETA_META_DECLARE_REMOVE_ENTRY(nat_entry);
+            SAIREDIS_META_DECLARE_REMOVE_ENTRY(fdb_entry);
+            SAIREDIS_META_DECLARE_REMOVE_ENTRY(inseg_entry);
+            SAIREDIS_META_DECLARE_REMOVE_ENTRY(ipmc_entry);
+            SAIREDIS_META_DECLARE_REMOVE_ENTRY(l2mc_entry);
+            SAIREDIS_META_DECLARE_REMOVE_ENTRY(mcast_fdb_entry);
+            SAIREDIS_META_DECLARE_REMOVE_ENTRY(neighbor_entry);
+            SAIREDIS_META_DECLARE_REMOVE_ENTRY(route_entry);
+            SAIREDIS_META_DECLARE_REMOVE_ENTRY(nat_entry);
 
         public: // set ENTRY
 
-            SAIMETA_META_DECLARE_SET_ENTRY(fdb_entry);
-            SAIMETA_META_DECLARE_SET_ENTRY(inseg_entry);
-            SAIMETA_META_DECLARE_SET_ENTRY(ipmc_entry);
-            SAIMETA_META_DECLARE_SET_ENTRY(l2mc_entry);
-            SAIMETA_META_DECLARE_SET_ENTRY(mcast_fdb_entry);
-            SAIMETA_META_DECLARE_SET_ENTRY(neighbor_entry);
-            SAIMETA_META_DECLARE_SET_ENTRY(route_entry);
-            SAIMETA_META_DECLARE_SET_ENTRY(nat_entry);
+            SAIREDIS_META_DECLARE_SET_ENTRY(fdb_entry);
+            SAIREDIS_META_DECLARE_SET_ENTRY(inseg_entry);
+            SAIREDIS_META_DECLARE_SET_ENTRY(ipmc_entry);
+            SAIREDIS_META_DECLARE_SET_ENTRY(l2mc_entry);
+            SAIREDIS_META_DECLARE_SET_ENTRY(mcast_fdb_entry);
+            SAIREDIS_META_DECLARE_SET_ENTRY(neighbor_entry);
+            SAIREDIS_META_DECLARE_SET_ENTRY(route_entry);
+            SAIREDIS_META_DECLARE_SET_ENTRY(nat_entry);
 
         public: // get ENTRY
 
-            SAIMETA_META_DECLARE_GET_ENTRY(fdb_entry);
-            SAIMETA_META_DECLARE_GET_ENTRY(inseg_entry);
-            SAIMETA_META_DECLARE_GET_ENTRY(ipmc_entry);
-            SAIMETA_META_DECLARE_GET_ENTRY(l2mc_entry);
-            SAIMETA_META_DECLARE_GET_ENTRY(mcast_fdb_entry);
-            SAIMETA_META_DECLARE_GET_ENTRY(neighbor_entry);
-            SAIMETA_META_DECLARE_GET_ENTRY(route_entry);
-            SAIMETA_META_DECLARE_GET_ENTRY(nat_entry);
+            SAIREDIS_META_DECLARE_GET_ENTRY(fdb_entry);
+            SAIREDIS_META_DECLARE_GET_ENTRY(inseg_entry);
+            SAIREDIS_META_DECLARE_GET_ENTRY(ipmc_entry);
+            SAIREDIS_META_DECLARE_GET_ENTRY(l2mc_entry);
+            SAIREDIS_META_DECLARE_GET_ENTRY(mcast_fdb_entry);
+            SAIREDIS_META_DECLARE_GET_ENTRY(neighbor_entry);
+            SAIREDIS_META_DECLARE_GET_ENTRY(route_entry);
+            SAIREDIS_META_DECLARE_GET_ENTRY(nat_entry);
 
-        public: // bulk quad API
+        public: // bulk QUAD oid
 
-            sai_status_t bulkCreate(
+            virtual sai_status_t bulkCreate(
                     _In_ sai_object_type_t object_type,
                     _In_ sai_object_id_t switch_id,
                     _In_ uint32_t object_count,
@@ -146,93 +139,92 @@ namespace saimeta
                     _In_ const sai_attribute_t **attr_list,
                     _In_ sai_bulk_op_error_mode_t mode,
                     _Out_ sai_object_id_t *object_id,
-                    _Out_ sai_status_t *object_statuses,
-                    _Inout_ sairedis::SaiInterface& saiInterface);
+                    _Out_ sai_status_t *object_statuses) override;
 
-            sai_status_t bulkRemove(
+            virtual sai_status_t bulkRemove(
                     _In_ sai_object_type_t object_type,
                     _In_ uint32_t object_count,
                     _In_ const sai_object_id_t *object_id,
                     _In_ sai_bulk_op_error_mode_t mode,
-                    _Out_ sai_status_t *object_statuses,
-                    _Inout_ sairedis::SaiInterface& saiInterface);
+                    _Out_ sai_status_t *object_statuses) override;
 
-            sai_status_t bulkSet(
+            virtual sai_status_t bulkSet(
                     _In_ sai_object_type_t object_type,
                     _In_ uint32_t object_count,
                     _In_ const sai_object_id_t *object_id,
                     _In_ const sai_attribute_t *attr_list,
                     _In_ sai_bulk_op_error_mode_t mode,
-                    _Out_ sai_status_t *object_statuses,
-                    _Inout_ sairedis::SaiInterface& saiInterface);
+                    _Out_ sai_status_t *object_statuses) override;
 
         public: // bulk create ENTRY
 
-            SAIMETA_META_DECLARE_BULK_CREATE_ENTRY(fdb_entry);
-            SAIMETA_META_DECLARE_BULK_CREATE_ENTRY(nat_entry);
-            SAIMETA_META_DECLARE_BULK_CREATE_ENTRY(route_entry);
+            SAIREDIS_META_DECLARE_BULK_CREATE_ENTRY(fdb_entry);
+            SAIREDIS_META_DECLARE_BULK_CREATE_ENTRY(nat_entry);
+            SAIREDIS_META_DECLARE_BULK_CREATE_ENTRY(route_entry);
 
         public: // bulk remove ENTRY
 
-            SAIMETA_META_DECLARE_BULK_REMOVE_ENTRY(fdb_entry);
-            SAIMETA_META_DECLARE_BULK_REMOVE_ENTRY(nat_entry);
-            SAIMETA_META_DECLARE_BULK_REMOVE_ENTRY(route_entry);
+            SAIREDIS_META_DECLARE_BULK_REMOVE_ENTRY(fdb_entry);
+            SAIREDIS_META_DECLARE_BULK_REMOVE_ENTRY(nat_entry);
+            SAIREDIS_META_DECLARE_BULK_REMOVE_ENTRY(route_entry);
 
         public: // bulk set ENTRY
 
-            SAIMETA_META_DECLARE_BULK_SET_ENTRY(fdb_entry);
-            SAIMETA_META_DECLARE_BULK_SET_ENTRY(nat_entry);
-            SAIMETA_META_DECLARE_BULK_SET_ENTRY(route_entry);
-
-        public: // non quad API
-
-            sai_status_t flushFdbEntries(
-                    _In_ sai_object_id_t switchId,
-                    _In_ uint32_t attrCount,
-                    _In_ const sai_attribute_t *attrList,
-                    _Inout_ sairedis::SaiInterface& saiInterface);
-
-        public: // SAI API
-
-            sai_status_t objectTypeGetAvailability(
-                    _In_ sai_object_id_t switchId,
-                    _In_ sai_object_type_t objectType,
-                    _In_ uint32_t attrCount,
-                    _In_ const sai_attribute_t *attrList,
-                    _Out_ uint64_t *count,
-                    _Inout_ sairedis::SaiInterface& saiInterface);
-
-            sai_status_t queryAattributeEnumValuesCapability(
-                    _In_ sai_object_id_t switch_id,
-                    _In_ sai_object_type_t object_type,
-                    _In_ sai_attr_id_t attr_id,
-                    _Inout_ sai_s32_list_t *enum_values_capability,
-                    _Inout_ sairedis::SaiInterface& saiInterface);
+            SAIREDIS_META_DECLARE_BULK_SET_ENTRY(fdb_entry);
+            SAIREDIS_META_DECLARE_BULK_SET_ENTRY(nat_entry);
+            SAIREDIS_META_DECLARE_BULK_SET_ENTRY(route_entry);
 
         public: // stats API
 
-            sai_status_t getStats(
+            virtual sai_status_t getStats(
                     _In_ sai_object_type_t object_type,
                     _In_ sai_object_id_t object_id,
                     _In_ uint32_t number_of_counters,
                     _In_ const sai_stat_id_t *counter_ids,
-                    _Out_ uint64_t *counters,
-                    _Inout_ sairedis::SaiInterface& saiInterface);
+                    _Out_ uint64_t *counters) override;
 
-            sai_status_t getStatsExt(
+            virtual sai_status_t getStatsExt(
                     _In_ sai_object_type_t object_type,
                     _In_ sai_object_id_t object_id,
                     _In_ uint32_t number_of_counters,
                     _In_ const sai_stat_id_t *counter_ids,
                     _In_ sai_stats_mode_t mode,
-                    _Out_ uint64_t *counters,
-                    _Inout_ sairedis::SaiInterface& saiInterface);
+                    _Out_ uint64_t *counters) override;
 
-            sai_status_t clearStats(
+            virtual sai_status_t clearStats(
                     _In_ sai_object_type_t object_type,
                     _In_ sai_object_id_t object_id,
                     _In_ uint32_t number_of_counters,
-                    _In_ const sai_stat_id_t *counter_ids,
-                    _Inout_ sairedis::SaiInterface& saiInterface);
+                    _In_ const sai_stat_id_t *counter_ids) override;
+
+        public: // non QUAD API
+
+            virtual sai_status_t flushFdbEntries(
+                    _In_ sai_object_id_t switchId,
+                    _In_ uint32_t attrCount,
+                    _In_ const sai_attribute_t *attrList) override;
+
+        public: // SAI API
+
+            virtual sai_status_t objectTypeGetAvailability(
+                    _In_ sai_object_id_t switchId,
+                    _In_ sai_object_type_t objectType,
+                    _In_ uint32_t attrCount,
+                    _In_ const sai_attribute_t *attrList,
+                    _Out_ uint64_t *count) override;
+
+            virtual sai_status_t queryAattributeEnumValuesCapability(
+                    _In_ sai_object_id_t switch_id,
+                    _In_ sai_object_type_t object_type,
+                    _In_ sai_attr_id_t attr_id,
+                    _Inout_ sai_s32_list_t *enum_values_capability) override;
+
+        public:
+
+            void clear();
+
+        private:
+
+            std::shared_ptr<sairedis::SaiInterface> m_implementation;
     };
 }

@@ -98,10 +98,25 @@ sai_status_t meta_genetic_validation_list(
         _In_ uint32_t count,
         _In_ const void* list);
 
+Meta::Meta(
+        _In_ std::shared_ptr<sairedis::SaiInterface> impl):
+    m_implementation(impl)
+{
+    SWSS_LOG_ENTER();
+
+    // empty
+}
+
+void Meta::clear()
+{
+    SWSS_LOG_ENTER();
+
+    meta_init_db();
+}
+
 sai_status_t Meta::remove(
         _In_ sai_object_type_t object_type,
-        _In_ sai_object_id_t object_id,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ sai_object_id_t object_id)
 {
     SWSS_LOG_ENTER();
 
@@ -121,7 +136,7 @@ sai_status_t Meta::remove(
         return status;
     }
 
-    status = saiInterface.remove(object_type, object_id);
+    status = m_implementation->remove(object_type, object_id);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -141,8 +156,7 @@ sai_status_t Meta::remove(
 }
 
 sai_status_t Meta::remove(
-        _In_ const sai_fdb_entry_t* fdb_entry,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_fdb_entry_t* fdb_entry)
 {
     SWSS_LOG_ENTER();
 
@@ -162,7 +176,7 @@ sai_status_t Meta::remove(
         return status;
     }
 
-    status = saiInterface.remove(fdb_entry);
+    status = m_implementation->remove(fdb_entry);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -182,8 +196,7 @@ sai_status_t Meta::remove(
 }
 
 sai_status_t Meta::remove(
-        _In_ const sai_mcast_fdb_entry_t* mcast_fdb_entry,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_mcast_fdb_entry_t* mcast_fdb_entry)
 {
     SWSS_LOG_ENTER();
 
@@ -203,7 +216,7 @@ sai_status_t Meta::remove(
         return status;
     }
 
-    status = saiInterface.remove(mcast_fdb_entry);
+    status = m_implementation->remove(mcast_fdb_entry);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -223,8 +236,7 @@ sai_status_t Meta::remove(
 }
 
 sai_status_t Meta::remove(
-        _In_ const sai_neighbor_entry_t* neighbor_entry,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_neighbor_entry_t* neighbor_entry)
 {
     SWSS_LOG_ENTER();
 
@@ -244,7 +256,7 @@ sai_status_t Meta::remove(
         return status;
     }
 
-    status = saiInterface.remove(neighbor_entry);
+    status = m_implementation->remove(neighbor_entry);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -264,8 +276,7 @@ sai_status_t Meta::remove(
 }
 
 sai_status_t Meta::remove(
-        _In_ const sai_route_entry_t* route_entry,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_route_entry_t* route_entry)
 {
     SWSS_LOG_ENTER();
 
@@ -285,7 +296,7 @@ sai_status_t Meta::remove(
         return status;
     }
 
-    status = saiInterface.remove(route_entry);
+    status = m_implementation->remove(route_entry);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -305,8 +316,7 @@ sai_status_t Meta::remove(
 }
 
 sai_status_t Meta::remove(
-        _In_ const sai_l2mc_entry_t* l2mc_entry,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_l2mc_entry_t* l2mc_entry)
 {
     SWSS_LOG_ENTER();
 
@@ -326,7 +336,7 @@ sai_status_t Meta::remove(
         return status;
     }
 
-    status = saiInterface.remove(l2mc_entry);
+    status = m_implementation->remove(l2mc_entry);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -346,8 +356,7 @@ sai_status_t Meta::remove(
 }
 
 sai_status_t Meta::remove(
-        _In_ const sai_ipmc_entry_t* ipmc_entry,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_ipmc_entry_t* ipmc_entry)
 {
     SWSS_LOG_ENTER();
 
@@ -367,7 +376,7 @@ sai_status_t Meta::remove(
         return status;
     }
 
-    status = saiInterface.remove(ipmc_entry);
+    status = m_implementation->remove(ipmc_entry);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -387,8 +396,7 @@ sai_status_t Meta::remove(
 }
 
 sai_status_t Meta::remove(
-        _In_ const sai_nat_entry_t* nat_entry,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_nat_entry_t* nat_entry)
 {
     SWSS_LOG_ENTER();
 
@@ -408,7 +416,7 @@ sai_status_t Meta::remove(
         return status;
     }
 
-    status = saiInterface.remove(nat_entry);
+    status = m_implementation->remove(nat_entry);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -428,8 +436,7 @@ sai_status_t Meta::remove(
 }
 
 sai_status_t Meta::remove(
-        _In_ const sai_inseg_entry_t* inseg_entry,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_inseg_entry_t* inseg_entry)
 {
     SWSS_LOG_ENTER();
 
@@ -449,7 +456,7 @@ sai_status_t Meta::remove(
         return status;
     }
 
-    status = saiInterface.remove(inseg_entry);
+    status = m_implementation->remove(inseg_entry);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -471,8 +478,7 @@ sai_status_t Meta::remove(
 sai_status_t Meta::create(
         _In_ const sai_fdb_entry_t* fdb_entry,
         _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -492,7 +498,7 @@ sai_status_t Meta::create(
         return status;
     }
 
-    status = saiInterface.create(fdb_entry, attr_count, attr_list);
+    status = m_implementation->create(fdb_entry, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -514,8 +520,7 @@ sai_status_t Meta::create(
 sai_status_t Meta::create(
         _In_ const sai_mcast_fdb_entry_t* mcast_fdb_entry,
         _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -535,7 +540,7 @@ sai_status_t Meta::create(
         return status;
     }
 
-    status = saiInterface.create(mcast_fdb_entry, attr_count, attr_list);
+    status = m_implementation->create(mcast_fdb_entry, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -557,8 +562,7 @@ sai_status_t Meta::create(
 sai_status_t Meta::create(
         _In_ const sai_neighbor_entry_t* neighbor_entry,
         _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -578,7 +582,7 @@ sai_status_t Meta::create(
         return status;
     }
 
-    status = saiInterface.create(neighbor_entry, attr_count, attr_list);
+    status = m_implementation->create(neighbor_entry, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -599,8 +603,7 @@ sai_status_t Meta::create(
 sai_status_t Meta::create(
         _In_ const sai_route_entry_t* route_entry,
         _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -620,7 +623,7 @@ sai_status_t Meta::create(
         return status;
     }
 
-    status = saiInterface.create(route_entry, attr_count, attr_list);
+    status = m_implementation->create(route_entry, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -642,8 +645,7 @@ sai_status_t Meta::create(
 sai_status_t Meta::create(
         _In_ const sai_l2mc_entry_t* l2mc_entry,
         _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -663,7 +665,7 @@ sai_status_t Meta::create(
         return status;
     }
 
-    status = saiInterface.create(l2mc_entry, attr_count, attr_list);
+    status = m_implementation->create(l2mc_entry, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -685,8 +687,7 @@ sai_status_t Meta::create(
 sai_status_t Meta::create(
         _In_ const sai_ipmc_entry_t* ipmc_entry,
         _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -706,7 +707,7 @@ sai_status_t Meta::create(
         return status;
     }
 
-    status = saiInterface.create(ipmc_entry, attr_count, attr_list);
+    status = m_implementation->create(ipmc_entry, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -728,8 +729,7 @@ sai_status_t Meta::create(
 sai_status_t Meta::create(
         _In_ const sai_inseg_entry_t* inseg_entry,
         _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -749,7 +749,7 @@ sai_status_t Meta::create(
         return status;
     }
 
-    status = saiInterface.create(inseg_entry, attr_count, attr_list);
+    status = m_implementation->create(inseg_entry, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -771,8 +771,7 @@ sai_status_t Meta::create(
 sai_status_t Meta::create(
         _In_ const sai_nat_entry_t* nat_entry,
         _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -792,7 +791,7 @@ sai_status_t Meta::create(
         return status;
     }
 
-    status = saiInterface.create(nat_entry, attr_count, attr_list);
+    status = m_implementation->create(nat_entry, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -813,8 +812,7 @@ sai_status_t Meta::create(
 
 sai_status_t Meta::set(
         _In_ const sai_fdb_entry_t* fdb_entry,
-        _In_ const sai_attribute_t *attr,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr)
 {
     SWSS_LOG_ENTER();
 
@@ -834,7 +832,7 @@ sai_status_t Meta::set(
         return status;
     }
 
-    status = saiInterface.set(fdb_entry, attr);
+    status = m_implementation->set(fdb_entry, attr);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -855,8 +853,7 @@ sai_status_t Meta::set(
 
 sai_status_t Meta::set(
         _In_ const sai_mcast_fdb_entry_t* mcast_fdb_entry,
-        _In_ const sai_attribute_t *attr,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr)
 {
     SWSS_LOG_ENTER();
 
@@ -876,7 +873,7 @@ sai_status_t Meta::set(
         return status;
     }
 
-    status = saiInterface.set(mcast_fdb_entry, attr);
+    status = m_implementation->set(mcast_fdb_entry, attr);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -897,8 +894,7 @@ sai_status_t Meta::set(
 
 sai_status_t Meta::set(
         _In_ const sai_neighbor_entry_t* neighbor_entry,
-        _In_ const sai_attribute_t *attr,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr)
 {
     SWSS_LOG_ENTER();
 
@@ -918,7 +914,7 @@ sai_status_t Meta::set(
         return status;
     }
 
-    status = saiInterface.set(neighbor_entry, attr);
+    status = m_implementation->set(neighbor_entry, attr);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -939,8 +935,7 @@ sai_status_t Meta::set(
 
 sai_status_t Meta::set(
         _In_ const sai_route_entry_t* route_entry,
-        _In_ const sai_attribute_t *attr,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr)
 {
     SWSS_LOG_ENTER();
 
@@ -960,7 +955,7 @@ sai_status_t Meta::set(
         return status;
     }
 
-    status = saiInterface.set(route_entry, attr);
+    status = m_implementation->set(route_entry, attr);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -981,8 +976,7 @@ sai_status_t Meta::set(
 
 sai_status_t Meta::set(
         _In_ const sai_l2mc_entry_t* l2mc_entry,
-        _In_ const sai_attribute_t *attr,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr)
 {
     SWSS_LOG_ENTER();
 
@@ -1002,7 +996,7 @@ sai_status_t Meta::set(
         return status;
     }
 
-    status = saiInterface.set(l2mc_entry, attr);
+    status = m_implementation->set(l2mc_entry, attr);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1023,8 +1017,7 @@ sai_status_t Meta::set(
 
 sai_status_t Meta::set(
         _In_ const sai_ipmc_entry_t* ipmc_entry,
-        _In_ const sai_attribute_t *attr,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr)
 {
     SWSS_LOG_ENTER();
 
@@ -1044,7 +1037,7 @@ sai_status_t Meta::set(
         return status;
     }
 
-    status = saiInterface.set(ipmc_entry, attr);
+    status = m_implementation->set(ipmc_entry, attr);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1065,8 +1058,7 @@ sai_status_t Meta::set(
 
 sai_status_t Meta::set(
         _In_ const sai_inseg_entry_t* inseg_entry,
-        _In_ const sai_attribute_t *attr,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr)
 {
     SWSS_LOG_ENTER();
 
@@ -1086,7 +1078,7 @@ sai_status_t Meta::set(
         return status;
     }
 
-    status = saiInterface.set(inseg_entry, attr);
+    status = m_implementation->set(inseg_entry, attr);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1107,8 +1099,7 @@ sai_status_t Meta::set(
 
 sai_status_t Meta::set(
         _In_ const sai_nat_entry_t* nat_entry,
-        _In_ const sai_attribute_t *attr,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr)
 {
     SWSS_LOG_ENTER();
     sai_status_t status = meta_sai_validate_nat_entry(nat_entry, false);
@@ -1127,7 +1118,7 @@ sai_status_t Meta::set(
         return status;
     }
 
-    status = saiInterface.set(nat_entry, attr);
+    status = m_implementation->set(nat_entry, attr);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1149,8 +1140,7 @@ sai_status_t Meta::set(
 sai_status_t Meta::get(
         _In_ const sai_fdb_entry_t* fdb_entry,
         _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Inout_ sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -1172,7 +1162,7 @@ sai_status_t Meta::get(
         return status;
     }
 
-    status = saiInterface.get(fdb_entry, attr_count, attr_list);
+    status = m_implementation->get(fdb_entry, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1185,8 +1175,7 @@ sai_status_t Meta::get(
 sai_status_t Meta::get(
         _In_ const sai_mcast_fdb_entry_t* mcast_fdb_entry,
         _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Inout_ sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -1208,7 +1197,7 @@ sai_status_t Meta::get(
         return status;
     }
 
-    status = saiInterface.get(mcast_fdb_entry, attr_count, attr_list);
+    status = m_implementation->get(mcast_fdb_entry, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1221,8 +1210,7 @@ sai_status_t Meta::get(
 sai_status_t Meta::get(
         _In_ const sai_neighbor_entry_t* neighbor_entry,
         _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Inout_ sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -1242,7 +1230,7 @@ sai_status_t Meta::get(
         return status;
     }
 
-    status = saiInterface.get(neighbor_entry, attr_count, attr_list);
+    status = m_implementation->get(neighbor_entry, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1255,8 +1243,7 @@ sai_status_t Meta::get(
 sai_status_t Meta::get(
         _In_ const sai_route_entry_t* route_entry,
         _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Inout_ sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -1276,7 +1263,7 @@ sai_status_t Meta::get(
         return status;
     }
 
-    status = saiInterface.get(route_entry, attr_count, attr_list);
+    status = m_implementation->get(route_entry, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1289,8 +1276,7 @@ sai_status_t Meta::get(
 sai_status_t Meta::get(
         _In_ const sai_l2mc_entry_t* l2mc_entry,
         _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Inout_ sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -1310,7 +1296,7 @@ sai_status_t Meta::get(
         return status;
     }
 
-    status = saiInterface.get(l2mc_entry, attr_count, attr_list);
+    status = m_implementation->get(l2mc_entry, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1323,8 +1309,7 @@ sai_status_t Meta::get(
 sai_status_t Meta::get(
         _In_ const sai_ipmc_entry_t* ipmc_entry,
         _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Inout_ sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -1344,7 +1329,7 @@ sai_status_t Meta::get(
         return status;
     }
 
-    status = saiInterface.get(ipmc_entry, attr_count, attr_list);
+    status = m_implementation->get(ipmc_entry, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1357,8 +1342,7 @@ sai_status_t Meta::get(
 sai_status_t Meta::get(
         _In_ const sai_inseg_entry_t* inseg_entry,
         _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Inout_ sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -1378,7 +1362,7 @@ sai_status_t Meta::get(
         return status;
     }
 
-    status = saiInterface.get(inseg_entry, attr_count, attr_list);
+    status = m_implementation->get(inseg_entry, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1391,8 +1375,7 @@ sai_status_t Meta::get(
 sai_status_t Meta::get(
         _In_ const sai_nat_entry_t* nat_entry,
         _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Inout_ sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -1412,7 +1395,7 @@ sai_status_t Meta::get(
         return status;
     }
 
-    status = saiInterface.get(nat_entry, attr_count, attr_list);
+    status = m_implementation->get(nat_entry, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1427,8 +1410,7 @@ sai_status_t Meta::create(
         _Out_ sai_object_id_t* object_id,
         _In_ sai_object_id_t switch_id,
         _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -1448,7 +1430,7 @@ sai_status_t Meta::create(
         return status;
     }
 
-    status = saiInterface.create(object_type, object_id, switch_id, attr_count, attr_list);
+    status = m_implementation->create(object_type, object_id, switch_id, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1483,8 +1465,7 @@ sai_status_t Meta::create(
 sai_status_t Meta::set(
         _In_ sai_object_type_t object_type,
         _In_ sai_object_id_t object_id,
-        _In_ const sai_attribute_t *attr,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr)
 {
     SWSS_LOG_ENTER();
 
@@ -1504,7 +1485,7 @@ sai_status_t Meta::set(
         return status;
     }
 
-    status = saiInterface.set(object_type, object_id, attr);
+    status = m_implementation->set(object_type, object_id, attr);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1527,8 +1508,7 @@ sai_status_t Meta::get(
         _In_ sai_object_type_t object_type,
         _In_ sai_object_id_t object_id,
         _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Inout_ sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -1548,7 +1528,7 @@ sai_status_t Meta::get(
         return status;
     }
 
-    status = saiInterface.get(object_type, object_id, attr_count, attr_list);
+    status = m_implementation->get(object_type, object_id, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1568,8 +1548,7 @@ sai_status_t Meta::get(
 sai_status_t Meta::flushFdbEntries(
         _In_ sai_object_id_t switch_id,
         _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -1704,7 +1683,7 @@ sai_status_t Meta::flushFdbEntries(
     // there are no mandatory attributes
     // there are no conditional attributes
 
-    auto status = saiInterface.flushFdbEntries(switch_id, attr_count, attr_list);
+    auto status = m_implementation->flushFdbEntries(switch_id, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1749,8 +1728,7 @@ sai_status_t Meta::objectTypeGetAvailability(
         _In_ sai_object_type_t objectType,
         _In_ uint32_t attrCount,
         _In_ const sai_attribute_t *attrList,
-        _Out_ uint64_t *count,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Out_ uint64_t *count)
 {
     SWSS_LOG_ENTER();
 
@@ -1820,7 +1798,7 @@ sai_status_t Meta::objectTypeGetAvailability(
         }
     }
 
-    auto status = saiInterface.objectTypeGetAvailability(switchId, objectType, attrCount, attrList, count);
+    auto status = m_implementation->objectTypeGetAvailability(switchId, objectType, attrCount, attrList, count);
 
     // no post validation required
 
@@ -1831,8 +1809,7 @@ sai_status_t Meta::queryAattributeEnumValuesCapability(
         _In_ sai_object_id_t switchId,
         _In_ sai_object_type_t objectType,
         _In_ sai_attr_id_t attrId,
-        _Inout_ sai_s32_list_t *enumValuesCapability,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Inout_ sai_s32_list_t *enumValuesCapability)
 {
     SWSS_LOG_ENTER();
 
@@ -1866,7 +1843,7 @@ sai_status_t Meta::queryAattributeEnumValuesCapability(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    auto status = saiInterface.queryAattributeEnumValuesCapability(switchId, objectType, attrId, enumValuesCapability);
+    auto status = m_implementation->queryAattributeEnumValuesCapability(switchId, objectType, attrId, enumValuesCapability);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1960,8 +1937,7 @@ sai_status_t Meta::getStats(
         _In_ sai_object_id_t object_id,
         _In_ uint32_t number_of_counters,
         _In_ const sai_stat_id_t *counter_ids,
-        _Out_ uint64_t *counters,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Out_ uint64_t *counters)
 {
     SWSS_LOG_ENTER();
 
@@ -1969,7 +1945,7 @@ sai_status_t Meta::getStats(
 
     CHECK_STATUS_SUCCESS(status);
 
-    status = saiInterface.getStats(object_type, object_id, number_of_counters, counter_ids, counters);
+    status = m_implementation->getStats(object_type, object_id, number_of_counters, counter_ids, counters);
 
     // no post validation required
 
@@ -1982,8 +1958,7 @@ sai_status_t Meta::getStatsExt(
         _In_ uint32_t number_of_counters,
         _In_ const sai_stat_id_t *counter_ids,
         _In_ sai_stats_mode_t mode,
-        _Out_ uint64_t *counters,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Out_ uint64_t *counters)
 {
     SWSS_LOG_ENTER();
 
@@ -1991,7 +1966,7 @@ sai_status_t Meta::getStatsExt(
 
     CHECK_STATUS_SUCCESS(status);
 
-    status = saiInterface.getStatsExt(object_type, object_id, number_of_counters, counter_ids, mode, counters);
+    status = m_implementation->getStatsExt(object_type, object_id, number_of_counters, counter_ids, mode, counters);
 
     // no post validation required
 
@@ -2002,8 +1977,7 @@ sai_status_t Meta::clearStats(
         _In_ sai_object_type_t object_type,
         _In_ sai_object_id_t object_id,
         _In_ uint32_t number_of_counters,
-        _In_ const sai_stat_id_t *counter_ids,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _In_ const sai_stat_id_t *counter_ids)
 {
     SWSS_LOG_ENTER();
 
@@ -2012,7 +1986,7 @@ sai_status_t Meta::clearStats(
 
     CHECK_STATUS_SUCCESS(status);
 
-    status = saiInterface.clearStats(object_type, object_id, number_of_counters, counter_ids);
+    status = m_implementation->clearStats(object_type, object_id, number_of_counters, counter_ids);
 
     // no post validation required
 
@@ -2027,8 +2001,7 @@ sai_status_t Meta::bulkRemove(
         _In_ uint32_t object_count,
         _In_ const sai_object_id_t *object_id,
         _In_ sai_bulk_op_error_mode_t mode,
-        _Out_ sai_status_t *object_statuses,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Out_ sai_status_t *object_statuses)
 {
     SWSS_LOG_ENTER();
 
@@ -2070,7 +2043,7 @@ sai_status_t Meta::bulkRemove(
         CHECK_STATUS_SUCCESS(status);
     }
 
-    auto status = saiInterface.bulkRemove(object_type, object_count, object_id, mode, object_statuses);
+    auto status = m_implementation->bulkRemove(object_type, object_count, object_id, mode, object_statuses);
 
     for (uint32_t idx = 0; idx < object_count; idx++)
     {
@@ -2087,8 +2060,7 @@ sai_status_t Meta::bulkRemove(
         _In_ uint32_t object_count,
         _In_ const sai_route_entry_t *route_entry,
         _In_ sai_bulk_op_error_mode_t mode,
-        _Out_ sai_status_t *object_statuses,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Out_ sai_status_t *object_statuses)
 {
     SWSS_LOG_ENTER();
 
@@ -2130,7 +2102,7 @@ sai_status_t Meta::bulkRemove(
         CHECK_STATUS_SUCCESS(status);
     }
 
-    auto status = saiInterface.bulkRemove(object_count, route_entry, mode, object_statuses);
+    auto status = m_implementation->bulkRemove(object_count, route_entry, mode, object_statuses);
 
     for (uint32_t idx = 0; idx < object_count; idx++)
     {
@@ -2147,8 +2119,7 @@ sai_status_t Meta::bulkRemove(
         _In_ uint32_t object_count,
         _In_ const sai_nat_entry_t *nat_entry,
         _In_ sai_bulk_op_error_mode_t mode,
-        _Out_ sai_status_t *object_statuses,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Out_ sai_status_t *object_statuses)
 {
     SWSS_LOG_ENTER();
 
@@ -2190,7 +2161,7 @@ sai_status_t Meta::bulkRemove(
         CHECK_STATUS_SUCCESS(status);
     }
 
-    auto status = saiInterface.bulkRemove(object_count, nat_entry, mode, object_statuses);
+    auto status = m_implementation->bulkRemove(object_count, nat_entry, mode, object_statuses);
 
     for (uint32_t idx = 0; idx < object_count; idx++)
     {
@@ -2207,8 +2178,7 @@ sai_status_t Meta::bulkRemove(
         _In_ uint32_t object_count,
         _In_ const sai_fdb_entry_t *fdb_entry,
         _In_ sai_bulk_op_error_mode_t mode,
-        _Out_ sai_status_t *object_statuses,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Out_ sai_status_t *object_statuses)
 {
     SWSS_LOG_ENTER();
 
@@ -2250,7 +2220,7 @@ sai_status_t Meta::bulkRemove(
         CHECK_STATUS_SUCCESS(status);
     }
 
-    auto status = saiInterface.bulkRemove(object_count, fdb_entry, mode, object_statuses);
+    auto status = m_implementation->bulkRemove(object_count, fdb_entry, mode, object_statuses);
 
     for (uint32_t idx = 0; idx < object_count; idx++)
     {
@@ -2269,8 +2239,7 @@ sai_status_t Meta::bulkSet(
         _In_ const sai_object_id_t *object_id,
         _In_ const sai_attribute_t *attr_list,
         _In_ sai_bulk_op_error_mode_t mode,
-        _Out_ sai_status_t *object_statuses,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Out_ sai_status_t *object_statuses)
 {
     SWSS_LOG_ENTER();
 
@@ -2313,7 +2282,7 @@ sai_status_t Meta::bulkSet(
         CHECK_STATUS_SUCCESS(status);
     }
 
-    auto status = saiInterface.bulkSet(object_type, object_count, object_id, attr_list, mode, object_statuses);
+    auto status = m_implementation->bulkSet(object_type, object_count, object_id, attr_list, mode, object_statuses);
 
     for (uint32_t idx = 0; idx < object_count; idx++)
     {
@@ -2331,8 +2300,7 @@ sai_status_t Meta::bulkSet(
         _In_ const sai_route_entry_t *route_entry,
         _In_ const sai_attribute_t *attr_list,
         _In_ sai_bulk_op_error_mode_t mode,
-        _Out_ sai_status_t *object_statuses,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Out_ sai_status_t *object_statuses)
 {
     SWSS_LOG_ENTER();
 
@@ -2372,7 +2340,7 @@ sai_status_t Meta::bulkSet(
         CHECK_STATUS_SUCCESS(status);
     }
 
-    auto status = saiInterface.bulkSet(object_count, route_entry, attr_list, mode, object_statuses);
+    auto status = m_implementation->bulkSet(object_count, route_entry, attr_list, mode, object_statuses);
 
     for (uint32_t idx = 0; idx < object_count; idx++)
     {
@@ -2390,8 +2358,7 @@ sai_status_t Meta::bulkSet(
         _In_ const sai_nat_entry_t *nat_entry,
         _In_ const sai_attribute_t *attr_list,
         _In_ sai_bulk_op_error_mode_t mode,
-        _Out_ sai_status_t *object_statuses,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Out_ sai_status_t *object_statuses)
 {
     SWSS_LOG_ENTER();
 
@@ -2431,7 +2398,7 @@ sai_status_t Meta::bulkSet(
         CHECK_STATUS_SUCCESS(status);
     }
 
-    auto status = saiInterface.bulkSet(object_count, nat_entry, attr_list, mode, object_statuses);
+    auto status = m_implementation->bulkSet(object_count, nat_entry, attr_list, mode, object_statuses);
 
     for (uint32_t idx = 0; idx < object_count; idx++)
     {
@@ -2449,8 +2416,7 @@ sai_status_t Meta::bulkSet(
         _In_ const sai_fdb_entry_t *fdb_entry,
         _In_ const sai_attribute_t *attr_list,
         _In_ sai_bulk_op_error_mode_t mode,
-        _Out_ sai_status_t *object_statuses,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Out_ sai_status_t *object_statuses)
 {
     SWSS_LOG_ENTER();
 
@@ -2490,7 +2456,7 @@ sai_status_t Meta::bulkSet(
         CHECK_STATUS_SUCCESS(status);
     }
 
-    auto status = saiInterface.bulkSet(object_count, fdb_entry, attr_list, mode, object_statuses);
+    auto status = m_implementation->bulkSet(object_count, fdb_entry, attr_list, mode, object_statuses);
 
     for (uint32_t idx = 0; idx < object_count; idx++)
     {
@@ -2511,8 +2477,7 @@ sai_status_t Meta::bulkCreate(
         _In_ const sai_attribute_t **attr_list,
         _In_ sai_bulk_op_error_mode_t mode,
         _Out_ sai_object_id_t *object_id,
-        _Out_ sai_status_t *object_statuses,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Out_ sai_status_t *object_statuses)
 {
     SWSS_LOG_ENTER();
 
@@ -2570,7 +2535,7 @@ sai_status_t Meta::bulkCreate(
         CHECK_STATUS_SUCCESS(status);
     }
 
-    auto status = saiInterface.bulkCreate(object_type, switchId, object_count, attr_count, attr_list, mode, object_id, object_statuses);
+    auto status = m_implementation->bulkCreate(object_type, switchId, object_count, attr_count, attr_list, mode, object_id, object_statuses);
 
     for (uint32_t idx = 0; idx < object_count; idx++)
     {
@@ -2596,8 +2561,7 @@ sai_status_t Meta::bulkCreate(
         _In_ const uint32_t *attr_count,
         _In_ const sai_attribute_t **attr_list,
         _In_ sai_bulk_op_error_mode_t mode,
-        _Out_ sai_status_t *object_statuses,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Out_ sai_status_t *object_statuses)
 {
     SWSS_LOG_ENTER();
 
@@ -2638,7 +2602,7 @@ sai_status_t Meta::bulkCreate(
         CHECK_STATUS_SUCCESS(status);
     }
 
-    auto status = saiInterface.bulkCreate(object_count, route_entry, attr_count, attr_list, mode, object_statuses);
+    auto status = m_implementation->bulkCreate(object_count, route_entry, attr_count, attr_list, mode, object_statuses);
 
     for (uint32_t idx = 0; idx < object_count; idx++)
     {
@@ -2657,8 +2621,7 @@ sai_status_t Meta::bulkCreate(
         _In_ const uint32_t *attr_count,
         _In_ const sai_attribute_t **attr_list,
         _In_ sai_bulk_op_error_mode_t mode,
-        _Out_ sai_status_t *object_statuses,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Out_ sai_status_t *object_statuses)
 {
     SWSS_LOG_ENTER();
 
@@ -2699,7 +2662,7 @@ sai_status_t Meta::bulkCreate(
         CHECK_STATUS_SUCCESS(status);
     }
 
-    auto status = saiInterface.bulkCreate(object_count, fdb_entry, attr_count, attr_list, mode, object_statuses);
+    auto status = m_implementation->bulkCreate(object_count, fdb_entry, attr_count, attr_list, mode, object_statuses);
 
     for (uint32_t idx = 0; idx < object_count; idx++)
     {
@@ -2717,8 +2680,7 @@ sai_status_t Meta::bulkCreate(
         _In_ const uint32_t *attr_count,
         _In_ const sai_attribute_t **attr_list,
         _In_ sai_bulk_op_error_mode_t mode,
-        _Out_ sai_status_t *object_statuses,
-        _Inout_ sairedis::SaiInterface& saiInterface)
+        _Out_ sai_status_t *object_statuses)
 {
     SWSS_LOG_ENTER();
 
@@ -2759,7 +2721,7 @@ sai_status_t Meta::bulkCreate(
         CHECK_STATUS_SUCCESS(status);
     }
 
-    auto status = saiInterface.bulkCreate(object_count, nat_entry, attr_count, attr_list, mode, object_statuses);
+    auto status = m_implementation->bulkCreate(object_count, nat_entry, attr_count, attr_list, mode, object_statuses);
 
     for (uint32_t idx = 0; idx < object_count; idx++)
     {
