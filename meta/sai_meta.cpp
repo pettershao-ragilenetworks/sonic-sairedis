@@ -33,9 +33,9 @@
 
 using namespace saimeta;
 
-static volatile bool unittests_enabled = false;
+volatile bool unittests_enabled = false;
 
-static std::set<std::string> meta_unittests_set_readonly_set;
+std::set<std::string> meta_unittests_set_readonly_set;
 
 void meta_unittests_enable(
         _In_ bool enable)

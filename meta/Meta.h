@@ -2,6 +2,9 @@
 
 #include "lib/inc/SaiInterface.h"
 
+#include "SaiAttrWrapper.h"
+
+#include <vector>
 #include <memory>
 
 #define SAIREDIS_META_DECLARE_REMOVE_ENTRY(ot) \
@@ -227,7 +230,173 @@ namespace saimeta
 
         public:
 
-            void clear();
+            void meta_init_db();
+
+        private: // validation helpers
+
+            sai_status_t meta_generic_validation_objlist(
+                    _In_ const sai_attr_metadata_t& md,
+                    _In_ sai_object_id_t switch_id,
+                    _In_ uint32_t count,
+                    _In_ const sai_object_id_t* list);
+
+            sai_status_t meta_genetic_validation_list(
+                    _In_ const sai_attr_metadata_t& md,
+                    _In_ uint32_t count,
+                    _In_ const void* list);
+
+            sai_status_t meta_generic_validate_non_object_on_create(
+                    _In_ const sai_object_meta_key_t& meta_key,
+                    _In_ sai_object_id_t switch_id);
+
+            sai_object_id_t meta_extract_switch_id(
+                    _In_ const sai_object_meta_key_t& meta_key,
+                    _In_ sai_object_id_t switch_id);
+
+            std::shared_ptr<SaiAttrWrapper> get_object_previous_attr(
+                    _In_ const sai_object_meta_key_t& metaKey,
+                    _In_ const sai_attr_metadata_t& md);
+
+            std::vector<const sai_attr_metadata_t*> get_attributes_metadata(
+                    _In_ sai_object_type_t objecttype);
+
+            void meta_generic_validation_post_get_objlist(
+                    _In_ const sai_object_meta_key_t& meta_key,
+                    _In_ const sai_attr_metadata_t& md,
+                    _In_ sai_object_id_t switch_id,
+                    _In_ uint32_t count,
+                    _In_ const sai_object_id_t* list);
+
+            bool is_ipv6_mask_valid(
+                    _In_ const uint8_t* mask);
+
+        private: // unit tests helpers
+
+            bool meta_unittests_get_and_erase_set_readonly_flag(
+                    _In_ const sai_attr_metadata_t& md);
+
+        public:
+
+            void meta_unittests_enable(
+                    _In_ bool enable);
+
+            bool meta_unittests_enabled();
+
+        private: // port helpers
+
+            sai_status_t meta_port_remove_validation(
+                    _In_ const sai_object_meta_key_t& meta_key);
+
+            bool meta_is_object_in_default_state(
+                    _In_ sai_object_id_t oid);
+
+            void post_port_remove(
+                    _In_ const sai_object_meta_key_t& meta_key);
+
+            void meta_post_port_get(
+                    _In_ const sai_object_meta_key_t& meta_key,
+                    _In_ sai_object_id_t switch_id,
+                    _In_ const uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
+
+            void meta_add_port_to_related_map(
+                    _In_ sai_object_id_t port_id,
+                    _In_ const sai_object_list_t& list);
+
+        private: // validation post QUAD
+
+            void meta_generic_validation_post_create(
+                    _In_ const sai_object_meta_key_t& meta_key,
+                    _In_ sai_object_id_t switch_id,
+                    _In_ const uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
+
+            void meta_generic_validation_post_remove(
+                    _In_ const sai_object_meta_key_t& meta_key);
+
+            void meta_generic_validation_post_set(
+                    _In_ const sai_object_meta_key_t& meta_key,
+                    _In_ const sai_attribute_t *attr);
+
+            void meta_generic_validation_post_get(
+                    _In_ const sai_object_meta_key_t& meta_key,
+                    _In_ sai_object_id_t switch_id,
+                    _In_ const uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
+
+        private: // validation QUAD
+
+            sai_status_t meta_generic_validation_create(
+                    _In_ const sai_object_meta_key_t& meta_key,
+                    _In_ sai_object_id_t switch_id,
+                    _In_ const uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
+
+            sai_status_t meta_generic_validation_remove(
+                    _In_ const sai_object_meta_key_t& meta_key);
+
+            sai_status_t meta_generic_validation_set(
+                    _In_ const sai_object_meta_key_t& meta_key,
+                    _In_ const sai_attribute_t *attr);
+
+            sai_status_t meta_generic_validation_get(
+                    _In_ const sai_object_meta_key_t& meta_key,
+                    _In_ const uint32_t attr_count,
+                    _In_ sai_attribute_t *attr_list);
+
+        private: // stats
+
+            sai_status_t meta_validate_stats(
+                    _In_ sai_object_type_t object_type,
+                    _In_ sai_object_id_t object_id,
+                    _In_ uint32_t number_of_counters,
+                    _In_ const sai_stat_id_t *counter_ids,
+                    _Out_ uint64_t *counters,
+                    _In_ sai_stats_mode_t mode);
+
+        private: // validate OID
+
+            sai_status_t meta_sai_validate_oid(
+                    _In_ sai_object_type_t object_type,
+                    _In_ const sai_object_id_t* object_id,
+                    _In_ sai_object_id_t switch_id,
+                    _In_ bool create);
+
+        private: // validate ENTRY
+
+            sai_status_t meta_sai_validate_fdb_entry(
+                    _In_ const sai_fdb_entry_t* fdb_entry,
+                    _In_ bool create,
+                    _In_ bool get = false);
+
+            sai_status_t meta_sai_validate_mcast_fdb_entry(
+                    _In_ const sai_mcast_fdb_entry_t* mcast_fdb_entry,
+                    _In_ bool create,
+                    _In_ bool get = false);
+
+            sai_status_t meta_sai_validate_neighbor_entry(
+                    _In_ const sai_neighbor_entry_t* neighbor_entry,
+                    _In_ bool create);
+
+            sai_status_t meta_sai_validate_route_entry(
+                    _In_ const sai_route_entry_t* route_entry,
+                    _In_ bool create);
+
+            sai_status_t meta_sai_validate_l2mc_entry(
+                    _In_ const sai_l2mc_entry_t* l2mc_entry,
+                    _In_ bool create);
+
+            sai_status_t meta_sai_validate_ipmc_entry(
+                    _In_ const sai_ipmc_entry_t* ipmc_entry,
+                    _In_ bool create);
+
+            sai_status_t meta_sai_validate_nat_entry(
+                    _In_ const sai_nat_entry_t* nat_entry,
+                    _In_ bool create);
+
+            sai_status_t meta_sai_validate_inseg_entry(
+                    _In_ const sai_inseg_entry_t* inseg_entry,
+                    _In_ bool create);
 
         private:
 
