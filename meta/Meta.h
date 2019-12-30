@@ -3,9 +3,14 @@
 #include "lib/inc/SaiInterface.h"
 
 #include "SaiAttrWrapper.h"
+#include "SaiObjectCollection.h"
+#include "PortRelatedSet.h"
+#include "AttrKeyMap.h"
+#include "OidRefCounter.h"
 
 #include <vector>
 #include <memory>
+#include <set>
 
 #define SAIREDIS_META_DECLARE_REMOVE_ENTRY(ot) \
     virtual sai_status_t remove(                                    \
@@ -401,5 +406,25 @@ namespace saimeta
         private:
 
             std::shared_ptr<sairedis::SaiInterface> m_implementation;
+
+        private: // database objects
+
+            PortRelatedSet m_portRelatedSet;
+
+            OidRefCounter m_oids;
+
+            SaiObjectCollection m_saiObjectCollection;
+
+            AttrKeyMap m_attrKeys;
+
+        private: // unittests
+
+            std::set<std::string> m_meta_unittests_set_readonly_set;
+
+            bool m_unittestsEnabled;
+
+        private: // warm boot
+
+            bool m_warmBoot;
     };
 }
