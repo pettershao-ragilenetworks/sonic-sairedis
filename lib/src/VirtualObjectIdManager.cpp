@@ -7,9 +7,6 @@ extern "C" {
 #include "saimetadata.h"
 }
 
-// for redis client
-#include "sai_redis.h"
-
 #define SAI_OBJECT_ID_BITS_SIZE (8 * sizeof(sai_object_id_t))
 
 static_assert(SAI_OBJECT_ID_BITS_SIZE == 64, "sai_object_id_t must have 64 bits");
