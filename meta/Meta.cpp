@@ -2733,3 +2733,19 @@ sai_status_t Meta::bulkCreate(
 
     return status;
 }
+
+sai_object_type_t Meta::objectTypeQuery(
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    return m_implementation->objectTypeQuery(objectId);
+}
+
+sai_object_id_t Meta::switchIdQuery(
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    return m_implementation->switchIdQuery(objectId);
+}
