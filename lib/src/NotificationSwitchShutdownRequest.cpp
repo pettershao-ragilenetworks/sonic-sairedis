@@ -36,9 +36,6 @@ void NotificationSwitchShutdownRequest::processMetadata(
 {
     SWSS_LOG_ENTER();
 
-    // TODO add parameter with metadata object, currently we are calling global
-    // functions
-
     meta->meta_sai_on_switch_shutdown_request(m_switchId);
 }
 
