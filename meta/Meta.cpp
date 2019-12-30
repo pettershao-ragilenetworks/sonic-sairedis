@@ -1494,7 +1494,7 @@ sai_status_t Meta::get(
 
     if (status == SAI_STATUS_SUCCESS)
     {
-        sai_object_id_t switch_id = sai_switch_id_query(object_id);
+        sai_object_id_t switch_id = switchIdQuery(object_id);
 
         if (!g_oids.objectReferenceExists(switch_id))
         {
@@ -1528,7 +1528,7 @@ sai_status_t Meta::flushFdbEntries(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    sai_object_type_t swot = sai_object_type_query(switch_id);
+    sai_object_type_t swot = objectTypeQuery(switch_id);
 
     if (swot != SAI_OBJECT_TYPE_SWITCH)
     {
@@ -1661,7 +1661,7 @@ sai_status_t Meta::flushFdbEntries(
         return SAI_STATUS_INVALID_PARAMETER; } }
 
 #define PARAMETER_CHECK_OID_OBJECT_TYPE(param, OT) {                                        \
-    sai_object_type_t _ot = sai_object_type_query(param);                                   \
+    sai_object_type_t _ot = objectTypeQuery(param);                                   \
     if (_ot != (OT)) {                                                                      \
         SWSS_LOG_ERROR("parameter " # param " %s object type is %s, but expected %s",       \
                 sai_serialize_object_id(param).c_str(),                                     \
@@ -1852,7 +1852,7 @@ sai_status_t Meta::meta_validate_stats(
     PARAMETER_CHECK_IF_NOT_NULL(counter_ids);
     PARAMETER_CHECK_IF_NOT_NULL(counters);
 
-    sai_object_id_t switch_id = sai_switch_id_query(object_id);
+    sai_object_id_t switch_id = switchIdQuery(object_id);
 
     // checks also if object type is OID
     sai_status_t status = meta_sai_validate_oid(object_type, &object_id, switch_id, false);
@@ -2745,7 +2745,7 @@ sai_status_t Meta::meta_generic_validation_remove(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    sai_object_type_t object_type = sai_object_type_query(oid);
+    sai_object_type_t object_type = objectTypeQuery(oid);
 
     if (object_type == SAI_NULL_OBJECT_ID)
     {
@@ -2879,7 +2879,7 @@ bool Meta::meta_is_object_in_default_state(
 
     sai_object_meta_key_t meta_key;
 
-    meta_key.objecttype = sai_object_type_query(oid);
+    meta_key.objecttype = objectTypeQuery(oid);
     meta_key.objectkey.key.object_id = oid;
 
     std::string key = sai_serialize_object_meta_key(meta_key);
@@ -2992,7 +2992,7 @@ sai_status_t Meta::meta_sai_validate_oid(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    sai_object_type_t ot = sai_object_type_query(oid);
+    sai_object_type_t ot = objectTypeQuery(oid);
 
     if (ot == SAI_OBJECT_TYPE_NULL)
     {
@@ -3231,7 +3231,7 @@ void Meta::post_port_remove(
 
         sai_object_meta_key_t meta;
 
-        meta.objecttype = sai_object_type_query(oid);
+        meta.objecttype = objectTypeQuery(oid);
         meta.objectkey.key.object_id = oid;
 
         SWSS_LOG_INFO("attempt to remove port related object: %s: %s",
@@ -3327,7 +3327,7 @@ sai_status_t Meta::meta_sai_validate_mcast_fdb_entry(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    sai_object_type_t object_type = sai_object_type_query(bv_id);
+    sai_object_type_t object_type = objectTypeQuery(bv_id);
 
     if (object_type == SAI_OBJECT_TYPE_NULL)
     {
@@ -3423,7 +3423,7 @@ sai_status_t Meta::meta_sai_validate_neighbor_entry(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    sai_object_type_t object_type = sai_object_type_query(rif);
+    sai_object_type_t object_type = objectTypeQuery(rif);
 
     if (object_type == SAI_OBJECT_TYPE_NULL)
     {
@@ -3531,7 +3531,7 @@ sai_status_t Meta::meta_sai_validate_route_entry(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    sai_object_type_t object_type = sai_object_type_query(vr);
+    sai_object_type_t object_type = objectTypeQuery(vr);
 
     if (object_type == SAI_OBJECT_TYPE_NULL)
     {
@@ -3657,7 +3657,7 @@ sai_status_t Meta::meta_sai_validate_l2mc_entry(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    sai_object_type_t object_type = sai_object_type_query(bv_id);
+    sai_object_type_t object_type = objectTypeQuery(bv_id);
 
     if (object_type == SAI_OBJECT_TYPE_NULL)
     {
@@ -3781,7 +3781,7 @@ sai_status_t Meta::meta_sai_validate_ipmc_entry(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    sai_object_type_t object_type = sai_object_type_query(vr_id);
+    sai_object_type_t object_type = objectTypeQuery(vr_id);
 
     if (object_type == SAI_OBJECT_TYPE_NULL)
     {
@@ -3862,7 +3862,7 @@ sai_status_t Meta::meta_sai_validate_nat_entry(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    sai_object_type_t object_type = sai_object_type_query(vr);
+    sai_object_type_t object_type = objectTypeQuery(vr);
 
     if (object_type == SAI_OBJECT_TYPE_NULL)
     {
@@ -4011,7 +4011,7 @@ sai_status_t Meta::meta_generic_validation_create(
             return SAI_STATUS_INVALID_PARAMETER;
         }
 
-        sai_object_type_t sw_type = sai_object_type_query(switch_id);
+        sai_object_type_t sw_type = objectTypeQuery(switch_id);
 
         if (sw_type != SAI_OBJECT_TYPE_SWITCH)
         {
@@ -4741,7 +4741,7 @@ sai_status_t Meta::meta_generic_validation_set(
 
     if (!info->isnonobjectid)
     {
-        switch_id = sai_switch_id_query(meta_key.objectkey.key.object_id);
+        switch_id = switchIdQuery(meta_key.objectkey.key.object_id);
 
         if (!g_oids.objectReferenceExists(switch_id))
         {
@@ -5106,7 +5106,7 @@ sai_status_t Meta::meta_generic_validation_set(
 
         sai_object_id_t oid = meta_key.objectkey.key.object_id;
 
-        sai_object_type_t object_type = sai_object_type_query(oid);
+        sai_object_type_t object_type = objectTypeQuery(oid);
 
         if (object_type == SAI_NULL_OBJECT_ID)
         {
@@ -5399,7 +5399,7 @@ sai_status_t Meta::meta_generic_validation_get(
 
         sai_object_id_t oid = meta_key.objectkey.key.object_id;
 
-        sai_object_type_t object_type = sai_object_type_query(oid);
+        sai_object_type_t object_type = objectTypeQuery(oid);
 
         if (object_type == SAI_NULL_OBJECT_ID)
         {
@@ -5726,7 +5726,7 @@ sai_status_t Meta::meta_generic_validation_objlist(
 
         oids.insert(oid);
 
-        sai_object_type_t ot = sai_object_type_query(oid);
+        sai_object_type_t ot = objectTypeQuery(oid);
 
         if (ot == SAI_NULL_OBJECT_ID)
         {
@@ -5763,7 +5763,7 @@ sai_status_t Meta::meta_generic_validation_objlist(
             }
         }
 
-        sai_object_id_t query_switch_id = sai_switch_id_query(oid);
+        sai_object_id_t query_switch_id = switchIdQuery(oid);
 
         if (!g_oids.objectReferenceExists(query_switch_id))
         {
@@ -5891,7 +5891,7 @@ sai_status_t Meta::meta_generic_validate_non_object_on_create(
             return SAI_STATUS_INVALID_PARAMETER;
         }
 
-        sai_object_type_t ot = sai_object_type_query(oid);
+        sai_object_type_t ot = objectTypeQuery(oid);
 
         /*
          * No need for checking null here, since metadata don't allow
@@ -5917,7 +5917,7 @@ sai_status_t Meta::meta_generic_validate_non_object_on_create(
             return SAI_STATUS_INVALID_PARAMETER;
         }
 
-        sai_object_id_t oid_switch_id = sai_switch_id_query(oid);
+        sai_object_id_t oid_switch_id = switchIdQuery(oid);
 
         if (!g_oids.objectReferenceExists(oid_switch_id))
         {
@@ -6151,7 +6151,7 @@ void Meta::meta_generic_validation_post_get_objlist(
             continue;
         }
 
-        sai_object_type_t ot = sai_object_type_query(oid);
+        sai_object_type_t ot = objectTypeQuery(oid);
 
         if (ot == SAI_OBJECT_TYPE_NULL)
         {
@@ -6182,7 +6182,7 @@ void Meta::meta_generic_validation_post_get_objlist(
             }
         }
 
-        sai_object_id_t query_switch_id = sai_switch_id_query(oid);
+        sai_object_id_t query_switch_id = switchIdQuery(oid);
 
         if (!g_oids.objectReferenceExists(query_switch_id))
         {
@@ -6303,7 +6303,7 @@ void Meta::meta_generic_validation_post_create(
                 break;
             }
 
-            sai_object_type_t object_type = sai_object_type_query(oid);
+            sai_object_type_t object_type = objectTypeQuery(oid);
 
             if (object_type == SAI_NULL_OBJECT_ID)
             {
@@ -6326,7 +6326,7 @@ void Meta::meta_generic_validation_post_create(
                  * Check if created object switch is the same as input switch.
                  */
 
-                sai_object_id_t query_switch_id = sai_switch_id_query(meta_key.objectkey.key.object_id);
+                sai_object_id_t query_switch_id = switchIdQuery(meta_key.objectkey.key.object_id);
 
                 if (!g_oids.objectReferenceExists(query_switch_id))
                 {
