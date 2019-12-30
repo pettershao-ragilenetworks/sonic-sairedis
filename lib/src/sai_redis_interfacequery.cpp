@@ -56,7 +56,7 @@ void clear_local_state()
     g_virtualObjectIdManager = std::make_shared<VirtualObjectIdManager>(0, g_redisVidIndexGenerator);
 
     if (g_meta)
-        g_meta->clear();
+        g_meta->meta_init_db();
 }
 
 sai_status_t sai_api_initialize(
