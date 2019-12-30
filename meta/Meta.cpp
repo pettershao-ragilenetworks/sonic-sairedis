@@ -6757,3 +6757,488 @@ bool Meta::meta_unittests_enabled()
     return m_unittestsEnabled;
 }
 
+static const sai_mac_t zero_mac = { 0, 0, 0, 0, 0, 0 };
+
+void Meta::meta_sai_on_fdb_flush_event_consolidated(
+        _In_ const sai_fdb_event_notification_data_t& data)
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_TIMER("fdb flush");
+
+    // since we don't keep objects by type, we need to scan via all objects
+    // and find fdb entries
+
+    // TODO on flush we need to respect switch id, and remove fdb entries only
+    // from selected switch when adding multiple switch support
+
+    auto bpid = sai_metadata_get_attr_by_id(SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID, data.attr_count, data.attr);
+    auto type = sai_metadata_get_attr_by_id(SAI_FDB_ENTRY_ATTR_TYPE, data.attr_count, data.attr);
+
+    if (type == NULL)
+    {
+        SWSS_LOG_ERROR("FATAL: fdb flush notification don't contain SAI_FDB_ENTRY_ATTR_TYPE attribute! bug!, no entries were flushed in local DB!");
+        return;
+    }
+
+    SWSS_LOG_NOTICE("processing consolidated fdb flush event of type: %s",
+            sai_metadata_get_fdb_entry_type_name((sai_fdb_entry_type_t)type->value.s32));
+
+    std::vector<sai_object_meta_key_t> toremove;
+
+    auto fdbEntries = m_saiObjectCollection.getObjectsByObjectType(SAI_OBJECT_TYPE_FDB_ENTRY);
+
+    for (auto& fdb: fdbEntries)
+    {
+        auto fdbTypeAttr = fdb->getAttr(SAI_FDB_ENTRY_ATTR_TYPE);
+
+        if (!fdbTypeAttr)
+        {
+            SWSS_LOG_ERROR("FATAL: missing SAI_FDB_ENTRY_ATTR_TYPE on %s! bug! skipping flush", fdb->getStrMetaKey().c_str());
+            continue;
+        }
+
+        if (fdbTypeAttr->getSaiAttr()->value.s32 != type->value.s32)
+        {
+            // entry type is not matching on this fdb entry
+            continue;
+        }
+
+        // only consider bridge port id if it's defined and value is not NULL
+        // since vendor can add this attribute to fdb_entry with NULL value
+        if (bpid != NULL && bpid->value.oid != SAI_NULL_OBJECT_ID)
+        {
+            auto bpidAttr = fdb->getAttr(SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID);
+
+            if (!bpidAttr)
+            {
+                // port is not defined for this fdb entry
+                continue;
+            }
+
+            if (bpidAttr->getSaiAttr()->value.oid != bpid->value.oid)
+            {
+                // bridge port is not matching this fdb entry
+                continue;
+            }
+        }
+
+        auto& meta_key_fdb = fdb->getMetaKey();
+
+        if (data.fdb_entry.bv_id != SAI_NULL_OBJECT_ID)
+        {
+            if (data.fdb_entry.bv_id != meta_key_fdb.objectkey.key.fdb_entry.bv_id)
+            {
+                // vlan/bridge id is not matching on this fdb entry
+                continue;
+            }
+        }
+
+        // this fdb entry is matching, removing
+
+        SWSS_LOG_INFO("removing %s", fdb->getStrMetaKey().c_str());
+
+        // since meta_generic_validation_post_remove also modifies m_saiObjectCollection
+        // we need to push this to a vector and remove in next loop
+        toremove.push_back(meta_key_fdb);
+    }
+
+    for (auto it = toremove.begin(); it != toremove.end(); ++it)
+    {
+        // remove selected objects
+        meta_generic_validation_post_remove(*it);
+    }
+}
+
+void Meta::meta_fdb_event_snoop_oid(
+        _In_ sai_object_id_t oid)
+{
+    SWSS_LOG_ENTER();
+
+    if (oid == SAI_NULL_OBJECT_ID)
+        return;
+
+    if (m_oids.objectReferenceExists(oid))
+        return;
+
+    sai_object_type_t ot = objectTypeQuery(oid);
+
+    if (ot == SAI_OBJECT_TYPE_NULL)
+    {
+        SWSS_LOG_ERROR("failed to get object type on fdb_event oid: 0x%" PRIx64 "", oid);
+        return;
+    }
+
+    sai_object_meta_key_t key = { .objecttype = ot, .objectkey = { .key = { .object_id = oid } } };
+
+    m_oids.objectReferenceInsert(oid);
+
+    if (!m_saiObjectCollection.objectExists(key))
+        m_saiObjectCollection.createObject(key);
+
+    /*
+     * In normal operation orch agent should query or create all bridge, vlan
+     * and bridge port, so we should not get this message. Let's put it as
+     * warning for better visibility. Most likely if this happen  there is a
+     * vendor bug in SAI and we should also see warnings or errors reported
+     * from syncd in logs.
+     */
+
+    SWSS_LOG_WARN("fdb_entry oid (snoop): %s: %s",
+            sai_serialize_object_type(ot).c_str(),
+            sai_serialize_object_id(oid).c_str());
+}
+
+void Meta::meta_sai_on_fdb_event_single(
+        _In_ const sai_fdb_event_notification_data_t& data)
+{
+    SWSS_LOG_ENTER();
+
+    const sai_object_meta_key_t meta_key_fdb = { .objecttype = SAI_OBJECT_TYPE_FDB_ENTRY, .objectkey = { .key = { .fdb_entry = data.fdb_entry } } };
+
+    std::string key_fdb = sai_serialize_object_meta_key(meta_key_fdb);
+
+    /*
+     * Because we could receive fdb event's before orch agent will query or
+     * create bridge/vlan/bridge port we should snoop here new OIDs and put
+     * them in local DB.
+     *
+     * Unfortunately we don't have a way to check whether those OIDs are correct
+     * or whether there maybe some bug in vendor SAI and for example is sending
+     * invalid OIDs in those event's. Also objectTypeQuery can return
+     * valid object type for OID, but this does not guarantee that this OID is
+     * valid, for example one of existing bridge ports that orch agent didn't
+     * query yet.
+     */
+
+    meta_fdb_event_snoop_oid(data.fdb_entry.bv_id);
+
+    for (uint32_t i = 0; i < data.attr_count; i++)
+    {
+        auto meta = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_FDB_ENTRY, data.attr[i].id);
+
+        if (meta == NULL)
+        {
+            SWSS_LOG_ERROR("failed to get metadata for fdb_entry attr.id = %d", data.attr[i].id);
+            continue;
+        }
+
+        if (meta->attrvaluetype == SAI_ATTR_VALUE_TYPE_OBJECT_ID)
+            meta_fdb_event_snoop_oid(data.attr[i].value.oid);
+    }
+
+    switch (data.event_type)
+    {
+        case SAI_FDB_EVENT_LEARNED:
+
+            if (m_saiObjectCollection.objectExists(key_fdb))
+            {
+                SWSS_LOG_WARN("object key %s alearedy exists, but received LEARNED event", key_fdb.c_str());
+                break;
+            }
+
+            {
+                sai_attribute_t *list = data.attr;
+                uint32_t count = data.attr_count;
+
+                sai_attribute_t local[2]; // 2 for port id and type
+
+                if (count == 1)
+                {
+                    // workaround for missing "TYPE" attribute on notification
+
+                    local[0] = data.attr[0]; // copy 1st attr
+                    local[1].id = SAI_FDB_ENTRY_ATTR_TYPE;
+                    local[1].value.s32 = SAI_FDB_ENTRY_TYPE_DYNAMIC; // assume learned entries are always dynamic
+
+                    list = local;
+                    count = 2; // now we added type
+                }
+
+                sai_status_t status = meta_generic_validation_create(meta_key_fdb, data.fdb_entry.switch_id, count, list);
+
+                if (status == SAI_STATUS_SUCCESS)
+                {
+                    meta_generic_validation_post_create(meta_key_fdb, data.fdb_entry.switch_id, count, list);
+                }
+                else
+                {
+                    SWSS_LOG_ERROR("failed to insert %s received in notification: %s", key_fdb.c_str(), sai_serialize_status(status).c_str());
+                }
+            }
+
+            break;
+
+        case SAI_FDB_EVENT_AGED:
+
+            if (!m_saiObjectCollection.objectExists(key_fdb))
+            {
+                SWSS_LOG_WARN("object key %s doesn't exist but received AGED event", key_fdb.c_str());
+                break;
+            }
+
+            meta_generic_validation_post_remove(meta_key_fdb);
+
+            break;
+
+        case SAI_FDB_EVENT_FLUSHED:
+
+            if (memcmp(data.fdb_entry.mac_address, zero_mac, sizeof(zero_mac)) == 0)
+            {
+                meta_sai_on_fdb_flush_event_consolidated(data);
+                break;
+            }
+
+            if (!m_saiObjectCollection.objectExists(key_fdb))
+            {
+                SWSS_LOG_WARN("object key %s doesn't exist but received FLUSHED event", key_fdb.c_str());
+                break;
+            }
+
+            meta_generic_validation_post_remove(meta_key_fdb);
+
+            break;
+
+        case SAI_FDB_EVENT_MOVE:
+
+            if (!m_saiObjectCollection.objectExists(key_fdb))
+            {
+                SWSS_LOG_WARN("object key %s doesn't exist but received FDB MOVE event", key_fdb.c_str());
+                break;
+            }
+
+            // on MOVE event, just update attributes on existing entry
+
+            for (uint32_t i = 0; i < data.attr_count; i++)
+            {
+                const sai_attribute_t& attr = data.attr[i];
+
+                sai_status_t status = meta_generic_validation_set(meta_key_fdb, &attr);
+
+                if (status != SAI_STATUS_SUCCESS)
+                {
+                    SWSS_LOG_ERROR("object key %s FDB MOVE event, SET validateion failed on attr.id = %d", key_fdb.c_str(), attr.id);
+                    continue;
+                }
+
+                meta_generic_validation_post_set(meta_key_fdb, &attr);
+            }
+
+            break;
+
+        default:
+
+            SWSS_LOG_ERROR("got FDB_ENTRY notification with unknown event_type %d, bug?", data.event_type);
+            break;
+    }
+}
+
+void Meta::meta_sai_on_fdb_event(
+        _In_ uint32_t count,
+        _In_ sai_fdb_event_notification_data_t *data)
+{
+    SWSS_LOG_ENTER();
+
+    if (count && data == NULL)
+    {
+        SWSS_LOG_ERROR("fdb_event_notification_data pointer is NULL when count is %u", count);
+        return;
+    }
+
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        meta_sai_on_fdb_event_single(data[i]);
+    }
+}
+
+void Meta::meta_sai_on_switch_state_change(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_switch_oper_status_t switch_oper_status)
+{
+    SWSS_LOG_ENTER();
+
+    auto ot = objectTypeQuery(switch_id);
+
+    if (ot != SAI_OBJECT_TYPE_SWITCH)
+    {
+        SWSS_LOG_WARN("switch_id %s is of type %s, but expected SAI_OBJECT_TYPE_SWITCH",
+                sai_serialize_object_id(switch_id).c_str(),
+                sai_serialize_object_type(ot).c_str());
+    }
+
+    sai_object_meta_key_t switch_meta_key = { .objecttype = ot , .objectkey = { .key = { .object_id = switch_id } } };
+
+    if (!m_saiObjectCollection.objectExists(switch_meta_key))
+    {
+        SWSS_LOG_ERROR("switch_id %s don't exists in local database",
+                sai_serialize_object_id(switch_id).c_str());
+    }
+
+    // we should not snoop switch_id, since switch id should be created directly by user
+
+    if (!sai_metadata_get_enum_value_name(
+                &sai_metadata_enum_sai_switch_oper_status_t,
+                switch_oper_status))
+    {
+        SWSS_LOG_WARN("switch oper status value (%d) not found in sai_switch_oper_status_t",
+                switch_oper_status);
+    }
+}
+
+void Meta::meta_sai_on_switch_shutdown_request(
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    auto ot = objectTypeQuery(switch_id);
+
+    if (ot != SAI_OBJECT_TYPE_SWITCH)
+    {
+        SWSS_LOG_WARN("switch_id %s is of type %s, but expected SAI_OBJECT_TYPE_SWITCH",
+                sai_serialize_object_id(switch_id).c_str(),
+                sai_serialize_object_type(ot).c_str());
+    }
+
+    sai_object_meta_key_t switch_meta_key = { .objecttype = ot , .objectkey = { .key = { .object_id = switch_id } } };
+
+    if (!m_saiObjectCollection.objectExists(switch_meta_key))
+    {
+        SWSS_LOG_ERROR("switch_id %s don't exists in local database",
+                sai_serialize_object_id(switch_id).c_str());
+    }
+
+    // we should not snoop switch_id, since switch id should be created directly by user
+}
+
+void Meta::meta_sai_on_port_state_change_single(
+        _In_ const sai_port_oper_status_notification_t& data)
+{
+    SWSS_LOG_ENTER();
+
+    auto ot = objectTypeQuery(data.port_id);
+
+    bool valid = false;
+
+    switch (ot)
+    {
+        // TODO hardcoded types, must advance SAI repository commit to get metadata for this
+        case SAI_OBJECT_TYPE_PORT:
+        case SAI_OBJECT_TYPE_BRIDGE_PORT:
+        case SAI_OBJECT_TYPE_LAG:
+
+            valid = true;
+            break;
+
+        default:
+
+            SWSS_LOG_ERROR("data.port_id %s has unexpected type: %s, expected PORT, BRIDGE_PORT or LAG",
+                    sai_serialize_object_id(data.port_id).c_str(),
+                    sai_serialize_object_type(ot).c_str());
+            break;
+    }
+
+    SWSS_LOG_WARN("data.port_id has invalid type, skip snoop");
+
+    if (valid && !m_oids.objectReferenceExists(data.port_id))
+    {
+        SWSS_LOG_NOTICE("data.port_id new object spotted %s not present in local DB (snoop!)",
+                sai_serialize_object_id(data.port_id).c_str());
+
+        sai_object_meta_key_t key = { .objecttype = ot, .objectkey = { .key = { .object_id = data.port_id } } };
+
+        m_oids.objectReferenceInsert(data.port_id);
+
+        if (!m_saiObjectCollection.objectExists(key))
+        {
+            m_saiObjectCollection.createObject(key);
+        }
+    }
+
+    if (!sai_metadata_get_enum_value_name(
+                &sai_metadata_enum_sai_port_oper_status_t,
+                data.port_state))
+    {
+        SWSS_LOG_WARN("port_state value (%d) not found in sai_port_oper_status_t",
+                data.port_state);
+    }
+}
+
+void Meta::meta_sai_on_port_state_change(
+        _In_ uint32_t count,
+        _In_ const sai_port_oper_status_notification_t *data)
+{
+    SWSS_LOG_ENTER();
+
+    if (count && data == NULL)
+    {
+        SWSS_LOG_ERROR("port_oper_status_notification pointer is NULL but count is %u", count);
+        return;
+    }
+
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        meta_sai_on_port_state_change_single(data[i]);
+    }
+}
+
+void Meta::meta_sai_on_queue_pfc_deadlock_notification_single(
+        _In_ const sai_queue_deadlock_notification_data_t& data)
+{
+    SWSS_LOG_ENTER();
+
+    auto ot = objectTypeQuery(data.queue_id);
+
+    bool valid = false;
+
+    switch (ot)
+    {
+        // TODO hardcoded types, must advance SAI repository commit to get metadata for this
+        case SAI_OBJECT_TYPE_QUEUE:
+
+            valid = true;
+            break;
+
+        default:
+
+            SWSS_LOG_ERROR("data.queue_id %s has unexpected type: %s, expected PORT, BRIDGE_PORT or LAG",
+                    sai_serialize_object_id(data.queue_id).c_str(),
+                    sai_serialize_object_type(ot).c_str());
+            break;
+    }
+
+    SWSS_LOG_WARN("data.queue_id has invalid type, skip snoop");
+
+    if (valid && !m_oids.objectReferenceExists(data.queue_id))
+    {
+        SWSS_LOG_NOTICE("data.queue_id new object spotted %s not present in local DB (snoop!)",
+                sai_serialize_object_id(data.queue_id).c_str());
+
+        sai_object_meta_key_t key = { .objecttype = ot, .objectkey = { .key = { .object_id = data.queue_id } } };
+
+        m_oids.objectReferenceInsert(data.queue_id);
+
+        if (!m_saiObjectCollection.objectExists(key))
+        {
+            m_saiObjectCollection.createObject(key);
+        }
+    }
+}
+
+void Meta::meta_sai_on_queue_pfc_deadlock_notification(
+        _In_ uint32_t count,
+        _In_ const sai_queue_deadlock_notification_data_t *data)
+{
+    SWSS_LOG_ENTER();
+
+    if (count && data == NULL)
+    {
+        SWSS_LOG_ERROR("queue_deadlock_notification_data pointer is NULL but count is %u", count);
+        return;
+    }
+
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        meta_sai_on_queue_pfc_deadlock_notification_single(data[i]);
+    }
+}
+

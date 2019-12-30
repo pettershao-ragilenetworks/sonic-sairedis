@@ -237,6 +237,44 @@ namespace saimeta
 
             void meta_init_db();
 
+        public: // notifications
+
+            void meta_sai_on_fdb_event(
+                    _In_ uint32_t count,
+                    _In_ sai_fdb_event_notification_data_t *data);
+
+            void meta_sai_on_switch_state_change(
+                    _In_ sai_object_id_t switch_id,
+                    _In_ sai_switch_oper_status_t switch_oper_status);
+
+            void meta_sai_on_switch_shutdown_request(
+                    _In_ sai_object_id_t switch_id);
+
+            void meta_sai_on_port_state_change(
+                    _In_ uint32_t count,
+                    _In_ const sai_port_oper_status_notification_t *data);
+
+            void meta_sai_on_queue_pfc_deadlock_notification(
+                    _In_ uint32_t count,
+                    _In_ const sai_queue_deadlock_notification_data_t *data);
+
+        private: // notifications helpers
+
+            void meta_sai_on_fdb_flush_event_consolidated(
+                    _In_ const sai_fdb_event_notification_data_t& data);
+
+            void meta_fdb_event_snoop_oid(
+                    _In_ sai_object_id_t oid);
+
+            void meta_sai_on_fdb_event_single(
+                    _In_ const sai_fdb_event_notification_data_t& data);
+
+            void meta_sai_on_port_state_change_single(
+                    _In_ const sai_port_oper_status_notification_t& data);
+
+            void meta_sai_on_queue_pfc_deadlock_notification_single(
+                    _In_ const sai_queue_deadlock_notification_data_t& data);
+
         private: // validation helpers
 
             sai_status_t meta_generic_validation_objlist(
@@ -428,3 +466,5 @@ namespace saimeta
             bool m_warmBoot;
     };
 }
+
+
