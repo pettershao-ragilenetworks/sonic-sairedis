@@ -24,12 +24,15 @@ attrid
 attridname
 attrs
 attrvalue
+BCM
 bool
 Bool
 booldata
 brcm
 broadcom
+bv
 candidateObjects
+CHARDATA
 childs
 COLDVIDS
 config
@@ -44,6 +47,7 @@ CreateObject
 currentObj
 currentObject
 currentView
+dbg
 deallocate
 decap
 del
@@ -86,6 +90,7 @@ hostif
 HSV
 https
 hw
+IFF
 inattr
 ini
 init
@@ -101,11 +106,13 @@ ipmc
 IPv
 isobjectid
 isoidattribute
+json
 KEYs
 librediscommon
 libsairedis
 libswsscommon
 linux
+LOGLEVEL
 logrotate
 lookup
 LOOPBACK
@@ -144,6 +151,7 @@ orchagent
 param
 params
 performTransition
+pfc
 policer
 PORTs
 pre
@@ -256,6 +264,7 @@ VIDTORID
 vlan
 vlans
 VLANS
+vr
 vslib
 vxlan
 VXLAN
@@ -263,11 +272,3 @@ workaroung
 WRED
 xoff
 xon
-dbg
-vr
-IFF
-LOGLEVEL
-BCM
-pfc
-CHARDATA
-bv
