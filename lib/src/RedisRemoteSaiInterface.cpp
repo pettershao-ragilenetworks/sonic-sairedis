@@ -2,6 +2,7 @@
 #include "Utils.h"
 #include "NotificationFactory.h"
 #include "Recorder.h"
+#include "VirtualObjectIdManager.h"
 
 #include "sairediscommon.h"
 #include "meta/sai_serialize.h"
@@ -16,6 +17,7 @@ using namespace sairedis;
 extern bool g_syncMode;  // TODO make member
 extern std::string getSelectResultAsString(int result);
 extern std::shared_ptr<Recorder> g_recorder;
+extern std::shared_ptr<VirtualObjectIdManager> g_virtualObjectIdManager;
 
 std::string joinFieldValues(
         _In_ const std::vector<swss::FieldValueTuple> &values);
@@ -1627,3 +1629,18 @@ void RedisRemoteSaiInterface::handleNotification(
     }
 }
 
+sai_object_type_t RedisRemoteSaiInterface::objectTypeQuery(
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    return g_virtualObjectIdManager->saiObjectTypeQuery(objectId);
+}
+
+sai_object_id_t RedisRemoteSaiInterface::switchIdQuery(
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    return g_virtualObjectIdManager->saiSwitchIdQuery(objectId);
+}

@@ -623,4 +623,18 @@ sai_status_t WrapperRemoteSaiInterface::notifySyncd(
     return status;
 }
 
+sai_object_type_t WrapperRemoteSaiInterface::objectTypeQuery(
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
 
+    return m_implementation->objectTypeQuery(objectId);
+}
+
+sai_object_id_t WrapperRemoteSaiInterface::switchIdQuery(
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    return m_implementation->switchIdQuery(objectId);
+}

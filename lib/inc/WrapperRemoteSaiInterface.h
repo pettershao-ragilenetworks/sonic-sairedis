@@ -231,6 +231,12 @@ namespace sairedis
                     _In_ sai_attr_id_t attr_id,
                     _Inout_ sai_s32_list_t *enum_values_capability) override;
 
+            virtual sai_object_type_t objectTypeQuery(
+                    _In_ sai_object_id_t objectId) override;
+
+            virtual sai_object_id_t switchIdQuery(
+                    _In_ sai_object_id_t objectId) override;
+
         public: // Remote
 
             virtual sai_status_t notifySyncd(
