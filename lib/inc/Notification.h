@@ -4,7 +4,10 @@ extern "C" {
 #include "saimetadata.h"
 }
 
+#include "meta/Meta.h"
+
 #include <string>
+#include <memory>
 
 namespace sairedis
 {
@@ -58,12 +61,9 @@ namespace sairedis
              * function.
              *
              * This function must be executed under sairedis API mutex.
-             *
-             * TODO: add parameter which will be metadata object on which
-             * process will be executed. Currently we are using global
-             * functions.
              */
-            virtual void processMetadata() const = 0;
+            virtual void processMetadata(
+                    std::shared_ptr<saimeta::Meta> meta) const = 0;
 
             /**
              * @brief Execute callback notification.

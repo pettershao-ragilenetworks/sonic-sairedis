@@ -46,15 +46,13 @@ void clear_local_state()
     // will clear switch container
     g_switchContainer = std::make_shared<SwitchContainer>();
 
-    // Initialize metadata database.
-    // TODO must be done per syncd instance
-    meta_init_db();
-
     // TODO since we create new manager, we need to create new meta db with
     // updated functions for query object type and switch id
     // TODO update global context when supporting multiple syncd instances
     g_virtualObjectIdManager = std::make_shared<VirtualObjectIdManager>(0, g_redisVidIndexGenerator);
 
+    // Initialize metadata database.
+    // TODO must be done per syncd instance
     if (g_meta)
         g_meta->meta_init_db();
 }

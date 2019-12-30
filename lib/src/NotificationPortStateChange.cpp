@@ -3,7 +3,6 @@
 #include "swss/logger.h"
 
 #include "meta/sai_serialize.h"
-#include "meta/sai_meta.h"
 
 using namespace sairedis;
 
@@ -58,14 +57,12 @@ sai_object_id_t NotificationPortStateChange::getAnyObjectId() const
     return SAI_NULL_OBJECT_ID;
 }
 
-void NotificationPortStateChange::processMetadata() const
+void NotificationPortStateChange::processMetadata(
+        _In_ std::shared_ptr<saimeta::Meta> meta) const
 {
     SWSS_LOG_ENTER();
 
-    // TODO add parameter with metadata object, currently we are calling global
-    // functions
-
-    meta_sai_on_port_state_change(m_count, m_portOperaStatusNotificationData);
+    meta->meta_sai_on_port_state_change(m_count, m_portOperaStatusNotificationData);
 }
 
 void NotificationPortStateChange::executeCallback(

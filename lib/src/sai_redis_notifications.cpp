@@ -52,7 +52,7 @@ static sai_switch_notifications_t processNotification(
     // it will access meta database and notification comes from different
     // thread, and this method is executed from notifications thread
 
-    notification->processMetadata();
+    notification->processMetadata(g_meta);
 
     auto objectId = notification->getAnyObjectId();
 

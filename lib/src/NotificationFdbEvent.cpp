@@ -3,7 +3,6 @@
 #include "swss/logger.h"
 
 #include "meta/sai_serialize.h"
-#include "meta/sai_meta.h"
 
 using namespace sairedis;
 
@@ -81,14 +80,12 @@ sai_object_id_t NotificationFdbEvent::getAnyObjectId() const
     return SAI_NULL_OBJECT_ID;
 }
 
-void NotificationFdbEvent::processMetadata() const
+void NotificationFdbEvent::processMetadata(
+        _In_ std::shared_ptr<saimeta::Meta> meta) const
 {
     SWSS_LOG_ENTER();
 
-    // TODO add parameter with metadata object, currently we are calling global
-    // functions
-
-    meta_sai_on_fdb_event(m_count, m_fdbEventNotificationData);
+    meta->meta_sai_on_fdb_event(m_count, m_fdbEventNotificationData);
 }
 
 void NotificationFdbEvent::executeCallback(

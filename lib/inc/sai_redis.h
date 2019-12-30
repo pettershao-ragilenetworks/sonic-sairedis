@@ -23,7 +23,6 @@ extern "C" {
 #include "swss/table.h"
 #include "swss/select.h"
 #include "swss/logger.h"
-#include "meta/sai_meta.h"
 
 #include "SwitchContainer.h"
 #include "VirtualObjectIdManager.h"

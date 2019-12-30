@@ -3,7 +3,6 @@
 #include "swss/logger.h"
 
 #include "meta/sai_serialize.h"
-#include "meta/sai_meta.h"
 
 using namespace sairedis;
 
@@ -58,14 +57,12 @@ sai_object_id_t NotificationQueuePfcDeadlock::getAnyObjectId() const
     return SAI_NULL_OBJECT_ID;
 }
 
-void NotificationQueuePfcDeadlock::processMetadata() const
+void NotificationQueuePfcDeadlock::processMetadata(
+        _In_ std::shared_ptr<saimeta::Meta> meta) const
 {
     SWSS_LOG_ENTER();
 
-    // TODO add parameter with metadata object, currently we are calling global
-    // functions
-
-    meta_sai_on_queue_pfc_deadlock_notification(m_count, m_queueDeadlockNotificationData);
+    meta->meta_sai_on_queue_pfc_deadlock_notification(m_count, m_queueDeadlockNotificationData);
 }
 
 void NotificationQueuePfcDeadlock::executeCallback(
