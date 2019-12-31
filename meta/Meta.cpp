@@ -7242,3 +7242,19 @@ void Meta::meta_sai_on_queue_pfc_deadlock_notification(
     }
 }
 
+int32_t Meta::getObjectReferenceCount(
+        _In_ sai_object_id_t oid) const
+{
+    SWSS_LOG_ENTER();
+
+    return m_oids.getObjectReferenceCount(oid);
+}
+
+bool Meta::objectExists(
+        _In_ const std::string& mk) const
+{
+    SWSS_LOG_ENTER();
+
+    return m_saiObjectCollection.objectExists(mk);
+}
+

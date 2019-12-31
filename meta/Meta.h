@@ -310,7 +310,9 @@ namespace saimeta
                     _In_ uint32_t count,
                     _In_ const sai_object_id_t* list);
 
-            bool is_ipv6_mask_valid(
+        public:
+
+            static bool is_ipv6_mask_valid(
                     _In_ const uint8_t* mask);
 
         private: // unit tests helpers
@@ -324,6 +326,14 @@ namespace saimeta
                     _In_ bool enable);
 
             bool meta_unittests_enabled();
+
+        public: // unittests method helpers
+
+            int32_t getObjectReferenceCount(
+                    _In_ sai_object_id_t oid) const;
+
+            bool objectExists(
+                    _In_ const std::string& mk) const;
 
         private: // port helpers
 
