@@ -94,7 +94,13 @@ libsaimetadata_la_LIBADD = -lhiredis -lswsscommon libsaimeta.la
 
 bin_PROGRAMS = tests
 
-tests_SOURCES = tests.cpp
+tests_SOURCES = \
+				tests.cpp \
+				DummySaiInterface.cpp \
+				MetaTestSaiInterface.cpp \
+				NumberOidIndexGenerator.cpp \
+				../lib/src/VirtualObjectIdManager.cpp
+
 tests_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON)
 tests_LDADD = -lhiredis -lswsscommon -lpthread libsaimetadata.la libsaimeta.la
 

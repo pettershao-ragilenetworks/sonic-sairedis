@@ -5,6 +5,8 @@
 #include "SaiAttrWrapper.h"
 #include "AttrKeyMap.h"
 #include "SaiObjectCollection.h"
+#include "MetaTestSaiInterface.h"
+#include "Meta.h"
 
 #include <inttypes.h>
 #include <string.h>
@@ -18,73 +20,26 @@
 
 using namespace saimeta;
 
-extern SaiObjectCollection g_saiObjectCollection;
-extern bool is_ipv6_mask_valid(const uint8_t* mask);
+static std::shared_ptr<MetaTestSaiInterface> g_sai = std::make_shared<MetaTestSaiInterface>();
+static std::shared_ptr<Meta> g_meta = std::make_shared<Meta>(g_sai);
 
-extern OidRefCounter g_oids;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-noreturn"
 
 sai_object_type_t sai_object_type_query(
         _In_ sai_object_id_t oid)
 {
     SWSS_LOG_ENTER();
 
-    if (oid == SAI_NULL_OBJECT_ID)
-    {
-        return SAI_OBJECT_TYPE_NULL;
-    }
-
-    sai_object_type_t objecttype = (sai_object_type_t)((oid >> 48) & 0xFF);
-
-    if ((objecttype <= SAI_OBJECT_TYPE_NULL) ||
-            (objecttype >= SAI_OBJECT_TYPE_EXTENSIONS_MAX))
-    {
-        SWSS_LOG_THROW("invalid oid 0x%" PRIx64, oid);
-    }
-
-    return objecttype;
+    SWSS_LOG_THROW("should not be used");
 }
-
-int switch_index = 0;
-uint64_t vid_index = 0;
-
 
 void clear_local()
 {
     SWSS_LOG_ENTER();
 
-    switch_index = 0;
-
-    vid_index = 0;
-}
-
-int get_switch_index(
-        _In_ sai_object_id_t switch_id)
-{
-    SWSS_LOG_ENTER();
-
-    if (switch_id == SAI_NULL_OBJECT_ID)
-    {
-        SWSS_LOG_THROW("switch id can't be NULL");
-    }
-
-    sai_object_type_t ot = sai_object_type_query(switch_id);
-
-    if (ot != SAI_OBJECT_TYPE_SWITCH)
-    {
-        SWSS_LOG_THROW("expected switch id, got %s", sai_serialize_object_type(ot).c_str());
-    }
-
-    return (int)((switch_id >> 56) & 0xFF);
-}
-
-sai_object_id_t construct_object_id(
-        _In_ sai_object_type_t object_type,
-        _In_ int sw_index,
-        _In_ uint64_t virtual_id)
-{
-    SWSS_LOG_ENTER();
-
-    return (sai_object_id_t)(((uint64_t)sw_index << 56) | ((uint64_t)object_type << 48) | virtual_id);
+    g_sai = std::make_shared<MetaTestSaiInterface>();
+    g_meta = std::make_shared<Meta>(g_sai);
 }
 
 sai_object_id_t create_dummy_object_id(
@@ -93,31 +48,16 @@ sai_object_id_t create_dummy_object_id(
 {
     SWSS_LOG_ENTER();
 
-    if ((object_type <= SAI_OBJECT_TYPE_NULL) ||
-            (object_type >= SAI_OBJECT_TYPE_EXTENSIONS_MAX))
+    sai_object_id_t oid;
+
+    auto status = g_sai->create(object_type, &oid, switch_id, 0, NULL);
+
+    if (status != SAI_STATUS_SUCCESS)
     {
-        SWSS_LOG_THROW("invalid objct type: %d", object_type);
+        SWSS_LOG_THROW("failed to create oid");
     }
 
-    if (object_type == SAI_OBJECT_TYPE_SWITCH)
-    {
-        if (switch_index > 0)
-        {
-            SWSS_LOG_THROW("creating second switch, not supported yet");
-        }
-
-        sai_object_id_t oid = construct_object_id(object_type, switch_index, switch_index);
-
-        switch_index++;
-
-        return oid;
-    }
-
-    int sw_index = get_switch_index(switch_id);
-
-    sai_object_id_t oid = construct_object_id(object_type, sw_index, vid_index++);
-
-    SWSS_LOG_DEBUG("created oid 0x%" PRIx64, oid);
+    SWSS_LOG_DEBUG("created oid %s", sai_serialize_object_id(oid).c_str());
 
     return oid;
 }
@@ -127,396 +67,40 @@ sai_object_id_t sai_switch_id_query(
 {
     SWSS_LOG_ENTER();
 
-    if (oid == SAI_NULL_OBJECT_ID)
-    {
-        return oid;
-    }
-
-    sai_object_type_t object_type = sai_object_type_query(oid);
-
-    if (object_type == SAI_OBJECT_TYPE_NULL)
-    {
-        SWSS_LOG_THROW("invalid object type of oid 0x%lx", oid);
-    }
-
-    if (object_type == SAI_OBJECT_TYPE_SWITCH)
-    {
-        return oid;
-    }
-
-    int sw_index = (int)((oid >> 56) & 0xFF);
-
-    sai_object_id_t sw_id = construct_object_id(SAI_OBJECT_TYPE_SWITCH, sw_index, sw_index);
-
-    return sw_id;
+    SWSS_LOG_THROW("should not be used");
 }
 
-// FDB ENTRY DUMMY FUNCTIONS
-
-sai_status_t dummy_success_sai_set_fdb_entry(
-        _In_ const sai_fdb_entry_t* fdb_entry,
-        _In_ const sai_attribute_t *attr)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_SUCCESS;
-}
-
-sai_status_t dummy_failure_sai_set_fdb_entry(
-        _In_ const sai_fdb_entry_t* fdb_entry,
-        _In_ const sai_attribute_t *attr)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_FAILURE;
-}
-
-sai_status_t dummy_success_sai_get_fdb_entry(
-        _In_ const sai_fdb_entry_t* fdb_entry,
-        _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_SUCCESS;
-}
-
-sai_status_t dummy_failure_sai_get_fdb_entry(
-        _In_ const sai_fdb_entry_t* fdb_entry,
-        _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_FAILURE;
-}
-
-sai_status_t dummy_success_sai_create_fdb_entry(
-        _In_ const sai_fdb_entry_t* fdb_entry,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_SUCCESS;
-}
-
-sai_status_t dummy_failure_sai_create_fdb_entry(
-        _In_ const sai_fdb_entry_t* fdb_entry,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_FAILURE;
-}
-
-sai_status_t dummy_success_sai_remove_fdb_entry(
-        _In_ const sai_fdb_entry_t* fdb_entry)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_SUCCESS;
-}
-
-sai_status_t dummy_failure_sai_remove_fdb_entry(
-        _In_ const sai_fdb_entry_t* fdb_entry)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_FAILURE;
-}
-
-// NEIGHBOR ENTRY DUMMY FUNCTIONS
-
-sai_status_t dummy_success_sai_set_neighbor_entry(
-        _In_ const sai_neighbor_entry_t* neighbor_entry,
-        _In_ const sai_attribute_t *attr)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_SUCCESS;
-}
-
-sai_status_t dummy_failure_sai_set_neighbor_entry(
-        _In_ const sai_neighbor_entry_t* neighbor_entry,
-        _In_ const sai_attribute_t *attr)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_FAILURE;
-}
-
-sai_status_t dummy_success_sai_get_neighbor_entry(
-        _In_ const sai_neighbor_entry_t* neighbor_entry,
-        _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_SUCCESS;
-}
-
-sai_status_t dummy_failure_sai_get_neighbor_entry(
-        _In_ const sai_neighbor_entry_t* neighbor_entry,
-        _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_FAILURE;
-}
-
-sai_status_t dummy_success_sai_create_neighbor_entry(
-        _In_ const sai_neighbor_entry_t* neighbor_entry,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_SUCCESS;
-}
-
-sai_status_t dummy_failure_sai_create_neighbor_entry(
-        _In_ const sai_neighbor_entry_t* neighbor_entry,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_FAILURE;
-}
-
-sai_status_t dummy_success_sai_remove_neighbor_entry(
-        _In_ const sai_neighbor_entry_t* neighbor_entry)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_SUCCESS;
-}
-
-sai_status_t dummy_failure_sai_remove_neighbor_entry(
-        _In_ const sai_neighbor_entry_t* neighbor_entry)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_FAILURE;
-}
-
-// ROUTE ENTRY DUMMY FUNCTIONS
-
-sai_status_t dummy_success_sai_set_route_entry(
-        _In_ const sai_route_entry_t* unicast_route_entry,
-        _In_ const sai_attribute_t *attr)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_SUCCESS;
-}
-
-sai_status_t dummy_failure_sai_set_route_entry(
-        _In_ const sai_route_entry_t* unicast_route_entry,
-        _In_ const sai_attribute_t *attr)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_FAILURE;
-}
-
-sai_status_t dummy_success_sai_get_route_entry(
-        _In_ const sai_route_entry_t* unicast_route_entry,
-        _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_SUCCESS;
-}
-
-sai_status_t dummy_failure_sai_get_route_entry(
-        _In_ const sai_route_entry_t* unicast_route_entry,
-        _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_FAILURE;
-}
-
-sai_status_t dummy_success_sai_create_route_entry(
-        _In_ const sai_route_entry_t* unicast_route_entry,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_SUCCESS;
-}
-
-sai_status_t dummy_failure_sai_create_route_entry(
-        _In_ const sai_route_entry_t* unicast_route_entry,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_FAILURE;
-}
-
-sai_status_t dummy_success_sai_remove_route_entry(
-        _In_ const sai_route_entry_t* unicast_route_entry)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_SUCCESS;
-}
-
-sai_status_t dummy_failure_sai_remove_route_entry(
-        _In_ const sai_route_entry_t* unicast_route_entry)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_FAILURE;
-}
-
-// GENERIC DUMMY FUNCTIONS
-
-sai_status_t dummy_success_sai_set_oid(
-        _In_ sai_object_type_t object_type,
-        _Out_ sai_object_id_t oid,
-        _In_ const sai_attribute_t *attr)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_SUCCESS;
-}
-
-sai_status_t dummy_failure_sai_set_oid(
-        _In_ sai_object_type_t object_type,
-        _Out_ sai_object_id_t oid,
-        _In_ const sai_attribute_t *attr)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_FAILURE;
-}
-
-sai_status_t dummy_success_sai_get_oid(
-        _In_ sai_object_type_t object_type,
-        _Out_ sai_object_id_t oid,
-        _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_SUCCESS;
-}
-
-sai_status_t dummy_failure_sai_get_oid(
-        _In_ sai_object_type_t object_type,
-        _Out_ sai_object_id_t oid,
-        _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_FAILURE;
-}
-
-sai_status_t dummy_success_sai_create_oid(
-        _In_ sai_object_type_t object_type,
-        _Out_ sai_object_id_t* oid,
-        _In_ sai_object_id_t switch_id,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    *oid = create_dummy_object_id(object_type, switch_id);
-
-    if (*oid == SAI_NULL_OBJECT_ID)
-    {
-        return SAI_STATUS_FAILURE;
-    }
-
-    return SAI_STATUS_SUCCESS;
-}
-
-sai_status_t dummy_failure_sai_create_oid(
-        _In_ sai_object_type_t object_type,
-        _Out_ sai_object_id_t* oid,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_FAILURE;
-}
-
-sai_status_t dummy_success_sai_remove_oid(
-        _In_ sai_object_type_t object_type,
-        _Out_ sai_object_id_t oid)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_SUCCESS;
-}
-
-sai_status_t dummy_failure_sai_remove_oid(
-        _In_ sai_object_type_t object_type,
-        _Out_ sai_object_id_t oid)
-{
-    SWSS_LOG_ENTER();
-
-    return SAI_STATUS_FAILURE;
-}
+#pragma GCC diagnostic pop
 
 // META ASSERTS
 
 #define META_ASSERT_SUCCESS(x) \
     if (x != SAI_STATUS_SUCCESS) \
 {\
-    SWSS_LOG_ERROR("expected success");\
+    SWSS_LOG_ERROR("expected success, line: %d", __LINE__);\
     throw;\
 }
 
 #define META_ASSERT_FAIL(x) \
     if (x == SAI_STATUS_SUCCESS) \
 {\
-    SWSS_LOG_ERROR("expected failure");\
+    SWSS_LOG_ERROR("expected failure, line: %d", __LINE__);\
     throw;\
 }
 
 #define META_ASSERT_TRUE(x) \
     if (!(x)) \
 {\
-    SWSS_LOG_ERROR("assert true failed '%s'", # x);\
+    SWSS_LOG_ERROR("assert true failed '%s', line: %d", # x, __LINE__);\
     throw;\
 }
 
 // SWITCH TESTS
 
-sai_status_t switch_get_virtual_router_id(
-        _In_ sai_object_type_t object_type,
-        _In_ sai_object_id_t object_id,
-        _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    sai_object_id_t switch_id = sai_switch_id_query(object_id);
-
-    attr_list[0].value.u32 = 32;
-    attr_list[1].value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_VIRTUAL_ROUTER, switch_id);
-
-    return SAI_STATUS_SUCCESS;
-};
-
 sai_object_id_t create_switch()
 {
     SWSS_LOG_ENTER();
 
-    sai_status_t    status;
     sai_attribute_t attr;
 
     sai_object_id_t switchid;
@@ -524,7 +108,7 @@ sai_object_id_t create_switch()
     attr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
     attr.value.booldata = true;
 
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_SWITCH, &switchid, SAI_NULL_OBJECT_ID, 1, &attr, dummy_success_sai_create_oid);
+    auto status = g_meta->create(SAI_OBJECT_TYPE_SWITCH, &switchid, SAI_NULL_OBJECT_ID, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     return switchid;
@@ -542,40 +126,42 @@ void test_switch_set()
 
     sai_object_id_t switchid = create_switch();
 
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, NULL, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, NULL);
     META_ASSERT_FAIL(status);
 
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, NULL);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
     META_ASSERT_FAIL(status);
 
     // id outside range
     attr.id = -1;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
     META_ASSERT_FAIL(status);
 
+    g_sai->setStatus(SAI_STATUS_FAILURE);
     attr.id = SAI_SWITCH_ATTR_PORT_NUMBER;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, &dummy_failure_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
     META_ASSERT_FAIL(status);
+    g_sai->setStatus(SAI_STATUS_SUCCESS);
 
     attr.id = SAI_SWITCH_ATTR_PORT_NUMBER;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
     META_ASSERT_FAIL(status);
 
     attr.id = SAI_SWITCH_ATTR_SWITCHING_MODE;
     attr.value.s32 = 0x1000;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
     META_ASSERT_FAIL(status);
 
     // enum
     attr.id = SAI_SWITCH_ATTR_SWITCHING_MODE;
     attr.value.s32 = SAI_SWITCH_SWITCHING_MODE_STORE_AND_FORWARD;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
     META_ASSERT_SUCCESS(status);
 
     // bool
     attr.id = SAI_SWITCH_ATTR_BCAST_CPU_FLOOD_ENABLE;
     attr.value.booldata = SAI_SWITCH_SWITCHING_MODE_STORE_AND_FORWARD;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
     META_ASSERT_SUCCESS(status);
 
     // mac
@@ -583,13 +169,13 @@ void test_switch_set()
 
     attr.id = SAI_SWITCH_ATTR_SRC_MAC_ADDRESS;
     memcpy(attr.value.mac, mac, sizeof(mac));
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
     META_ASSERT_SUCCESS(status);
 
     // uint8
     attr.id = SAI_SWITCH_ATTR_QOS_DEFAULT_TC;
     attr.value.u8 = 0x11;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
     META_ASSERT_SUCCESS(status);
 
     // object id with not allowed null
@@ -599,63 +185,64 @@ void test_switch_set()
 //    // null oid
 //    attr.id = SAI_SWITCH_ATTR_LAG_HASH_IPV6;
 //    attr.value.oid = SAI_NULL_OBJECT_ID;
-//    status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, &dummy_success_sai_set_oid);
+//    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
 //    META_ASSERT_FAIL(status);
 //
 //    // wrong object type
 //    attr.id = SAI_SWITCH_ATTR_LAG_HASH_IPV6;
 //    attr.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_LAG);
-//    status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, &dummy_success_sai_set_oid);
+//    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
 //    META_ASSERT_FAIL(status);
 //
 //    // valid object (object must exist)
 //    attr.id = SAI_SWITCH_ATTR_LAG_HASH_IPV6;
-//    attr.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_HASH);
+//    attr.value.oid = create_hash(switchid);
 //
-//    g_oids.objectReferenceInsert(attr.value.oid);
-//
-//    status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, &dummy_success_sai_set_oid);
+//    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
 //    META_ASSERT_SUCCESS(status);
 //
-//    META_ASSERT_TRUE(g_oids.getObjectReferenceCount(attr.value.oid) == 1);
+//    META_ASSERT_TRUE(g_meta->getObjectReferenceCount(attr.value.oid) == 1);
 
     // object id with allowed null
 
     // null oid
     attr.id = SAI_SWITCH_ATTR_QOS_DOT1P_TO_TC_MAP;
     attr.value.oid = SAI_NULL_OBJECT_ID;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
     META_ASSERT_SUCCESS(status);
 
     // wrong object
     attr.id = SAI_SWITCH_ATTR_QOS_DOT1P_TO_TC_MAP;
-    attr.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_LAG, switchid);
+    status = g_meta->create(SAI_OBJECT_TYPE_LAG, &attr.value.oid, switchid, 0, NULL);
+    META_ASSERT_SUCCESS(status);
 
-    g_oids.objectReferenceInsert(attr.value.oid);
-
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
     META_ASSERT_FAIL(status);
 
     // good object
     attr.id = SAI_SWITCH_ATTR_QOS_DOT1P_TO_TC_MAP;
-    attr.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_QOS_MAP, switchid);
+
+    sai_attribute_t a[2] = { };
+    a[0].id = SAI_QOS_MAP_ATTR_TYPE;
+    a[0].value.s32 = 1;
+    a[1].id = SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST;
+    status = g_meta->create(SAI_OBJECT_TYPE_QOS_MAP, &attr.value.oid, switchid, 2, a);
+    META_ASSERT_SUCCESS(status);
 
     sai_object_id_t oid = attr.value.oid;
 
-    g_oids.objectReferenceInsert(attr.value.oid);
-
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
     META_ASSERT_SUCCESS(status);
 
-    META_ASSERT_TRUE(g_oids.getObjectReferenceCount(attr.value.oid) == 1);
+    META_ASSERT_TRUE(g_meta->getObjectReferenceCount(attr.value.oid) == 1);
 
     attr.id = SAI_SWITCH_ATTR_QOS_DOT1P_TO_TC_MAP;
     attr.value.oid = SAI_NULL_OBJECT_ID;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_SWITCH, switchid, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
     META_ASSERT_SUCCESS(status);
 
     // check if it was decreased
-    META_ASSERT_TRUE(g_oids.getObjectReferenceCount(oid) == 0);
+    META_ASSERT_TRUE(g_meta->getObjectReferenceCount(oid) == 0);
 }
 
 void test_switch_get()
@@ -671,28 +258,28 @@ void test_switch_get()
     sai_object_id_t switchid = create_switch();
 
     attr.id = SAI_SWITCH_ATTR_PORT_NUMBER;
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_SWITCH, switchid, 0, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switchid, 0, &attr);
     META_ASSERT_FAIL(status);
 
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_SWITCH, switchid, 1000, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switchid, 1000, &attr);
     META_ASSERT_FAIL(status);
 
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_SWITCH, switchid, 1, NULL, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switchid, 1, NULL);
     META_ASSERT_FAIL(status);
 
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_SWITCH, switchid, 1, NULL, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switchid, 1, NULL);
     META_ASSERT_FAIL(status);
 
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_SWITCH, switchid, 1, &attr, NULL);
-    META_ASSERT_FAIL(status);
+    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switchid, 1, &attr);
+    META_ASSERT_SUCCESS(status);
 
     attr.id = -1;
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_SWITCH, switchid, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switchid, 1, &attr);
     META_ASSERT_FAIL(status);
 
     attr.id = SAI_SWITCH_ATTR_PORT_NUMBER;
     attr.value.u32 = 0;
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_SWITCH, switchid, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switchid, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     sai_attribute_t attr1;
@@ -702,26 +289,79 @@ void test_switch_get()
     attr2.id = SAI_SWITCH_ATTR_DEFAULT_VIRTUAL_ROUTER_ID;
     sai_attribute_t list[2] = { attr1, attr2 };
 
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_SWITCH, switchid, 2, list, &switch_get_virtual_router_id);
+    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switchid, 2, list);
     META_ASSERT_SUCCESS(status);
 }
 
 // FDB TESTS
 
-sai_status_t fdb_entry_get_port_id(
-        _In_ const sai_fdb_entry_t* fdb_entry,
-        _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attr_list)
+static sai_object_id_t create_bridge(
+        _In_ sai_object_id_t switch_id)
 {
     SWSS_LOG_ENTER();
 
-    sai_object_id_t switch_id = fdb_entry->switch_id;
+    sai_object_id_t bridge_id;
 
-    attr_list[0].value.s32 = SAI_FDB_ENTRY_TYPE_STATIC;
-    attr_list[1].value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_PORT,switch_id);
+    sai_attribute_t attrs[9] = {};
 
-    return SAI_STATUS_SUCCESS;
-};
+    attrs[0].id = SAI_BRIDGE_ATTR_TYPE;
+    attrs[0].value.s32 = SAI_BRIDGE_TYPE_1Q;
+
+    sai_status_t status = g_meta->create(SAI_OBJECT_TYPE_BRIDGE, &bridge_id, switch_id, 1, attrs);
+    META_ASSERT_SUCCESS(status);
+
+    return bridge_id;
+}
+
+static sai_object_id_t create_port(
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t port;
+
+    static uint32_t id = 1;
+    id++;
+    sai_attribute_t attrs[9] = { };
+
+    uint32_t list[1] = { id };
+
+    attrs[0].id = SAI_PORT_ATTR_HW_LANE_LIST;
+    attrs[0].value.u32list.count = 1;
+    attrs[0].value.u32list.list = list;
+
+    attrs[1].id = SAI_PORT_ATTR_SPEED;
+    attrs[1].value.u32 = 10000;
+
+    auto status = g_meta->create(SAI_OBJECT_TYPE_PORT, &port, switch_id, 2, attrs);
+    META_ASSERT_SUCCESS(status);
+
+    return port;
+}
+
+static sai_object_id_t create_bridge_port(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_object_id_t bridge_id)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t bridge_port;
+
+    sai_attribute_t attrs[9] = { };
+
+    auto port = create_port(switch_id);
+
+    attrs[0].id = SAI_BRIDGE_PORT_ATTR_TYPE;
+    attrs[0].value.s32 = SAI_BRIDGE_PORT_TYPE_PORT;
+
+    attrs[1].id = SAI_BRIDGE_PORT_ATTR_PORT_ID;
+    attrs[1].value.oid = port;
+
+    auto status = g_meta->create(SAI_OBJECT_TYPE_BRIDGE_PORT, &bridge_port, switch_id, 2, attrs);
+    META_ASSERT_SUCCESS(status);
+
+    return bridge_port;
+}
 
 void test_fdb_entry_create()
 {
@@ -740,27 +380,26 @@ void test_fdb_entry_create()
     sai_mac_t mac = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
 
     memcpy(fdb_entry.mac_address, mac, sizeof(mac));
+
     fdb_entry.switch_id = switch_id;
-    sai_object_id_t bridge_id = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE, switch_id);
-    g_oids.objectReferenceInsert(bridge_id);
+    sai_object_id_t bridge_id = create_bridge(switch_id);
     fdb_entry.bv_id = bridge_id;
 
-    sai_object_id_t port = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE_PORT, switch_id);
-    g_oids.objectReferenceInsert(port);
+    sai_object_id_t port = create_bridge_port(switch_id, bridge_id);
 
     SWSS_LOG_NOTICE("create tests");
 
     SWSS_LOG_NOTICE("zero attribute count (but there are mandatory attributes)");
     attr.id = SAI_FDB_ENTRY_ATTR_TYPE;
-    status = meta_sai_create_fdb_entry(&fdb_entry, 0, &attr, &dummy_success_sai_create_fdb_entry);
+    status = g_meta->create(&fdb_entry, 0, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("attr is null");
-    status = meta_sai_create_fdb_entry(&fdb_entry, 1, NULL, &dummy_success_sai_create_fdb_entry);
+    status = g_meta->create(&fdb_entry, 1, NULL);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("fdb entry is null");
-    status = meta_sai_create_fdb_entry(NULL, 1, &attr, &dummy_success_sai_create_fdb_entry);
+    status = g_meta->create((const sai_fdb_entry_t*)NULL, 1, &attr);
     META_ASSERT_FAIL(status);
 
     sai_attribute_t list1[4] = { };
@@ -781,36 +420,32 @@ void test_fdb_entry_create()
 
     attr4.id = -1;
 
-    SWSS_LOG_NOTICE("create function is null");
-    status = meta_sai_create_fdb_entry(&fdb_entry, 3, list1, NULL);
-    META_ASSERT_FAIL(status);
-
     SWSS_LOG_NOTICE("invalid attribute id");
-    status = meta_sai_create_fdb_entry(&fdb_entry, 4, list1, &dummy_success_sai_create_fdb_entry);
+    status = g_meta->create(&fdb_entry, 4, list1);
     META_ASSERT_FAIL(status);
 
 //    // packet action is now optional
 //    SWSS_LOG_NOTICE("passing optional attribute");
-//    status = meta_sai_create_fdb_entry(&fdb_entry, 1, list1, &dummy_success_sai_create_fdb_entry);
+//    status = g_meta->create(&fdb_entry, 1, list1);
 //    META_ASSERT_SUCCESS(status);
 
     attr2.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_HASH, switch_id);
 
     SWSS_LOG_NOTICE("invalid attribute value on oid");
-    status = meta_sai_create_fdb_entry(&fdb_entry, 3, list1, &dummy_success_sai_create_fdb_entry);
+    status = g_meta->create(&fdb_entry, 3, list1);
     META_ASSERT_FAIL(status);
 
     attr2.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_PORT, switch_id);
 
     SWSS_LOG_NOTICE("non existing object on oid");
-    status = meta_sai_create_fdb_entry(&fdb_entry, 3, list1, &dummy_success_sai_create_fdb_entry);
+    status = g_meta->create(&fdb_entry, 3, list1);
     META_ASSERT_FAIL(status);
 
     attr2.value.oid = port;
     attr3.value.s32 = 0x100;
 
     SWSS_LOG_NOTICE("invalid attribute value on enum");
-    status = meta_sai_create_fdb_entry(&fdb_entry, 3, list1, &dummy_success_sai_create_fdb_entry);
+    status = g_meta->create(&fdb_entry, 3, list1);
     META_ASSERT_FAIL(status);
 
     attr3.value.s32 = SAI_PACKET_ACTION_FORWARD;
@@ -818,15 +453,15 @@ void test_fdb_entry_create()
     sai_attribute_t list2[4] = { attr1, attr2, attr3, attr3 };
 
     SWSS_LOG_NOTICE("repeated attribute id");
-    status = meta_sai_create_fdb_entry(&fdb_entry, 4, list2, &dummy_success_sai_create_fdb_entry);
+    status = g_meta->create(&fdb_entry, 4, list2);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("correct");
-    status = meta_sai_create_fdb_entry(&fdb_entry, 3, list2, &dummy_success_sai_create_fdb_entry);
+    status = g_meta->create(&fdb_entry, 3, list2);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("already exists");
-    status = meta_sai_create_fdb_entry(&fdb_entry, 3, list2, &dummy_success_sai_create_fdb_entry);
+    status = g_meta->create(&fdb_entry, 3, list2);
     META_ASSERT_FAIL(status);
 }
 
@@ -847,12 +482,10 @@ void test_fdb_entry_remove()
 
     memcpy(fdb_entry.mac_address, mac, sizeof(mac));
     fdb_entry.switch_id = switch_id;
-    sai_object_id_t bridge_id = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE, switch_id);
-    g_oids.objectReferenceInsert(bridge_id);
+    sai_object_id_t bridge_id = create_bridge(switch_id);
     fdb_entry.bv_id= bridge_id;
 
-    sai_object_id_t port = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE_PORT,switch_id);
-    g_oids.objectReferenceInsert(port);
+    sai_object_id_t port = create_bridge_port(switch_id, bridge_id);
 
     sai_attribute_t list1[3] = { };
 
@@ -870,23 +503,23 @@ void test_fdb_entry_remove()
     attr3.value.s32 = SAI_PACKET_ACTION_FORWARD;
 
     SWSS_LOG_NOTICE("creating fdb entry");
-    status = meta_sai_create_fdb_entry(&fdb_entry, 3, list1, &dummy_success_sai_create_fdb_entry);
+    status = g_meta->create(&fdb_entry, 3, list1);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("remove tests");
 
     SWSS_LOG_NOTICE("fdb_entry is null");
-    status = meta_sai_remove_fdb_entry(NULL, &dummy_success_sai_remove_fdb_entry);
+    status = g_meta->remove((const sai_fdb_entry_t*)NULL);
     META_ASSERT_FAIL(status);
 
     //SWSS_LOG_NOTICE("invalid vlan");
-    //status = meta_sai_remove_fdb_entry(&fdb_entry, &dummy_success_sai_remove_fdb_entry);
+    //status = g_meta->remove(&fdb_entry);
     //META_ASSERT_FAIL(status);
 
     fdb_entry.mac_address[0] = 1;
 
     SWSS_LOG_NOTICE("invalid mac");
-    status = meta_sai_remove_fdb_entry(&fdb_entry, &dummy_success_sai_remove_fdb_entry);
+    status = g_meta->remove(&fdb_entry);
     META_ASSERT_FAIL(status);
 
     fdb_entry.mac_address[0] = 0x11;
@@ -895,13 +528,57 @@ void test_fdb_entry_remove()
 
     std::string key = sai_serialize_object_meta_key(meta);
 
-    META_ASSERT_TRUE(g_saiObjectCollection.objectExists(key));
+    META_ASSERT_TRUE(g_meta->objectExists(key));
 
     SWSS_LOG_NOTICE("success");
-    status = meta_sai_remove_fdb_entry(&fdb_entry, &dummy_success_sai_remove_fdb_entry);
+    status = g_meta->remove(&fdb_entry);
     META_ASSERT_SUCCESS(status);
 
-    META_ASSERT_TRUE(!g_saiObjectCollection.objectExists(key));
+    META_ASSERT_TRUE(!g_meta->objectExists(key));
+}
+
+static sai_fdb_entry_t create_fdb_entry()
+{
+    SWSS_LOG_ENTER();
+
+    sai_fdb_entry_t fdb_entry;
+
+    sai_mac_t mac = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
+
+    memcpy(fdb_entry.mac_address, mac, sizeof(mac));
+
+    auto switch_id = create_switch();
+
+    fdb_entry.switch_id = switch_id;
+    sai_object_id_t bridge_id = create_bridge(switch_id);
+    fdb_entry.bv_id = bridge_id;
+
+    sai_object_id_t port = create_bridge_port(switch_id, bridge_id);
+
+    sai_attribute_t list1[4] = { };
+
+    sai_attribute_t &attr1 = list1[0];
+    sai_attribute_t &attr2 = list1[1];
+    sai_attribute_t &attr3 = list1[2];
+    sai_attribute_t &attr4 = list1[3];
+
+    attr1.id = SAI_FDB_ENTRY_ATTR_TYPE;
+    attr1.value.s32 = SAI_FDB_ENTRY_TYPE_STATIC;
+
+    attr2.id = SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID;
+    attr2.value.oid = port;
+
+    attr3.id = SAI_FDB_ENTRY_ATTR_PACKET_ACTION;
+    attr3.value.s32 = SAI_PACKET_ACTION_FORWARD;
+
+    attr4.id = -1;
+
+    sai_attribute_t list2[4] = { attr1, attr2, attr3, attr3 };
+
+    auto status = g_meta->create(&fdb_entry, 3, list2);
+    META_ASSERT_SUCCESS(status);
+
+    return fdb_entry;
 }
 
 void test_fdb_entry_set()
@@ -914,56 +591,47 @@ void test_fdb_entry_set()
     sai_status_t    status;
     sai_attribute_t attr;
 
-    sai_object_id_t switch_id = create_switch();
+    sai_fdb_entry_t fdb_entry = create_fdb_entry();
 
-    sai_fdb_entry_t fdb_entry;
-
-    sai_mac_t mac = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
-
-    memcpy(fdb_entry.mac_address, mac, sizeof(mac));
-    fdb_entry.switch_id = switch_id;
-
-    // TODO we should use CREATE for this
-    sai_object_meta_key_t meta_key_fdb = { .objecttype = SAI_OBJECT_TYPE_FDB_ENTRY, .objectkey = { .key = { .fdb_entry = fdb_entry } } };
-    std::string fdb_key = sai_serialize_object_meta_key(meta_key_fdb);
-    g_saiObjectCollection.createObject(meta_key_fdb);
+    //status = g_meta->create(&fdb_entry, 0, 0);
+    //META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("attr is null");
-    status = meta_sai_set_fdb_entry(&fdb_entry, NULL, &dummy_success_sai_set_fdb_entry);
+    status = g_meta->set(&fdb_entry, NULL);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("fdb entry is null");
-    status = meta_sai_set_fdb_entry(NULL, &attr, &dummy_success_sai_set_fdb_entry);
+    status = g_meta->set((const sai_fdb_entry_t*)NULL, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("setting read only object");
     attr.id = SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID;
-    attr.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE_PORT,switch_id);
+    attr.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE_PORT, fdb_entry.switch_id);
 
-    status = meta_sai_set_fdb_entry(&fdb_entry, &attr, &dummy_success_sai_set_fdb_entry);
+    status = g_meta->set(&fdb_entry, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("setting invalid attrib id");
     attr.id = -1;
-    status = meta_sai_set_fdb_entry(&fdb_entry, &attr, &dummy_success_sai_set_fdb_entry);
+    status = g_meta->set(&fdb_entry, &attr);
     META_ASSERT_FAIL(status);
 
     //SWSS_LOG_NOTICE("invalid vlan");
     //attr.id = SAI_FDB_ENTRY_ATTR_TYPE;
     //attr.value.s32 = SAI_FDB_ENTRY_TYPE_STATIC;
-    //status = meta_sai_set_fdb_entry(&fdb_entry, &attr, &dummy_success_sai_set_fdb_entry);
+    //status = g_meta->set(&fdb_entry, &attr);
     //META_ASSERT_FAIL(status);
 
     //SWSS_LOG_NOTICE("vlan outside range");
     //attr.id = SAI_FDB_ENTRY_ATTR_TYPE;
     //attr.value.s32 = SAI_FDB_ENTRY_TYPE_STATIC;
-    //status = meta_sai_set_fdb_entry(&fdb_entry, &attr, &dummy_success_sai_set_fdb_entry);
+    //status = g_meta->set(&fdb_entry, &attr);
     //META_ASSERT_FAIL(status);
 
     // correct
     attr.id = SAI_FDB_ENTRY_ATTR_TYPE;
     attr.value.s32 = SAI_FDB_ENTRY_TYPE_STATIC;
-    status = meta_sai_set_fdb_entry(&fdb_entry, &attr, &dummy_success_sai_set_fdb_entry);
+    status = g_meta->set(&fdb_entry, &attr);
     META_ASSERT_SUCCESS(status);
 
     // TODO check references ?
@@ -979,56 +647,36 @@ void test_fdb_entry_get()
     sai_status_t    status;
     sai_attribute_t attr;
 
-    sai_fdb_entry_t fdb_entry;
-
-    sai_mac_t mac = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
-
-    sai_object_id_t switch_id = create_switch();
-
-    memcpy(fdb_entry.mac_address, mac, sizeof(mac));
-    fdb_entry.switch_id = switch_id;
-
-    sai_object_id_t bridge_id = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE, switch_id);
-    g_oids.objectReferenceInsert(bridge_id);
-    fdb_entry.bv_id = bridge_id;
-
-    // TODO we should use CREATE for this
-    sai_object_meta_key_t meta_key_fdb = { .objecttype = SAI_OBJECT_TYPE_FDB_ENTRY, .objectkey = { .key = { .fdb_entry = fdb_entry } } };
-    std::string fdb_key = sai_serialize_object_meta_key(meta_key_fdb);
-    g_saiObjectCollection.createObject(meta_key_fdb);
+    sai_fdb_entry_t fdb_entry = create_fdb_entry();
 
     attr.id = SAI_FDB_ENTRY_ATTR_TYPE;
     attr.value.s32 = SAI_FDB_ENTRY_TYPE_STATIC;
-    status = meta_sai_set_fdb_entry(&fdb_entry, &attr, &dummy_success_sai_set_fdb_entry);
+    status = g_meta->set(&fdb_entry, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("get test");
 
     // zero attribute count
     attr.id = SAI_FDB_ENTRY_ATTR_TYPE;
-    status = meta_sai_get_fdb_entry(&fdb_entry, 0, &attr, &dummy_success_sai_get_fdb_entry);
+    status = g_meta->get(&fdb_entry, 0, &attr);
     META_ASSERT_FAIL(status);
 
     // attr is null
-    status = meta_sai_get_fdb_entry(&fdb_entry, 1, NULL, &dummy_success_sai_get_fdb_entry);
+    status = g_meta->get(&fdb_entry, 1, NULL);
     META_ASSERT_FAIL(status);
 
     // fdb entry is null
-    status = meta_sai_get_fdb_entry(NULL, 1, &attr, &dummy_success_sai_get_fdb_entry);
-    META_ASSERT_FAIL(status);
-
-    // get function is null
-    status = meta_sai_get_fdb_entry(&fdb_entry, 1, &attr, NULL);
+    status = g_meta->get((sai_fdb_entry_t*)NULL, 1, &attr);
     META_ASSERT_FAIL(status);
 
     // attr id out of range
     attr.id = -1;
-    status = meta_sai_get_fdb_entry(&fdb_entry, 1, &attr, &dummy_success_sai_get_fdb_entry);
+    status = g_meta->get(&fdb_entry, 1, &attr);
     META_ASSERT_FAIL(status);
 
     // correct single valid attribute
     attr.id = SAI_FDB_ENTRY_ATTR_TYPE;
-    status = meta_sai_get_fdb_entry(&fdb_entry, 1, &attr, &dummy_success_sai_get_fdb_entry);
+    status = g_meta->get(&fdb_entry, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     // correct 2 attributes
@@ -1039,7 +687,7 @@ void test_fdb_entry_get()
     attr2.id = SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID;
     sai_attribute_t list[2] = { attr1, attr2 };
 
-    status = meta_sai_get_fdb_entry(&fdb_entry, 2, list, &fdb_entry_get_port_id);
+    status = g_meta->get(&fdb_entry, 2, list);
     META_ASSERT_SUCCESS(status);
 }
 
@@ -1063,12 +711,10 @@ void test_fdb_entry_flow()
     memcpy(fdb_entry.mac_address, mac, sizeof(mac));
     fdb_entry.switch_id = switch_id;
 
-    sai_object_id_t bridge_id = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE, switch_id);
-    g_oids.objectReferenceInsert(bridge_id);
+    sai_object_id_t bridge_id = create_bridge(switch_id);
     fdb_entry.bv_id= bridge_id;
 
-    sai_object_id_t lag = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE_PORT,switch_id);
-    g_oids.objectReferenceInsert(lag);
+    sai_object_id_t lag = create_bridge_port(switch_id, bridge_id);
 
     sai_attribute_t list[4] = { };
 
@@ -1090,39 +736,80 @@ void test_fdb_entry_flow()
     attr4.value.u32 = 0x12345678;
 
     SWSS_LOG_NOTICE("create");
-    status = meta_sai_create_fdb_entry(&fdb_entry, 4, list, dummy_success_sai_create_fdb_entry);
+    status = g_meta->create(&fdb_entry, 4, list);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("create existing");
-    status = meta_sai_create_fdb_entry(&fdb_entry, 4, list, dummy_success_sai_create_fdb_entry);
+    status = g_meta->create(&fdb_entry, 4, list);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("set");
     attr.id = SAI_FDB_ENTRY_ATTR_TYPE;
     attr.value.s32 = SAI_FDB_ENTRY_TYPE_DYNAMIC;
-    status = meta_sai_set_fdb_entry(&fdb_entry, &attr, &dummy_success_sai_set_fdb_entry);
+    status = g_meta->set(&fdb_entry, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("set");
     attr.id = SAI_FDB_ENTRY_ATTR_META_DATA;
     attr.value.u32 = SAI_FDB_ENTRY_TYPE_DYNAMIC;
-    status = meta_sai_set_fdb_entry(&fdb_entry, &attr, &dummy_success_sai_set_fdb_entry);
+    status = g_meta->set(&fdb_entry, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("get");
-    status = meta_sai_get_fdb_entry(&fdb_entry, 4, list, &dummy_success_sai_get_fdb_entry);
+    status = g_meta->get(&fdb_entry, 4, list);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("remove");
-    status = meta_sai_remove_fdb_entry(&fdb_entry, &dummy_success_sai_remove_fdb_entry);
+    status = g_meta->remove(&fdb_entry);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("remove non existing");
-    status = meta_sai_remove_fdb_entry(&fdb_entry, &dummy_success_sai_remove_fdb_entry);
+    status = g_meta->remove(&fdb_entry);
     META_ASSERT_FAIL(status);
 }
 
 // NEIGHBOR TESTS
+
+static sai_object_id_t create_virtual_router(
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t vr;
+
+    auto status = g_meta->create(SAI_OBJECT_TYPE_VIRTUAL_ROUTER, &vr, switch_id, 0, NULL);
+    META_ASSERT_SUCCESS(status);
+
+    return vr;
+}
+
+static sai_object_id_t create_rif(
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t rif;
+
+    sai_attribute_t attrs[9] = { };
+
+    auto port = create_port(switch_id);
+
+    auto vr = create_virtual_router(switch_id);
+
+    attrs[0].id = SAI_ROUTER_INTERFACE_ATTR_VIRTUAL_ROUTER_ID;
+    attrs[0].value.oid = vr;
+
+    attrs[1].id = SAI_ROUTER_INTERFACE_ATTR_TYPE;
+    attrs[1].value.s32 = SAI_ROUTER_INTERFACE_TYPE_PORT;
+
+    attrs[2].id = SAI_ROUTER_INTERFACE_ATTR_PORT_ID;
+    attrs[2].value.oid = port;
+
+    auto status = g_meta->create(SAI_OBJECT_TYPE_ROUTER_INTERFACE, &rif, switch_id, 3, attrs);
+    META_ASSERT_SUCCESS(status);
+
+    return rif;
+}
 
 void test_neighbor_entry_create()
 {
@@ -1139,12 +826,7 @@ void test_neighbor_entry_create()
 
     sai_neighbor_entry_t neighbor_entry;
 
-    // TODO we should use create
-    sai_object_id_t rif = create_dummy_object_id(SAI_OBJECT_TYPE_ROUTER_INTERFACE,switch_id);
-    g_oids.objectReferenceInsert(rif);
-    sai_object_meta_key_t meta_key_rif = { .objecttype = SAI_OBJECT_TYPE_ROUTER_INTERFACE, .objectkey = { .key = { .object_id = rif } } };
-    std::string rif_key = sai_serialize_object_meta_key(meta_key_rif);
-    g_saiObjectCollection.createObject(meta_key_rif);
+    sai_object_id_t rif = create_rif(switch_id);
 
     neighbor_entry.ip_address.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     neighbor_entry.ip_address.addr.ip4 = htonl(0x0a00000f);
@@ -1154,15 +836,15 @@ void test_neighbor_entry_create()
     SWSS_LOG_NOTICE("create tests");
 
     SWSS_LOG_NOTICE("zero attribute count (but there are mandatory attributes)");
-    status = meta_sai_create_neighbor_entry(&neighbor_entry, 0, &attr, &dummy_success_sai_create_neighbor_entry);
+    status = g_meta->create(&neighbor_entry, 0, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("attr is null");
-    status = meta_sai_create_neighbor_entry(&neighbor_entry, 1, NULL, &dummy_success_sai_create_neighbor_entry);
+    status = g_meta->create(&neighbor_entry, 1, NULL);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("neighbor entry is null");
-    status = meta_sai_create_neighbor_entry(NULL, 1, &attr, &dummy_success_sai_create_neighbor_entry);
+    status = g_meta->create((sai_neighbor_entry_t*)NULL, 1, &attr);
     META_ASSERT_FAIL(status);
 
     sai_attribute_t list[3] = { };
@@ -1179,17 +861,13 @@ void test_neighbor_entry_create()
 
     attr3.id = -1;
 
-    SWSS_LOG_NOTICE("create function is null");
-    status = meta_sai_create_neighbor_entry(&neighbor_entry, 2, list, NULL);
-    META_ASSERT_FAIL(status);
-
     SWSS_LOG_NOTICE("invalid attribute id");
-    status = meta_sai_create_neighbor_entry(&neighbor_entry, 3, list, &dummy_success_sai_create_neighbor_entry);
+    status = g_meta->create(&neighbor_entry, 3, list);
     META_ASSERT_FAIL(status);
 
     attr2.value.s32 = SAI_PACKET_ACTION_FORWARD + 0x100;
     SWSS_LOG_NOTICE("invalid attribute value on enum");
-    status = meta_sai_create_neighbor_entry(&neighbor_entry, 2, list, &dummy_success_sai_create_neighbor_entry);
+    status = g_meta->create(&neighbor_entry, 2, list);
     META_ASSERT_FAIL(status);
 
     attr2.value.s32 = SAI_PACKET_ACTION_FORWARD;
@@ -1197,11 +875,11 @@ void test_neighbor_entry_create()
     sai_attribute_t list2[4] = { attr1, attr2, attr2 };
 
     SWSS_LOG_NOTICE("repeated attribute id");
-    status = meta_sai_create_neighbor_entry(&neighbor_entry, 3, list2, &dummy_success_sai_create_neighbor_entry);
+    status = g_meta->create(&neighbor_entry, 3, list2);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("correct ipv4");
-    status = meta_sai_create_neighbor_entry(&neighbor_entry, 2, list2, &dummy_success_sai_create_neighbor_entry);
+    status = g_meta->create(&neighbor_entry, 2, list2);
     META_ASSERT_SUCCESS(status);
 
     neighbor_entry.ip_address.addr_family = SAI_IP_ADDR_FAMILY_IPV6;
@@ -1209,12 +887,67 @@ void test_neighbor_entry_create()
     memcpy(neighbor_entry.ip_address.addr.ip6, ip6, 16);
 
     SWSS_LOG_NOTICE("correct ipv6");
-    status = meta_sai_create_neighbor_entry(&neighbor_entry, 2, list2, &dummy_success_sai_create_neighbor_entry);
+    status = g_meta->create(&neighbor_entry, 2, list2);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("already exists");
-    status = meta_sai_create_neighbor_entry(&neighbor_entry, 2, list2, &dummy_success_sai_create_neighbor_entry);
+    status = g_meta->create(&neighbor_entry, 2, list2);
     META_ASSERT_FAIL(status);
+}
+
+sai_neighbor_entry_t create_neighbor_entry()
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t switch_id = create_switch();
+    sai_status_t    status;
+
+    sai_mac_t mac = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
+
+    sai_neighbor_entry_t neighbor_entry;
+
+    sai_object_id_t rif = create_rif(switch_id);
+
+    neighbor_entry.ip_address.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
+    neighbor_entry.ip_address.addr.ip4 = htonl(0x0a00000f);
+    neighbor_entry.rif_id = rif;
+    neighbor_entry.switch_id = switch_id;
+
+    sai_attribute_t list[3] = { };
+
+    sai_attribute_t &attr1 = list[0];
+    sai_attribute_t &attr2 = list[1];
+    sai_attribute_t &attr3 = list[2];
+
+    attr1.id = SAI_NEIGHBOR_ENTRY_ATTR_DST_MAC_ADDRESS;
+    memcpy(attr1.value.mac, mac, 6);
+
+    attr2.id = SAI_NEIGHBOR_ENTRY_ATTR_PACKET_ACTION;
+    attr2.value.s32 = SAI_PACKET_ACTION_FORWARD;
+
+    attr3.id = -1;
+
+    attr2.value.s32 = SAI_PACKET_ACTION_FORWARD;
+
+    sai_attribute_t list2[4] = { attr1, attr2, attr2 };
+
+    status = g_meta->create(&neighbor_entry, 2, list2);
+    META_ASSERT_SUCCESS(status);
+
+    return neighbor_entry;
+}
+
+static sai_object_id_t create_hash(
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t hash;
+
+    auto status = g_meta->create(SAI_OBJECT_TYPE_HASH, &hash, switch_id, 0, NULL);
+    META_ASSERT_SUCCESS(status);
+
+    return hash;
 }
 
 void test_neighbor_entry_remove()
@@ -1242,12 +975,7 @@ void test_neighbor_entry_remove()
     attr2.id = SAI_NEIGHBOR_ENTRY_ATTR_PACKET_ACTION;
     attr2.value.s32 = SAI_PACKET_ACTION_FORWARD;
 
-    // TODO we should use create
-    sai_object_id_t rif = create_dummy_object_id(SAI_OBJECT_TYPE_ROUTER_INTERFACE,switch_id);
-    g_oids.objectReferenceInsert(rif);
-    sai_object_meta_key_t meta_key_rif = { .objecttype = SAI_OBJECT_TYPE_ROUTER_INTERFACE, .objectkey = { .key = { .object_id = rif } } };
-    std::string rif_key = sai_serialize_object_meta_key(meta_key_rif);
-    g_saiObjectCollection.createObject(meta_key_rif);
+    sai_object_id_t rif = create_rif(switch_id);
 
     neighbor_entry.ip_address.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     neighbor_entry.ip_address.addr.ip4 = htonl(0x0a00000f);
@@ -1257,7 +985,7 @@ void test_neighbor_entry_remove()
     SWSS_LOG_NOTICE("create");
 
     SWSS_LOG_NOTICE("correct ipv4");
-    status = meta_sai_create_neighbor_entry(&neighbor_entry, 2, list, &dummy_success_sai_create_neighbor_entry);
+    status = g_meta->create(&neighbor_entry, 2, list);
     META_ASSERT_SUCCESS(status);
 
     neighbor_entry.ip_address.addr_family = SAI_IP_ADDR_FAMILY_IPV6;
@@ -1265,31 +993,31 @@ void test_neighbor_entry_remove()
     memcpy(neighbor_entry.ip_address.addr.ip6, ip6, 16);
 
     SWSS_LOG_NOTICE("correct ipv6");
-    status = meta_sai_create_neighbor_entry(&neighbor_entry, 2, list, &dummy_success_sai_create_neighbor_entry);
+    status = g_meta->create(&neighbor_entry, 2, list);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("remove tests");
 
     SWSS_LOG_NOTICE("neighbor_entry is null");
-    status = meta_sai_remove_neighbor_entry(NULL, &dummy_success_sai_remove_neighbor_entry);
+    status = g_meta->remove((sai_neighbor_entry_t*)NULL);
     META_ASSERT_FAIL(status);
 
     neighbor_entry.rif_id = SAI_NULL_OBJECT_ID;
 
     SWSS_LOG_NOTICE("invalid object id null");
-    status = meta_sai_remove_neighbor_entry(&neighbor_entry, &dummy_success_sai_remove_neighbor_entry);
+    status = g_meta->remove(&neighbor_entry);
     META_ASSERT_FAIL(status);
 
-    neighbor_entry.rif_id = create_dummy_object_id(SAI_OBJECT_TYPE_HASH,switch_id);
+    neighbor_entry.rif_id = create_hash(switch_id);
 
     SWSS_LOG_NOTICE("invalid object id hash");
-    status = meta_sai_remove_neighbor_entry(&neighbor_entry, &dummy_success_sai_remove_neighbor_entry);
+    status = g_meta->remove(&neighbor_entry);
     META_ASSERT_FAIL(status);
 
-    neighbor_entry.rif_id = create_dummy_object_id(SAI_OBJECT_TYPE_ROUTER_INTERFACE,switch_id);
+    neighbor_entry.rif_id = create_rif(switch_id);
 
     SWSS_LOG_NOTICE("invalid object id router");
-    status = meta_sai_remove_neighbor_entry(&neighbor_entry, &dummy_success_sai_remove_neighbor_entry);
+    status = g_meta->remove(&neighbor_entry);
     META_ASSERT_FAIL(status);
 
     neighbor_entry.rif_id = rif;
@@ -1298,13 +1026,13 @@ void test_neighbor_entry_remove()
 
     std::string key = sai_serialize_object_meta_key(meta);
 
-    META_ASSERT_TRUE(g_saiObjectCollection.objectExists(key));
+    META_ASSERT_TRUE(g_meta->objectExists(key));
 
     SWSS_LOG_NOTICE("success");
-    status = meta_sai_remove_neighbor_entry(&neighbor_entry, &dummy_success_sai_remove_neighbor_entry);
+    status = g_meta->remove(&neighbor_entry);
     META_ASSERT_SUCCESS(status);
 
-    META_ASSERT_TRUE(!g_saiObjectCollection.objectExists(key));
+    META_ASSERT_TRUE(!g_meta->objectExists(key));
 }
 
 void test_neighbor_entry_set()
@@ -1334,12 +1062,7 @@ void test_neighbor_entry_set()
     attr2.id = SAI_NEIGHBOR_ENTRY_ATTR_PACKET_ACTION;
     attr2.value.s32 = SAI_PACKET_ACTION_FORWARD;
 
-    // TODO we should use create
-    sai_object_id_t rif = create_dummy_object_id(SAI_OBJECT_TYPE_ROUTER_INTERFACE,switch_id);
-    g_oids.objectReferenceInsert(rif);
-    sai_object_meta_key_t meta_key_rif = { .objecttype = SAI_OBJECT_TYPE_ROUTER_INTERFACE, .objectkey = { .key = { .object_id = rif } } };
-    std::string rif_key = sai_serialize_object_meta_key(meta_key_rif);
-    g_saiObjectCollection.createObject(meta_key_rif);
+    sai_object_id_t rif = create_rif(switch_id);
 
     neighbor_entry.ip_address.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     neighbor_entry.ip_address.addr.ip4 = htonl(0x0a00000f);
@@ -1349,7 +1072,7 @@ void test_neighbor_entry_set()
     SWSS_LOG_NOTICE("create");
 
     SWSS_LOG_NOTICE("correct ipv4");
-    status = meta_sai_create_neighbor_entry(&neighbor_entry, 2, list, &dummy_success_sai_create_neighbor_entry);
+    status = g_meta->create(&neighbor_entry, 2, list);
     META_ASSERT_SUCCESS(status);
 
     neighbor_entry.ip_address.addr_family = SAI_IP_ADDR_FAMILY_IPV6;
@@ -1357,34 +1080,34 @@ void test_neighbor_entry_set()
     memcpy(neighbor_entry.ip_address.addr.ip6, ip6, 16);
 
     SWSS_LOG_NOTICE("correct ipv6");
-    status = meta_sai_create_neighbor_entry(&neighbor_entry, 2, list, &dummy_success_sai_create_neighbor_entry);
+    status = g_meta->create(&neighbor_entry, 2, list);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("set tests");
 
     SWSS_LOG_NOTICE("attr is null");
-    status = meta_sai_set_neighbor_entry(&neighbor_entry, NULL, &dummy_success_sai_set_neighbor_entry);
+    status = g_meta->set(&neighbor_entry, NULL);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("neighbor entry is null");
-    status = meta_sai_set_neighbor_entry(NULL, &attr, &dummy_success_sai_set_neighbor_entry);
+    status = g_meta->set((sai_neighbor_entry_t*)NULL, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("setting invalid attrib id");
     attr.id = -1;
-    status = meta_sai_set_neighbor_entry(&neighbor_entry, &attr, &dummy_success_sai_set_neighbor_entry);
+    status = g_meta->set(&neighbor_entry, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("value outside range");
     attr.id = SAI_NEIGHBOR_ENTRY_ATTR_PACKET_ACTION;
     attr.value.s32 = 0x100;
-    status = meta_sai_set_neighbor_entry(&neighbor_entry, &attr, &dummy_success_sai_set_neighbor_entry);
+    status = g_meta->set(&neighbor_entry, &attr);
     META_ASSERT_FAIL(status);
 
     // correct
     attr.id = SAI_NEIGHBOR_ENTRY_ATTR_PACKET_ACTION;
     attr.value.s32 = SAI_PACKET_ACTION_DROP;
-    status = meta_sai_set_neighbor_entry(&neighbor_entry, &attr, &dummy_success_sai_set_neighbor_entry);
+    status = g_meta->set(&neighbor_entry, &attr);
     META_ASSERT_SUCCESS(status);
 }
 
@@ -1415,12 +1138,7 @@ void test_neighbor_entry_get()
     attr2.id = SAI_NEIGHBOR_ENTRY_ATTR_PACKET_ACTION;
     attr2.value.s32 = SAI_PACKET_ACTION_FORWARD;
 
-    // TODO we should use create
-    sai_object_id_t rif = create_dummy_object_id(SAI_OBJECT_TYPE_ROUTER_INTERFACE,switch_id);
-    g_oids.objectReferenceInsert(rif);
-    sai_object_meta_key_t meta_key_rif = { .objecttype = SAI_OBJECT_TYPE_ROUTER_INTERFACE, .objectkey = { .key = { .object_id = rif } } };
-    std::string rif_key = sai_serialize_object_meta_key(meta_key_rif);
-    g_saiObjectCollection.createObject(meta_key_rif);
+    sai_object_id_t rif = create_rif(switch_id);
 
     neighbor_entry.ip_address.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     neighbor_entry.ip_address.addr.ip4 = htonl(0x0a00000f);
@@ -1430,7 +1148,7 @@ void test_neighbor_entry_get()
     SWSS_LOG_NOTICE("create");
 
     SWSS_LOG_NOTICE("correct ipv4");
-    status = meta_sai_create_neighbor_entry(&neighbor_entry, 2, list, &dummy_success_sai_create_neighbor_entry);
+    status = g_meta->create(&neighbor_entry, 2, list);
     META_ASSERT_SUCCESS(status);
 
     neighbor_entry.ip_address.addr_family = SAI_IP_ADDR_FAMILY_IPV6;
@@ -1438,36 +1156,32 @@ void test_neighbor_entry_get()
     memcpy(neighbor_entry.ip_address.addr.ip6, ip6, 16);
 
     SWSS_LOG_NOTICE("correct ipv6");
-    status = meta_sai_create_neighbor_entry(&neighbor_entry, 2, list, &dummy_success_sai_create_neighbor_entry);
+    status = g_meta->create(&neighbor_entry, 2, list);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("get test");
 
     SWSS_LOG_NOTICE("zero attribute count");
     attr.id = SAI_NEIGHBOR_ENTRY_ATTR_PACKET_ACTION;
-    status = meta_sai_get_neighbor_entry(&neighbor_entry, 0, &attr, &dummy_success_sai_get_neighbor_entry);
+    status = g_meta->get(&neighbor_entry, 0, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("attr is null");
-    status = meta_sai_get_neighbor_entry(&neighbor_entry, 1, NULL, &dummy_success_sai_get_neighbor_entry);
+    status = g_meta->get(&neighbor_entry, 1, NULL);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("neighbor entry is null");
-    status = meta_sai_get_neighbor_entry(NULL, 1, &attr, &dummy_success_sai_get_neighbor_entry);
-    META_ASSERT_FAIL(status);
-
-    SWSS_LOG_NOTICE("get function is null");
-    status = meta_sai_get_neighbor_entry(&neighbor_entry, 1, &attr, NULL);
+    status = g_meta->get((sai_neighbor_entry_t*)NULL, 1, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("attr id out of range");
     attr.id = -1;
-    status = meta_sai_get_neighbor_entry(&neighbor_entry, 1, &attr, &dummy_success_sai_get_neighbor_entry);
+    status = g_meta->get(&neighbor_entry, 1, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("correct single valid attribute");
     attr.id = SAI_NEIGHBOR_ENTRY_ATTR_PACKET_ACTION;
-    status = meta_sai_get_neighbor_entry(&neighbor_entry, 1, &attr, &dummy_success_sai_get_neighbor_entry);
+    status = g_meta->get(&neighbor_entry, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("correct 2 attributes");
@@ -1479,7 +1193,7 @@ void test_neighbor_entry_get()
     attr4.id = SAI_NEIGHBOR_ENTRY_ATTR_NO_HOST_ROUTE;
 
     sai_attribute_t list2[2] = { attr3, attr4 };
-    status = meta_sai_get_neighbor_entry(&neighbor_entry, 2, list2, &dummy_success_sai_get_neighbor_entry);
+    status = g_meta->get(&neighbor_entry, 2, list2);
     META_ASSERT_SUCCESS(status);
 }
 
@@ -1516,12 +1230,7 @@ void test_neighbor_entry_flow()
     attr4.id = SAI_NEIGHBOR_ENTRY_ATTR_META_DATA;
     attr4.value.u32 = 1;
 
-    // TODO we should use create
-    sai_object_id_t rif = create_dummy_object_id(SAI_OBJECT_TYPE_ROUTER_INTERFACE,switch_id);
-    g_oids.objectReferenceInsert(rif);
-    sai_object_meta_key_t meta_key_rif = { .objecttype = SAI_OBJECT_TYPE_ROUTER_INTERFACE, .objectkey = { .key = { .object_id = rif } } };
-    std::string rif_key = sai_serialize_object_meta_key(meta_key_rif);
-    g_saiObjectCollection.createObject(meta_key_rif);
+    sai_object_id_t rif = create_rif(switch_id);
 
     neighbor_entry.ip_address.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     neighbor_entry.ip_address.addr.ip4 = htonl(0x0a00000f);
@@ -1531,39 +1240,70 @@ void test_neighbor_entry_flow()
     SWSS_LOG_NOTICE("create");
 
     SWSS_LOG_NOTICE("correct ipv4");
-    status = meta_sai_create_neighbor_entry(&neighbor_entry, 2, list, &dummy_success_sai_create_neighbor_entry);
+    status = g_meta->create(&neighbor_entry, 2, list);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("correct ipv4 existing");
-    status = meta_sai_create_neighbor_entry(&neighbor_entry, 2, list, &dummy_success_sai_create_neighbor_entry);
+    status = g_meta->create(&neighbor_entry, 2, list);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("set");
-    status = meta_sai_set_neighbor_entry(&neighbor_entry, &attr1, &dummy_success_sai_set_neighbor_entry);
+    status = g_meta->set(&neighbor_entry, &attr1);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("set");
-    status = meta_sai_set_neighbor_entry(&neighbor_entry, &attr2, &dummy_success_sai_set_neighbor_entry);
+    status = g_meta->set(&neighbor_entry, &attr2);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("set");
-    status = meta_sai_set_neighbor_entry(&neighbor_entry, &attr3, &dummy_success_sai_set_neighbor_entry);
+    status = g_meta->set(&neighbor_entry, &attr3);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("set");
-    status = meta_sai_set_neighbor_entry(&neighbor_entry, &attr4, &dummy_success_sai_set_neighbor_entry);
+    status = g_meta->set(&neighbor_entry, &attr4);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("remove");
-    status = meta_sai_remove_neighbor_entry(&neighbor_entry, &dummy_success_sai_remove_neighbor_entry);
+    status = g_meta->remove(&neighbor_entry);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("remove existing");
-    status = meta_sai_remove_neighbor_entry(&neighbor_entry, &dummy_success_sai_remove_neighbor_entry);
+    status = g_meta->remove(&neighbor_entry);
     META_ASSERT_FAIL(status);
 }
 
 // VLAN TESTS
+
+sai_object_id_t create_vlan(
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t vlan;
+
+    sai_attribute_t attrs[9] = { };
+
+    attrs[0].id = SAI_VLAN_ATTR_VLAN_ID;
+    attrs[0].value.u16 = 1;
+
+    auto status = g_meta->create(SAI_OBJECT_TYPE_VLAN, &vlan, switch_id, 1, attrs);
+    META_ASSERT_SUCCESS(status);
+
+    return vlan;
+}
+
+static sai_object_id_t create_stp(
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t stp;
+
+    auto status = g_meta->create(SAI_OBJECT_TYPE_STP, &stp, switch_id, 0, NULL);
+    META_ASSERT_SUCCESS(status);
+
+    return stp;
+}
 
 void test_vlan_create()
 {
@@ -1582,7 +1322,7 @@ void test_vlan_create()
 
     sai_object_id_t switch_id = create_switch();
 
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_VLAN, &vlan1_id, switch_id, 1, &vlan1_att, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_VLAN, &vlan1_id, switch_id, 1, &vlan1_att);
     META_ASSERT_SUCCESS(status);
 
     sai_attribute_t vlan;
@@ -1591,37 +1331,26 @@ void test_vlan_create()
 
     sai_object_id_t vlan_id;
 
-    // TODO we should use create
-    sai_object_id_t stp = create_dummy_object_id(SAI_OBJECT_TYPE_STP,switch_id);
-    g_oids.objectReferenceInsert(stp);
-    sai_object_meta_key_t meta_key_stp = { .objecttype = SAI_OBJECT_TYPE_STP, .objectkey = { .key = { .object_id = stp } } };
-    std::string stp_key = sai_serialize_object_meta_key(meta_key_stp);
-    g_saiObjectCollection.createObject(meta_key_stp);
-
     SWSS_LOG_NOTICE("create tests");
 
 //    SWSS_LOG_NOTICE("existing vlan");
-//    status = meta_sai_create_oid(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &vlan, &dummy_success_sai_create_oid);
+//    status = g_meta->create(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &vlan);
 //    META_ASSERT_FAIL(status);
 
     vlan.value.u16 = MAXIMUM_VLAN_NUMBER + 1;
 
 //    SWSS_LOG_NOTICE("vlan outside range");
-//    status = meta_sai_create_oid(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &vlan, &dummy_success_sai_create_oid);
+//    status = g_meta->create(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &vlan);
 //    META_ASSERT_FAIL(status);
 
     vlan.value.u16 = 2;
 
-    SWSS_LOG_NOTICE("create is null");
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &vlan, NULL);
-    META_ASSERT_FAIL(status);
-
     SWSS_LOG_NOTICE("correct");
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &vlan, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &vlan);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("existing");
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &vlan, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &vlan);
     META_ASSERT_FAIL(status);
 }
 
@@ -1641,16 +1370,9 @@ void test_vlan_remove()
     sai_object_id_t vlan1_id;
     sai_object_id_t switch_id = create_switch();
 
-    // TODO we should use create
-    sai_object_id_t stp = create_dummy_object_id(SAI_OBJECT_TYPE_STP,switch_id);
-    g_oids.objectReferenceInsert(stp);
-    sai_object_meta_key_t meta_key_stp = { .objecttype = SAI_OBJECT_TYPE_STP, .objectkey = { .key = { .object_id = stp } } };
-    std::string stp_key = sai_serialize_object_meta_key(meta_key_stp);
-    g_saiObjectCollection.createObject(meta_key_stp);
-
     SWSS_LOG_NOTICE("create");
 
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_VLAN, &vlan1_id, switch_id, 1, &vlan1_att, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_VLAN, &vlan1_id, switch_id, 1, &vlan1_att);
     META_ASSERT_SUCCESS(status);
 
     sai_attribute_t vlan;
@@ -1660,29 +1382,25 @@ void test_vlan_remove()
     sai_object_id_t vlan_id;
 
     SWSS_LOG_NOTICE("correct");
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &vlan, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &vlan);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("remove tests");
 
     SWSS_LOG_NOTICE("invalid vlan");
-    status = meta_sai_remove_oid(SAI_OBJECT_TYPE_VLAN, SAI_NULL_OBJECT_ID, &dummy_success_sai_remove_oid);
+    status = g_meta->remove(SAI_OBJECT_TYPE_VLAN, SAI_NULL_OBJECT_ID);
     META_ASSERT_FAIL(status);
 
 //    SWSS_LOG_NOTICE("default vlan");
-//    status = meta_sai_remove_oid(SAI_OBJECT_TYPE_VLAN, vlan1_id, &dummy_success_sai_remove_oid);
+//    status = g_meta->remove(SAI_OBJECT_TYPE_VLAN, vlan1_id);
 //    META_ASSERT_FAIL(status);
 
-    SWSS_LOG_NOTICE("remove is null");
-    status = meta_sai_remove_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, NULL);
-    META_ASSERT_FAIL(status);
-
     SWSS_LOG_NOTICE("success");
-    status = meta_sai_remove_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, &dummy_success_sai_remove_oid);
+    status = g_meta->remove(SAI_OBJECT_TYPE_VLAN, vlan_id);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("non existing");
-    status = meta_sai_remove_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, &dummy_success_sai_remove_oid);
+    status = g_meta->remove(SAI_OBJECT_TYPE_VLAN, vlan_id);
     META_ASSERT_FAIL(status);
 }
 
@@ -1704,16 +1422,11 @@ void test_vlan_set()
     sai_object_id_t vlan1_id;
     sai_object_id_t switch_id = create_switch();
 
-    // TODO we should use create
-    sai_object_id_t stp = create_dummy_object_id(SAI_OBJECT_TYPE_STP,switch_id);
-    g_oids.objectReferenceInsert(stp);
-    sai_object_meta_key_t meta_key_stp = { .objecttype = SAI_OBJECT_TYPE_STP, .objectkey = { .key = { .object_id = stp } } };
-    std::string stp_key = sai_serialize_object_meta_key(meta_key_stp);
-    g_saiObjectCollection.createObject(meta_key_stp);
+    sai_object_id_t stp = create_stp(switch_id);
 
     SWSS_LOG_NOTICE("create");
 
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_VLAN, &vlan1_id, switch_id, 1, &vlan1_att, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_VLAN, &vlan1_id, switch_id, 1, &vlan1_att);
     META_ASSERT_SUCCESS(status);
 
     sai_attribute_t vlan;
@@ -1723,75 +1436,75 @@ void test_vlan_set()
     sai_object_id_t vlan_id;
 
     SWSS_LOG_NOTICE("correct");
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &vlan, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &vlan);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("set tests");
 
     SWSS_LOG_NOTICE("invalid vlan");
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_VLAN, SAI_NULL_OBJECT_ID, &vlan, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_VLAN, SAI_NULL_OBJECT_ID, &vlan);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("set is null");
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr, NULL);
+    status = g_meta->set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("attr is null");
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, NULL, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_VLAN, vlan_id, NULL);
     META_ASSERT_FAIL(status);
 
     attr.id = -1;
 
     SWSS_LOG_NOTICE("invalid attribute");
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
     META_ASSERT_FAIL(status);
 
     attr.id = SAI_VLAN_ATTR_MEMBER_LIST;
 
     SWSS_LOG_NOTICE("read only");
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("max learned addresses");
     attr.id = SAI_VLAN_ATTR_MAX_LEARNED_ADDRESSES;
     attr.value.u32 = 1;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("null stp instance");
     attr.id = SAI_VLAN_ATTR_STP_INSTANCE;
     attr.value.oid = SAI_NULL_OBJECT_ID;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("wrong type on stp instance");
     attr.id = SAI_VLAN_ATTR_STP_INSTANCE;
     attr.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_HASH,switch_id);
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("wrong type on stp instance");
     attr.id = SAI_VLAN_ATTR_STP_INSTANCE;
     attr.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_STP,switch_id);
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("good stp oid");
     attr.id = SAI_VLAN_ATTR_STP_INSTANCE;
     attr.value.oid = stp;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("learn disable");
     attr.id = SAI_VLAN_ATTR_LEARN_DISABLE;
     attr.value.booldata = false;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("metadat");
     attr.id = SAI_VLAN_ATTR_META_DATA;
     attr.value.u32 = 1;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
     META_ASSERT_SUCCESS(status);
 }
 
@@ -1813,16 +1526,11 @@ void test_vlan_get()
 
     sai_object_id_t vlan1_id;
 
-    // TODO we should use create
-    sai_object_id_t stp = create_dummy_object_id(SAI_OBJECT_TYPE_STP,switch_id);
-    g_oids.objectReferenceInsert(stp);
-    sai_object_meta_key_t meta_key_stp = { .objecttype = SAI_OBJECT_TYPE_STP, .objectkey = { .key = { .object_id = stp } } };
-    std::string stp_key = sai_serialize_object_meta_key(meta_key_stp);
-    g_saiObjectCollection.createObject(meta_key_stp);
+    sai_object_id_t stp = create_stp(switch_id);
 
     SWSS_LOG_NOTICE("create");
 
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_VLAN, &vlan1_id, switch_id, 1, &vlan1_att, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_VLAN, &vlan1_id, switch_id, 1, &vlan1_att);
     META_ASSERT_SUCCESS(status);
 
     sai_attribute_t vlan;
@@ -1832,7 +1540,7 @@ void test_vlan_get()
     sai_object_id_t vlan_id;
 
     SWSS_LOG_NOTICE("correct");
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &vlan, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &vlan);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("get tests");
@@ -1840,29 +1548,25 @@ void test_vlan_get()
     attr.id = SAI_VLAN_ATTR_MAX_LEARNED_ADDRESSES;
 
     SWSS_LOG_NOTICE("invalid vlan");
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, 0, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, 0, 1, &attr);
     META_ASSERT_FAIL(status);
 
 //    SWSS_LOG_NOTICE("invalid vlan");
-//    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, 3, 1, &attr, &dummy_success_sai_get_oid);
+//    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, 3, 1, &attr);
 //    META_ASSERT_FAIL(status);
 
-    SWSS_LOG_NOTICE("get is null");
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr, NULL);
-    META_ASSERT_FAIL(status);
-
     SWSS_LOG_NOTICE("attr is null");
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, NULL, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, NULL);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("zero attributes");
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 0, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 0, &attr);
     META_ASSERT_FAIL(status);
 
     attr.id = -1;
 
     SWSS_LOG_NOTICE("invalid attribute");
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
     META_ASSERT_FAIL(status);
 
     attr.id = SAI_VLAN_ATTR_MEMBER_LIST;
@@ -1870,7 +1574,7 @@ void test_vlan_get()
     attr.value.objlist.list = NULL;
 
     SWSS_LOG_NOTICE("read only null list");
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
     META_ASSERT_FAIL(status);
 
     sai_object_id_t list[5] = { };
@@ -1884,40 +1588,40 @@ void test_vlan_get()
     attr.value.objlist.list = list;
 
     SWSS_LOG_NOTICE("readonly 0 count and not null");
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
 //    META_ASSERT_SUCCESS(status);
 
     attr.value.objlist.count = 5;
 
     SWSS_LOG_NOTICE("readonly count and not null");
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     attr.value.objlist.count = 0;
     attr.value.objlist.list = NULL;
 
     SWSS_LOG_NOTICE("readonly count 0 and null");
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("max learned addresses");
     attr.id = SAI_VLAN_ATTR_MAX_LEARNED_ADDRESSES;
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("stp instance");
     attr.id = SAI_VLAN_ATTR_STP_INSTANCE;
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("learn disable");
     attr.id = SAI_VLAN_ATTR_LEARN_DISABLE;
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("metadata");
     attr.id = SAI_VLAN_ATTR_META_DATA;
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 }
 
@@ -1939,15 +1643,10 @@ void test_vlan_flow()
     at.value.u16 = 2;
     sai_object_id_t switch_id = create_switch();
 
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &at, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &at);
     META_ASSERT_SUCCESS(status);
 
-    // TODO we should use create
-    sai_object_id_t stp = create_dummy_object_id(SAI_OBJECT_TYPE_STP,switch_id);
-    g_oids.objectReferenceInsert(stp);
-    sai_object_meta_key_t meta_key_stp = { .objecttype = SAI_OBJECT_TYPE_STP, .objectkey = { .key = { .object_id = stp } } };
-    std::string stp_key = sai_serialize_object_meta_key(meta_key_stp);
-    g_saiObjectCollection.createObject(meta_key_stp);
+    sai_object_id_t stp = create_stp(switch_id);
 
     SWSS_LOG_NOTICE("create");
 
@@ -1955,11 +1654,11 @@ void test_vlan_flow()
     at.value.u16 = 2;
 
     SWSS_LOG_NOTICE("correct");
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &attr, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("existing");
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &attr, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("set");
@@ -1967,25 +1666,25 @@ void test_vlan_flow()
     SWSS_LOG_NOTICE("max learned addresses");
     attr.id = SAI_VLAN_ATTR_MAX_LEARNED_ADDRESSES;
     attr.value.u32 = 1;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("good stp oid");
     attr.id = SAI_VLAN_ATTR_STP_INSTANCE;
     attr.value.oid = stp;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("learn disable");
     attr.id = SAI_VLAN_ATTR_LEARN_DISABLE;
     attr.value.booldata = false;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("metadata");
     attr.id = SAI_VLAN_ATTR_META_DATA;
     attr.value.u32 = 1;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("get");
@@ -2001,59 +1700,84 @@ void test_vlan_flow()
     attr.value.objlist.list = list;
 
     SWSS_LOG_NOTICE("readonly 0 count and not null");
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     attr.value.objlist.count = 5;
 
     SWSS_LOG_NOTICE("readonly count and not null");
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     attr.value.objlist.count = 0;
     attr.value.objlist.list = NULL;
 
     SWSS_LOG_NOTICE("readonly count 0 and null");
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("max learned addresses");
     attr.id = SAI_VLAN_ATTR_MAX_LEARNED_ADDRESSES;
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("stp instance");
     attr.id = SAI_VLAN_ATTR_STP_INSTANCE;
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("learn disable");
     attr.id = SAI_VLAN_ATTR_LEARN_DISABLE;
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("metadata");
     attr.id = SAI_VLAN_ATTR_META_DATA;
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("remove");
 
     SWSS_LOG_NOTICE("success");
-    status = meta_sai_remove_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, &dummy_success_sai_remove_oid);
+    status = g_meta->remove(SAI_OBJECT_TYPE_VLAN, vlan_id);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("non existing");
-    status = meta_sai_remove_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, &dummy_success_sai_remove_oid);
+    status = g_meta->remove(SAI_OBJECT_TYPE_VLAN, vlan_id);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("learn disable");
     attr.id = SAI_VLAN_ATTR_LEARN_DISABLE;
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
     META_ASSERT_FAIL(status);
 }
 
 // ROUTE TESTS
+
+static sai_object_id_t create_next_hop(
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t nh;
+
+    sai_attribute_t attrs[9] = { };
+
+    attrs[0].id = SAI_NEXT_HOP_ATTR_TYPE;
+    attrs[0].value.s32 = SAI_NEXT_HOP_TYPE_IP;
+
+    attrs[1].id = SAI_NEXT_HOP_ATTR_IP;
+
+    auto rif = create_rif(switch_id);
+
+    attrs[2].id = SAI_NEXT_HOP_ATTR_ROUTER_INTERFACE_ID;
+    attrs[2].value.oid = rif;
+
+    auto status = g_meta->create(SAI_OBJECT_TYPE_NEXT_HOP, &nh, switch_id, 3, attrs);
+    META_ASSERT_SUCCESS(status);
+
+    return nh;
+}
 
 void test_route_entry_create()
 {
@@ -2068,18 +1792,9 @@ void test_route_entry_create()
     sai_object_id_t switch_id = create_switch();
     sai_route_entry_t route_entry;
 
-    // TODO we should use create
-    sai_object_id_t vr = create_dummy_object_id(SAI_OBJECT_TYPE_VIRTUAL_ROUTER,switch_id);
-    g_oids.objectReferenceInsert(vr);
-    sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
-    std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
-    g_saiObjectCollection.createObject(meta_key_vr);
+    sai_object_id_t vr = create_virtual_router(switch_id);
 
-    sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP,switch_id);
-    g_oids.objectReferenceInsert(hop);
-    sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
-    std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
-    g_saiObjectCollection.createObject(meta_key_hop);
+    sai_object_id_t hop = create_next_hop(switch_id);
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     route_entry.destination.addr.ip4 = htonl(0x0a00000f);
@@ -2092,15 +1807,15 @@ void test_route_entry_create()
     // commented out as there is no mandatory attribute
     // SWSS_LOG_NOTICE("zero attribute count (but there are mandatory attributes)");
     // attr.id = SAI_ROUTE_ENTRY_ATTR_NEXT_HOP_ID;
-    // status = meta_sai_create_route_entry(&route_entry, 0, &attr, &dummy_success_sai_create_route_entry);
+    // status = g_meta->create(&route_entry, 0, &attr);
     // META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("attr is null");
-    status = meta_sai_create_route_entry(&route_entry, 1, NULL, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 1, NULL);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("route entry is null");
-    status = meta_sai_create_route_entry(NULL, 1, &attr, &dummy_success_sai_create_route_entry);
+    status = g_meta->create((sai_route_entry_t*)NULL, 1, &attr);
     META_ASSERT_FAIL(status);
 
     sai_attribute_t list[3] = { };
@@ -2117,17 +1832,13 @@ void test_route_entry_create()
 
     attr3.id = -1;
 
-    SWSS_LOG_NOTICE("create function is null");
-    status = meta_sai_create_route_entry(&route_entry, 2, list, NULL);
-    META_ASSERT_FAIL(status);
-
     SWSS_LOG_NOTICE("invalid attribute id");
-    status = meta_sai_create_route_entry(&route_entry, 3, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 3, list);
     META_ASSERT_FAIL(status);
 
     attr2.value.s32 = SAI_PACKET_ACTION_FORWARD + 0x100;
     SWSS_LOG_NOTICE("invalid attribute value on enum");
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_FAIL(status);
 
     attr2.value.s32 = SAI_PACKET_ACTION_FORWARD;
@@ -2135,17 +1846,17 @@ void test_route_entry_create()
     sai_attribute_t list2[4] = { attr1, attr2, attr2 };
 
     SWSS_LOG_NOTICE("repeated attribute id");
-    status = meta_sai_create_route_entry(&route_entry, 3, list2, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 3, list2);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("wrong obejct type");
     attr1.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_HASH,switch_id);
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("non existing object");
     attr1.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP,switch_id);
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_FAIL(status);
 
     int fam = 10;
@@ -2153,12 +1864,12 @@ void test_route_entry_create()
     route_entry.destination.addr_family = (sai_ip_addr_family_t)fam;
 
     SWSS_LOG_NOTICE("wrong address family");
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("correct ipv4");
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_SUCCESS(status);
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV6;
@@ -2169,7 +1880,7 @@ void test_route_entry_create()
     memcpy(route_entry.destination.mask.ip6, ip6mask2, 16);
 
     SWSS_LOG_NOTICE("invalid mask");
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_FAIL(status);
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV6;
@@ -2180,11 +1891,11 @@ void test_route_entry_create()
     memcpy(route_entry.destination.mask.ip6, ip6mask, 16);
 
     SWSS_LOG_NOTICE("correct ipv6");
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("already exists");
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_FAIL(status);
 }
 
@@ -2200,18 +1911,8 @@ void test_route_entry_remove()
 
     sai_route_entry_t route_entry;
 
-    // TODO we should use create
-    sai_object_id_t vr = create_dummy_object_id(SAI_OBJECT_TYPE_VIRTUAL_ROUTER,switch_id);
-    g_oids.objectReferenceInsert(vr);
-    sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
-    std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
-    g_saiObjectCollection.createObject(meta_key_vr);
-
-    sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP,switch_id);
-    g_oids.objectReferenceInsert(hop);
-    sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
-    std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
-    g_saiObjectCollection.createObject(meta_key_hop);
+    sai_object_id_t vr = create_virtual_router(switch_id);
+    sai_object_id_t hop = create_next_hop(switch_id);
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     route_entry.destination.addr.ip4 = htonl(0x0a00000f);
@@ -2234,7 +1935,7 @@ void test_route_entry_remove()
 
     SWSS_LOG_NOTICE("correct ipv4");
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_SUCCESS(status);
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV6;
@@ -2245,31 +1946,31 @@ void test_route_entry_remove()
     memcpy(route_entry.destination.mask.ip6, ip6mask, 16);
 
     SWSS_LOG_NOTICE("correct ipv6");
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("remove tests");
 
     SWSS_LOG_NOTICE("route_entry is null");
-    status = meta_sai_remove_route_entry(NULL, &dummy_success_sai_remove_route_entry);
+    status = g_meta->remove((sai_route_entry_t*)NULL);
     META_ASSERT_FAIL(status);
 
     route_entry.vr_id = SAI_NULL_OBJECT_ID;
 
     SWSS_LOG_NOTICE("invalid object id null");
-    status = meta_sai_remove_route_entry(&route_entry, &dummy_success_sai_remove_route_entry);
+    status = g_meta->remove(&route_entry);
     META_ASSERT_FAIL(status);
 
     route_entry.vr_id = create_dummy_object_id(SAI_OBJECT_TYPE_HASH,switch_id);
 
     SWSS_LOG_NOTICE("invalid object id hash");
-    status = meta_sai_remove_route_entry(&route_entry, &dummy_success_sai_remove_route_entry);
+    status = g_meta->remove(&route_entry);
     META_ASSERT_FAIL(status);
 
     route_entry.vr_id = create_dummy_object_id(SAI_OBJECT_TYPE_VIRTUAL_ROUTER,switch_id);
 
     SWSS_LOG_NOTICE("invalid object id router");
-    status = meta_sai_remove_route_entry(&route_entry, &dummy_success_sai_remove_route_entry);
+    status = g_meta->remove(&route_entry);
     META_ASSERT_FAIL(status);
 
     route_entry.vr_id = vr;
@@ -2278,20 +1979,20 @@ void test_route_entry_remove()
 
     std::string key = sai_serialize_object_meta_key(meta);
 
-    META_ASSERT_TRUE(g_saiObjectCollection.objectExists(key));
+    META_ASSERT_TRUE(g_meta->objectExists(key));
 
     SWSS_LOG_NOTICE("success");
-    status = meta_sai_remove_route_entry(&route_entry, &dummy_success_sai_remove_route_entry);
+    status = g_meta->remove(&route_entry);
     META_ASSERT_SUCCESS(status);
 
-    META_ASSERT_TRUE(!g_saiObjectCollection.objectExists(key));
+    META_ASSERT_TRUE(!g_meta->objectExists(key));
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     route_entry.destination.addr.ip4 = htonl(0x0a00000f);
     route_entry.destination.mask.ip4 = htonl(0xffffff00);
 
     SWSS_LOG_NOTICE("success");
-    status = meta_sai_remove_route_entry(&route_entry, &dummy_success_sai_remove_route_entry);
+    status = g_meta->remove(&route_entry);
     META_ASSERT_SUCCESS(status);
 }
 
@@ -2308,18 +2009,8 @@ void test_route_entry_set()
 
     sai_route_entry_t route_entry;
 
-    // TODO we should use create
-    sai_object_id_t vr = create_dummy_object_id(SAI_OBJECT_TYPE_VIRTUAL_ROUTER,switch_id);
-    g_oids.objectReferenceInsert(vr);
-    sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
-    std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
-    g_saiObjectCollection.createObject(meta_key_vr);
-
-    sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP,switch_id);
-    g_oids.objectReferenceInsert(hop);
-    sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
-    std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
-    g_saiObjectCollection.createObject(meta_key_hop);
+    sai_object_id_t vr = create_virtual_router(switch_id);
+    sai_object_id_t hop = create_next_hop(switch_id);
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     route_entry.destination.addr.ip4 = htonl(0x0a00000f);
@@ -2342,7 +2033,7 @@ void test_route_entry_set()
 
     SWSS_LOG_NOTICE("correct ipv4");
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_SUCCESS(status);
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV6;
@@ -2353,46 +2044,46 @@ void test_route_entry_set()
     memcpy(route_entry.destination.mask.ip6, ip6mask, 16);
 
     SWSS_LOG_NOTICE("correct ipv6");
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("set tests");
 
     SWSS_LOG_NOTICE("attr is null");
-    status = meta_sai_set_route_entry(&route_entry, NULL, &dummy_success_sai_set_route_entry);
+    status = g_meta->set(&route_entry, NULL);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("route entry is null");
-    status = meta_sai_set_route_entry(NULL, &attr, &dummy_success_sai_set_route_entry);
+    status = g_meta->set((sai_route_entry_t*)NULL, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("setting invalid attrib id");
     attr.id = -1;
-    status = meta_sai_set_route_entry(&route_entry, &attr, &dummy_success_sai_set_route_entry);
+    status = g_meta->set(&route_entry, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("value outside range");
     attr.id = SAI_ROUTE_ENTRY_ATTR_PACKET_ACTION;
     attr.value.s32 = 0x100;
-    status = meta_sai_set_route_entry(&route_entry, &attr, &dummy_success_sai_set_route_entry);
+    status = g_meta->set(&route_entry, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("correct packet action");
     attr.id = SAI_ROUTE_ENTRY_ATTR_PACKET_ACTION;
     attr.value.s32 = SAI_PACKET_ACTION_DROP;
-    status = meta_sai_set_route_entry(&route_entry, &attr, &dummy_success_sai_set_route_entry);
+    status = g_meta->set(&route_entry, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("correct next hop");
     attr.id = SAI_ROUTE_ENTRY_ATTR_NEXT_HOP_ID;
     attr.value.oid = hop;
-    status = meta_sai_set_route_entry(&route_entry, &attr, &dummy_success_sai_set_route_entry);
+    status = g_meta->set(&route_entry, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("correct metadata");
     attr.id = SAI_ROUTE_ENTRY_ATTR_META_DATA;
     attr.value.u32 = 0x12345678;
-    status = meta_sai_set_route_entry(&route_entry, &attr, &dummy_success_sai_set_route_entry);
+    status = g_meta->set(&route_entry, &attr);
     META_ASSERT_SUCCESS(status);
 }
 
@@ -2409,18 +2100,8 @@ void test_route_entry_get()
 
     sai_route_entry_t route_entry;
 
-    // TODO we should use create
-    sai_object_id_t vr = create_dummy_object_id(SAI_OBJECT_TYPE_VIRTUAL_ROUTER,switch_id);
-    g_oids.objectReferenceInsert(vr);
-    sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
-    std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
-    g_saiObjectCollection.createObject(meta_key_vr);
-
-    sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP,switch_id);
-    g_oids.objectReferenceInsert(hop);
-    sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
-    std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
-    g_saiObjectCollection.createObject(meta_key_hop);
+    sai_object_id_t vr = create_virtual_router(switch_id);
+    sai_object_id_t hop = create_next_hop(switch_id);
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     route_entry.destination.addr.ip4 = htonl(0x0a00000f);
@@ -2443,7 +2124,7 @@ void test_route_entry_get()
 
     SWSS_LOG_NOTICE("correct ipv4");
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_SUCCESS(status);
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV6;
@@ -2454,44 +2135,40 @@ void test_route_entry_get()
     memcpy(route_entry.destination.mask.ip6, ip6mask, 16);
 
     SWSS_LOG_NOTICE("correct ipv6");
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("zero attribute count");
     attr.id = SAI_ROUTE_ENTRY_ATTR_PACKET_ACTION;
-    status = meta_sai_get_route_entry(&route_entry, 0, &attr, &dummy_success_sai_get_route_entry);
+    status = g_meta->get(&route_entry, 0, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("attr is null");
-    status = meta_sai_get_route_entry(&route_entry, 1, NULL, &dummy_success_sai_get_route_entry);
+    status = g_meta->get(&route_entry, 1, NULL);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("route entry is null");
-    status = meta_sai_get_route_entry(NULL, 1, &attr, &dummy_success_sai_get_route_entry);
-    META_ASSERT_FAIL(status);
-
-    SWSS_LOG_NOTICE("get function is null");
-    status = meta_sai_get_route_entry(&route_entry, 1, &attr, NULL);
+    status = g_meta->get((sai_route_entry_t*)NULL, 1, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("attr id out of range");
     attr.id = -1;
-    status = meta_sai_get_route_entry(&route_entry, 1, &attr, &dummy_success_sai_get_route_entry);
+    status = g_meta->get(&route_entry, 1, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("correct packet action");
     attr.id = SAI_ROUTE_ENTRY_ATTR_PACKET_ACTION;
-    status = meta_sai_get_route_entry(&route_entry, 1, &attr, &dummy_success_sai_get_route_entry);
+    status = g_meta->get(&route_entry, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("correct next hop");
     attr.id = SAI_ROUTE_ENTRY_ATTR_NEXT_HOP_ID;
-    status = meta_sai_get_route_entry(&route_entry, 1, &attr, &dummy_success_sai_get_route_entry);
+    status = g_meta->get(&route_entry, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("correct meta");
     attr.id = SAI_ROUTE_ENTRY_ATTR_META_DATA;
-    status = meta_sai_get_route_entry(&route_entry, 1, &attr, &dummy_success_sai_get_route_entry);
+    status = g_meta->get(&route_entry, 1, &attr);
     META_ASSERT_SUCCESS(status);
 }
 
@@ -2508,18 +2185,8 @@ void test_route_entry_flow()
     sai_route_entry_t route_entry;
     sai_object_id_t switch_id = create_switch();
 
-    // TODO we should use create
-    sai_object_id_t vr = create_dummy_object_id(SAI_OBJECT_TYPE_VIRTUAL_ROUTER,switch_id);
-    g_oids.objectReferenceInsert(vr);
-    sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
-    std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
-    g_saiObjectCollection.createObject(meta_key_vr);
-
-    sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP,switch_id);
-    g_oids.objectReferenceInsert(hop);
-    sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
-    std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
-    g_saiObjectCollection.createObject(meta_key_hop);
+    sai_object_id_t vr = create_virtual_router(switch_id);
+    sai_object_id_t hop = create_next_hop(switch_id);
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
     route_entry.destination.addr.ip4 = htonl(0x0a00000f);
@@ -2542,12 +2209,12 @@ void test_route_entry_flow()
 
     SWSS_LOG_NOTICE("correct ipv4");
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("already exists ipv4");
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_FAIL(status);
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV6;
@@ -2558,7 +2225,7 @@ void test_route_entry_flow()
     memcpy(route_entry.destination.mask.ip6, ip6mask2, 16);
 
     SWSS_LOG_NOTICE("invalid mask");
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_FAIL(status);
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV6;
@@ -2569,11 +2236,11 @@ void test_route_entry_flow()
     memcpy(route_entry.destination.mask.ip6, ip6mask, 16);
 
     SWSS_LOG_NOTICE("correct ipv6");
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("already exists");
-    status = meta_sai_create_route_entry(&route_entry, 2, list, &dummy_success_sai_create_route_entry);
+    status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("set tests");
@@ -2581,46 +2248,46 @@ void test_route_entry_flow()
     SWSS_LOG_NOTICE("correct packet action");
     attr.id = SAI_ROUTE_ENTRY_ATTR_PACKET_ACTION;
     attr.value.s32 = SAI_PACKET_ACTION_DROP;
-    status = meta_sai_set_route_entry(&route_entry, &attr, &dummy_success_sai_set_route_entry);
+    status = g_meta->set(&route_entry, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("correct next hop");
     attr.id = SAI_ROUTE_ENTRY_ATTR_NEXT_HOP_ID;
     attr.value.oid = hop;
-    status = meta_sai_set_route_entry(&route_entry, &attr, &dummy_success_sai_set_route_entry);
+    status = g_meta->set(&route_entry, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("correct metadata");
     attr.id = SAI_ROUTE_ENTRY_ATTR_META_DATA;
     attr.value.u32 = 0x12345678;
-    status = meta_sai_set_route_entry(&route_entry, &attr, &dummy_success_sai_set_route_entry);
+    status = g_meta->set(&route_entry, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("get tests");
 
     SWSS_LOG_NOTICE("correct packet action");
     attr.id = SAI_ROUTE_ENTRY_ATTR_PACKET_ACTION;
-    status = meta_sai_get_route_entry(&route_entry, 1, &attr, &dummy_success_sai_get_route_entry);
+    status = g_meta->get(&route_entry, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("correct next hop");
     attr.id = SAI_ROUTE_ENTRY_ATTR_NEXT_HOP_ID;
-    status = meta_sai_get_route_entry(&route_entry, 1, &attr, &dummy_success_sai_get_route_entry);
+    status = g_meta->get(&route_entry, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("correct meta");
     attr.id = SAI_ROUTE_ENTRY_ATTR_META_DATA;
-    status = meta_sai_get_route_entry(&route_entry, 1, &attr, &dummy_success_sai_get_route_entry);
+    status = g_meta->get(&route_entry, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("remove tests");
 
     SWSS_LOG_NOTICE("success");
-    status = meta_sai_remove_route_entry(&route_entry, &dummy_success_sai_remove_route_entry);
+    status = g_meta->remove(&route_entry);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("non existing");
-    status = meta_sai_remove_route_entry(&route_entry, &dummy_success_sai_remove_route_entry);
+    status = g_meta->remove(&route_entry);
     META_ASSERT_FAIL(status);
 
     route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
@@ -2628,11 +2295,11 @@ void test_route_entry_flow()
     route_entry.destination.mask.ip4 = htonl(0xffffff00);
 
     SWSS_LOG_NOTICE("success");
-    status = meta_sai_remove_route_entry(&route_entry, &dummy_success_sai_remove_route_entry);
+    status = g_meta->remove(&route_entry);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("non existing");
-    status = meta_sai_remove_route_entry(&route_entry, &dummy_success_sai_remove_route_entry);
+    status = g_meta->remove(&route_entry);
     META_ASSERT_FAIL(status);
 }
 
@@ -2647,13 +2314,10 @@ void test_serialization_type_vlan_list()
 
     sai_status_t    status;
 
-    sai_object_id_t stp;
-
     SWSS_LOG_NOTICE("create stp");
     sai_object_id_t switch_id = create_switch();
 
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_STP, &stp, switch_id, 0, NULL, &dummy_success_sai_create_oid);
-    META_ASSERT_SUCCESS(status);
+    sai_object_id_t stp = create_stp(switch_id);
 
     sai_vlan_id_t list[2] = { 1, 2 };
 
@@ -2665,17 +2329,17 @@ void test_serialization_type_vlan_list()
 
     SWSS_LOG_NOTICE("set vlan list");
 
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_STP, stp, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_STP, stp, &attr);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("get vlan list");
 
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_STP, stp, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_STP, stp, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("remove stp");
 
-    status = meta_sai_remove_oid(SAI_OBJECT_TYPE_STP, stp, &dummy_success_sai_remove_oid);
+    status = g_meta->remove(SAI_OBJECT_TYPE_STP, stp);
     META_ASSERT_SUCCESS(status);
 }
 
@@ -2698,22 +2362,22 @@ void test_serialization_type_bool()
     attr.id = SAI_VIRTUAL_ROUTER_ATTR_ADMIN_V4_STATE;
     attr.value.booldata = true;
 
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_VIRTUAL_ROUTER, &vr, switch_id, 1, &attr, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_VIRTUAL_ROUTER, &vr, switch_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("set bool");
 
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_VIRTUAL_ROUTER, vr, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_VIRTUAL_ROUTER, vr, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("get bool");
 
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_VIRTUAL_ROUTER, vr, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_VIRTUAL_ROUTER, vr, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("remove vr");
 
-    status = meta_sai_remove_oid(SAI_OBJECT_TYPE_VIRTUAL_ROUTER, vr, &dummy_success_sai_remove_oid);
+    status = g_meta->remove(SAI_OBJECT_TYPE_VIRTUAL_ROUTER, vr);
     META_ASSERT_SUCCESS(status);
 }
 
@@ -2728,15 +2392,10 @@ void test_serialization_type_char()
 
     sai_object_id_t hostif;
 
-    SWSS_LOG_NOTICE("create rif");
+    SWSS_LOG_NOTICE("create port");
     sai_object_id_t switch_id = create_switch();
 
-    // TODO we should use create
-    sai_object_id_t rif = create_dummy_object_id(SAI_OBJECT_TYPE_PORT,switch_id);
-    g_oids.objectReferenceInsert(rif);
-    sai_object_meta_key_t meta_key_rif = { .objecttype = SAI_OBJECT_TYPE_ROUTER_INTERFACE, .objectkey = { .key = { .object_id = rif } } };
-    std::string rif_key = sai_serialize_object_meta_key(meta_key_rif);
-    g_saiObjectCollection.createObject(meta_key_rif);
+    sai_object_id_t port = create_port(switch_id);
 
     sai_attribute_t attr, attr2, attr3;
 
@@ -2744,7 +2403,7 @@ void test_serialization_type_char()
     attr.value.s32 = SAI_HOSTIF_TYPE_NETDEV;
 
     attr2.id = SAI_HOSTIF_ATTR_OBJ_ID;
-    attr2.value.oid = rif;
+    attr2.value.oid = port;
 
     attr3.id = SAI_HOSTIF_ATTR_NAME;
 
@@ -2756,22 +2415,22 @@ void test_serialization_type_char()
 
     SWSS_LOG_NOTICE("create hostif");
 
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_HOSTIF, &hostif, switch_id, 3, list, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_HOSTIF, &hostif, switch_id, 3, list);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("set char");
 
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_HOSTIF, hostif, &attr3, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_HOSTIF, hostif, &attr3);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("get char");
 
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_HOSTIF, hostif, 1, &attr3, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_HOSTIF, hostif, 1, &attr3);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("remove hostif");
 
-    status = meta_sai_remove_oid(SAI_OBJECT_TYPE_HOSTIF, hostif, &dummy_success_sai_remove_oid);
+    status = g_meta->remove(SAI_OBJECT_TYPE_HOSTIF, hostif);
     META_ASSERT_SUCCESS(status);
 
     attr.id = SAI_HOSTIF_ATTR_TYPE;
@@ -2780,7 +2439,7 @@ void test_serialization_type_char()
     sai_attribute_t list2[1] = { attr };
 
     SWSS_LOG_NOTICE("create hostif with non mandatory");
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_HOSTIF, &hostif, switch_id, 1, list2, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_HOSTIF, &hostif, switch_id, 1, list2);
     META_ASSERT_SUCCESS(status);
 
 // TODO this test should pass, we are doing query here for conditional
@@ -2794,7 +2453,7 @@ void test_serialization_type_char()
 //
 //    SWSS_LOG_NOTICE("get char");
 //
-//    status = meta_sai_get_oid(SAI_OBJECT_TYPE_HOSTIF, hostif, 1, &attr2, &dummy_success_sai_get_oid);
+//    status = g_meta->get(SAI_OBJECT_TYPE_HOSTIF, hostif, 1, &attr2);
 //    META_ASSERT_FAIL(status);
 
     attr.id = SAI_HOSTIF_ATTR_TYPE;
@@ -2803,7 +2462,7 @@ void test_serialization_type_char()
     sai_attribute_t list3[1] = { attr };
 
     SWSS_LOG_NOTICE("create hostif with mandatory missing");
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_HOSTIF, &hostif, switch_id, 1, list3, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_HOSTIF, &hostif, switch_id, 1, list3);
     META_ASSERT_FAIL(status);
 }
 
@@ -2829,22 +2488,22 @@ void test_serialization_type_int32_list()
     attr.value.s32list.count = 2;
     attr.value.s32list.list = list;
 
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_HASH, &hash, switch_id, 1, &attr, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_HASH, &hash, switch_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("set hash");
 
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_HASH, hash, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_HASH, hash, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("get hash");
 
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_HASH, hash, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_HASH, hash, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("remove hash");
 
-    status = meta_sai_remove_oid(SAI_OBJECT_TYPE_HASH, hash, &dummy_success_sai_remove_oid);
+    status = g_meta->remove(SAI_OBJECT_TYPE_HASH, hash);
     META_ASSERT_SUCCESS(status);
 }
 
@@ -2870,22 +2529,22 @@ void test_serialization_type_uint32_list()
     attr.value.s32list.count = 2;
     attr.value.s32list.list = list;
 
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_HASH, &hash, switch_id, 1, &attr, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_HASH, &hash, switch_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("set hash");
 
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_HASH, hash, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_HASH, hash, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("get hash");
 
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_HASH, hash, 1, &attr, &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_HASH, hash, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("remove hash");
 
-    status = meta_sai_remove_oid(SAI_OBJECT_TYPE_HASH, hash, &dummy_success_sai_remove_oid);
+    status = g_meta->remove(SAI_OBJECT_TYPE_HASH, hash);
     META_ASSERT_SUCCESS(status);
 }
 
@@ -2906,16 +2565,128 @@ void test_mask()
     sai_ip6_t ip6mask8 = {0xff, 0xff, 0xff, 0xff,0xff, 0xff, 0xff,0xff, 0xff, 0xff, 0xff, 0xff,0xff,0xff,0xff,0x8f};
     sai_ip6_t ip6mask9 = {0xff, 0xff, 0xff, 0xff,0xff, 0xff, 0xff,0xf1, 0xff, 0xff, 0xff, 0xff,0xff,0xff,0xff,0xff};
 
-    META_ASSERT_TRUE(is_ipv6_mask_valid(ip6mask1));
-    META_ASSERT_TRUE(is_ipv6_mask_valid(ip6mask2));
-    META_ASSERT_TRUE(is_ipv6_mask_valid(ip6mask3));
-    META_ASSERT_TRUE(is_ipv6_mask_valid(ip6mask4));
-    META_ASSERT_TRUE(is_ipv6_mask_valid(ip6mask5));
+    META_ASSERT_TRUE(Meta::is_ipv6_mask_valid(ip6mask1));
+    META_ASSERT_TRUE(Meta::is_ipv6_mask_valid(ip6mask2));
+    META_ASSERT_TRUE(Meta::is_ipv6_mask_valid(ip6mask3));
+    META_ASSERT_TRUE(Meta::is_ipv6_mask_valid(ip6mask4));
+    META_ASSERT_TRUE(Meta::is_ipv6_mask_valid(ip6mask5));
 
-    META_ASSERT_TRUE(!is_ipv6_mask_valid(ip6mask6));
-    META_ASSERT_TRUE(!is_ipv6_mask_valid(ip6mask7));
-    META_ASSERT_TRUE(!is_ipv6_mask_valid(ip6mask8));
-    META_ASSERT_TRUE(!is_ipv6_mask_valid(ip6mask9));
+    META_ASSERT_TRUE(!Meta::is_ipv6_mask_valid(ip6mask6));
+    META_ASSERT_TRUE(!Meta::is_ipv6_mask_valid(ip6mask7));
+    META_ASSERT_TRUE(!Meta::is_ipv6_mask_valid(ip6mask8));
+    META_ASSERT_TRUE(!Meta::is_ipv6_mask_valid(ip6mask9));
+}
+
+static sai_object_id_t create_acl_table(
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t at;
+
+    sai_attribute_t attrs[9] = { };
+
+    attrs[0].id = SAI_ACL_TABLE_ATTR_ACL_STAGE;
+    attrs[0].value.s32 = SAI_ACL_STAGE_INGRESS;
+
+    auto status = g_meta->create(SAI_OBJECT_TYPE_ACL_TABLE, &at, switch_id, 1, attrs);
+    META_ASSERT_SUCCESS(status);
+
+    return at;
+}
+
+static sai_object_id_t create_acl_counter(
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t ac;
+
+    sai_attribute_t attrs[9] = { };
+
+    attrs[0].id = SAI_ACL_COUNTER_ATTR_TABLE_ID;
+    attrs[0].value.oid = create_acl_table(switch_id);
+
+    auto status = g_meta->create(SAI_OBJECT_TYPE_ACL_COUNTER, &ac, switch_id, 1, attrs);
+    META_ASSERT_SUCCESS(status);
+
+    return ac;
+}
+
+static sai_object_id_t create_policer(
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t policer;
+
+    sai_attribute_t attrs[9] = { };
+
+    attrs[0].id = SAI_POLICER_ATTR_METER_TYPE;
+    attrs[0].value.s32 = SAI_METER_TYPE_PACKETS;
+    attrs[1].id = SAI_POLICER_ATTR_MODE;
+    attrs[1].value.s32 = SAI_POLICER_MODE_SR_TCM;
+
+    auto status = g_meta->create(SAI_OBJECT_TYPE_POLICER, &policer, switch_id, 2, attrs);
+    META_ASSERT_SUCCESS(status);
+
+    return policer;
+}
+
+static sai_object_id_t create_samplepacket(
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t sp;
+
+    sai_attribute_t attrs[9] = { };
+
+    attrs[0].id = SAI_SAMPLEPACKET_ATTR_SAMPLE_RATE;
+    attrs[0].value.u32 = 1;
+
+    auto status = g_meta->create(SAI_OBJECT_TYPE_SAMPLEPACKET, &sp, switch_id, 1, attrs);
+    META_ASSERT_SUCCESS(status);
+
+    return sp;
+}
+
+static sai_object_id_t create_hostif_udt(
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t udt;
+
+    sai_attribute_t attrs[9] = { };
+
+    attrs[0].id = SAI_HOSTIF_USER_DEFINED_TRAP_ATTR_TYPE;
+    attrs[0].value.s32 = SAI_HOSTIF_USER_DEFINED_TRAP_TYPE_ROUTER;
+
+    auto status = g_meta->create(SAI_OBJECT_TYPE_HOSTIF_USER_DEFINED_TRAP, &udt, switch_id, 1, attrs);
+    META_ASSERT_SUCCESS(status);
+
+    return udt;
+}
+
+static sai_object_id_t create_ipg(
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t ipg;
+
+    sai_attribute_t attrs[9] = { };
+
+    attrs[0].id = SAI_INGRESS_PRIORITY_GROUP_ATTR_PORT;
+    attrs[0].value.oid = create_port(switch_id);
+    attrs[1].id = SAI_INGRESS_PRIORITY_GROUP_ATTR_INDEX;
+    attrs[1].value.u8 = 0;
+
+    auto status = g_meta->create(SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP, &ipg, switch_id, 2, attrs);
+    META_ASSERT_SUCCESS(status);
+
+    return ipg;
 }
 
 sai_object_id_t insert_dummy_object(
@@ -2924,14 +2695,33 @@ sai_object_id_t insert_dummy_object(
 {
     SWSS_LOG_ENTER();
 
-    // TODO we should use create
-    sai_object_id_t oid = create_dummy_object_id(ot,switch_id);
-    g_oids.objectReferenceInsert(oid);
-    sai_object_meta_key_t meta_key_oid = { .objecttype = ot, .objectkey = { .key = { .object_id = oid } } };
-    std::string oid_key = sai_serialize_object_meta_key(meta_key_oid);
-    g_saiObjectCollection.createObject(meta_key_oid);
+    switch (ot)
+    {
+        case SAI_OBJECT_TYPE_PORT:
+            return create_port(switch_id);
 
-    return oid;
+        case SAI_OBJECT_TYPE_ACL_TABLE:
+            return create_acl_table(switch_id);
+
+        case SAI_OBJECT_TYPE_ACL_COUNTER:
+            return create_acl_counter(switch_id);
+
+        case SAI_OBJECT_TYPE_POLICER:
+            return create_policer(switch_id);
+
+        case SAI_OBJECT_TYPE_SAMPLEPACKET:
+            return create_samplepacket(switch_id);
+
+        case SAI_OBJECT_TYPE_HOSTIF_USER_DEFINED_TRAP:
+            return create_hostif_udt(switch_id);
+
+        case SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP:
+            return create_ipg(switch_id);
+
+        default:
+
+            SWSS_LOG_THROW("not implemented: %s, FIXME", sai_serialize_object_type(ot).c_str());
+    }
 }
 
 void test_acl_entry_field_and_action()
@@ -3084,7 +2874,7 @@ void test_acl_entry_field_and_action()
 
     SWSS_LOG_NOTICE("create acl entry");
 
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_ACL_ENTRY, &aclentry, switch_id, (uint32_t)vattrs.size(), vattrs.data(), &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_ACL_ENTRY, &aclentry, switch_id, (uint32_t)vattrs.size(), vattrs.data());
     META_ASSERT_SUCCESS(status);
 
     for (uint32_t i = 0; i < sizeof(ids)/sizeof(int32_t); ++i)
@@ -3096,18 +2886,18 @@ void test_acl_entry_field_and_action()
 
         SWSS_LOG_NOTICE("set aclentry %u %s", i, m->attridname);
 
-        status = meta_sai_set_oid(SAI_OBJECT_TYPE_ACL_ENTRY, aclentry, &vattrs[i], &dummy_success_sai_set_oid);
+        status = g_meta->set(SAI_OBJECT_TYPE_ACL_ENTRY, aclentry, &vattrs[i]);
         META_ASSERT_SUCCESS(status);
     }
 
     SWSS_LOG_NOTICE("get aclentry");
 
-    status = meta_sai_get_oid(SAI_OBJECT_TYPE_ACL_ENTRY, aclentry, (uint32_t)vattrs.size(), vattrs.data(), &dummy_success_sai_get_oid);
+    status = g_meta->get(SAI_OBJECT_TYPE_ACL_ENTRY, aclentry, (uint32_t)vattrs.size(), vattrs.data());
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("remove aclentry");
 
-    status = meta_sai_remove_oid(SAI_OBJECT_TYPE_ACL_ENTRY, aclentry, &dummy_success_sai_remove_oid);
+    status = g_meta->remove(SAI_OBJECT_TYPE_ACL_ENTRY, aclentry);
     META_ASSERT_SUCCESS(status);
 }
 
@@ -3137,6 +2927,30 @@ void test_construct_key()
     META_ASSERT_TRUE(key == "SAI_PORT_ATTR_HW_LANE_LIST:1,2,3,4;");
 }
 
+static sai_object_id_t create_scheduler_group(
+    _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t sg;
+
+    sai_attribute_t attrs[9] = { };
+
+    attrs[0].id = SAI_SCHEDULER_GROUP_ATTR_PORT_ID;
+    attrs[0].value.oid = create_port(switch_id);
+    attrs[1].id = SAI_SCHEDULER_GROUP_ATTR_LEVEL;
+    attrs[1].value.u8 = 0;
+    attrs[2].id = SAI_SCHEDULER_GROUP_ATTR_MAX_CHILDS;
+    attrs[2].value.u8 = 1;
+    attrs[3].id = SAI_SCHEDULER_GROUP_ATTR_PARENT_NODE;
+    attrs[3].value.oid = attrs[0].value.oid;
+
+    auto status = g_meta->create(SAI_OBJECT_TYPE_SCHEDULER_GROUP, &sg, switch_id, 4, attrs);
+    META_ASSERT_SUCCESS(status);
+
+    return sg;
+}
+
 void test_queue_create()
 {
     SWSS_LOG_ENTER();
@@ -3161,33 +2975,29 @@ void test_queue_create()
     attr2.value.u8 = 7;
 
     attr3.id = SAI_QUEUE_ATTR_PORT;
-    attr3.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_PORT, switch_id);
-
-    g_oids.objectReferenceInsert(attr3.value.oid);
+    attr3.value.oid = create_port(switch_id);
 
     attr4.id = SAI_QUEUE_ATTR_PARENT_SCHEDULER_NODE;
-    attr4.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_SCHEDULER_GROUP, switch_id);
-
-    g_oids.objectReferenceInsert(attr4.value.oid);
+    attr4.value.oid = create_scheduler_group(switch_id);
 
     sai_attribute_t list[4] = { attr1, attr2, attr3, attr4 };
 
     SWSS_LOG_NOTICE("create tests");
 
     SWSS_LOG_NOTICE("create queue");
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_QUEUE, &queue, switch_id, 4, list, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_QUEUE, &queue, switch_id, 4, list);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("create queue but key exists");
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_QUEUE, &queue, switch_id, 4, list, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_QUEUE, &queue, switch_id, 4, list);
     META_ASSERT_FAIL(status);
 
     SWSS_LOG_NOTICE("remove queue");
-    status = meta_sai_remove_oid(SAI_OBJECT_TYPE_QUEUE, queue, &dummy_success_sai_remove_oid);
+    status = g_meta->remove(SAI_OBJECT_TYPE_QUEUE, queue);
     META_ASSERT_SUCCESS(status);
 
     SWSS_LOG_NOTICE("create queue");
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_QUEUE, &queue, switch_id, 4, list, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_QUEUE, &queue, switch_id, 4, list);
     META_ASSERT_SUCCESS(status);
 }
 
@@ -3212,13 +3022,13 @@ void test_null_list()
     sai_object_id_t switch_id = create_switch();
 
     SWSS_LOG_NOTICE("0 count, not null list");
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_HASH, &hash, switch_id, 1, &attr, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_HASH, &hash, switch_id, 1, &attr);
     META_ASSERT_FAIL(status);
 
     attr.value.s32list.list = NULL;
 
     SWSS_LOG_NOTICE("0 count, null list");
-    status = meta_sai_create_oid(SAI_OBJECT_TYPE_HASH, &hash, switch_id, 1, &attr, &dummy_success_sai_create_oid);
+    status = g_meta->create(SAI_OBJECT_TYPE_HASH, &hash, switch_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 }
 
@@ -3241,7 +3051,7 @@ void test_priority_group()
 
     attr.id = SAI_INGRESS_PRIORITY_GROUP_ATTR_BUFFER_PROFILE;
     attr.value.oid = SAI_NULL_OBJECT_ID;
-    status = meta_sai_set_oid(SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP, pg, &attr, &dummy_success_sai_set_oid);
+    status = g_meta->set(SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP, pg, &attr);
     META_ASSERT_SUCCESS(status);
 }
 
@@ -4067,7 +3877,7 @@ void test_numbers()
 
 int main()
 {
-    swss::Logger::getInstance().setMinPrio(swss::Logger::SWSS_DEBUG);
+    swss::Logger::getInstance().setMinPrio(swss::Logger::SWSS_INFO);
 
     SWSS_LOG_ENTER();
 
