@@ -14,6 +14,7 @@
 
 #include "SwitchContainer.h"
 #include "RealObjectIdManager.h"
+#include "VirtualSwitchSaiInterface.h"
 
 using namespace saivs;
 
@@ -36,8 +37,9 @@ std::map<std::string,std::vector<uint32_t>> g_ifname_to_lanes;
 std::vector<uint32_t> g_lane_order;
 std::vector<std::vector<uint32_t>> g_laneMap;
 
-std::shared_ptr<SwitchContainer>          g_switchContainer;
-std::shared_ptr<RealObjectIdManager>      g_realObjectIdManager;
+std::shared_ptr<SwitchContainer>                g_switchContainer;
+std::shared_ptr<RealObjectIdManager>            g_realObjectIdManager;
+std::shared_ptr<VirtualSwitchSaiInterface>      g_vs;
 
 const char *g_boot_type             = NULL;
 const char *g_warm_boot_read_file   = NULL;
@@ -481,6 +483,8 @@ void clear_local_state()
      */
 
     meta_init_db();
+
+    g_vs = std::make_shared<VirtualSwitchSaiInterface>();
 
     // TODO since we create new manager, we need to create new meta db with
     // updated functions for query object type and switch id
@@ -997,7 +1001,7 @@ sai_object_type_t sai_object_type_query(
         return SAI_OBJECT_TYPE_NULL;
     }
 
-    return g_realObjectIdManager->saiObjectTypeQuery(objectId);
+    return g_vs->objectTypeQuery(objectId);
 }
 
 sai_object_id_t sai_switch_id_query(
@@ -1011,5 +1015,5 @@ sai_object_id_t sai_switch_id_query(
         return SAI_OBJECT_TYPE_NULL;
     }
 
-    return g_realObjectIdManager->saiSwitchIdQuery(objectId);
+    return g_vs->switchIdQuery(objectId);
 }

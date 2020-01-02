@@ -155,7 +155,7 @@
                 object_type ## _id,                                 \
                 &sai_metadata_enum_sai_ ## object_type ## _stat_t,  \
                 number_of_counters,                                 \
-                (const int32_t*)counter_ids,                        \
+                counter_ids,                                        \
                 counters);                                          \
     }
 
@@ -174,7 +174,7 @@
                 object_type ## _id,                                 \
                 &sai_metadata_enum_sai_ ## object_type ## _stat_t,  \
                 number_of_counters,                                 \
-                (const int32_t*)counter_ids,                        \
+                counter_ids,                                        \
                 mode,                                               \
                 counters);                                          \
     }
@@ -192,7 +192,7 @@
                 object_type ## _id,                                 \
                 &sai_metadata_enum_sai_ ## object_type ## _stat_t,  \
                 number_of_counters,                                 \
-                (const int32_t*)counter_ids);                       \
+                counter_ids);                                       \
     }
 
 #define VS_GENERIC_STATS(OT, ot)    \

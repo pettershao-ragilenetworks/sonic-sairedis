@@ -13,6 +13,7 @@ extern "C" {
 #include "Globals.h"
 #include "SwitchContainer.h"
 #include "RealObjectIdManager.h"
+#include "VirtualSwitchSaiInterface.h"
 
 #include <mutex>
 
@@ -62,6 +63,7 @@ extern void getPortLaneMap(
 
 extern std::shared_ptr<saivs::SwitchContainer>           g_switchContainer;
 extern std::shared_ptr<saivs::RealObjectIdManager>       g_realObjectIdManager;
+extern std::shared_ptr<saivs::VirtualSwitchSaiInterface> g_vs;
 
 extern const sai_acl_api_t              vs_acl_api;
 extern const sai_bfd_api_t              vs_bfd_api;
@@ -174,7 +176,7 @@ sai_status_t vs_generic_get_stats(
         _In_ sai_object_id_t object_id,
         _In_ const sai_enum_metadata_t *enum_metadata,
         _In_ uint32_t number_of_counters,
-        _In_ const int32_t *counter_ids,
+        _In_ const sai_stat_id_t*counter_ids,
         _Out_ uint64_t *counters);
 
 sai_status_t vs_generic_get_stats_ext(
@@ -182,7 +184,7 @@ sai_status_t vs_generic_get_stats_ext(
         _In_ sai_object_id_t object_id,
         _In_ const sai_enum_metadata_t *enum_metadata,
         _In_ uint32_t number_of_counters,
-        _In_ const int32_t *counter_ids,
+        _In_ const sai_stat_id_t*counter_ids,
         _In_ sai_stats_mode_t mode,
         _Out_ uint64_t *counters);
 
@@ -191,6 +193,6 @@ sai_status_t vs_generic_clear_stats(
         _In_ sai_object_id_t object_id,
         _In_ const sai_enum_metadata_t *enum_metadata,
         _In_ uint32_t number_of_counters,
-        _In_ const int32_t *counter_ids);
+        _In_ const sai_stat_id_t*counter_ids);
 
 #endif // __SAI_VS__
