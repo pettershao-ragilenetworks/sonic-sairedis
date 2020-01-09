@@ -9,11 +9,17 @@ endif
 lib_LTLIBRARIES = libsaivs.la
 
 libsaivs_la_SOURCES = \
+					  sai_vs_generic_create.cpp \
+					  sai_vs_generic_get.cpp \
+					  sai_vs_generic_remove.cpp \
+					  sai_vs_generic_set.cpp \
 					  sai_vs_acl.cpp \
 					  sai_vs_bfd.cpp \
 					  sai_vs_bmtor.cpp \
 					  sai_vs_bridge.cpp \
 					  sai_vs_buffer.cpp \
+					  sai_vs_counter.cpp \
+					  sai_vs.cpp \
 					  sai_vs_debug_counter.cpp\
 					  sai_vs_dtel.cpp \
 					  sai_vs_fdb.cpp \
@@ -22,12 +28,14 @@ libsaivs_la_SOURCES = \
 					  sai_vs_interfacequery.cpp \
 					  sai_vs_ipmc.cpp \
 					  sai_vs_ipmc_group.cpp \
+					  sai_vs_isolation_group.cpp \
 					  sai_vs_l2mc.cpp \
 					  sai_vs_l2mcgroup.cpp \
 					  sai_vs_lag.cpp \
 					  sai_vs_mcastfdb.cpp \
 					  sai_vs_mirror.cpp \
 					  sai_vs_mpls.cpp \
+					  sai_vs_nat.cpp \
 					  sai_vs_neighbor.cpp \
 					  sai_vs_nexthop.cpp \
 					  sai_vs_nexthopgroup.cpp \
@@ -43,21 +51,15 @@ libsaivs_la_SOURCES = \
 					  sai_vs_schedulergroup.cpp \
 					  sai_vs_segmentroute.cpp \
 					  sai_vs_stp.cpp \
+					  sai_vs_switch_BCM56850.cpp \
 					  sai_vs_switch.cpp \
+					  sai_vs_switch_MLNX2700.cpp \
 					  sai_vs_tam.cpp \
 					  sai_vs_tunnel.cpp \
 					  sai_vs_udf.cpp \
 					  sai_vs_virtual_router.cpp \
 					  sai_vs_vlan.cpp \
 					  sai_vs_wred.cpp \
-					  sai_vs_nat.cpp \
-					  sai_vs_generic_create.cpp \
-					  sai_vs_generic_get.cpp \
-					  sai_vs_generic_remove.cpp \
-					  sai_vs_generic_set.cpp \
-					  sai_vs.cpp \
-					  sai_vs_switch_BCM56850.cpp \
-					  sai_vs_switch_MLNX2700.cpp \
 					  Globals.cpp \
 					  Switch.cpp \
 					  SwitchContainer.cpp \

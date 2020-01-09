@@ -888,19 +888,22 @@ sai_status_t sai_api_query(
         API_CASE(BMTOR,bmtor);
         API_CASE(BRIDGE,bridge);
         API_CASE(BUFFER,buffer);
+        API_CASE(COUNTER,counter);
+        API_CASE(DEBUG_COUNTER,debug_counter);
         API_CASE(DTEL,dtel);
         API_CASE(FDB,fdb);
         API_CASE(HASH,hash);
         API_CASE(HOSTIF,hostif);
         API_CASE(IPMC_GROUP,ipmc_group);
         API_CASE(IPMC,ipmc);
-        //API_CASE(ISOLATION_GROUP,isolation_group);
+        API_CASE(ISOLATION_GROUP,isolation_group);
         API_CASE(L2MC_GROUP,l2mc_group);
         API_CASE(L2MC,l2mc);
         API_CASE(LAG,lag);
         API_CASE(MCAST_FDB,mcast_fdb);
         API_CASE(MIRROR,mirror);
         API_CASE(MPLS,mpls);
+        API_CASE(NAT,nat);
         API_CASE(NEIGHBOR,neighbor);
         API_CASE(NEXT_HOP_GROUP,next_hop_group);
         API_CASE(NEXT_HOP,next_hop);
@@ -923,8 +926,6 @@ sai_status_t sai_api_query(
         API_CASE(VIRTUAL_ROUTER,virtual_router);
         API_CASE(VLAN,vlan);
         API_CASE(WRED,wred);
-        API_CASE(DEBUG_COUNTER,debug_counter);
-        API_CASE(NAT,nat);
 
         default:
             SWSS_LOG_ERROR("Invalid API type %d", sai_api_id);

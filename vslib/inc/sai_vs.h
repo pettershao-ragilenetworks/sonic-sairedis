@@ -73,18 +73,22 @@ extern const sai_bfd_api_t              vs_bfd_api;
 extern const sai_bmtor_api_t            vs_bmtor_api;
 extern const sai_bridge_api_t           vs_bridge_api;
 extern const sai_buffer_api_t           vs_buffer_api;
+extern const sai_counter_api_t          vs_counter_api;
+extern const sai_debug_counter_api_t    vs_debug_counter_api;
 extern const sai_dtel_api_t             vs_dtel_api;
 extern const sai_fdb_api_t              vs_fdb_api;
 extern const sai_hash_api_t             vs_hash_api;
 extern const sai_hostif_api_t           vs_hostif_api;
 extern const sai_ipmc_api_t             vs_ipmc_api;
 extern const sai_ipmc_group_api_t       vs_ipmc_group_api;
+extern const sai_isolation_group_api_t  vs_isolation_group_api;
 extern const sai_l2mc_api_t             vs_l2mc_api;
 extern const sai_l2mc_group_api_t       vs_l2mc_group_api;
 extern const sai_lag_api_t              vs_lag_api;
 extern const sai_mcast_fdb_api_t        vs_mcast_fdb_api;
 extern const sai_mirror_api_t           vs_mirror_api;
 extern const sai_mpls_api_t             vs_mpls_api;
+extern const sai_nat_api_t              vs_nat_api;
 extern const sai_neighbor_api_t         vs_neighbor_api;
 extern const sai_next_hop_api_t         vs_next_hop_api;
 extern const sai_next_hop_group_api_t   vs_next_hop_group_api;
@@ -107,8 +111,6 @@ extern const sai_udf_api_t              vs_udf_api;
 extern const sai_virtual_router_api_t   vs_virtual_router_api;
 extern const sai_vlan_api_t             vs_vlan_api;
 extern const sai_wred_api_t             vs_wred_api;
-extern const sai_debug_counter_api_t    vs_debug_counter_api;
-extern const sai_nat_api_t              vs_nat_api;
 
 // OID QUAD
 
