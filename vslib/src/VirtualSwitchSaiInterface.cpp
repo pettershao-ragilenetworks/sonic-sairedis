@@ -325,6 +325,8 @@ sai_status_t VirtualSwitchSaiInterface::remove(
 
             if (attr.value.booldata)
             {
+                // TODO should be done on uninitialize and contain all switches
+                // that has this flag true on multiple switches scenario
                 vs_dump_switch_database_for_warm_restart(object_id);
             }
         }
