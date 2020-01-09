@@ -817,8 +817,8 @@ sai_status_t sai_api_initialize(
 sai_status_t sai_api_uninitialize(void)
 {
     MUTEX();
-
     SWSS_LOG_ENTER();
+    VS_CHECK_API_INITIALIZED();
 
     if (!Globals::apiInitialized)
     {
@@ -850,8 +850,8 @@ sai_status_t sai_log_set(
         _In_ sai_log_level_t log_level)
 {
     MUTEX();
-
     SWSS_LOG_ENTER();
+    VS_CHECK_API_INITIALIZED();
 
     return SAI_STATUS_NOT_IMPLEMENTED;
 }
@@ -866,8 +866,8 @@ sai_status_t sai_api_query(
         _Out_ void** api_method_table)
 {
     MUTEX();
-
     SWSS_LOG_ENTER();
+    VS_CHECK_API_INITIALIZED();
 
     if (api_method_table == NULL)
     {
@@ -939,7 +939,9 @@ sai_status_t sai_query_attribute_enum_values_capability(
         _In_ sai_attr_id_t attr_id,
         _Inout_ sai_s32_list_t *enum_values_capability)
 {
+    MUTEX();
     SWSS_LOG_ENTER();
+    VS_CHECK_API_INITIALIZED();
 
     return g_vs->queryAattributeEnumValuesCapability(
             switch_id,
@@ -955,7 +957,9 @@ sai_status_t sai_object_type_get_availability(
         _In_ const sai_attribute_t *attr_list,
         _Out_ uint64_t *count)
 {
+    MUTEX();
     SWSS_LOG_ENTER();
+    VS_CHECK_API_INITIALIZED();
 
     return g_vs->objectTypeGetAvailability(
             switch_id,

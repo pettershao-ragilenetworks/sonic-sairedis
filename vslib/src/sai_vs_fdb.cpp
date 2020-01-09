@@ -313,8 +313,8 @@ sai_status_t vs_flush_fdb_entries(
         _In_ const sai_attribute_t *attr_list)
 {
     MUTEX();
-
     SWSS_LOG_ENTER();
+    VS_CHECK_API_INITIALIZED();
 
     return meta_sai_flush_fdb_entries(
             switch_id,

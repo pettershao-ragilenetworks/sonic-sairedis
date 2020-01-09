@@ -301,8 +301,8 @@ sai_status_t vs_create_switch(
         _In_ const sai_attribute_t *attr_list)
 {
     MUTEX();
-
     SWSS_LOG_ENTER();
+    VS_CHECK_API_INITIALIZED();
 
     sai_status_t status = meta_sai_create_oid(
             SAI_OBJECT_TYPE_SWITCH,
@@ -328,8 +328,8 @@ sai_status_t vs_remove_switch(
             _In_ sai_object_id_t switch_id)
 {
     MUTEX();
-
     SWSS_LOG_ENTER();
+    VS_CHECK_API_INITIALIZED();
 
     vs_remove_netlink_message_listener(switch_id);
 
@@ -353,8 +353,8 @@ sai_status_t vs_set_switch_attribute(
         _In_ const sai_attribute_t *attr)
 {
     MUTEX();
-
     SWSS_LOG_ENTER();
+    VS_CHECK_API_INITIALIZED();
 
     sai_status_t status = meta_sai_set_oid(
             SAI_OBJECT_TYPE_SWITCH,

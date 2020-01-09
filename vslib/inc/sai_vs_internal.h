@@ -17,6 +17,7 @@
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
+        VS_CHECK_API_INITIALIZED();                                 \
         return meta_sai_create_oid(                                 \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
@@ -32,6 +33,7 @@
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
+        VS_CHECK_API_INITIALIZED();                                 \
         return meta_sai_remove_oid(                                 \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
@@ -45,6 +47,7 @@
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
+        VS_CHECK_API_INITIALIZED();                                 \
         return meta_sai_set_oid(                                    \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
@@ -60,6 +63,7 @@
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
+        VS_CHECK_API_INITIALIZED();                                 \
         return meta_sai_get_oid(                                    \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
@@ -84,6 +88,7 @@
     {                                                           \
         MUTEX();                                                \
         SWSS_LOG_ENTER();                                       \
+        VS_CHECK_API_INITIALIZED();                             \
         return meta_sai_create_ ## object_type(                 \
                 object_type,                                    \
                 attr_count,                                     \
@@ -97,6 +102,7 @@
     {                                                           \
         MUTEX();                                                \
         SWSS_LOG_ENTER();                                       \
+        VS_CHECK_API_INITIALIZED();                             \
         return meta_sai_remove_ ## object_type(                 \
                 object_type,                                    \
                 &vs_generic_remove_ ## object_type);            \
@@ -109,6 +115,7 @@
     {                                                           \
         MUTEX();                                                \
         SWSS_LOG_ENTER();                                       \
+        VS_CHECK_API_INITIALIZED();                             \
         return meta_sai_set_ ## object_type(                    \
                 object_type,                                    \
                 attr,                                           \
@@ -123,6 +130,7 @@
     {                                                           \
         MUTEX();                                                \
         SWSS_LOG_ENTER();                                       \
+        VS_CHECK_API_INITIALIZED();                             \
         return meta_sai_get_ ## object_type(                    \
                 object_type,                                    \
                 attr_count,                                     \
@@ -155,6 +163,7 @@
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
+        VS_CHECK_API_INITIALIZED();                                 \
         return g_vs->getStats(                                      \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
@@ -173,6 +182,7 @@
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
+        VS_CHECK_API_INITIALIZED();                                 \
         return g_vs->getStatsExt(                                   \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
@@ -190,6 +200,7 @@
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
+        VS_CHECK_API_INITIALIZED();                                 \
         return g_vs->clearStats(                                    \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \

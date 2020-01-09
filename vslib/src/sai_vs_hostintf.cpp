@@ -744,8 +744,8 @@ sai_status_t vs_recv_hostif_packet(
         _Out_ sai_attribute_t *attr_list)
 {
     MUTEX();
-
     SWSS_LOG_ENTER();
+    VS_CHECK_API_INITIALIZED();
 
     return SAI_STATUS_NOT_IMPLEMENTED;
 }
@@ -758,8 +758,8 @@ sai_status_t vs_send_hostif_packet(
         _In_ const sai_attribute_t *attr_list)
 {
     MUTEX();
-
     SWSS_LOG_ENTER();
+    VS_CHECK_API_INITIALIZED();
 
     return SAI_STATUS_NOT_IMPLEMENTED;
 }
