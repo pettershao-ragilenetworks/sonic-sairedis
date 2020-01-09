@@ -3,6 +3,8 @@
 #include <net/if.h>
 #include <algorithm>
 
+using namespace saivs;
+
 // TODO extra work may be needed on GET api if N on list will be > then actual
 
 /*
@@ -1009,7 +1011,7 @@ static sai_status_t refresh_bridge_port_list(
      * TODO possible issues with vxlan and lag.
      */
 
-    auto &all_bridge_ports = g_switch_state_map.at(switch_id)->objectHash.at(SAI_OBJECT_TYPE_BRIDGE_PORT);
+    auto &all_bridge_ports = g_switch_state_map.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_BRIDGE_PORT);
 
     sai_attribute_t attr;
 
@@ -1032,7 +1034,7 @@ static sai_status_t refresh_bridge_port_list(
 
     sai_object_id_t default_1q_bridge_id = attr.value.oid;
 
-    std::map<sai_object_id_t, AttrHash> bridge_port_list_on_bridge_id;
+    std::map<sai_object_id_t, SwitchState::AttrHash> bridge_port_list_on_bridge_id;
 
     // update default bridge port id's for bridge port if attr type is missing
     for (const auto &bp: all_bridge_ports)
@@ -1140,7 +1142,7 @@ static sai_status_t refresh_vlan_member_list(
 {
     SWSS_LOG_ENTER();
 
-    auto &all_vlan_members = g_switch_state_map.at(switch_id)->objectHash.at(SAI_OBJECT_TYPE_VLAN_MEMBER);
+    auto &all_vlan_members = g_switch_state_map.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_VLAN_MEMBER);
 
     auto m_member_list = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_VLAN, SAI_VLAN_ATTR_MEMBER_LIST);
     auto md_vlan_id = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_VLAN_MEMBER, SAI_VLAN_MEMBER_ATTR_VLAN_ID);
@@ -1154,7 +1156,7 @@ static sai_status_t refresh_vlan_member_list(
 
     sai_attribute_t attr;
 
-    auto me = g_switch_state_map.at(switch_id)->objectHash.at(SAI_OBJECT_TYPE_VLAN).at(sai_serialize_object_id(vlan_id));
+    auto me = g_switch_state_map.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_VLAN).at(sai_serialize_object_id(vlan_id));
 
     for (auto vm: all_vlan_members)
     {
@@ -1258,9 +1260,9 @@ static sai_status_t refresh_port_list(
 
     // iterate via ASIC state to find all the ports
 
-    auto &objectHash = g_switch_state_map.at(switch_id)->objectHash.at(SAI_OBJECT_TYPE_PORT);
+    auto &m_objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_PORT);
 
-    for (const auto& it: objectHash)
+    for (const auto& it: m_objectHash)
     {
         sai_object_id_t port_id;
         sai_deserialize_object_id(it.first, port_id);

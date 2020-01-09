@@ -207,7 +207,7 @@ void channelOpSetStats(
      * Check if object for statistics was created and exists on switch.
      */
 
-    auto &objectHash = g_switch_state_map.at(switch_id)->objectHash.at(ot);
+    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(ot);
 
     auto it = objectHash.find(key.c_str());
 
@@ -222,7 +222,7 @@ void channelOpSetStats(
      * create empty map.
      */
 
-    auto &countersMap = g_switch_state_map.at(switch_id)->countersMap;
+    auto &countersMap = g_switch_state_map.at(switch_id)->m_countersMap;
 
     auto mapit = countersMap.find(key);
 

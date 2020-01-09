@@ -6,6 +6,8 @@
 
 #include <algorithm>
 
+using namespace saivs;
+
 #define MAX_OBJLIST_LEN 128
 
 sai_status_t vs_clear_port_all_stats(
@@ -297,9 +299,9 @@ bool vs_check_object_default_state(
     return true;
 }
 
-bool vs_check_port_reference_count(
+static bool vs_check_port_reference_count(
         _In_ sai_object_id_t port_id,
-        _In_ const ObjectHash& objectHash)
+        _In_ const SwitchState::ObjectHash& objectHash)
 {
     SWSS_LOG_ENTER();
 
@@ -379,7 +381,7 @@ sai_status_t vs_check_port_dependencies(
 
     std::string str_port_id = sai_serialize_object_id(port_id);
 
-    auto &objectHash = g_switch_state_map.at(switch_id)->objectHash.at(ot);
+    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(ot);
 
     auto it = objectHash.find(str_port_id);
 
@@ -398,7 +400,7 @@ sai_status_t vs_check_port_dependencies(
 
     // check port reference count on bridge port
 
-    if (!vs_check_port_reference_count(port_id, g_switch_state_map.at(switch_id)->objectHash))
+    if (!vs_check_port_reference_count(port_id, g_switch_state_map.at(switch_id)->m_objectHash))
     {
         SWSS_LOG_ERROR("port %s reference count IS NOT ZERO, can't remove, remove dependencies first",
                 sai_serialize_object_id(port_id).c_str());

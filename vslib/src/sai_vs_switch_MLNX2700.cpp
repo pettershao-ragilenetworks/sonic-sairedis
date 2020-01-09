@@ -1,6 +1,8 @@
 #include "sai_vs.h"
 #include "sai_vs_state.h"
 
+using namespace saivs;
+
 /*
  * We can use local variable here for initialization (init should be in class
  * constructor anyway, we can move it there later) because each switch init is
@@ -966,7 +968,7 @@ static sai_status_t refresh_bridge_port_list(
      * TODO possible issues with vxlan and lag.
      */
 
-    auto &all_bridge_ports = g_switch_state_map.at(switch_id)->objectHash.at(SAI_OBJECT_TYPE_BRIDGE_PORT);
+    auto &all_bridge_ports = g_switch_state_map.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_BRIDGE_PORT);
 
     sai_attribute_t attr;
 
@@ -978,7 +980,7 @@ static sai_status_t refresh_bridge_port_list(
      * First get all port's that belong to this bridge id.
      */
 
-    std::map<sai_object_id_t, AttrHash> bridge_port_list_on_bridge_id;
+    std::map<sai_object_id_t, SwitchState::AttrHash> bridge_port_list_on_bridge_id;
 
     for (const auto &bp: all_bridge_ports)
     {
@@ -1063,7 +1065,7 @@ static sai_status_t refresh_vlan_member_list(
 {
     SWSS_LOG_ENTER();
 
-    auto &all_vlan_members = g_switch_state_map.at(switch_id)->objectHash.at(SAI_OBJECT_TYPE_VLAN_MEMBER);
+    auto &all_vlan_members = g_switch_state_map.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_VLAN_MEMBER);
 
     auto m_member_list = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_VLAN, SAI_VLAN_ATTR_MEMBER_LIST);
     auto md_vlan_id = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_VLAN_MEMBER, SAI_VLAN_MEMBER_ATTR_VLAN_ID);
@@ -1077,7 +1079,7 @@ static sai_status_t refresh_vlan_member_list(
 
     sai_attribute_t attr;
 
-    auto me = g_switch_state_map.at(switch_id)->objectHash.at(SAI_OBJECT_TYPE_VLAN).at(sai_serialize_object_id(vlan_id));
+    auto me = g_switch_state_map.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_VLAN).at(sai_serialize_object_id(vlan_id));
 
     for (auto vm: all_vlan_members)
     {

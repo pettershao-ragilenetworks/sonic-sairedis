@@ -17,6 +17,7 @@ libsaivs_la_SOURCES = \
 					  VirtualSwitchSaiInterface.cpp \
 					  SaiAttrWrap.cpp \
 					  SelectableFd.cpp \
+					  SwitchState.cpp \
 					  sai_vs_fdb.cpp \
 					  sai_vs_hostintf.cpp \
 					  sai_vs_interfacequery.cpp \

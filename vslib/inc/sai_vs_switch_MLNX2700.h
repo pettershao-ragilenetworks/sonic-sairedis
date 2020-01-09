@@ -4,9 +4,11 @@
 #include "meta/sai_serialize.h"
 #include "meta/saiattributelist.h"
 
+#include "SwitchState.h"
+
 void init_switch_MLNX2700(
         _In_ sai_object_id_t switch_id,
-        _In_ std::shared_ptr<SwitchState> warmBootState);
+        _In_ std::shared_ptr<saivs::SwitchState> warmBootState);
 
 void uninit_switch_MLNX2700(
         _In_ sai_object_id_t switch_id);

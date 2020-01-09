@@ -4,9 +4,9 @@
 
 using namespace saivs;
 
-bool doesFdbEntryNotMatchFlushAttr(
+static bool doesFdbEntryNotMatchFlushAttr(
         _In_ const std::string &str_fdb_entry,
-        _In_ AttrHash &fdb_attrs,
+        _In_ SwitchState::AttrHash &fdb_attrs,
         _In_ uint32_t attr_count,
         _In_ const sai_attribute_t *attr_list)
 {
@@ -94,10 +94,10 @@ sai_status_t internal_vs_flush_fdb_entries(
      * metadata db should be cleared by flush notification handler.
      */
 
-    auto &fdbs = g_switch_state_map.at(switch_id)->objectHash.at(SAI_OBJECT_TYPE_FDB_ENTRY);
+    auto &fdbs = g_switch_state_map.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_FDB_ENTRY);
 
-    std::map<std::string, AttrHash> static_fdbs;
-    std::map<std::string, AttrHash> dynamic_fdbs;
+    std::map<std::string, SwitchState::AttrHash> static_fdbs;
+    std::map<std::string, SwitchState::AttrHash> dynamic_fdbs;
 
     for (auto it = fdbs.begin(); it != fdbs.end();)
     {

@@ -39,7 +39,7 @@ VirtualSwitchSaiInterface::~VirtualSwitchSaiInterface()
     // empty
 }
 
-SwitchStateMap g_switch_state_map;
+SwitchState::SwitchStateMap g_switch_state_map;
 
 static void vs_update_real_object_ids(
         _In_ const std::shared_ptr<SwitchState> warmBootState)
@@ -52,7 +52,7 @@ static void vs_update_real_object_ids(
      * not have the same ID as existing ones.
      */
 
-    for (auto oh: warmBootState->objectHash)
+    for (auto oh: warmBootState->m_objectHash)
     {
         sai_object_type_t ot = oh.first;
 
@@ -147,7 +147,7 @@ static std::shared_ptr<SwitchState> vs_read_switch_database_for_warm_restart(
 
         sai_deserialize_object_meta_key(str_object_type + ":" + str_object_id, meta_key);
 
-        auto &objectHash = ss->objectHash.at(meta_key.objecttype);
+        auto &objectHash = ss->m_objectHash.at(meta_key.objecttype);
 
         if (objectHash.find(str_object_id) == objectHash.end())
         {
@@ -253,7 +253,7 @@ static void vs_update_local_metadata(
      * called, we could check the actual state.
      */
 
-    auto &objectHash = g_switch_state_map.at(switch_id)->objectHash;//.at(object_type);
+    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash;//.at(object_type);
 
     // first create switch
     // first we need to create all "oid" objects to have reference base
@@ -577,7 +577,7 @@ sai_status_t VirtualSwitchSaiInterface::create(
         SWSS_LOG_THROW("multiple switches not supported, FIXME");
     }
 
-    auto &objectHash = g_switch_state_map.at(switch_id)->objectHash.at(object_type);
+    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(object_type);
 
     auto it = objectHash.find(serializedObjectId);
 
@@ -626,7 +626,7 @@ static sai_status_t internal_vs_generic_remove(
 {
     SWSS_LOG_ENTER();
 
-    auto &objectHash = g_switch_state_map.at(switch_id)->objectHash.at(object_type);
+    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(object_type);
 
     auto it = objectHash.find(serializedObjectId);
 
@@ -674,7 +674,7 @@ static void vs_dump_switch_database_for_warm_restart(
 
     auto switchState = it->second;
 
-    auto objectHash = switchState->objectHash;
+    const auto& objectHash = switchState->m_objectHash;
 
     // dump all objects and attributes to file
 
@@ -830,7 +830,7 @@ static sai_status_t internal_vs_generic_set(
         SWSS_LOG_THROW("multiple switches not supported, FIXME");
     }
 
-    auto &objectHash = g_switch_state_map.at(switch_id)->objectHash.at(object_type);
+    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(object_type);
 
     auto it = objectHash.find(serializedObjectId);
 
@@ -843,7 +843,7 @@ static sai_status_t internal_vs_generic_set(
         return SAI_STATUS_ITEM_NOT_FOUND;
     }
 
-    AttrHash &attrHash = it->second;
+    auto &attrHash = it->second;
 
     auto a = std::make_shared<SaiAttrWrap>(object_type, attr);
 
@@ -927,7 +927,7 @@ sai_status_t VirtualSwitchSaiInterface::get(
         return SAI_STATUS_FAILURE;
     }
 
-    auto &objectHash = g_switch_state_map.at(switch_id)->objectHash.at(objectType);
+    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(objectType);
 
     auto it = objectHash.find(serializedObjectId);
 
@@ -945,7 +945,7 @@ sai_status_t VirtualSwitchSaiInterface::get(
      * object.
      */
 
-    AttrHash& attrHash = it->second;
+    auto& attrHash = it->second;
 
     /*
      * Some of the list query maybe for length, so we can't do
@@ -1190,7 +1190,7 @@ static sai_status_t internal_vs_generic_stats_function(
         perform_set = true;
     }
 
-    auto &countersMap = g_switch_state_map.at(switch_id)->countersMap;
+    auto &countersMap = g_switch_state_map.at(switch_id)->m_countersMap;
 
     auto str_object_id = sai_serialize_object_id(object_id);
 

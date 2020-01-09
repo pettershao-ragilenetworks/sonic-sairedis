@@ -228,7 +228,7 @@ void findBridgeVlanForPortVlan(
 
     sai_object_id_t switch_id = sai_switch_id_query(port_id);
 
-    auto &objectHash = g_switch_state_map.at(switch_id)->objectHash.at(SAI_OBJECT_TYPE_BRIDGE_PORT);
+    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_BRIDGE_PORT);
 
     // iterate via all bridge ports to find match on port id
 
@@ -334,7 +334,7 @@ void findBridgeVlanForPortVlan(
         }
         else
         {
-            auto &objectHash2 = g_switch_state_map.at(switch_id)->objectHash.at(SAI_OBJECT_TYPE_VLAN);
+            auto &objectHash2 = g_switch_state_map.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_VLAN);
 
             // iterate via all vlans to find match on vlan id
 
@@ -385,7 +385,7 @@ bool getLagFromPort(
 
     sai_object_id_t switch_id = sai_switch_id_query(port_id);
 
-    auto &objectHash = g_switch_state_map.at(switch_id)->objectHash.at(SAI_OBJECT_TYPE_LAG_MEMBER);
+    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_LAG_MEMBER);
 
     // iterate via all lag members to find match on port id
 
@@ -442,7 +442,7 @@ bool isLagOrPortRifBased(
 
     sai_object_id_t switch_id = sai_switch_id_query(lag_or_port_id);
 
-    auto &objectHash = g_switch_state_map.at(switch_id)->objectHash.at(SAI_OBJECT_TYPE_ROUTER_INTERFACE);
+    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_ROUTER_INTERFACE);
 
     // iterate via all lag members to find match on port id
 
@@ -1478,7 +1478,7 @@ sai_status_t vs_recreate_hostif_tap_interfaces(
         return SAI_STATUS_FAILURE;
     }
 
-    auto &objectHash = g_switch_state_map.at(switch_id)->objectHash.at(SAI_OBJECT_TYPE_HOSTIF);
+    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_HOSTIF);
 
     SWSS_LOG_NOTICE("attempt to recreate %zu tap devices for host interfaces", objectHash.size());
 
