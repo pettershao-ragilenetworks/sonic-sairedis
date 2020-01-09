@@ -257,7 +257,38 @@ sai_status_t VirtualSwitchSaiInterface::queryAattributeEnumValuesCapability(
 {
     SWSS_LOG_ENTER();
 
-    throw; // TODO
+    // TODO: We should generate this metadata for the virtual switch rather
+    // than hard-coding it here.
+
+    if (object_type == SAI_OBJECT_TYPE_DEBUG_COUNTER && attr_id == SAI_DEBUG_COUNTER_ATTR_IN_DROP_REASON_LIST)
+    {
+        if (enum_values_capability->count < 3)
+        {
+            return SAI_STATUS_BUFFER_OVERFLOW;
+        }
+
+        enum_values_capability->count = 3;
+        enum_values_capability->list[0] = SAI_IN_DROP_REASON_L2_ANY;
+        enum_values_capability->list[1] = SAI_IN_DROP_REASON_L3_ANY;
+        enum_values_capability->list[2] = SAI_IN_DROP_REASON_ACL_ANY;
+
+        return SAI_STATUS_SUCCESS;
+    }
+    else if (object_type == SAI_OBJECT_TYPE_DEBUG_COUNTER && attr_id == SAI_DEBUG_COUNTER_ATTR_OUT_DROP_REASON_LIST)
+    {
+        if (enum_values_capability->count < 2)
+        {
+            return SAI_STATUS_BUFFER_OVERFLOW;
+        }
+
+        enum_values_capability->count = 2;
+        enum_values_capability->list[0] = SAI_OUT_DROP_REASON_L2_ANY;
+        enum_values_capability->list[1] = SAI_OUT_DROP_REASON_L3_ANY;
+
+        return SAI_STATUS_SUCCESS;
+    }
+        
+    return SAI_STATUS_NOT_SUPPORTED;
 }
 
 sai_status_t VirtualSwitchSaiInterface::getStats(
