@@ -117,9 +117,33 @@ void on_packet_event(
     SWSS_LOG_ENTER();
 }
 
+static void clearDB()
+{
+    SWSS_LOG_ENTER();
+
+    auto db = std::make_shared<swss::DBConnector>(ASIC_DB, "localhost", 6379, 0);
+
+    swss::RedisReply r(db.get(), "FLUSHALL", REDIS_REPLY_STATUS);
+
+    r.checkStatusOK();
+}
+
+static void sai_reinit()
+{
+    SWSS_LOG_ENTER();
+
+    SUCCESS(sai_api_uninitialize());
+
+    clearDB();
+
+    SUCCESS(sai_api_initialize(0, (sai_service_method_table_t*)&test_services));
+}
+
 void test_ports()
 {
     SWSS_LOG_ENTER();
+
+    sai_reinit();
 
     uint32_t expected_ports = 32;
 
@@ -154,6 +178,8 @@ void test_ports()
 void test_set_readonly_attribute()
 {
     SWSS_LOG_ENTER();
+
+    sai_reinit();
 
     sai_attribute_t attr;
 
@@ -191,6 +217,8 @@ void test_set_readonly_attribute()
 void test_set_readonly_attribute_via_redis()
 {
     SWSS_LOG_ENTER();
+
+    sai_reinit();
 
     sai_attribute_t attr;
 
@@ -248,6 +276,8 @@ void test_set_readonly_attribute_via_redis()
 void test_set_stats_via_redis()
 {
     SWSS_LOG_ENTER();
+
+    sai_reinit();
 
     sai_attribute_t attr;
 
@@ -372,6 +402,8 @@ sai_fdb_entry_t create_fdb_entry(
 void test_fdb_flush()
 {
     SWSS_LOG_ENTER();
+
+    sai_reinit();
 
     // TODO we need 10 cases, 10th where nothing was removed
 
@@ -667,6 +699,8 @@ void test_fdb_flush()
 void test_get_stats()
 {
     SWSS_LOG_ENTER();
+
+    sai_reinit();
 
     uint32_t expected_ports = 32;
 

@@ -22,7 +22,7 @@ bool                    g_vs_hostif_use_tap_device = false;
 sai_vs_switch_type_t    g_vs_switch_type = SAI_VS_SWITCH_TYPE_NONE;
 
 volatile bool                               g_unittestChannelRun;
-swss::SelectableEvent                       g_unittestChannelThreadEvent;
+std::shared_ptr<swss::SelectableEvent>      g_unittestChannelThreadEvent;
 std::shared_ptr<std::thread>                g_unittestChannelThread;
 std::shared_ptr<swss::NotificationConsumer> g_unittestChannelNotificationConsumer;
 std::shared_ptr<swss::DBConnector>          g_dbNtf;
@@ -350,7 +350,7 @@ void unittestChannelThreadProc()
     swss::Select s;
 
     s.addSelectable(g_unittestChannelNotificationConsumer.get());
-    s.addSelectable(&g_unittestChannelThreadEvent);
+    s.addSelectable(g_unittestChannelThreadEvent.get());
 
     while (g_unittestChannelRun)
     {
@@ -358,7 +358,7 @@ void unittestChannelThreadProc()
 
         int result = s.select(&sel);
 
-        if (sel == &g_unittestChannelThreadEvent)
+        if (sel == g_unittestChannelThreadEvent.get())
         {
             // user requested shutdown_switch
             break;
@@ -366,6 +366,7 @@ void unittestChannelThreadProc()
 
         if (result == swss::Select::OBJECT)
         {
+
             swss::KeyOpFieldsValuesTuple kco;
 
             std::string op;
@@ -492,6 +493,14 @@ void clear_local_state()
     // TODO since we create new manager, we need to create new meta db with
     // updated functions for query object type and switch id
     g_realObjectIdManager = std::make_shared<RealObjectIdManager>(0);
+
+    g_lane_to_ifname.clear();
+    g_ifname_to_lanes.clear();
+    g_lane_order.clear();
+    g_laneMap.clear();
+
+    g_switch_state_map.clear();
+    g_fdb_info_set.clear();
 }
 
 bool check_ifname(
@@ -795,7 +804,9 @@ sai_status_t sai_api_initialize(
 
     clear_local_state();
 
-    g_dbNtf = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
+    g_unittestChannelThreadEvent = std::make_shared<swss::SelectableEvent>();
+
+    g_dbNtf = std::make_shared<swss::DBConnector>(ASIC_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
     g_unittestChannelNotificationConsumer = std::make_shared<swss::NotificationConsumer>(g_dbNtf.get(), SAI_VS_UNITTEST_CHANNEL);
 
     g_unittestChannelRun = true;
@@ -827,18 +838,24 @@ sai_status_t sai_api_uninitialize(void)
         return SAI_STATUS_FAILURE;
     }
 
-    clear_local_state();
+    SWSS_LOG_NOTICE("stopping threads");
 
     g_unittestChannelRun = false;
 
     //// notify thread that it should end
-    g_unittestChannelThreadEvent.notify();
+    g_unittestChannelThreadEvent->notify();
 
     g_unittestChannelThread->join();
+
+    // TODO add event for end aging thread like notify
 
     g_fdbAgingThreadRun = false;
 
     g_fdbAgingThread->join();
+
+    // clear state after ending all threads
+
+    clear_local_state();
 
     Globals::apiInitialized = false;
 
