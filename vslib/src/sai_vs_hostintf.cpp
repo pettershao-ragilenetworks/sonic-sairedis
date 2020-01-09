@@ -7,6 +7,8 @@
 
 #include "meta/sai_serialize.h"
 
+#include "SelectableFd.h"
+
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -25,38 +27,6 @@
 #include <linux/if_ether.h>
 
 using namespace saivs;
-
-class SelectableFd :
-    public swss::Selectable
-{
-    public:
-        SelectableFd(
-                _In_ int fd)
-        {
-            SWSS_LOG_ENTER();
-
-            m_fd = fd;
-        }
-
-        int getFd() override
-        {
-            SWSS_LOG_ENTER();
-
-            return m_fd;
-        }
-
-        uint64_t readData() override
-        {
-            SWSS_LOG_ENTER();
-
-            // empty
-            return 0;
-        }
-
-    private:
-
-        int m_fd;
-};
 
 typedef struct _hostif_info_t
 {

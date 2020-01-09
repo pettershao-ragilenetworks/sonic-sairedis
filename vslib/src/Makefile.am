@@ -16,6 +16,7 @@ libsaivs_la_SOURCES = \
 					  RealObjectIdManager.cpp \
 					  VirtualSwitchSaiInterface.cpp \
 					  SaiAttrWrap.cpp \
+					  SelectableFd.cpp \
 					  sai_vs_fdb.cpp \
 					  sai_vs_hostintf.cpp \
 					  sai_vs_interfacequery.cpp \
