@@ -412,12 +412,12 @@ void processFdbEntriesForAging()
 
         attr.id = SAI_SWITCH_ATTR_FDB_AGING_TIME;
 
-        sai_status_t status = vs_generic_get(SAI_OBJECT_TYPE_SWITCH, it->fdb_entry.switch_id, 1, &attr);
+        sai_status_t status = vs_generic_get(SAI_OBJECT_TYPE_SWITCH, it->getFdbEntry().switch_id, 1, &attr);
 
         if (status != SAI_STATUS_SUCCESS)
         {
             SWSS_LOG_WARN("failed to get FDB aging time for switch %s",
-                    sai_serialize_object_id(it->fdb_entry.switch_id).c_str());
+                    sai_serialize_object_id(it->getFdbEntry().switch_id).c_str());
 
             ++it;
             continue;
@@ -432,9 +432,9 @@ void processFdbEntriesForAging()
             continue;
         }
 
-        if ((current - it->timestamp) >= aging_time)
+        if ((current - it->getTimestamp()) >= aging_time)
         {
-            fdb_info_t fi = *it;
+            FdbInfo fi = *it;
 
             processFdbInfo(fi, SAI_FDB_EVENT_AGED);
 

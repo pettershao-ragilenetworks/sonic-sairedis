@@ -24,12 +24,7 @@
 #include <net/if_arp.h>
 #include <linux/if_ether.h>
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow"
-#include "swss/json.hpp"
-#pragma GCC diagnostic pop
-
-using json = nlohmann::json;
+using namespace saivs;
 
 class SelectableFd :
     public swss::Selectable
@@ -125,44 +120,7 @@ typedef struct _hostif_info_t
 // since interface names can be the same in each switch
 std::map<std::string, std::shared_ptr<hostif_info_t>> hostif_info_map;
 
-std::set<fdb_info_t> g_fdb_info_set;
-
-std::string sai_vs_serialize_fdb_info(
-        _In_ const fdb_info_t& fi)
-{
-    SWSS_LOG_ENTER();
-
-    json j;
-
-    j["port_id"] = sai_serialize_object_id(fi.port_id);
-    j["vlan_id"] = sai_serialize_vlan_id(fi.vlan_id);
-    j["bridge_port_id"] = sai_serialize_object_id(fi.bridge_port_id);
-    j["fdb_entry"] = sai_serialize_fdb_entry(fi.fdb_entry);
-    j["timestamp"] = sai_serialize_number(fi.timestamp);
-
-    SWSS_LOG_INFO("item: %s", j.dump().c_str());
-
-    return j.dump();
-}
-
-void sai_vs_deserialize_fdb_info(
-        _In_ const std::string& data,
-        _Out_ fdb_info_t& fi)
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_INFO("item: %s", data.c_str());
-
-    const json& j = json::parse(data);
-
-    memset(&fi, 0, sizeof(fi));
-
-    sai_deserialize_object_id(j["port_id"], fi.port_id);
-    sai_deserialize_vlan_id(j["vlan_id"], fi.vlan_id);
-    sai_deserialize_object_id(j["bridge_port_id"], fi.bridge_port_id);
-    sai_deserialize_fdb_entry(j["fdb_entry"], fi.fdb_entry);
-    sai_deserialize_number(j["timestamp"], fi.timestamp);
-}
+std::set<FdbInfo> g_fdb_info_set;
 
 void updateLocalDB(
         _In_ const sai_fdb_event_notification_data_t &data,
@@ -209,7 +167,7 @@ void updateLocalDB(
 }
 
 void processFdbInfo(
-        _In_ const fdb_info_t &fi,
+        _In_ const FdbInfo &fi,
         _In_ sai_fdb_event_t fdb_event)
 {
     SWSS_LOG_ENTER();
@@ -220,13 +178,13 @@ void processFdbInfo(
     attrs[0].value.s32 = SAI_FDB_ENTRY_TYPE_DYNAMIC;
 
     attrs[1].id = SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID;
-    attrs[1].value.oid = fi.bridge_port_id;
+    attrs[1].value.oid = fi.getBridgePortId();
 
     sai_fdb_event_notification_data_t data;
 
     data.event_type = fdb_event;
 
-    data.fdb_entry = fi.fdb_entry;
+    data.fdb_entry = fi.getFdbEntry();
 
     data.attr_count = 2;
     data.attr = attrs;
@@ -686,14 +644,15 @@ void hostif_info_t::process_packet_for_fdb_event(
 
     // we have vlan and mac address which is KEY, so just see if that is already defined
 
-    fdb_info_t fi;
+    FdbInfo fi;
 
-    fi.port_id = (lag_id != SAI_NULL_OBJECT_ID) ? lag_id : portid;
-    fi.vlan_id = vlan_id;
+    fi.setPortId((lag_id != SAI_NULL_OBJECT_ID) ? lag_id : portid);
 
-    memcpy(fi.fdb_entry.mac_address, eh->h_source, sizeof(sai_mac_t));
+    fi.setVlanId(vlan_id);
 
-    std::set<fdb_info_t>::iterator it = g_fdb_info_set.find(fi);
+    memcpy(fi.m_fdbEntry.mac_address, eh->h_source, sizeof(sai_mac_t));
+
+    std::set<FdbInfo>::iterator it = g_fdb_info_set.find(fi);
 
     if (it != g_fdb_info_set.end())
     {
@@ -702,7 +661,7 @@ void hostif_info_t::process_packet_for_fdb_event(
 
         fi = *it;
 
-        fi.timestamp = frametime;
+        fi.setTimestamp(frametime);
 
         g_fdb_info_set.insert(fi);
 
@@ -711,23 +670,24 @@ void hostif_info_t::process_packet_for_fdb_event(
 
     // key was not found, get additional information
 
-    fi.timestamp = frametime;
-    fi.fdb_entry.switch_id = sai_switch_id_query(portid);
+    fi.setTimestamp(frametime);
 
-    findBridgeVlanForPortVlan(portid, vlan_id, fi.fdb_entry.bv_id, fi.bridge_port_id);
+    fi.m_fdbEntry.switch_id = sai_switch_id_query(portid);
 
-    if (fi.fdb_entry.bv_id == SAI_NULL_OBJECT_ID)
+    findBridgeVlanForPortVlan(portid, vlan_id, fi.m_fdbEntry.bv_id, fi.m_bridgePortId);
+
+    if (fi.getFdbEntry().bv_id == SAI_NULL_OBJECT_ID)
     {
         SWSS_LOG_WARN("skipping mac learn for %s, since BV_ID was not found for mac",
-                sai_serialize_fdb_entry(fi.fdb_entry).c_str());
+                sai_serialize_fdb_entry(fi.getFdbEntry()).c_str());
 
         // bridge was not found, skip mac learning
         return;
     }
 
     SWSS_LOG_INFO("inserting to fdb_info set: %s, vid: %d",
-            sai_serialize_fdb_entry(fi.fdb_entry).c_str(),
-            fi.vlan_id);
+            sai_serialize_fdb_entry(fi.getFdbEntry()).c_str(),
+            fi.getVlanId());
 
     g_fdb_info_set.insert(fi);
 

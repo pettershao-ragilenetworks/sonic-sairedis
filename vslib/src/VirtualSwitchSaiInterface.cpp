@@ -133,9 +133,7 @@ static std::shared_ptr<SwitchState> vs_read_switch_database_for_warm_restart(
 
             if (g_vs_hostif_use_tap_device)
             {
-                fdb_info_t fi;
-
-                sai_vs_deserialize_fdb_info(str_object_id, fi);
+                FdbInfo fi = FdbInfo::deserialize(str_object_id);
 
                 g_fdb_info_set.insert(fi);
             }
@@ -720,7 +718,7 @@ static void vs_dump_switch_database_for_warm_restart(
 
         for (auto fi: g_fdb_info_set)
         {
-            dumpFile << SAI_VS_FDB_INFO << " " << sai_vs_serialize_fdb_info(fi) << std::endl;
+            dumpFile << SAI_VS_FDB_INFO << " " << fi.serialize() << std::endl;
         }
 
         SWSS_LOG_NOTICE("dumped %zu fdb infos", g_fdb_info_set.size());

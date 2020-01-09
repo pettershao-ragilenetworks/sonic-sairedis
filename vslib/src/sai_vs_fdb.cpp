@@ -2,6 +2,8 @@
 #include "sai_vs_state.h"
 #include "sai_vs_internal.h"
 
+using namespace saivs;
+
 bool doesFdbEntryNotMatchFlushAttr(
         _In_ const std::string &str_fdb_entry,
         _In_ AttrHash &fdb_attrs,
@@ -133,36 +135,36 @@ sai_status_t internal_vs_flush_fdb_entries(
 
             // update fdb info set
 
-            fdb_info_t fi;
-
-            // will set vlan to 0, we need to recreate that information
-            memset(&fi, 0, sizeof(fi));
+            FdbInfo fi;
 
             // If fdb entry has bv_id set to vlan object type then we can try to get vlan number from
             // that object and populate vlan_id in fdb_info. If bv_id is bridge object type then vlan
             // must be zero, since there can be only 1 (assuming) mac address on a given bridge.
 
-            sai_deserialize_fdb_entry(it->first, fi.fdb_entry);
+            sai_fdb_entry_t fdb_entry;
+            sai_deserialize_fdb_entry(it->first, fdb_entry);
 
-            if (g_realObjectIdManager->saiObjectTypeQuery(fi.fdb_entry.bv_id) == SAI_OBJECT_TYPE_VLAN)
+            fi.setFdbEntry(fdb_entry);
+
+            if (g_realObjectIdManager->saiObjectTypeQuery(fdb_entry.bv_id) == SAI_OBJECT_TYPE_VLAN)
             {
                 sai_attribute_t attr;
 
                 attr.id = SAI_VLAN_ATTR_VLAN_ID;
 
-                sai_status_t status = vs_generic_get(SAI_OBJECT_TYPE_VLAN, fi.fdb_entry.bv_id, 1, &attr);
+                sai_status_t status = vs_generic_get(SAI_OBJECT_TYPE_VLAN, fdb_entry.bv_id, 1, &attr);
 
                 if (status != SAI_STATUS_SUCCESS)
                 {
                     SWSS_LOG_ERROR("failed to get vlan_id for vlan object: %s",
-                            sai_serialize_object_id(fi.fdb_entry.bv_id).c_str());
+                            sai_serialize_object_id(fdb_entry.bv_id).c_str());
 
                     return SAI_STATUS_FAILURE;
                 }
 
                 SWSS_LOG_INFO("got vlan id %d", attr.value.u16);
 
-                fi.vlan_id = attr.value.u16;
+                fi.setVlanId(attr.value.u16);
             }
 
             auto fit = g_fdb_info_set.find(fi);
