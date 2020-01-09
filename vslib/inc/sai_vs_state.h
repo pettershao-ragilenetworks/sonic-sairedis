@@ -8,6 +8,7 @@
 
 #include "RealObjectIdManager.h"
 #include "FdbInfo.h"
+#include "SaiAttrWrap.h"
 
 #include <unordered_map>
 #include <string>
@@ -20,83 +21,10 @@
             { return s; }               \
     }
 
-// TODO unify wrapper and add to common
-class SaiAttrWrap
-{
-    public:
-
-        SaiAttrWrap(
-                _In_ sai_object_type_t object_type,
-                _In_ const sai_attribute_t *attr)
-        {
-            SWSS_LOG_ENTER();
-
-            m_meta = sai_metadata_get_attr_metadata(object_type, attr->id);
-
-            m_attr.id = attr->id;
-
-            /*
-             * We are making serialize and deserialize to get copy of
-             * attribute, it may be a list so we need to allocate new memory.
-             *
-             * This copy will be used later to get previous value of attribute
-             * if attribute will be updated. And if this attribute is oid list
-             * then we need to release object reference count.
-             */
-
-            m_value = sai_serialize_attr_value(*m_meta, *attr, false);
-
-            sai_deserialize_attr_value(m_value, *m_meta, m_attr, false);
-        }
-
-        ~SaiAttrWrap()
-        {
-            SWSS_LOG_ENTER();
-
-            /*
-             * On destructor we need to call free to deallocate possible
-             * allocated list on constructor.
-             */
-
-            sai_deserialize_free_attribute_value(m_meta->attrvaluetype, m_attr);
-        }
-
-        const sai_attribute_t* getAttr() const
-        {
-            SWSS_LOG_ENTER();
-
-            return &m_attr;
-        }
-
-        const sai_attr_metadata_t* getAttrMetadata() const
-        {
-            SWSS_LOG_ENTER();
-
-            return m_meta;
-        }
-
-        const std::string& getAttrStrValue() const
-        {
-            SWSS_LOG_ENTER();
-
-            return m_value;
-        }
-
-    private:
-
-        SaiAttrWrap(const SaiAttrWrap&);
-        SaiAttrWrap& operator=(const SaiAttrWrap&);
-
-        const sai_attr_metadata_t *m_meta;
-        sai_attribute_t m_attr;
-
-        std::string m_value;
-};
-
 /**
  * @brief AttrHash key is attribute ID, value is actual attribute
  */
-typedef std::map<std::string, std::shared_ptr<SaiAttrWrap>> AttrHash;
+typedef std::map<std::string, std::shared_ptr<saivs::SaiAttrWrap>> AttrHash;
 
 /**
  * @brief ObjectHash is map indexed by object type and then serialized object id.

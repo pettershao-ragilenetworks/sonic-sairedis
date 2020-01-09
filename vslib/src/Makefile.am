@@ -9,6 +9,21 @@ endif
 lib_LTLIBRARIES = libsaivs.la
 
 libsaivs_la_SOURCES = \
+					  Globals.cpp \
+					  Switch.cpp \
+					  FdbInfo.cpp \
+					  SwitchContainer.cpp \
+					  RealObjectIdManager.cpp \
+					  VirtualSwitchSaiInterface.cpp \
+					  SaiAttrWrap.cpp \
+					  sai_vs_fdb.cpp \
+					  sai_vs_hostintf.cpp \
+					  sai_vs_interfacequery.cpp \
+					  sai_vs_port.cpp \
+					  sai_vs_switch_BCM56850.cpp \
+					  sai_vs_switch.cpp \
+					  sai_vs_switch_MLNX2700.cpp \
+					  sai_vs_debug_counter.cpp\
 					  sai_vs_generic_create.cpp \
 					  sai_vs_generic_get.cpp \
 					  sai_vs_generic_remove.cpp \
@@ -20,12 +35,8 @@ libsaivs_la_SOURCES = \
 					  sai_vs_buffer.cpp \
 					  sai_vs_counter.cpp \
 					  sai_vs.cpp \
-					  sai_vs_debug_counter.cpp\
 					  sai_vs_dtel.cpp \
-					  sai_vs_fdb.cpp \
 					  sai_vs_hash.cpp \
-					  sai_vs_hostintf.cpp \
-					  sai_vs_interfacequery.cpp \
 					  sai_vs_ipmc.cpp \
 					  sai_vs_ipmc_group.cpp \
 					  sai_vs_isolation_group.cpp \
@@ -40,7 +51,6 @@ libsaivs_la_SOURCES = \
 					  sai_vs_nexthop.cpp \
 					  sai_vs_nexthopgroup.cpp \
 					  sai_vs_policer.cpp \
-					  sai_vs_port.cpp \
 					  sai_vs_qosmaps.cpp \
 					  sai_vs_queue.cpp \
 					  sai_vs_route.cpp \
@@ -51,20 +61,12 @@ libsaivs_la_SOURCES = \
 					  sai_vs_schedulergroup.cpp \
 					  sai_vs_segmentroute.cpp \
 					  sai_vs_stp.cpp \
-					  sai_vs_switch_BCM56850.cpp \
-					  sai_vs_switch.cpp \
-					  sai_vs_switch_MLNX2700.cpp \
 					  sai_vs_tam.cpp \
 					  sai_vs_tunnel.cpp \
 					  sai_vs_udf.cpp \
 					  sai_vs_virtual_router.cpp \
 					  sai_vs_vlan.cpp \
-					  sai_vs_wred.cpp \
-					  Globals.cpp \
-					  Switch.cpp \
-					  SwitchContainer.cpp \
-					  RealObjectIdManager.cpp \
-					  VirtualSwitchSaiInterface.cpp
+					  sai_vs_wred.cpp
 
 libsaivs_la_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON)
 libsaivs_la_LIBADD = -lhiredis -lswsscommon
