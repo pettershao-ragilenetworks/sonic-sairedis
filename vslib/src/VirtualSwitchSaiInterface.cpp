@@ -101,7 +101,7 @@ sai_status_t VirtualSwitchSaiInterface::get(
 
 
 #define DECLARE_REMOVE_ENTRY(OT,ot)                             \
-sai_status_t VirtualSwitchSaiInterface::remove(                   \
+sai_status_t VirtualSwitchSaiInterface::remove(                 \
         _In_ const sai_ ## ot ## _t* ot)                        \
 {                                                               \
     SWSS_LOG_ENTER();                                           \
@@ -120,7 +120,7 @@ DECLARE_REMOVE_ENTRY(ROUTE_ENTRY,route_entry);
 DECLARE_REMOVE_ENTRY(NAT_ENTRY,nat_entry);
 
 #define DECLARE_CREATE_ENTRY(OT,ot)                             \
-sai_status_t VirtualSwitchSaiInterface::create(                   \
+sai_status_t VirtualSwitchSaiInterface::create(                 \
         _In_ const sai_ ## ot ## _t* ot,                        \
         _In_ uint32_t attr_count,                               \
         _In_ const sai_attribute_t *attr_list)                  \
@@ -143,7 +143,7 @@ DECLARE_CREATE_ENTRY(ROUTE_ENTRY,route_entry);
 DECLARE_CREATE_ENTRY(NAT_ENTRY,nat_entry);
 
 #define DECLARE_SET_ENTRY(OT,ot)                                \
-sai_status_t VirtualSwitchSaiInterface::set(                      \
+sai_status_t VirtualSwitchSaiInterface::set(                    \
         _In_ const sai_ ## ot ## _t* ot,                        \
         _In_ const sai_attribute_t *attr)                       \
 {                                                               \
@@ -205,7 +205,7 @@ sai_status_t VirtualSwitchSaiInterface::get(
 }
 
 #define DECLARE_GET_ENTRY(OT,ot)                                \
-sai_status_t VirtualSwitchSaiInterface::get(                      \
+sai_status_t VirtualSwitchSaiInterface::get(                    \
         _In_ const sai_ ## ot ## _t* ot,                        \
         _In_ uint32_t attr_count,                               \
         _Inout_ sai_attribute_t *attr_list)                     \
@@ -324,7 +324,7 @@ sai_status_t VirtualSwitchSaiInterface::getStats(
             counters);
 }
 
-sai_status_t internal_vs_generic_stats_function(
+static sai_status_t internal_vs_generic_stats_function(
         _In_ sai_object_type_t obejct_type,
         _In_ sai_object_id_t object_id,
         _In_ sai_object_id_t switch_id,
