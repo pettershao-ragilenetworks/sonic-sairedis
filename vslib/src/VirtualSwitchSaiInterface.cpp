@@ -246,7 +246,18 @@ sai_status_t VirtualSwitchSaiInterface::objectTypeGetAvailability(
 {
     SWSS_LOG_ENTER();
 
-    throw; // TODO
+    // TODO: We should generate this metadata for the virtual switch rather
+    // than hard-coding it here.
+    //
+    // TODO what about attribute list?
+
+    if (objectType == SAI_OBJECT_TYPE_DEBUG_COUNTER)
+    {
+        *count = 3;
+        return SAI_STATUS_SUCCESS;
+    }
+
+    return SAI_STATUS_NOT_SUPPORTED;
 }
 
 sai_status_t VirtualSwitchSaiInterface::queryAattributeEnumValuesCapability(

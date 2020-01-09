@@ -957,14 +957,12 @@ sai_status_t sai_object_type_get_availability(
 {
     SWSS_LOG_ENTER();
 
-    // TODO: We should generate this metadata for the virtual switch rather than hard-coding it here.
-    if (object_type == SAI_OBJECT_TYPE_DEBUG_COUNTER)
-    {
-        *count = 3;
-        return SAI_STATUS_SUCCESS;
-    }
-
-    return SAI_STATUS_NOT_SUPPORTED;
+    return g_vs->objectTypeGetAvailability(
+            switch_id,
+            object_type,
+            attr_count,
+            attr_list,
+            count);
 }
 
 sai_object_type_t sai_object_type_query(
