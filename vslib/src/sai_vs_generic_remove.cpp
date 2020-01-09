@@ -1,6 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_state.h"
-
 
 sai_status_t vs_generic_remove(
         _In_ sai_object_type_t object_type,

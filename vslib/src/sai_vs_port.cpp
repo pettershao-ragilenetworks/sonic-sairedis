@@ -1,6 +1,5 @@
 #include "sai_vs.h"
 #include "sai_vs_internal.h"
-#include "sai_vs_state.h"
 #include "sai_vs_switch_BCM56850.h"
 #include "sai_vs_switch_MLNX2700.h"
 

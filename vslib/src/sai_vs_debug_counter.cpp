@@ -1,6 +1,6 @@
 #include "sai_vs.h"
 #include "sai_vs_internal.h"
-#include "sai_vs_state.h"
+
 #include <unordered_set>
 
 const int maxDebugCounters = 32;
@@ -42,7 +42,7 @@ sai_status_t vs_create_debug_counter(
     }
 
     CHECK_STATUS(meta_sai_create_oid(
-            static_cast<sai_object_type_t>(SAI_OBJECT_TYPE_DEBUG_COUNTER),
+            SAI_OBJECT_TYPE_DEBUG_COUNTER,
             debug_counter_id,
             switch_id,
             attr_count,
@@ -77,6 +77,7 @@ sai_status_t vs_remove_debug_counter(
     return SAI_STATUS_SUCCESS;
 }
 
+//REDIS_GENERIC_QUAD(DEBUG_COUNTER,debug_counter);
 VS_GET(DEBUG_COUNTER,debug_counter);
 VS_SET(DEBUG_COUNTER,debug_counter);
 

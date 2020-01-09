@@ -1,7 +1,6 @@
 #include "saivs.h"
 #include "sai_vs.h"
 #include "sai_vs_internal.h"
-#include "sai_vs_state.h"
 #include "swss/selectableevent.h"
 #include "swss/select.h"
 

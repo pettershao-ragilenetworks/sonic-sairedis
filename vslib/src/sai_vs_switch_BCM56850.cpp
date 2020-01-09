@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_state.h"
 #include <net/if.h>
 #include <algorithm>
 
