@@ -40,6 +40,7 @@ std::vector<std::vector<uint32_t>> g_laneMap;
 std::shared_ptr<SwitchContainer>                g_switchContainer;
 std::shared_ptr<RealObjectIdManager>            g_realObjectIdManager;
 std::shared_ptr<VirtualSwitchSaiInterface>      g_vs;
+std::shared_ptr<saimeta::Meta>                  g_meta;
 
 const char *g_boot_type             = NULL;
 const char *g_warm_boot_read_file   = NULL;
@@ -485,6 +486,8 @@ void clear_local_state()
     meta_init_db();
 
     g_vs = std::make_shared<VirtualSwitchSaiInterface>();
+
+    g_meta = std::make_shared<saimeta::Meta>(g_vs);
 
     // TODO since we create new manager, we need to create new meta db with
     // updated functions for query object type and switch id

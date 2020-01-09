@@ -15,6 +15,8 @@ extern "C" {
 #include "RealObjectIdManager.h"
 #include "VirtualSwitchSaiInterface.h"
 
+#include "meta/Meta.h"
+
 #include <mutex>
 
 #define SAI_VS_MAX_PORTS 1024
@@ -64,6 +66,7 @@ extern void getPortLaneMap(
 extern std::shared_ptr<saivs::SwitchContainer>           g_switchContainer;
 extern std::shared_ptr<saivs::RealObjectIdManager>       g_realObjectIdManager;
 extern std::shared_ptr<saivs::VirtualSwitchSaiInterface> g_vs;
+extern std::shared_ptr<saimeta::Meta>                    g_meta;
 
 extern const sai_acl_api_t              vs_acl_api;
 extern const sai_bfd_api_t              vs_bfd_api;
