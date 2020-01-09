@@ -973,6 +973,7 @@ sai_object_type_t sai_object_type_query(
     if (!Globals::apiInitialized)
     {
         SWSS_LOG_ERROR("SAI API not initialized before calling sai_object_type_query");
+
         return SAI_OBJECT_TYPE_NULL;
     }
 
@@ -987,7 +988,8 @@ sai_object_id_t sai_switch_id_query(
     if (!Globals::apiInitialized)
     {
         SWSS_LOG_ERROR("SAI API not initialized before calling sai_switch_id_query");
-        return SAI_OBJECT_TYPE_NULL;
+
+        return SAI_NULL_OBJECT_ID;
     }
 
     return g_vs->switchIdQuery(objectId);
