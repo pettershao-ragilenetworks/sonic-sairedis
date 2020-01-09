@@ -150,10 +150,9 @@
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
-        return vs_generic_get_stats(                                \
+        return g_vs->getStats(                                      \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
-                &sai_metadata_enum_sai_ ## object_type ## _stat_t,  \
                 number_of_counters,                                 \
                 counter_ids,                                        \
                 counters);                                          \
@@ -169,10 +168,9 @@
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
-        return vs_generic_get_stats_ext(                            \
+        return g_vs->getStatsExt(                                   \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
-                &sai_metadata_enum_sai_ ## object_type ## _stat_t,  \
                 number_of_counters,                                 \
                 counter_ids,                                        \
                 mode,                                               \
@@ -187,10 +185,9 @@
     {                                                               \
         MUTEX();                                                    \
         SWSS_LOG_ENTER();                                           \
-        return vs_generic_clear_stats(                              \
+        return g_vs->clearStats(                                    \
                 (sai_object_type_t)SAI_OBJECT_TYPE_ ## OBJECT_TYPE, \
                 object_type ## _id,                                 \
-                &sai_metadata_enum_sai_ ## object_type ## _stat_t,  \
                 number_of_counters,                                 \
                 counter_ids);                                       \
     }
