@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "SwitchStateBase.h"
+#include "SwitchBCM56850.h"
 
 using namespace saivs;
 
@@ -15,70 +16,6 @@ using namespace saivs;
  */
 
 static std::shared_ptr<SwitchStateBase> ss;
-
-static sai_status_t create_qos_queues_per_port(
-        _In_ sai_object_id_t switch_object_id,
-        _In_ sai_object_id_t port_id)
-{
-    SWSS_LOG_ENTER();
-
-    sai_attribute_t attr;
-
-    // 10 in and 10 out queues per port
-    const uint32_t port_qos_queues_count = 20;
-
-    std::vector<sai_object_id_t> queues;
-
-    for (uint32_t i = 0; i < port_qos_queues_count; ++i)
-    {
-        sai_object_id_t queue_id;
-
-        CHECK_STATUS(vs_generic_create(SAI_OBJECT_TYPE_QUEUE, &queue_id, switch_object_id, 0, NULL));
-
-        queues.push_back(queue_id);
-
-        attr.id = SAI_QUEUE_ATTR_TYPE;
-        attr.value.s32 = (i < port_qos_queues_count / 2) ?  SAI_QUEUE_TYPE_UNICAST : SAI_QUEUE_TYPE_MULTICAST;
-
-        CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_QUEUE, queue_id, &attr));
-
-        attr.id = SAI_QUEUE_ATTR_INDEX;
-        attr.value.u8 = (uint8_t)i;
-
-        CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_QUEUE, queue_id, &attr));
-    }
-
-    attr.id = SAI_PORT_ATTR_QOS_NUMBER_OF_QUEUES;
-    attr.value.u32 = port_qos_queues_count;
-
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
-
-    attr.id = SAI_PORT_ATTR_QOS_QUEUE_LIST;
-    attr.value.objlist.count = port_qos_queues_count;
-    attr.value.objlist.list = queues.data();
-
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
-
-    return SAI_STATUS_SUCCESS;
-}
-
-static sai_status_t create_qos_queues()
-{
-    SWSS_LOG_ENTER();
-
-    // TODO queues size may change when we will modify queue or ports
-
-    SWSS_LOG_INFO("create qos queues");
-
-    sai_object_id_t switch_object_id = ss->getSwitchId();
-
-    for (auto &port_id : ss->m_port_list)
-    {
-        CHECK_STATUS(create_qos_queues_per_port(switch_object_id, port_id));
-    }
-
-    return SAI_STATUS_SUCCESS;
-}
 
 static sai_status_t create_scheduler_group_tree(
         _In_ const std::vector<sai_object_id_t>& sgs,
@@ -371,7 +308,7 @@ static sai_status_t initialize_default_objects()
     CHECK_STATUS(ss->set_acl_entry_min_prio());
     CHECK_STATUS(ss->set_acl_capabilities());
     CHECK_STATUS(ss->create_ingress_priority_groups());
-    CHECK_STATUS(create_qos_queues());
+    CHECK_STATUS(ss->create_qos_queues());
     CHECK_STATUS(set_maximum_number_of_childs_per_scheduler_group());
     CHECK_STATUS(set_number_of_ecmp_groups());
     CHECK_STATUS(ss->set_switch_default_attributes());
@@ -429,6 +366,7 @@ void init_switch_BCM56850(
     {
         g_switch_state_map[switch_id] = warmBootState;
 
+        // TODO cast right switch or different data pass
         ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
 
         warm_boot_initialize_objects();
@@ -443,7 +381,7 @@ void init_switch_BCM56850(
         SWSS_LOG_THROW("switch already exists 0x%lx", switch_id);
     }
 
-    g_switch_state_map[switch_id] = std::make_shared<SwitchStateBase>(switch_id);
+    g_switch_state_map[switch_id] = std::make_shared<SwitchBCM56850>(switch_id);
 
     ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
 
@@ -912,9 +850,7 @@ sai_status_t vs_create_port_BCM56850(
     // attributes are not required since they will be set outside this function
 
     CHECK_STATUS(ss->create_ingress_priority_groups_per_port(switch_id, port_id));
-
-    CHECK_STATUS(create_qos_queues_per_port(switch_id, port_id));
-
+    CHECK_STATUS(ss->create_qos_queues_per_port(switch_id, port_id));
     CHECK_STATUS(create_scheduler_groups_per_port(switch_id, port_id));
 
     // TODO should bridge ports should also be created when new port is created?

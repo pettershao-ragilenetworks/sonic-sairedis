@@ -506,4 +506,26 @@ sai_status_t SwitchStateBase::set_acl_capabilities()
     return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
 }
 
+sai_status_t SwitchStateBase::create_qos_queues_per_port(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_object_id_t port_id)
+{
+    SWSS_LOG_ENTER();
 
+    // TODO this method can be abstract, FIXME
+
+    SWSS_LOG_ERROR("implement in child class");
+
+    return SAI_STATUS_NOT_IMPLEMENTED;
+}
+
+sai_status_t SwitchStateBase::create_qos_queues()
+{
+    SWSS_LOG_ENTER();
+
+    // TODO this method can be abstract, FIXME
+
+    SWSS_LOG_ERROR("implement in child class");
+
+    return SAI_STATUS_NOT_IMPLEMENTED;
+}

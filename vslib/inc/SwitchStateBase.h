@@ -51,6 +51,12 @@ namespace saivs
 
             virtual sai_status_t set_acl_capabilities();
 
+            virtual sai_status_t create_qos_queues_per_port(
+                    _In_ sai_object_id_t switch_object_id,
+                    _In_ sai_object_id_t port_id);
+
+            virtual sai_status_t create_qos_queues();
+
         protected:
 
             virtual sai_status_t create(
@@ -65,7 +71,7 @@ namespace saivs
                     _In_ sai_object_id_t objectId,
                     _In_ const sai_attribute_t* attr);
 
-        public: // TODO to proctected
+        public: // TODO to protected
 
             std::vector<sai_object_id_t> m_port_list;
             std::vector<sai_object_id_t> m_bridge_port_list_port_based;

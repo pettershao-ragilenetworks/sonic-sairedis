@@ -9,6 +9,8 @@ endif
 lib_LTLIBRARIES = libsaivs.la
 
 libsaivs_la_SOURCES = \
+					  SwitchBCM56850.cpp \
+					  SwitchMLNX2700.cpp \
 					  SwitchStateBase.cpp \
 					  sai_vs_switch_BCM56850.cpp \
 					  sai_vs_switch_MLNX2700.cpp \
