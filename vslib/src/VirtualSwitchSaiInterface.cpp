@@ -876,46 +876,6 @@ sai_status_t VirtualSwitchSaiInterface::remove(
     return status;
 }
 
-static sai_status_t internal_vs_generic_set(
-        _In_ sai_object_type_t object_type,
-        _In_ const std::string &serializedObjectId,
-        _In_ sai_object_id_t switch_id,
-        _In_ const sai_attribute_t *attr)
-{
-    SWSS_LOG_ENTER();
-
-    if (g_switch_state_map.size() == 1)
-    {
-        switch_id = g_switch_state_map.begin()->first;
-    }
-    else
-    {
-        SWSS_LOG_THROW("multiple switches not supported, FIXME");
-    }
-
-    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(object_type);
-
-    auto it = objectHash.find(serializedObjectId);
-
-    if (it == objectHash.end())
-    {
-        SWSS_LOG_ERROR("not found %s:%s",
-                sai_serialize_object_type(object_type).c_str(),
-                serializedObjectId.c_str());
-
-        return SAI_STATUS_ITEM_NOT_FOUND;
-    }
-
-    auto &attrHash = it->second;
-
-    auto a = std::make_shared<SaiAttrWrap>(object_type, attr);
-
-    // set have only one attribute
-    attrHash[a->getAttrMetadata()->attridname] = a;
-
-    return SAI_STATUS_SUCCESS;
-}
-
 sai_status_t VirtualSwitchSaiInterface::set(
         _In_ sai_object_type_t objectType,
         _In_ const std::string &serializedObjectId,
@@ -928,11 +888,19 @@ sai_status_t VirtualSwitchSaiInterface::set(
 
     sai_object_id_t switch_id = SAI_NULL_OBJECT_ID; // sai_switch_id_query(object_id);
 
-    return internal_vs_generic_set(
-            objectType,
-            serializedObjectId,
-            switch_id,
-            attr);
+    if (g_switch_state_map.size() == 1)
+    {
+        switch_id = g_switch_state_map.begin()->first;
+    }
+    else
+    {
+        SWSS_LOG_THROW("multiple switches not supported, FIXME");
+    }
+
+    // TODO remove cast
+    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
+
+    return ss->set(objectType, serializedObjectId, attr);
 }
 
 static sai_status_t refresh_read_only(

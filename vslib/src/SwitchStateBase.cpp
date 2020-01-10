@@ -31,12 +31,42 @@ sai_status_t SwitchStateBase::create(
 
 sai_status_t SwitchStateBase::set(
         _In_ sai_object_type_t objectType,
+        _In_ const std::string &serializedObjectId,
+        _In_ const sai_attribute_t* attr)
+{
+    SWSS_LOG_ENTER();
+
+    auto it = m_objectHash.at(objectType).find(serializedObjectId);
+
+    if (it == m_objectHash.at(objectType).end())
+    {
+        SWSS_LOG_ERROR("not found %s:%s",
+                sai_serialize_object_type(objectType).c_str(),
+                serializedObjectId.c_str());
+
+        return SAI_STATUS_ITEM_NOT_FOUND;
+    }
+
+    auto &attrHash = it->second;
+
+    auto a = std::make_shared<SaiAttrWrap>(objectType, attr);
+
+    // set have only one attribute
+    attrHash[a->getAttrMetadata()->attridname] = a;
+
+    return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t SwitchStateBase::set(
+        _In_ sai_object_type_t objectType,
         _In_ sai_object_id_t objectId,
         _In_ const sai_attribute_t* attr)
 {
     SWSS_LOG_ENTER();
 
-    return vs_generic_set(objectType, objectId, attr);
+    auto sid = sai_serialize_object_id(objectId);
+
+    return set(objectType, sid, attr);
 }
 
 sai_status_t SwitchStateBase::get(
