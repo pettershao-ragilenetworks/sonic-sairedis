@@ -79,6 +79,11 @@ namespace saivs
                     _In_ sai_object_id_t port_id,
                     _In_ sai_object_id_t switch_id);
 
+            virtual sai_status_t refresh_bridge_port_list(
+                    _In_ const sai_attr_metadata_t *meta,
+                    _In_ sai_object_id_t bridge_id,
+                    _In_ sai_object_id_t switch_id);
+
             virtual sai_status_t warm_boot_initialize_objects();
 
         public: // TODO should be pure

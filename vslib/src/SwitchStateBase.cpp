@@ -755,3 +755,16 @@ sai_status_t SwitchStateBase::warm_boot_initialize_objects()
     return SAI_STATUS_SUCCESS;
 }
 
+sai_status_t SwitchStateBase::refresh_bridge_port_list(
+        _In_ const sai_attr_metadata_t *meta,
+        _In_ sai_object_id_t bridge_id,
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO this method can be abstract, FIXME
+
+    SWSS_LOG_ERROR("implement in child class");
+
+    return SAI_STATUS_NOT_IMPLEMENTED;
+}

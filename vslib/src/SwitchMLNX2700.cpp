@@ -259,3 +259,104 @@ sai_status_t SwitchMLNX2700::set_maximum_number_of_childs_per_scheduler_group()
     return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
 }
 
+sai_status_t SwitchMLNX2700::refresh_bridge_port_list(
+        _In_ const sai_attr_metadata_t *meta,
+        _In_ sai_object_id_t bridge_id,
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    /*
+     * TODO possible issues with vxlan and lag.
+     */
+
+    auto &all_bridge_ports = m_objectHash.at(SAI_OBJECT_TYPE_BRIDGE_PORT);
+
+    sai_attribute_t attr;
+
+    auto me_port_list = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_BRIDGE, SAI_BRIDGE_ATTR_PORT_LIST);
+    auto m_port_id = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_BRIDGE_PORT, SAI_BRIDGE_PORT_ATTR_PORT_ID);
+    auto m_bridge_id = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_BRIDGE_PORT, SAI_BRIDGE_PORT_ATTR_BRIDGE_ID);
+
+    /*
+     * First get all port's that belong to this bridge id.
+     */
+
+    std::map<sai_object_id_t, SwitchState::AttrHash> bridge_port_list_on_bridge_id;
+
+    for (const auto &bp: all_bridge_ports)
+    {
+        auto it = bp.second.find(m_bridge_id->attridname);
+
+        if (it == bp.second.end())
+        {
+            continue;
+        }
+
+        if (bridge_id == it->second->getAttr()->value.oid)
+        {
+            /*
+             * This bridge port belongs to currently processing bridge ID.
+             */
+
+            sai_object_id_t bridge_port;
+
+            sai_deserialize_object_id(bp.first, bridge_port);
+
+            bridge_port_list_on_bridge_id[bridge_port] = bp.second;
+        }
+    }
+
+    /*
+     * Now sort those bridge port id's by port id to be consistent.
+     */
+
+    std::vector<sai_object_id_t> bridge_port_list;
+
+    for (const auto &p: m_port_list)
+    {
+        for (const auto &bp: bridge_port_list_on_bridge_id)
+        {
+            auto it = bp.second.find(m_port_id->attridname);
+
+            if (it == bp.second.end())
+            {
+                SWSS_LOG_THROW("bridge port is missing %s, not supported yet, FIXME", m_port_id->attridname);
+            }
+
+            if (p == it->second->getAttr()->value.oid)
+            {
+                bridge_port_list.push_back(bp.first);
+            }
+        }
+    }
+
+    if (bridge_port_list_on_bridge_id.size() != bridge_port_list.size())
+    {
+        SWSS_LOG_THROW("filter by port id failed size on lists is different: %zu vs %zu",
+                bridge_port_list_on_bridge_id.size(),
+                bridge_port_list.size());
+    }
+
+    /* default 1q router at the end */
+
+    bridge_port_list.push_back(m_default_bridge_port_1q_router);
+
+    /*
+        SAI_BRIDGE_PORT_ATTR_BRIDGE_ID: oid:0x100100000039
+        SAI_BRIDGE_PORT_ATTR_FDB_LEARNING_MODE: SAI_BRIDGE_PORT_FDB_LEARNING_MODE_HW
+        SAI_BRIDGE_PORT_ATTR_PORT_ID: oid:0x1010000000001
+        SAI_BRIDGE_PORT_ATTR_TYPE: SAI_BRIDGE_PORT_TYPE_PORT
+    */
+
+    uint32_t bridge_port_list_count = (uint32_t)bridge_port_list.size();
+
+    SWSS_LOG_NOTICE("recalculated %s: %u", me_port_list->attridname, bridge_port_list_count);
+
+    attr.id = SAI_BRIDGE_ATTR_PORT_LIST;
+    attr.value.objlist.count = bridge_port_list_count;
+    attr.value.objlist.list = bridge_port_list.data();
+
+    return vs_generic_set(SAI_OBJECT_TYPE_BRIDGE, bridge_id, &attr);
+}
+

@@ -31,5 +31,10 @@ namespace saivs
                     _In_ sai_object_id_t port_id) override;
 
             virtual sai_status_t set_maximum_number_of_childs_per_scheduler_group() override;
+
+            virtual sai_status_t refresh_bridge_port_list(
+                    _In_ const sai_attr_metadata_t *meta,
+                    _In_ sai_object_id_t bridge_id,
+                    _In_ sai_object_id_t switch_id) override;
     };
 }
