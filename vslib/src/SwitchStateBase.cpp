@@ -134,4 +134,25 @@ sai_status_t SwitchStateBase::create_cpu_port()
     return set(SAI_OBJECT_TYPE_PORT, m_cpu_port_id, &attr);
 }
 
+sai_status_t SwitchStateBase::create_default_1q_bridge()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_INFO("create default 1q bridge");
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_BRIDGE_ATTR_TYPE;
+    attr.value.s32 = SAI_BRIDGE_TYPE_1Q;
+
+    sai_object_id_t default_1q_bridge;
+
+    CHECK_STATUS(create(SAI_OBJECT_TYPE_BRIDGE, &default_1q_bridge, m_switch_id, 1, &attr));
+
+    attr.id = SAI_SWITCH_ATTR_DEFAULT_1Q_BRIDGE_ID;
+    attr.value.oid = default_1q_bridge;
+
+    return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
+}
+
 

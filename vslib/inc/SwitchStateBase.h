@@ -25,6 +25,8 @@ namespace saivs
 
             virtual sai_status_t create_cpu_port();
 
+            virtual sai_status_t create_default_1q_bridge();
+
         protected:
 
             virtual sai_status_t create(
