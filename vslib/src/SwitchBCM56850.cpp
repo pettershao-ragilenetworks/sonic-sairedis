@@ -305,19 +305,3 @@ sai_status_t SwitchBCM56850::create_scheduler_groups_per_port(
     return SAI_STATUS_SUCCESS;
 }
 
-sai_status_t SwitchBCM56850::create_scheduler_groups()
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_INFO("create scheduler groups");
-
-    // TODO scheduler groups size may change when we will modify sg or ports
-
-    for (auto &port_id : m_port_list)
-    {
-        CHECK_STATUS(create_scheduler_groups_per_port(m_switch_id, port_id));
-    }
-
-    return SAI_STATUS_SUCCESS;
-}
-

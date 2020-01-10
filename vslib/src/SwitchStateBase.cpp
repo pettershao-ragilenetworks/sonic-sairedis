@@ -549,6 +549,7 @@ sai_status_t SwitchStateBase::create_scheduler_groups_per_port(
 {
     SWSS_LOG_ENTER();
 
+
     // TODO this method can be abstract, FIXME
 
     SWSS_LOG_ERROR("implement in child class");
@@ -560,9 +561,14 @@ sai_status_t SwitchStateBase::create_scheduler_groups()
 {
     SWSS_LOG_ENTER();
 
-    // TODO this method can be abstract, FIXME
+    SWSS_LOG_INFO("create scheduler groups");
 
-    SWSS_LOG_ERROR("implement in child class");
+    // TODO scheduler groups size may change when we will modify sg or ports
 
-    return SAI_STATUS_NOT_IMPLEMENTED;
+    for (auto &port_id : m_port_list)
+    {
+        CHECK_STATUS(create_scheduler_groups_per_port(m_switch_id, port_id));
+    }
+
+    return SAI_STATUS_SUCCESS;
 }

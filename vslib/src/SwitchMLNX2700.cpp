@@ -207,53 +207,40 @@ sai_status_t SwitchMLNX2700::create_scheduler_groups_per_port(
 {
     SWSS_LOG_ENTER();
 
-    // TODO !
-
-    return SAI_STATUS_NOT_IMPLEMENTED;
-}
-
-
-sai_status_t SwitchMLNX2700::create_scheduler_groups()
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_INFO("create scheduler groups");
-
     uint32_t port_sgs_count = 16; // mlnx default
 
-    for (const auto &port_id : m_port_list)
+    sai_attribute_t attr;
+
+    attr.id = SAI_PORT_ATTR_QOS_NUMBER_OF_SCHEDULER_GROUPS;
+    attr.value.u32 = port_sgs_count;
+
+    CHECK_STATUS(set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
+
+    // scheduler groups per port
+
+    std::vector<sai_object_id_t> sgs;
+
+    for (uint32_t i = 0; i < port_sgs_count; ++i)
     {
-        sai_attribute_t attr;
+        sai_object_id_t sg_id;
 
-        attr.id = SAI_PORT_ATTR_QOS_NUMBER_OF_SCHEDULER_GROUPS;
-        attr.value.u32 = port_sgs_count;
+        CHECK_STATUS(create(SAI_OBJECT_TYPE_SCHEDULER_GROUP, &sg_id, m_switch_id, 0, NULL));
 
-        CHECK_STATUS(set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
-
-        // scheduler groups per port
-
-        std::vector<sai_object_id_t> sgs;
-
-        for (uint32_t i = 0; i < port_sgs_count; ++i)
-        {
-            sai_object_id_t sg_id;
-
-            CHECK_STATUS(create(SAI_OBJECT_TYPE_SCHEDULER_GROUP, &sg_id, m_switch_id, 0, NULL));
-
-            sgs.push_back(sg_id);
-        }
-
-        attr.id = SAI_PORT_ATTR_QOS_SCHEDULER_GROUP_LIST;
-        attr.value.objlist.count = port_sgs_count;
-        attr.value.objlist.list = sgs.data();
-
-        CHECK_STATUS(set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
-
-        CHECK_STATUS(create_scheduler_group_tree(sgs, port_id));
+        sgs.push_back(sg_id);
     }
 
+    attr.id = SAI_PORT_ATTR_QOS_SCHEDULER_GROUP_LIST;
+    attr.value.objlist.count = port_sgs_count;
+    attr.value.objlist.list = sgs.data();
+
+    CHECK_STATUS(set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
+
+    CHECK_STATUS(create_scheduler_group_tree(sgs, port_id));
+
+    // TODO
     // SAI_SCHEDULER_GROUP_ATTR_CHILD_COUNT // sched_groups + count
     // scheduler group are organized in tree and on the bottom there are queues
     // order matters in returning api
+
     return SAI_STATUS_SUCCESS;
 }
