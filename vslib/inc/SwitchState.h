@@ -80,7 +80,7 @@ namespace saivs
                     _In_ const sai_object_id_t port_id,
                     _Out_ std::string& if_name);
 
-        private:
+        protected:
 
             sai_object_id_t m_switch_id;
 

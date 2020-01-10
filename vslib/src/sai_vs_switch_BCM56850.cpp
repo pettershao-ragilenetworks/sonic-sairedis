@@ -2,6 +2,8 @@
 #include <net/if.h>
 #include <algorithm>
 
+#include "SwitchStateBase.h"
+
 using namespace saivs;
 
 // TODO extra work may be needed on GET api if N on list will be > then actual
@@ -12,104 +14,13 @@ using namespace saivs;
  * done under global lock.
  */
 
-static std::shared_ptr<SwitchState> ss;
+static std::shared_ptr<SwitchStateBase> ss;
 
 static std::vector<sai_object_id_t> port_list;
 static std::vector<sai_object_id_t> bridge_port_list_port_based;
 
 static std::vector<sai_acl_action_type_t> ingress_acl_action_list;
 static std::vector<sai_acl_action_type_t> egress_acl_action_list;
-
-static sai_object_id_t default_vlan_id;
-
-static sai_status_t set_switch_mac_address()
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_INFO("create switch src mac address");
-
-    sai_attribute_t attr;
-
-    attr.id = SAI_SWITCH_ATTR_SRC_MAC_ADDRESS;
-
-    attr.value.mac[0] = 0x11;
-    attr.value.mac[1] = 0x22;
-    attr.value.mac[2] = 0x33;
-    attr.value.mac[3] = 0x44;
-    attr.value.mac[4] = 0x55;
-    attr.value.mac[5] = 0x66;
-
-    return vs_generic_set(SAI_OBJECT_TYPE_SWITCH, ss->getSwitchId(), &attr);
-}
-
-static sai_status_t set_switch_default_attributes()
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_INFO("create switch default attributes");
-
-    sai_attribute_t attr;
-
-    attr.id = SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY;
-    attr.value.ptr = NULL;
-
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_SWITCH, ss->getSwitchId(), &attr));
-
-    attr.id = SAI_SWITCH_ATTR_FDB_EVENT_NOTIFY;
-
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_SWITCH, ss->getSwitchId(), &attr));
-
-    attr.id = SAI_SWITCH_ATTR_FDB_AGING_TIME;
-    attr.value.u32 = 0;
-
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_SWITCH, ss->getSwitchId(), &attr));
-
-    attr.id = SAI_SWITCH_ATTR_RESTART_WARM;
-    attr.value.booldata = false;
-
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_SWITCH, ss->getSwitchId(), &attr));
-
-    attr.id = SAI_SWITCH_ATTR_AVAILABLE_SNAT_ENTRY;
-    attr.value.u32 = 100;
-
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_SWITCH, ss->getSwitchId(), &attr));
-
-    attr.id = SAI_SWITCH_ATTR_AVAILABLE_DNAT_ENTRY;
-    attr.value.u32 = 100;
-
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_SWITCH, ss->getSwitchId(), &attr));
-
-    attr.id = SAI_SWITCH_ATTR_AVAILABLE_DOUBLE_NAT_ENTRY;
-    attr.value.u32 = 50; /* Half of single NAT entry */
-
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_SWITCH, ss->getSwitchId(), &attr));
-
-    attr.id = SAI_SWITCH_ATTR_WARM_RECOVER;
-    attr.value.booldata = false;
-
-    return vs_generic_set(SAI_OBJECT_TYPE_SWITCH, ss->getSwitchId(), &attr);
-}
-
-static sai_status_t create_default_vlan()
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_INFO("create default vlan");
-
-    sai_attribute_t attr;
-
-    attr.id = SAI_VLAN_ATTR_VLAN_ID;
-    attr.value.u16 = DEFAULT_VLAN_NUMBER;
-
-    CHECK_STATUS(vs_generic_create(SAI_OBJECT_TYPE_VLAN, &default_vlan_id, ss->getSwitchId(), 1, &attr));
-
-    /* set default vlan on switch */
-
-    attr.id = SAI_SWITCH_ATTR_DEFAULT_VLAN_ID;
-    attr.value.oid = default_vlan_id;
-
-    return vs_generic_set(SAI_OBJECT_TYPE_SWITCH, ss->getSwitchId(), &attr);
-}
 
 static sai_status_t create_cpu_port()
 {
@@ -807,7 +718,7 @@ static sai_status_t create_vlan_members()
         attrs[0].value.oid = bridge_port_id;
 
         attrs[1].id = SAI_VLAN_MEMBER_ATTR_VLAN_ID;
-        attrs[1].value.oid = default_vlan_id;
+        attrs[1].value.oid = ss->m_default_vlan_id;
 
         attrs[2].id = SAI_VLAN_MEMBER_ATTR_VLAN_TAGGING_MODE;
         attrs[2].value.s32 = SAI_VLAN_TAGGING_MODE_UNTAGGED;
@@ -888,10 +799,10 @@ static sai_status_t initialize_default_objects()
 {
     SWSS_LOG_ENTER();
 
-    CHECK_STATUS(set_switch_mac_address());
+    CHECK_STATUS(ss->set_switch_mac_address());
 
     CHECK_STATUS(create_cpu_port());
-    CHECK_STATUS(create_default_vlan());
+    CHECK_STATUS(ss->create_default_vlan());
     CHECK_STATUS(create_default_virtual_router());
     CHECK_STATUS(create_default_stp_instance());
     CHECK_STATUS(create_default_1q_bridge());
@@ -905,7 +816,7 @@ static sai_status_t initialize_default_objects()
     CHECK_STATUS(create_qos_queues());
     CHECK_STATUS(set_maximum_number_of_childs_per_scheduler_group());
     CHECK_STATUS(set_number_of_ecmp_groups());
-    CHECK_STATUS(set_switch_default_attributes());
+    CHECK_STATUS(ss->set_switch_default_attributes());
     CHECK_STATUS(create_scheduler_groups());
 
     return SAI_STATUS_SUCCESS;
@@ -958,7 +869,9 @@ void init_switch_BCM56850(
 
     if (warmBootState != nullptr)
     {
-        ss = g_switch_state_map[switch_id] = warmBootState;
+        g_switch_state_map[switch_id] = warmBootState;
+
+        ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
 
         warm_boot_initialize_objects();
 
@@ -972,7 +885,9 @@ void init_switch_BCM56850(
         SWSS_LOG_THROW("switch already exists 0x%lx", switch_id);
     }
 
-    ss = g_switch_state_map[switch_id] = std::make_shared<SwitchState>(switch_id);
+    g_switch_state_map[switch_id] = std::make_shared<SwitchStateBase>(switch_id);
+
+    ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
 
     sai_status_t status = initialize_default_objects();
 

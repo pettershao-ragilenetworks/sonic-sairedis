@@ -11,6 +11,7 @@
 #include "meta/sai_serialize.h"
 #include "sai_vs_switch_BCM56850.h"
 #include "sai_vs_switch_MLNX2700.h"
+#include "SwitchStateBase.h"
 
 /*
  * Max number of counters used in 1 api call
@@ -106,7 +107,7 @@ static std::shared_ptr<SwitchState> vs_read_switch_database_for_warm_restart(
         return nullptr;
     }
 
-    std::shared_ptr<SwitchState> ss = std::make_shared<SwitchState>(switch_id);
+    std::shared_ptr<SwitchState> ss = std::make_shared<SwitchStateBase>(switch_id);
 
     size_t count = 1; // count is 1 since switch_id was inserted to objectHash in SwitchState constructor
 
