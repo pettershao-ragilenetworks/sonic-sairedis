@@ -31,6 +31,8 @@ namespace saivs
 
             virtual sai_status_t set_port_list();
 
+            virtual sai_status_t create_default_virtual_router();
+
         protected:
 
             virtual sai_status_t create(

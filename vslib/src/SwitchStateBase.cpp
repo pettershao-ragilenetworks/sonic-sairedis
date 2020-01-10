@@ -250,3 +250,21 @@ sai_status_t SwitchStateBase::set_port_list()
     return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
 }
 
+sai_status_t SwitchStateBase::create_default_virtual_router()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_INFO("create default virtual router");
+
+    sai_object_id_t virtual_router_id;
+
+    CHECK_STATUS(vs_generic_create(SAI_OBJECT_TYPE_VIRTUAL_ROUTER, &virtual_router_id, m_switch_id, 0, NULL));
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_SWITCH_ATTR_DEFAULT_VIRTUAL_ROUTER_ID;
+    attr.value.oid = virtual_router_id;
+
+    return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
+}
+
