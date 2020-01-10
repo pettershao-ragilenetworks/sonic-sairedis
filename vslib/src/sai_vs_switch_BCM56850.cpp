@@ -16,83 +16,10 @@ using namespace saivs;
 
 static std::shared_ptr<SwitchStateBase> ss;
 
-static std::vector<sai_object_id_t> port_list;
 static std::vector<sai_object_id_t> bridge_port_list_port_based;
 
 static std::vector<sai_acl_action_type_t> ingress_acl_action_list;
 static std::vector<sai_acl_action_type_t> egress_acl_action_list;
-
-static sai_status_t create_ports()
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_INFO("create ports");
-
-    std::vector<std::vector<uint32_t>> laneMap;
-
-    getPortLaneMap(laneMap);
-
-    uint32_t port_count = (uint32_t)laneMap.size();
-
-    port_list.clear();
-
-    sai_object_id_t switch_object_id = ss->getSwitchId();
-
-    for (uint32_t i = 0; i < port_count; i++)
-    {
-        SWSS_LOG_DEBUG("create port index %u", i);
-
-        sai_object_id_t port_id;
-
-        CHECK_STATUS(vs_generic_create(SAI_OBJECT_TYPE_PORT, &port_id, switch_object_id, 0, NULL));
-
-        port_list.push_back(port_id);
-
-        sai_attribute_t attr;
-
-        attr.id = SAI_PORT_ATTR_ADMIN_STATE;
-        attr.value.booldata = false;     /* default admin state is down as defined in SAI */
-
-        CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
-
-        attr.id = SAI_PORT_ATTR_MTU;
-        attr.value.u32 = 1514;     /* default MTU is 1514 as defined in SAI */
-
-        CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
-
-        attr.id = SAI_PORT_ATTR_SPEED;
-        attr.value.u32 = 10 * 1000;
-
-        CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
-
-        std::vector<uint32_t> lanes = laneMap.at(i);
-
-        attr.id = SAI_PORT_ATTR_HW_LANE_LIST;
-        attr.value.u32list.count = (uint32_t)lanes.size();
-        attr.value.u32list.list = lanes.data();
-
-        CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
-
-        attr.id = SAI_PORT_ATTR_TYPE;
-        attr.value.s32 = SAI_PORT_TYPE_LOGICAL;
-
-        CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
-
-        attr.id = SAI_PORT_ATTR_OPER_STATUS;
-        attr.value.s32 = SAI_PORT_OPER_STATUS_DOWN;
-
-        CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
-
-        attr.id = SAI_PORT_ATTR_PORT_VLAN_ID;
-        attr.value.u32 = DEFAULT_VLAN_NUMBER;
-
-        CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
-
-        // TODO populate other port attributes
-    }
-
-    return SAI_STATUS_SUCCESS;
-}
 
 static sai_status_t create_bridge_ports()
 {
@@ -130,7 +57,7 @@ static sai_status_t create_bridge_ports()
 
     bridge_port_list_port_based.clear();
 
-    for (const auto &port_id: port_list)
+    for (const auto &port_id: ss->m_port_list)
     {
         SWSS_LOG_DEBUG("create bridge port for port %s", sai_serialize_object_id(port_id).c_str());
 
@@ -328,7 +255,7 @@ static sai_status_t create_qos_queues()
 
     sai_object_id_t switch_object_id = ss->getSwitchId();
 
-    for (auto &port_id : port_list)
+    for (auto &port_id : ss->m_port_list)
     {
         CHECK_STATUS(create_qos_queues_per_port(switch_object_id, port_id));
     }
@@ -381,7 +308,7 @@ static sai_status_t create_ingress_priority_groups()
 
     sai_object_id_t switch_object_id = ss->getSwitchId();
 
-    for (auto &port_id : port_list)
+    for (auto &port_id : ss->m_port_list)
     {
         CHECK_STATUS(create_ingress_priority_groups_per_port(switch_object_id, port_id));
     }
@@ -625,7 +552,7 @@ static sai_status_t create_scheduler_groups()
 
     sai_object_id_t switch_object_id = ss->getSwitchId();
 
-    for (auto &port_id : port_list)
+    for (auto &port_id : ss->m_port_list)
     {
         CHECK_STATUS(create_scheduler_groups_per_port(switch_object_id, port_id));
     }
@@ -757,7 +684,7 @@ static sai_status_t initialize_default_objects()
     CHECK_STATUS(create_default_stp_instance());
     CHECK_STATUS(ss->create_default_1q_bridge());
     CHECK_STATUS(create_default_trap_group());
-    CHECK_STATUS(create_ports());
+    CHECK_STATUS(ss->create_ports());
     CHECK_STATUS(create_bridge_ports());
     CHECK_STATUS(create_vlan_members());
     CHECK_STATUS(create_acl_entry_min_prio());
@@ -788,20 +715,20 @@ static sai_status_t warm_boot_initialize_objects()
 
     sai_object_id_t switch_id = ss->getSwitchId();
 
-    port_list.resize(SAI_VS_MAX_PORTS);
+    ss->m_port_list.resize(SAI_VS_MAX_PORTS);
 
     sai_attribute_t attr;
 
     attr.id = SAI_SWITCH_ATTR_PORT_LIST;
 
     attr.value.objlist.count = SAI_VS_MAX_PORTS;
-    attr.value.objlist.list = port_list.data();
+    attr.value.objlist.list = ss->m_port_list.data();
 
     CHECK_STATUS(vs_generic_get(SAI_OBJECT_TYPE_SWITCH, switch_id, 1, &attr));
 
-    port_list.resize(attr.value.objlist.count);
+    ss->m_port_list.resize(attr.value.objlist.count);
 
-    SWSS_LOG_NOTICE("port list size: %zu", port_list.size());
+    SWSS_LOG_NOTICE("port list size: %zu", ss->m_port_list.size());
 
     return SAI_STATUS_SUCCESS;
 }
@@ -963,7 +890,7 @@ static sai_status_t refresh_bridge_port_list(
 
     std::vector<sai_object_id_t> bridge_port_list;
 
-    for (const auto &p: port_list)
+    for (const auto &p: ss->m_port_list)
     {
         for (const auto &bp: bridge_port_list_on_bridge_id)
         {
@@ -1120,7 +1047,7 @@ static sai_status_t refresh_port_list(
 
     const sai_object_id_t cpu_port_id = attr.value.oid;
 
-    port_list.clear();
+    ss->m_port_list.clear();
 
     // iterate via ASIC state to find all the ports
 
@@ -1136,7 +1063,7 @@ static sai_status_t refresh_port_list(
         if (port_id == cpu_port_id)
             continue;
 
-        port_list.push_back(port_id);
+        ss->m_port_list.push_back(port_id);
     }
 
     /*
@@ -1151,15 +1078,15 @@ static sai_status_t refresh_port_list(
      * Currently we just sort all the port oids.
      */
 
-    std::sort(port_list.begin(), port_list.end());
+    std::sort(ss->m_port_list.begin(), ss->m_port_list.end());
 
     sai_object_id_t switch_object_id = ss->getSwitchId();
 
-    uint32_t port_count = (uint32_t)port_list.size();
+    uint32_t port_count = (uint32_t)ss->m_port_list.size();
 
     attr.id = SAI_SWITCH_ATTR_PORT_LIST;
     attr.value.objlist.count = port_count;
-    attr.value.objlist.list = port_list.data();
+    attr.value.objlist.list = ss->m_port_list.data();
 
     CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_SWITCH, switch_object_id, &attr));
 
@@ -1168,7 +1095,7 @@ static sai_status_t refresh_port_list(
 
     CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_SWITCH, switch_object_id, &attr));
 
-    SWSS_LOG_NOTICE("refreshed port list, current port number: %zu, not counting cpu port", port_list.size());
+    SWSS_LOG_NOTICE("refreshed port list, current port number: %zu, not counting cpu port", ss->m_port_list.size());
 
     return SAI_STATUS_SUCCESS;
 }

@@ -155,4 +155,72 @@ sai_status_t SwitchStateBase::create_default_1q_bridge()
     return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
 }
 
+sai_status_t SwitchStateBase::create_ports()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_INFO("create ports");
+
+    std::vector<std::vector<uint32_t>> laneMap;
+
+    getPortLaneMap(laneMap); // TODO per switch !! on constructor !
+
+    uint32_t port_count = (uint32_t)laneMap.size();
+
+    m_port_list.clear();
+
+    for (uint32_t i = 0; i < port_count; i++)
+    {
+        SWSS_LOG_DEBUG("create port index %u", i);
+
+        sai_object_id_t port_id;
+
+        CHECK_STATUS(create(SAI_OBJECT_TYPE_PORT, &port_id, m_switch_id, 0, NULL));
+
+        m_port_list.push_back(port_id);
+
+        sai_attribute_t attr;
+
+        attr.id = SAI_PORT_ATTR_ADMIN_STATE;
+        attr.value.booldata = false;     /* default admin state is down as defined in SAI */
+
+        CHECK_STATUS(set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
+
+        attr.id = SAI_PORT_ATTR_MTU;
+        attr.value.u32 = 1514;     /* default MTU is 1514 as defined in SAI */
+
+        CHECK_STATUS(set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
+
+        attr.id = SAI_PORT_ATTR_SPEED;
+        attr.value.u32 = 40 * 1000;     /* TODO from config */
+
+        CHECK_STATUS(set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
+
+        std::vector<uint32_t> lanes = laneMap.at(i);
+
+        attr.id = SAI_PORT_ATTR_HW_LANE_LIST;
+        attr.value.u32list.count = (uint32_t)lanes.size();
+        attr.value.u32list.list = lanes.data();
+
+        CHECK_STATUS(set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
+
+        attr.id = SAI_PORT_ATTR_TYPE;
+        attr.value.s32 = SAI_PORT_TYPE_LOGICAL;
+
+        CHECK_STATUS(set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
+
+        attr.id = SAI_PORT_ATTR_OPER_STATUS;
+        attr.value.s32 = SAI_PORT_OPER_STATUS_DOWN;
+
+        CHECK_STATUS(set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
+
+        attr.id = SAI_PORT_ATTR_PORT_VLAN_ID;
+        attr.value.u32 = DEFAULT_VLAN_NUMBER;
+
+        CHECK_STATUS(set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
+    }
+
+    return SAI_STATUS_SUCCESS;
+}
+
 
