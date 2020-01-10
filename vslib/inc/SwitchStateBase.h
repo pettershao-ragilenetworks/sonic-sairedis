@@ -95,6 +95,11 @@ namespace saivs
 
             virtual sai_status_t warm_boot_initialize_objects();
 
+            virtual sai_status_t refresh_read_only(
+                    _In_ const sai_attr_metadata_t *meta,
+                    _In_ sai_object_id_t object_id,
+                    _In_ sai_object_id_t switch_id);
+
         public: // TODO should be pure
 
             virtual sai_status_t create_qos_queues_per_port(

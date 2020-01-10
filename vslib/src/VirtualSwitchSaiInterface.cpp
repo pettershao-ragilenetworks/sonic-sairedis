@@ -9,8 +9,6 @@
 
 #include "sai_vs.h"
 #include "meta/sai_serialize.h"
-#include "sai_vs_switch_BCM56850.h"
-#include "sai_vs_switch_MLNX2700.h"
 
 #include "SwitchStateBase.h"
 #include "SwitchBCM56850.h"
@@ -949,13 +947,19 @@ static sai_status_t refresh_read_only(
      * different order maybe on the queues.
      */
 
+    if (g_switch_state_map.size() != 1)
+    {
+        SWSS_LOG_THROW("multiple switches not supported, FIXME");
+    }
+
+    // TODO remove cast
+    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
+
     switch (g_vs_switch_type)
     {
         case SAI_VS_SWITCH_TYPE_BCM56850:
-            return refresh_read_only_BCM56850(meta, object_id, switch_id);
-
         case SAI_VS_SWITCH_TYPE_MLNX2700:
-            return refresh_read_only_MLNX2700(meta, object_id, switch_id);
+            return ss->refresh_read_only(meta, object_id, switch_id);
 
         default:
             break;

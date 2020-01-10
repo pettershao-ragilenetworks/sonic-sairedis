@@ -1,6 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_switch_BCM56850.h"
-#include "sai_vs_switch_MLNX2700.h"
 
 sai_status_t vs_generic_create(
         _In_ sai_object_type_t object_type,
