@@ -51,11 +51,23 @@ namespace saivs
 
             virtual sai_status_t set_acl_capabilities();
 
+        public: // TODO should be pure
+
             virtual sai_status_t create_qos_queues_per_port(
                     _In_ sai_object_id_t switch_object_id,
                     _In_ sai_object_id_t port_id);
 
             virtual sai_status_t create_qos_queues();
+
+            virtual sai_status_t create_scheduler_group_tree(
+                    _In_ const std::vector<sai_object_id_t>& sgs,
+                    _In_ sai_object_id_t port_id);
+
+            virtual sai_status_t create_scheduler_groups_per_port(
+                    _In_ sai_object_id_t switch_id,
+                    _In_ sai_object_id_t port_id);
+
+            virtual sai_status_t create_scheduler_groups();
 
         protected:
 

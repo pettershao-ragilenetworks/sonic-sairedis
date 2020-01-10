@@ -529,3 +529,40 @@ sai_status_t SwitchStateBase::create_qos_queues()
 
     return SAI_STATUS_NOT_IMPLEMENTED;
 }
+
+sai_status_t SwitchStateBase::create_scheduler_group_tree(
+        _In_ const std::vector<sai_object_id_t>& sgs,
+        _In_ sai_object_id_t port_id)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO this method can be abstract, FIXME
+
+    SWSS_LOG_ERROR("implement in child class");
+
+    return SAI_STATUS_NOT_IMPLEMENTED;
+}
+
+sai_status_t SwitchStateBase::create_scheduler_groups_per_port(
+        _In_ sai_object_id_t switch_id,
+        _In_ sai_object_id_t port_id)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO this method can be abstract, FIXME
+
+    SWSS_LOG_ERROR("implement in child class");
+
+    return SAI_STATUS_NOT_IMPLEMENTED;
+}
+
+sai_status_t SwitchStateBase::create_scheduler_groups()
+{
+    SWSS_LOG_ENTER();
+
+    // TODO this method can be abstract, FIXME
+
+    SWSS_LOG_ERROR("implement in child class");
+
+    return SAI_STATUS_NOT_IMPLEMENTED;
+}
