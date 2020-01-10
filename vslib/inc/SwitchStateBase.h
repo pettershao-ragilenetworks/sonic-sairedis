@@ -43,6 +43,8 @@ namespace saivs
 
             virtual sai_status_t create_ingress_priority_groups();
 
+            virtual sai_status_t create_vlan_members();
+
         protected:
 
             virtual sai_status_t create(

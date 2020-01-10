@@ -374,4 +374,34 @@ sai_status_t SwitchStateBase::create_ingress_priority_groups()
     return SAI_STATUS_SUCCESS;
 }
 
+sai_status_t SwitchStateBase::create_vlan_members()
+{
+    SWSS_LOG_ENTER();
+
+    // Crete vlan members for bridge ports.
+
+    for (auto bridge_port_id: m_bridge_port_list_port_based)
+    {
+        SWSS_LOG_DEBUG("create vlan member for bridge port %s",
+                sai_serialize_object_id(bridge_port_id).c_str());
+
+        sai_attribute_t attrs[3];
+
+        attrs[0].id = SAI_VLAN_MEMBER_ATTR_BRIDGE_PORT_ID;
+        attrs[0].value.oid = bridge_port_id;
+
+        attrs[1].id = SAI_VLAN_MEMBER_ATTR_VLAN_ID;
+        attrs[1].value.oid = m_default_vlan_id;
+
+        attrs[2].id = SAI_VLAN_MEMBER_ATTR_VLAN_TAGGING_MODE;
+        attrs[2].value.s32 = SAI_VLAN_TAGGING_MODE_UNTAGGED;
+
+        sai_object_id_t vlan_member_id;
+
+        CHECK_STATUS(create(SAI_OBJECT_TYPE_VLAN_MEMBER, &vlan_member_id, m_switch_id, 3, attrs));
+    }
+
+    return SAI_STATUS_SUCCESS;
+}
+
 
