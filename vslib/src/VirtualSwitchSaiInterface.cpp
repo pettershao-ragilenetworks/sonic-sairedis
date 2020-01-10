@@ -958,16 +958,6 @@ DECLARE_GET_ENTRY(NEIGHBOR_ENTRY,neighbor_entry);
 DECLARE_GET_ENTRY(ROUTE_ENTRY,route_entry);
 DECLARE_GET_ENTRY(NAT_ENTRY,nat_entry);
 
-sai_status_t VirtualSwitchSaiInterface::flushFdbEntries(
-        _In_ sai_object_id_t switchId,
-        _In_ uint32_t attrCount,
-        _In_ const sai_attribute_t *attrList)
-{
-    SWSS_LOG_ENTER();
-
-    throw; // TODO
-}
-
 sai_status_t VirtualSwitchSaiInterface::objectTypeGetAvailability(
         _In_ sai_object_id_t switchId,
         _In_ sai_object_type_t objectType,
