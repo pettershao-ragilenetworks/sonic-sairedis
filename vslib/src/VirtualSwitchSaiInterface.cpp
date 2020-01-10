@@ -959,7 +959,7 @@ static sai_status_t refresh_read_only(
     {
         case SAI_VS_SWITCH_TYPE_BCM56850:
         case SAI_VS_SWITCH_TYPE_MLNX2700:
-            return ss->refresh_read_only(meta, object_id, switch_id);
+            return ss->refresh_read_only(meta, object_id);
 
         default:
             break;

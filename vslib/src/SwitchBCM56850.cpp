@@ -17,7 +17,6 @@ SwitchBCM56850::SwitchBCM56850(
 }
 
 sai_status_t SwitchBCM56850::create_qos_queues_per_port(
-        _In_ sai_object_id_t switch_id,
         _In_ sai_object_id_t port_id)
 {
     SWSS_LOG_ENTER();
@@ -33,7 +32,7 @@ sai_status_t SwitchBCM56850::create_qos_queues_per_port(
     {
         sai_object_id_t queue_id;
 
-        CHECK_STATUS(create(SAI_OBJECT_TYPE_QUEUE, &queue_id, switch_id, 0, NULL));
+        CHECK_STATUS(create(SAI_OBJECT_TYPE_QUEUE, &queue_id, m_switch_id, 0, NULL));
 
         queues.push_back(queue_id);
 
@@ -72,7 +71,7 @@ sai_status_t SwitchBCM56850::create_qos_queues()
 
     for (auto &port_id : m_port_list)
     {
-        CHECK_STATUS(create_qos_queues_per_port(m_switch_id, port_id));
+        CHECK_STATUS(create_qos_queues_per_port(port_id));
     }
 
     return SAI_STATUS_SUCCESS;
@@ -256,7 +255,6 @@ sai_status_t SwitchBCM56850::create_scheduler_group_tree(
 }
 
 sai_status_t SwitchBCM56850::create_scheduler_groups_per_port(
-        _In_ sai_object_id_t switch_id,
         _In_ sai_object_id_t port_id)
 {
     SWSS_LOG_ENTER();
@@ -321,8 +319,7 @@ sai_status_t SwitchBCM56850::set_maximum_number_of_childs_per_scheduler_group()
 
 sai_status_t SwitchBCM56850::refresh_bridge_port_list(
         _In_ const sai_attr_metadata_t *meta,
-        _In_ sai_object_id_t bridge_id,
-        _In_ sai_object_id_t switch_id)
+        _In_ sai_object_id_t bridge_id)
 {
     SWSS_LOG_ENTER();
 
@@ -345,7 +342,7 @@ sai_status_t SwitchBCM56850::refresh_bridge_port_list(
 
     attr.id = SAI_SWITCH_ATTR_DEFAULT_1Q_BRIDGE_ID;
 
-    CHECK_STATUS(vs_generic_get(SAI_OBJECT_TYPE_SWITCH, switch_id, 1, &attr));
+    CHECK_STATUS(vs_generic_get(SAI_OBJECT_TYPE_SWITCH, m_switch_id, 1, &attr));
 
     /*
      * Create bridge ports for regular ports.

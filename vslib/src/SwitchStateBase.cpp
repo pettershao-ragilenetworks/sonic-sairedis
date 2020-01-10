@@ -305,7 +305,6 @@ sai_status_t SwitchStateBase::create_default_trap_group()
 }
 
 sai_status_t SwitchStateBase::create_ingress_priority_groups_per_port(
-        _In_ sai_object_id_t switch_id,
         _In_ sai_object_id_t port_id)
 {
     SWSS_LOG_ENTER();
@@ -337,7 +336,7 @@ sai_status_t SwitchStateBase::create_ingress_priority_groups_per_port(
          * TODO fix number of attributes
          */
 
-        CHECK_STATUS(create(SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP, &pg_id, switch_id, 1, attr));
+        CHECK_STATUS(create(SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP, &pg_id, m_switch_id, 1, attr));
 
         pgs.push_back(pg_id);
     }
@@ -368,7 +367,7 @@ sai_status_t SwitchStateBase::create_ingress_priority_groups()
 
     for (auto &port_id : m_port_list)
     {
-        create_ingress_priority_groups_per_port(m_switch_id, port_id);
+        create_ingress_priority_groups_per_port(port_id);
     }
 
     return SAI_STATUS_SUCCESS;
@@ -509,7 +508,6 @@ sai_status_t SwitchStateBase::set_acl_capabilities()
 }
 
 sai_status_t SwitchStateBase::create_qos_queues_per_port(
-        _In_ sai_object_id_t switch_id,
         _In_ sai_object_id_t port_id)
 {
     SWSS_LOG_ENTER();
@@ -546,7 +544,6 @@ sai_status_t SwitchStateBase::create_scheduler_group_tree(
 }
 
 sai_status_t SwitchStateBase::create_scheduler_groups_per_port(
-        _In_ sai_object_id_t switch_id,
         _In_ sai_object_id_t port_id)
 {
     SWSS_LOG_ENTER();
@@ -568,7 +565,7 @@ sai_status_t SwitchStateBase::create_scheduler_groups()
 
     for (auto &port_id : m_port_list)
     {
-        CHECK_STATUS(create_scheduler_groups_per_port(m_switch_id, port_id));
+        CHECK_STATUS(create_scheduler_groups_per_port(port_id));
     }
 
     return SAI_STATUS_SUCCESS;
@@ -648,9 +645,9 @@ sai_status_t SwitchStateBase::create_port(
 
     // attributes are not required since they will be set outside this function
 
-    CHECK_STATUS(create_ingress_priority_groups_per_port(m_switch_id, port_id));
-    CHECK_STATUS(create_qos_queues_per_port(m_switch_id, port_id));
-    CHECK_STATUS(create_scheduler_groups_per_port(m_switch_id, port_id));
+    CHECK_STATUS(create_ingress_priority_groups_per_port(port_id));
+    CHECK_STATUS(create_qos_queues_per_port(port_id));
+    CHECK_STATUS(create_scheduler_groups_per_port(port_id));
 
     // TODO should bridge ports should also be created when new port is created?
     // this needs to be checked on real ASIC and updated here
@@ -660,8 +657,7 @@ sai_status_t SwitchStateBase::create_port(
 
 sai_status_t SwitchStateBase::refresh_ingress_priority_group(
         _In_ const sai_attr_metadata_t *meta,
-        _In_ sai_object_id_t port_id,
-        _In_ sai_object_id_t switch_id)
+        _In_ sai_object_id_t port_id)
 {
     SWSS_LOG_ENTER();
 
@@ -676,8 +672,7 @@ sai_status_t SwitchStateBase::refresh_ingress_priority_group(
 
 sai_status_t SwitchStateBase::refresh_qos_queues(
         _In_ const sai_attr_metadata_t *meta,
-        _In_ sai_object_id_t port_id,
-        _In_ sai_object_id_t switch_id)
+        _In_ sai_object_id_t port_id)
 {
     SWSS_LOG_ENTER();
 
@@ -692,8 +687,7 @@ sai_status_t SwitchStateBase::refresh_qos_queues(
 
 sai_status_t SwitchStateBase::refresh_scheduler_groups(
         _In_ const sai_attr_metadata_t *meta,
-        _In_ sai_object_id_t port_id,
-        _In_ sai_object_id_t switch_id)
+        _In_ sai_object_id_t port_id)
 {
     SWSS_LOG_ENTER();
 
@@ -759,8 +753,7 @@ sai_status_t SwitchStateBase::warm_boot_initialize_objects()
 
 sai_status_t SwitchStateBase::refresh_bridge_port_list(
         _In_ const sai_attr_metadata_t *meta,
-        _In_ sai_object_id_t bridge_id,
-        _In_ sai_object_id_t switch_id)
+        _In_ sai_object_id_t bridge_id)
 {
     SWSS_LOG_ENTER();
 
@@ -773,8 +766,7 @@ sai_status_t SwitchStateBase::refresh_bridge_port_list(
 
 sai_status_t SwitchStateBase::refresh_vlan_member_list(
         _In_ const sai_attr_metadata_t *meta,
-        _In_ sai_object_id_t vlan_id,
-        _In_ sai_object_id_t switch_id)
+        _In_ sai_object_id_t vlan_id)
 {
     SWSS_LOG_ENTER();
 
@@ -828,8 +820,7 @@ sai_status_t SwitchStateBase::refresh_vlan_member_list(
 }
 
 sai_status_t SwitchStateBase::refresh_port_list(
-        _In_ const sai_attr_metadata_t *meta,
-        _In_ sai_object_id_t switch_id)
+        _In_ const sai_attr_metadata_t *meta)
 {
     SWSS_LOG_ENTER();
 
@@ -840,7 +831,7 @@ sai_status_t SwitchStateBase::refresh_port_list(
 
     attr.id = SAI_SWITCH_ATTR_CPU_PORT;
 
-    CHECK_STATUS(vs_generic_get(SAI_OBJECT_TYPE_SWITCH, switch_id, 1, &attr));
+    CHECK_STATUS(vs_generic_get(SAI_OBJECT_TYPE_SWITCH, m_switch_id, 1, &attr));
 
     const sai_object_id_t cpu_port_id = attr.value.oid;
 
@@ -909,8 +900,7 @@ sai_status_t SwitchStateBase::refresh_port_list(
 
 sai_status_t SwitchStateBase::refresh_read_only(
         _In_ const sai_attr_metadata_t *meta,
-        _In_ sai_object_id_t object_id,
-        _In_ sai_object_id_t switch_id)
+        _In_ sai_object_id_t object_id)
 {
     SWSS_LOG_ENTER();
 
@@ -940,7 +930,7 @@ sai_status_t SwitchStateBase::refresh_read_only(
 
             case SAI_SWITCH_ATTR_PORT_NUMBER:
             case SAI_SWITCH_ATTR_PORT_LIST:
-                return refresh_port_list(meta, switch_id);
+                return refresh_port_list(meta);
 
             case SAI_SWITCH_ATTR_QOS_MAX_NUMBER_OF_CHILDS_PER_SCHEDULER_GROUP:
                 return SAI_STATUS_SUCCESS;
@@ -953,15 +943,15 @@ sai_status_t SwitchStateBase::refresh_read_only(
         {
             case SAI_PORT_ATTR_QOS_NUMBER_OF_QUEUES:
             case SAI_PORT_ATTR_QOS_QUEUE_LIST:
-                return refresh_qos_queues(meta, object_id, switch_id);
+                return refresh_qos_queues(meta, object_id);
 
             case SAI_PORT_ATTR_NUMBER_OF_INGRESS_PRIORITY_GROUPS:
             case SAI_PORT_ATTR_INGRESS_PRIORITY_GROUP_LIST:
-                return refresh_ingress_priority_group(meta, object_id, switch_id);
+                return refresh_ingress_priority_group(meta, object_id);
 
             case SAI_PORT_ATTR_QOS_NUMBER_OF_SCHEDULER_GROUPS:
             case SAI_PORT_ATTR_QOS_SCHEDULER_GROUP_LIST:
-                return refresh_scheduler_groups(meta, object_id, switch_id);
+                return refresh_scheduler_groups(meta, object_id);
 
                 /*
                  * This status is based on hostif vEthernetX status.
@@ -978,18 +968,18 @@ sai_status_t SwitchStateBase::refresh_read_only(
         {
             case SAI_SCHEDULER_GROUP_ATTR_CHILD_COUNT:
             case SAI_SCHEDULER_GROUP_ATTR_CHILD_LIST:
-                return refresh_scheduler_groups(meta, object_id, switch_id);
+                return refresh_scheduler_groups(meta, object_id);
         }
     }
 
     if (meta->objecttype == SAI_OBJECT_TYPE_BRIDGE && meta->attrid == SAI_BRIDGE_ATTR_PORT_LIST)
     {
-        return refresh_bridge_port_list(meta, object_id, switch_id);
+        return refresh_bridge_port_list(meta, object_id);
     }
 
     if (meta->objecttype == SAI_OBJECT_TYPE_VLAN && meta->attrid == SAI_VLAN_ATTR_MEMBER_LIST)
     {
-        return refresh_vlan_member_list(meta, object_id, switch_id);
+        return refresh_vlan_member_list(meta, object_id);
     }
 
     if (meta->objecttype == SAI_OBJECT_TYPE_DEBUG_COUNTER && meta->attrid == SAI_DEBUG_COUNTER_ATTR_INDEX)

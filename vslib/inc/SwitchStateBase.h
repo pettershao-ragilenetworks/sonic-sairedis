@@ -38,7 +38,6 @@ namespace saivs
             virtual sai_status_t create_default_trap_group();
 
             virtual sai_status_t create_ingress_priority_groups_per_port(
-                    _In_ sai_object_id_t switch_id,
                     _In_ sai_object_id_t port_id);
 
             virtual sai_status_t create_ingress_priority_groups();
@@ -66,44 +65,36 @@ namespace saivs
 
             virtual sai_status_t refresh_ingress_priority_group(
                     _In_ const sai_attr_metadata_t *meta,
-                    _In_ sai_object_id_t port_id,
-                    _In_ sai_object_id_t switch_id);
+                    _In_ sai_object_id_t port_id);
 
             virtual sai_status_t refresh_qos_queues(
                     _In_ const sai_attr_metadata_t *meta,
-                    _In_ sai_object_id_t port_id,
-                    _In_ sai_object_id_t switch_id);
+                    _In_ sai_object_id_t port_id);
 
             virtual sai_status_t refresh_scheduler_groups(
                     _In_ const sai_attr_metadata_t *meta,
-                    _In_ sai_object_id_t port_id,
-                    _In_ sai_object_id_t switch_id);
+                    _In_ sai_object_id_t port_id);
 
             virtual sai_status_t refresh_bridge_port_list(
                     _In_ const sai_attr_metadata_t *meta,
-                    _In_ sai_object_id_t bridge_id,
-                    _In_ sai_object_id_t switch_id);
+                    _In_ sai_object_id_t bridge_id);
 
             virtual sai_status_t refresh_vlan_member_list(
                     _In_ const sai_attr_metadata_t *meta,
-                    _In_ sai_object_id_t vlan_id,
-                    _In_ sai_object_id_t switch_id);
+                    _In_ sai_object_id_t vlan_id);
 
             virtual sai_status_t refresh_port_list(
-                    _In_ const sai_attr_metadata_t *meta,
-                    _In_ sai_object_id_t switch_id);
+                    _In_ const sai_attr_metadata_t *meta);
 
             virtual sai_status_t warm_boot_initialize_objects();
 
             virtual sai_status_t refresh_read_only(
                     _In_ const sai_attr_metadata_t *meta,
-                    _In_ sai_object_id_t object_id,
-                    _In_ sai_object_id_t switch_id);
+                    _In_ sai_object_id_t object_id);
 
         public: // TODO should be pure
 
             virtual sai_status_t create_qos_queues_per_port(
-                    _In_ sai_object_id_t switch_object_id,
                     _In_ sai_object_id_t port_id);
 
             virtual sai_status_t create_qos_queues();
@@ -113,7 +104,6 @@ namespace saivs
                     _In_ sai_object_id_t port_id);
 
             virtual sai_status_t create_scheduler_groups_per_port(
-                    _In_ sai_object_id_t switch_id,
                     _In_ sai_object_id_t port_id);
 
             virtual sai_status_t create_scheduler_groups();

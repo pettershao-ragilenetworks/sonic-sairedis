@@ -17,7 +17,6 @@ namespace saivs
         protected:
 
             virtual sai_status_t create_qos_queues_per_port(
-                    _In_ sai_object_id_t switch_object_id,
                     _In_ sai_object_id_t port_id) override;
 
             virtual sai_status_t create_qos_queues() override;
@@ -27,15 +26,13 @@ namespace saivs
                     _In_ sai_object_id_t port_id) override;
 
             virtual sai_status_t create_scheduler_groups_per_port(
-                    _In_ sai_object_id_t switch_id,
                     _In_ sai_object_id_t port_id) override;
 
             virtual sai_status_t set_maximum_number_of_childs_per_scheduler_group() override;
 
             virtual sai_status_t refresh_bridge_port_list(
                     _In_ const sai_attr_metadata_t *meta,
-                    _In_ sai_object_id_t bridge_id,
-                    _In_ sai_object_id_t switch_id) override;
+                    _In_ sai_object_id_t bridge_id) override;
     };
 }
 

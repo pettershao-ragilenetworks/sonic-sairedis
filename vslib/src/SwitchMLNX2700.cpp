@@ -17,7 +17,6 @@ SwitchMLNX2700::SwitchMLNX2700(
 }
 
 sai_status_t SwitchMLNX2700::create_qos_queues_per_port(
-        _In_ sai_object_id_t switch_id,
         _In_ sai_object_id_t port_id)
 {
     SWSS_LOG_ENTER();
@@ -37,7 +36,7 @@ sai_status_t SwitchMLNX2700::create_qos_queues_per_port(
         attr[1].id = SAI_QUEUE_ATTR_PORT;
         attr[1].value.oid = port_id;
 
-        CHECK_STATUS(create(SAI_OBJECT_TYPE_QUEUE, &queue_id, switch_id, 2, attr));
+        CHECK_STATUS(create(SAI_OBJECT_TYPE_QUEUE, &queue_id, m_switch_id, 2, attr));
 
         queues.push_back(queue_id);
     }
@@ -70,7 +69,7 @@ sai_status_t SwitchMLNX2700::create_qos_queues()
 
     for (auto &port_id : copy)
     {
-        create_qos_queues_per_port(m_switch_id, port_id);
+        create_qos_queues_per_port(port_id);
     }
 
     return SAI_STATUS_SUCCESS;
@@ -202,7 +201,6 @@ sai_status_t SwitchMLNX2700::create_scheduler_group_tree(
 }
 
 sai_status_t SwitchMLNX2700::create_scheduler_groups_per_port(
-        _In_ sai_object_id_t switch_id,
         _In_ sai_object_id_t port_id)
 {
     SWSS_LOG_ENTER();
@@ -261,8 +259,7 @@ sai_status_t SwitchMLNX2700::set_maximum_number_of_childs_per_scheduler_group()
 
 sai_status_t SwitchMLNX2700::refresh_bridge_port_list(
         _In_ const sai_attr_metadata_t *meta,
-        _In_ sai_object_id_t bridge_id,
-        _In_ sai_object_id_t switch_id)
+        _In_ sai_object_id_t bridge_id)
 {
     SWSS_LOG_ENTER();
 
