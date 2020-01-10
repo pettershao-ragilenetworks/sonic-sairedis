@@ -149,59 +149,6 @@ static sai_status_t create_qos_queues()
     return SAI_STATUS_SUCCESS;
 }
 
-static sai_status_t create_ingress_priority_groups_per_port(
-        _In_ sai_object_id_t switch_object_id,
-        _In_ sai_object_id_t port_id)
-{
-    SWSS_LOG_ENTER();
-
-    const uint32_t port_pgs_count = 8;
-
-    std::vector<sai_object_id_t> pgs;
-
-    for (uint32_t i = 0; i < port_pgs_count; ++i)
-    {
-        sai_object_id_t pg_id;
-
-        CHECK_STATUS(vs_generic_create(SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP, &pg_id, switch_object_id, 0, NULL));
-
-        pgs.push_back(pg_id);
-    }
-
-    sai_attribute_t attr;
-
-    attr.id = SAI_PORT_ATTR_NUMBER_OF_INGRESS_PRIORITY_GROUPS;
-    attr.value.u32 = port_pgs_count;
-
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
-
-    attr.id = SAI_PORT_ATTR_INGRESS_PRIORITY_GROUP_LIST;
-    attr.value.objlist.count = port_pgs_count;
-    attr.value.objlist.list = pgs.data();
-
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
-
-    return SAI_STATUS_SUCCESS;
-}
-
-static sai_status_t create_ingress_priority_groups()
-{
-    SWSS_LOG_ENTER();
-
-    // TODO priority groups size may change when we will modify pg or ports
-
-    SWSS_LOG_INFO("create priority groups");
-
-    sai_object_id_t switch_object_id = ss->getSwitchId();
-
-    for (auto &port_id : ss->m_port_list)
-    {
-        CHECK_STATUS(create_ingress_priority_groups_per_port(switch_object_id, port_id));
-    }
-
-    return SAI_STATUS_SUCCESS;
-}
-
 static sai_status_t create_scheduler_group_tree(
         _In_ const std::vector<sai_object_id_t>& sgs,
         _In_ sai_object_id_t port_id)
@@ -576,7 +523,7 @@ static sai_status_t initialize_default_objects()
     CHECK_STATUS(create_vlan_members());
     CHECK_STATUS(create_acl_entry_min_prio());
     CHECK_STATUS(create_acl_capabilities());
-    CHECK_STATUS(create_ingress_priority_groups());
+    CHECK_STATUS(ss->create_ingress_priority_groups());
     CHECK_STATUS(create_qos_queues());
     CHECK_STATUS(set_maximum_number_of_childs_per_scheduler_group());
     CHECK_STATUS(set_number_of_ecmp_groups());
@@ -1117,7 +1064,7 @@ sai_status_t vs_create_port_BCM56850(
 
     // attributes are not required since they will be set outside this function
 
-    CHECK_STATUS(create_ingress_priority_groups_per_port(switch_id, port_id));
+    CHECK_STATUS(ss->create_ingress_priority_groups_per_port(switch_id, port_id));
 
     CHECK_STATUS(create_qos_queues_per_port(switch_id, port_id));
 
