@@ -456,7 +456,7 @@ sai_status_t SwitchStateBase::set_acl_entry_min_prio()
 {
     SWSS_LOG_ENTER();
 
-    SWSS_LOG_INFO("create acl entry min prio");
+    SWSS_LOG_INFO("set acl entry min prio");
 
     sai_attribute_t attr;
 
@@ -467,6 +467,41 @@ sai_status_t SwitchStateBase::set_acl_entry_min_prio()
 
     attr.id = SAI_SWITCH_ATTR_ACL_ENTRY_MAXIMUM_PRIORITY;
     attr.value.u32 = 16000;
+
+    return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
+}
+
+sai_status_t SwitchStateBase::set_acl_capabilities()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_INFO("set acl capabilities");
+
+    sai_attribute_t attr;
+
+    m_ingress_acl_action_list.clear();
+    m_egress_acl_action_list.clear();
+
+    for (int action_type = SAI_ACL_ENTRY_ATTR_ACTION_START; action_type <= SAI_ACL_ENTRY_ATTR_ACTION_END; action_type++)
+    {
+        m_ingress_acl_action_list.push_back(static_cast<sai_acl_action_type_t>(action_type - SAI_ACL_ENTRY_ATTR_ACTION_START));
+        m_egress_acl_action_list.push_back(static_cast<sai_acl_action_type_t>(action_type - SAI_ACL_ENTRY_ATTR_ACTION_START));
+    }
+
+    attr.id = SAI_SWITCH_ATTR_MAX_ACL_ACTION_COUNT;
+    attr.value.u32 = static_cast<uint32_t>(std::max(m_ingress_acl_action_list.size(), m_egress_acl_action_list.size()));
+
+    CHECK_STATUS(set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr));
+
+    attr.id = SAI_SWITCH_ATTR_ACL_STAGE_INGRESS;
+    attr.value.aclcapability.action_list.list = reinterpret_cast<int32_t*>(m_ingress_acl_action_list.data());
+    attr.value.aclcapability.action_list.count = static_cast<uint32_t>(m_ingress_acl_action_list.size());
+
+    CHECK_STATUS(set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr));
+
+    attr.id = SAI_SWITCH_ATTR_ACL_STAGE_EGRESS;
+    attr.value.aclcapability.action_list.list = reinterpret_cast<int32_t*>(m_egress_acl_action_list.data());
+    attr.value.aclcapability.action_list.count = static_cast<uint32_t>(m_egress_acl_action_list.size());
 
     return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
 }

@@ -49,6 +49,8 @@ namespace saivs
 
             virtual sai_status_t set_acl_entry_min_prio();
 
+            virtual sai_status_t set_acl_capabilities();
+
         protected:
 
             virtual sai_status_t create(
@@ -68,7 +70,7 @@ namespace saivs
             std::vector<sai_object_id_t> m_port_list;
             std::vector<sai_object_id_t> m_bridge_port_list_port_based;
 
-            std::vector<sai_acl_action_type_t> ingress_acl_action_list;
+            std::vector<sai_acl_action_type_t> m_ingress_acl_action_list;
             std::vector<sai_acl_action_type_t> m_egress_acl_action_list;
 
             sai_object_id_t m_cpu_port_id;
