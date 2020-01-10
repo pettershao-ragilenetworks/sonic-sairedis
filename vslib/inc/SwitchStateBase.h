@@ -133,6 +133,12 @@ namespace saivs
                     _In_ uint32_t attr_count,
                     _Out_ sai_attribute_t *attr_list);
 
+            virtual sai_status_t get(
+                    _In_ sai_object_type_t object_type,
+                    _In_ const std::string &serializedObjectId,
+                    _In_ uint32_t attr_count,
+                    _Out_ sai_attribute_t *attr_list);
+
         public: // TODO to protected
 
             std::vector<sai_object_id_t> m_port_list;

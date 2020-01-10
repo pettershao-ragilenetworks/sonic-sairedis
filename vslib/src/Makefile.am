@@ -9,8 +9,6 @@ endif
 lib_LTLIBRARIES = libsaivs.la
 
 libsaivs_la_SOURCES = \
-					  SwitchBCM56850.cpp \
-					  SwitchMLNX2700.cpp \
 					  SwitchStateBase.cpp \
 					  Globals.cpp \
 					  Switch.cpp \
@@ -21,6 +19,8 @@ libsaivs_la_SOURCES = \
 					  SaiAttrWrap.cpp \
 					  SelectableFd.cpp \
 					  SwitchState.cpp \
+					  SwitchBCM56850.cpp \
+					  SwitchMLNX2700.cpp \
 					  sai_vs_fdb.cpp \
 					  sai_vs_hostintf.cpp \
 					  sai_vs_interfacequery.cpp \

@@ -77,7 +77,135 @@ sai_status_t SwitchStateBase::get(
 {
     SWSS_LOG_ENTER();
 
-    return vs_generic_get(object_type, object_id, attr_count, attr_list);
+    auto sid = sai_serialize_object_id(object_id);
+
+    return get(object_type, sid, attr_count, attr_list);
+}
+
+sai_status_t SwitchStateBase::get(
+        _In_ sai_object_type_t objectType,
+        _In_ const std::string &serializedObjectId,
+        _In_ uint32_t attr_count,
+        _Out_ sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    auto &objectHash = m_objectHash.at(objectType);
+
+    auto it = objectHash.find(serializedObjectId);
+
+    if (it == objectHash.end())
+    {
+        SWSS_LOG_ERROR("not found %s:%s",
+                sai_serialize_object_type(objectType).c_str(),
+                serializedObjectId.c_str());
+
+        return SAI_STATUS_ITEM_NOT_FOUND;
+    }
+
+    /*
+     * We need reference here since we can potentially update attr hash for RO
+     * object.
+     */
+
+    auto& attrHash = it->second;
+
+    /*
+     * Some of the list query maybe for length, so we can't do
+     * normal serialize, maybe with count only.
+     */
+
+    sai_status_t final_status = SAI_STATUS_SUCCESS;
+
+    for (uint32_t idx = 0; idx < attr_count; ++idx)
+    {
+        sai_attr_id_t id = attr_list[idx].id;
+
+        auto meta = sai_metadata_get_attr_metadata(objectType, id);
+
+        if (meta == NULL)
+        {
+            SWSS_LOG_ERROR("failed to find attribute %d for %s:%s", id,
+                    sai_serialize_object_type(objectType).c_str(),
+                    serializedObjectId.c_str());
+
+            return SAI_STATUS_FAILURE;
+        }
+
+        sai_status_t status;
+
+        if (SAI_HAS_FLAG_READ_ONLY(meta->flags))
+        {
+            /*
+             * Read only attributes may require recalculation.
+             * Metadata makes sure that non object id's can't have
+             * read only attributes. So here is definitely OID.
+             */
+
+            sai_object_id_t oid;
+            sai_deserialize_object_id(serializedObjectId, oid);
+
+            status = refresh_read_only(meta, oid);
+
+            if (status != SAI_STATUS_SUCCESS)
+            {
+                SWSS_LOG_ERROR("%s read only not implemented on %s",
+                        meta->attridname,
+                        serializedObjectId.c_str());
+
+                return status;
+            }
+        }
+
+        auto ait = attrHash.find(meta->attridname);
+
+        if (ait == attrHash.end())
+        {
+            SWSS_LOG_ERROR("%s not implemented on %s",
+                    meta->attridname,
+                    serializedObjectId.c_str());
+
+            return SAI_STATUS_NOT_IMPLEMENTED;
+        }
+
+        auto attr = ait->second->getAttr();
+
+        status = transfer_attributes(objectType, 1, attr, &attr_list[idx], false);
+
+        if (status == SAI_STATUS_BUFFER_OVERFLOW)
+        {
+            /*
+             * This is considered partial success, since we get correct list
+             * length.  Note that other items ARE processes on the list.
+             */
+
+            SWSS_LOG_NOTICE("BUFFER_OVERFLOW %s: %s",
+                    serializedObjectId.c_str(),
+                    meta->attridname);
+
+            /*
+             * We still continue processing other attributes for get as long as
+             * we only will be getting buffer overflow error.
+             */
+
+            final_status = status;
+            continue;
+        }
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            // all other errors
+
+            SWSS_LOG_ERROR("get failed %s: %s: %s",
+                    serializedObjectId.c_str(),
+                    meta->attridname,
+                    sai_serialize_status(status).c_str());
+
+            return status;
+        }
+    }
+
+    return final_status;
 }
 
 sai_status_t SwitchStateBase::set_switch_mac_address()
