@@ -35,6 +35,8 @@ namespace saivs
 
             virtual sai_status_t create_default_stp_instance();
 
+            virtual sai_status_t create_default_trap_group();
+
         protected:
 
             virtual sai_status_t create(

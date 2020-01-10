@@ -21,26 +21,6 @@ static std::vector<sai_acl_action_type_t> egress_acl_action_list;
 
 static sai_object_id_t default_bridge_port_1q_router;
 
-static sai_status_t create_default_trap_group()
-{
-    SWSS_LOG_ENTER();
-
-    sai_object_id_t switch_id = ss->getSwitchId();
-
-    SWSS_LOG_INFO("create default trap group");
-
-    sai_object_id_t trap_group_id;
-
-    CHECK_STATUS(vs_generic_create(SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP, &trap_group_id, switch_id, 0, NULL));
-
-    sai_attribute_t attr;
-
-    attr.id = SAI_SWITCH_ATTR_DEFAULT_TRAP_GROUP;
-    attr.value.oid = trap_group_id;
-
-    return vs_generic_set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
-}
-
 static sai_status_t create_qos_queues_per_port(
         _In_ sai_object_id_t switch_id,
         _In_ sai_object_id_t port_id)
@@ -508,7 +488,7 @@ static sai_status_t initialize_default_objects()
     CHECK_STATUS(ss->create_default_virtual_router());
     CHECK_STATUS(ss->create_default_stp_instance());
     CHECK_STATUS(ss->create_default_1q_bridge());
-    CHECK_STATUS(create_default_trap_group());
+    CHECK_STATUS(ss->create_default_trap_group());
     CHECK_STATUS(ss->create_ports());
     CHECK_STATUS(ss->set_port_list());
     CHECK_STATUS(create_bridge_ports());

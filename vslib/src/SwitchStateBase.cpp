@@ -286,3 +286,20 @@ sai_status_t SwitchStateBase::create_default_stp_instance()
     return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
 }
 
+sai_status_t SwitchStateBase::create_default_trap_group()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_INFO("create default trap group");
+
+    sai_object_id_t trap_group_id;
+
+    CHECK_STATUS(create(SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP, &trap_group_id, m_switch_id, 0, NULL));
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_SWITCH_ATTR_DEFAULT_TRAP_GROUP;
+    attr.value.oid = trap_group_id;
+
+    return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
+}
