@@ -95,7 +95,7 @@ sai_status_t SwitchMLNX2700::create_scheduler_group_tree(
     attrq.value.objlist.count = queues_count;
     attrq.value.objlist.list = queues.data();
 
-    CHECK_STATUS(vs_generic_get(SAI_OBJECT_TYPE_PORT, port_id, 1, &attrq));
+    CHECK_STATUS(get(SAI_OBJECT_TYPE_PORT, port_id, 1, &attrq));
 
     // schedulers groups indexes on list: 0 1 2 3 4 5 6 7 8 9 a b c d e f
 
@@ -354,6 +354,6 @@ sai_status_t SwitchMLNX2700::refresh_bridge_port_list(
     attr.value.objlist.count = bridge_port_list_count;
     attr.value.objlist.list = bridge_port_list.data();
 
-    return vs_generic_set(SAI_OBJECT_TYPE_BRIDGE, bridge_id, &attr);
+    return set(SAI_OBJECT_TYPE_BRIDGE, bridge_id, &attr);
 }
 

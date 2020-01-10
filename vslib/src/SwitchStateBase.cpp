@@ -39,6 +39,17 @@ sai_status_t SwitchStateBase::set(
     return vs_generic_set(objectType, objectId, attr);
 }
 
+sai_status_t SwitchStateBase::get(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ uint32_t attr_count,
+        _Out_ sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    return vs_generic_get(object_type, object_id, attr_count, attr_list);
+}
+
 sai_status_t SwitchStateBase::set_switch_mac_address()
 {
     SWSS_LOG_ENTER();
@@ -127,7 +138,7 @@ sai_status_t SwitchStateBase::create_cpu_port()
     attr.id = SAI_SWITCH_ATTR_CPU_PORT;
     attr.value.oid = m_cpu_port_id;
 
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr));
+    CHECK_STATUS(set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr));
 
     // set type on cpu
     attr.id = SAI_PORT_ATTR_TYPE;
@@ -258,7 +269,7 @@ sai_status_t SwitchStateBase::create_default_virtual_router()
 
     sai_object_id_t virtual_router_id;
 
-    CHECK_STATUS(vs_generic_create(SAI_OBJECT_TYPE_VIRTUAL_ROUTER, &virtual_router_id, m_switch_id, 0, NULL));
+    CHECK_STATUS(create(SAI_OBJECT_TYPE_VIRTUAL_ROUTER, &virtual_router_id, m_switch_id, 0, NULL));
 
     sai_attribute_t attr;
 
@@ -641,7 +652,7 @@ sai_status_t SwitchStateBase::create_port(
     attr.id = SAI_PORT_ATTR_ADMIN_STATE;
     attr.value.booldata = false;
 
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
+    CHECK_STATUS(set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
 
     // attributes are not required since they will be set outside this function
 
@@ -724,7 +735,7 @@ sai_status_t SwitchStateBase::warm_boot_initialize_objects()
     attr.value.objlist.count = SAI_VS_MAX_PORTS;
     attr.value.objlist.list = m_port_list.data();
 
-    CHECK_STATUS(vs_generic_get(SAI_OBJECT_TYPE_SWITCH, m_switch_id, 1, &attr));
+    CHECK_STATUS(get(SAI_OBJECT_TYPE_SWITCH, m_switch_id, 1, &attr));
 
     m_port_list.resize(attr.value.objlist.count);
 
@@ -732,7 +743,7 @@ sai_status_t SwitchStateBase::warm_boot_initialize_objects()
 
     attr.id = SAI_SWITCH_ATTR_DEFAULT_1Q_BRIDGE_ID;
 
-    CHECK_STATUS(vs_generic_get(SAI_OBJECT_TYPE_SWITCH, m_switch_id, 1, &attr));
+    CHECK_STATUS(get(SAI_OBJECT_TYPE_SWITCH, m_switch_id, 1, &attr));
 
     m_default_bridge_port_1q_router = attr.value.oid;
 
@@ -816,7 +827,7 @@ sai_status_t SwitchStateBase::refresh_vlan_member_list(
     attr.value.objlist.count = vlan_member_list_count;
     attr.value.objlist.list = vlan_member_list.data();
 
-    return vs_generic_set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
+    return set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
 }
 
 sai_status_t SwitchStateBase::refresh_port_list(
@@ -831,7 +842,7 @@ sai_status_t SwitchStateBase::refresh_port_list(
 
     attr.id = SAI_SWITCH_ATTR_CPU_PORT;
 
-    CHECK_STATUS(vs_generic_get(SAI_OBJECT_TYPE_SWITCH, m_switch_id, 1, &attr));
+    CHECK_STATUS(get(SAI_OBJECT_TYPE_SWITCH, m_switch_id, 1, &attr));
 
     const sai_object_id_t cpu_port_id = attr.value.oid;
 
@@ -872,12 +883,12 @@ sai_status_t SwitchStateBase::refresh_port_list(
     attr.value.objlist.count = port_count;
     attr.value.objlist.list = m_port_list.data();
 
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr));
+    CHECK_STATUS(set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr));
 
     attr.id = SAI_SWITCH_ATTR_PORT_NUMBER;
     attr.value.u32 = port_count;
 
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr));
+    CHECK_STATUS(set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr));
 
     SWSS_LOG_NOTICE("refreshed port list, current port number: %zu, not counting cpu port", m_port_list.size());
 

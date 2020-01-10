@@ -99,7 +99,7 @@ sai_status_t SwitchBCM56850::create_scheduler_group_tree(
     attrq.value.objlist.list = queues.data();
 
     // NOTE it will do recalculate
-    CHECK_STATUS(vs_generic_get(SAI_OBJECT_TYPE_PORT, port_id, 1, &attrq));
+    CHECK_STATUS(get(SAI_OBJECT_TYPE_PORT, port_id, 1, &attrq));
 
     // schedulers groups: 0 1 2 3 4 5 6 7 8 9 a b c
 
@@ -342,7 +342,7 @@ sai_status_t SwitchBCM56850::refresh_bridge_port_list(
 
     attr.id = SAI_SWITCH_ATTR_DEFAULT_1Q_BRIDGE_ID;
 
-    CHECK_STATUS(vs_generic_get(SAI_OBJECT_TYPE_SWITCH, m_switch_id, 1, &attr));
+    CHECK_STATUS(get(SAI_OBJECT_TYPE_SWITCH, m_switch_id, 1, &attr));
 
     /*
      * Create bridge ports for regular ports.
@@ -380,7 +380,7 @@ sai_status_t SwitchBCM56850::refresh_bridge_port_list(
         sai_object_id_t bridge_port;
         sai_deserialize_object_id(bp.first, bridge_port);
 
-        CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_BRIDGE_PORT, bridge_port, &attr));
+        CHECK_STATUS(set(SAI_OBJECT_TYPE_BRIDGE_PORT, bridge_port, &attr));
     }
 
     // will contain 1q router bridge port, which we want to skip?
@@ -448,6 +448,6 @@ sai_status_t SwitchBCM56850::refresh_bridge_port_list(
     attr.value.objlist.count = bridge_port_list_count;
     attr.value.objlist.list = bridge_port_list.data();
 
-    return vs_generic_set(SAI_OBJECT_TYPE_BRIDGE, bridge_id, &attr);
+    return set(SAI_OBJECT_TYPE_BRIDGE, bridge_id, &attr);
 }
 
