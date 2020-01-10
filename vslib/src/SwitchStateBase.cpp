@@ -624,3 +624,35 @@ sai_status_t SwitchStateBase::initialize_default_objects()
     return SAI_STATUS_SUCCESS;
 }
 
+sai_status_t SwitchStateBase::create_port(
+        _In_ sai_object_id_t port_id,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_WARN("check attributes and set, FIXME");
+
+    // this method is post create action on generic create object
+
+    sai_attribute_t attr;
+
+    // default admin state is down as defined in SAI
+
+    attr.id = SAI_PORT_ATTR_ADMIN_STATE;
+    attr.value.booldata = false;
+
+    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
+
+    // attributes are not required since they will be set outside this function
+
+    CHECK_STATUS(create_ingress_priority_groups_per_port(m_switch_id, port_id));
+    CHECK_STATUS(create_qos_queues_per_port(m_switch_id, port_id));
+    CHECK_STATUS(create_scheduler_groups_per_port(m_switch_id, port_id));
+
+    // TODO should bridge ports should also be created when new port is created?
+    // this needs to be checked on real ASIC and updated here
+
+    return SAI_STATUS_SUCCESS;
+}
+

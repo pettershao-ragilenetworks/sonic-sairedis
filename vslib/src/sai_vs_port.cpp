@@ -1,7 +1,7 @@
 #include "sai_vs.h"
 #include "sai_vs_internal.h"
-#include "sai_vs_switch_BCM56850.h"
-#include "sai_vs_switch_MLNX2700.h"
+
+#include "SwitchStateBase.h"
 
 #include <algorithm>
 
@@ -37,24 +37,21 @@ sai_status_t vs_create_port(
                 attr_list,
                 &vs_generic_create));
 
-    // TODO needs to be revisited
-    // TODO attributes must be considered
+    // TODO must be moved inside
 
-    if (g_vs_switch_type == SAI_VS_SWITCH_TYPE_BCM56850)
+    switch (g_vs_switch_type)
     {
-        vs_create_port_BCM56850(*port_id, switch_id);
-    }
-    else if (g_vs_switch_type == SAI_VS_SWITCH_TYPE_MLNX2700)
-    {
-        vs_create_port_MLNX2700(*port_id, switch_id);
-    }
-    else
-    {
-        SWSS_LOG_ERROR("unknown switch type: %d", g_vs_switch_type);
-        return SAI_STATUS_FAILURE;
-    }
+        case SAI_VS_SWITCH_TYPE_BCM56850:
+        case SAI_VS_SWITCH_TYPE_MLNX2700:
 
-    return SAI_STATUS_SUCCESS;
+            // TODO remove cast
+            return std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map.at(switch_id))->create_port(*port_id, attr_count, attr_list);
+
+        default:
+
+            SWSS_LOG_ERROR("unknown switch type: %d", g_vs_switch_type);
+            return SAI_STATUS_FAILURE;
+    }
 }
 
 static bool vs_get_object_list(

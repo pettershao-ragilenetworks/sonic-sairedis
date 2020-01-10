@@ -532,29 +532,3 @@ sai_status_t refresh_read_only_BCM56850(
     return SAI_STATUS_NOT_IMPLEMENTED;
 }
 
-sai_status_t vs_create_port_BCM56850(
-        _In_ sai_object_id_t port_id,
-        _In_ sai_object_id_t switch_id)
-{
-    SWSS_LOG_ENTER();
-
-    // this method is post create action on generic create object
-
-    sai_attribute_t attr;
-
-    attr.id = SAI_PORT_ATTR_ADMIN_STATE;
-    attr.value.booldata = false;     /* default admin state is down as defined in SAI */
-
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
-
-    // attributes are not required since they will be set outside this function
-
-    CHECK_STATUS(ss->create_ingress_priority_groups_per_port(switch_id, port_id));
-    CHECK_STATUS(ss->create_qos_queues_per_port(switch_id, port_id));
-    CHECK_STATUS(ss->create_scheduler_groups_per_port(switch_id, port_id));
-
-    // TODO should bridge ports should also be created when new port is created?
-    // this needs to be checked on real ASIC and updated here
-
-    return SAI_STATUS_SUCCESS;
-}

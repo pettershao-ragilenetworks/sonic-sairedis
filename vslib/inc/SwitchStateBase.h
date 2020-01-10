@@ -57,6 +57,11 @@ namespace saivs
 
             virtual sai_status_t initialize_default_objects();
 
+            virtual sai_status_t create_port(
+                    _In_ sai_object_id_t port_id,
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
+
         public: // TODO should be pure
 
             virtual sai_status_t create_qos_queues_per_port(
