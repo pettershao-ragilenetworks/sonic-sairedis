@@ -26,6 +26,7 @@ std::shared_ptr<std::thread>                g_unittestChannelThread;
 std::shared_ptr<swss::NotificationConsumer> g_unittestChannelNotificationConsumer;
 std::shared_ptr<swss::DBConnector>          g_dbNtf;
 
+std::shared_ptr<swss::SelectableEvent>      g_fdbAgingThreadEvent;
 volatile bool                               g_fdbAgingThreadRun;
 std::shared_ptr<std::thread>                g_fdbAgingThread;
 
@@ -353,7 +354,7 @@ void unittestChannelThreadProc()
 
     while (g_unittestChannelRun)
     {
-        swss::Selectable *sel;
+        swss::Selectable *sel = nullptr;
 
         int result = s.select(&sel);
 
@@ -448,17 +449,40 @@ void processFdbEntriesForAging()
     Globals::apimutex.unlock();
 }
 
+
+/**
+ * @brief FDB aging thread timeout in milliseconds.
+ *
+ * Every timeout aging FDB will be performed.
+ */
+#define FDB_AGING_THREAD_TIMEOUT_MS (1000)
+
 void fdbAgingThreadProc()
 {
     SWSS_LOG_ENTER();
 
     SWSS_LOG_NOTICE("starting fdb aging thread");
 
+    swss::Select s;
+
+    s.addSelectable(g_fdbAgingThreadEvent.get());
+
     while (g_fdbAgingThreadRun)
     {
-        processFdbEntriesForAging();
+        swss::Selectable *sel = nullptr;
 
-        sleep(1);
+        int result = s.select(&sel, FDB_AGING_THREAD_TIMEOUT_MS);
+
+        if (sel == g_fdbAgingThreadEvent.get())
+        {
+            // user requested shutdown_switch
+            break;
+        }
+
+        if (result == swss::Select::TIMEOUT)
+        {
+            processFdbEntriesForAging();
+        }
     }
 
     SWSS_LOG_NOTICE("ending fdb aging thread");
@@ -814,6 +838,8 @@ sai_status_t sai_api_initialize(
 
     g_fdb_info_set.clear();
 
+    g_fdbAgingThreadEvent = std::make_shared<swss::SelectableEvent>();
+
     g_fdbAgingThreadRun = true;
 
     // TODO should this be moved to create switch and SwitchState?
@@ -841,12 +867,12 @@ sai_status_t sai_api_uninitialize(void)
 
     g_unittestChannelRun = false;
 
-    //// notify thread that it should end
+    // notify thread that it should end
     g_unittestChannelThreadEvent->notify();
 
     g_unittestChannelThread->join();
 
-    // TODO add event for end aging thread like notify
+    g_fdbAgingThreadEvent->notify();
 
     g_fdbAgingThreadRun = false;
 
