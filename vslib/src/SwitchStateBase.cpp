@@ -704,3 +704,54 @@ sai_status_t SwitchStateBase::refresh_scheduler_groups(
     return SAI_STATUS_SUCCESS;
 }
 
+sai_status_t SwitchStateBase::warm_boot_initialize_objects()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_INFO("warm boot init objects");
+
+    /*
+     * We need to bring back previous state in case user will get some read
+     * only attributes and recalculation will need to be done.
+     *
+     * We need to refresh:
+     * - ports
+     * - default bridge port 1q router
+     */
+
+    m_port_list.resize(SAI_VS_MAX_PORTS);
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_SWITCH_ATTR_PORT_LIST;
+
+    attr.value.objlist.count = SAI_VS_MAX_PORTS;
+    attr.value.objlist.list = m_port_list.data();
+
+    CHECK_STATUS(vs_generic_get(SAI_OBJECT_TYPE_SWITCH, m_switch_id, 1, &attr));
+
+    m_port_list.resize(attr.value.objlist.count);
+
+    SWSS_LOG_NOTICE("port list size: %zu", m_port_list.size());
+
+    attr.id = SAI_SWITCH_ATTR_DEFAULT_1Q_BRIDGE_ID;
+
+    CHECK_STATUS(vs_generic_get(SAI_OBJECT_TYPE_SWITCH, m_switch_id, 1, &attr));
+
+    m_default_bridge_port_1q_router = attr.value.oid;
+
+    SWSS_LOG_NOTICE("default bridge port 1q router: %s",
+            sai_serialize_object_id(m_default_bridge_port_1q_router).c_str());
+
+    // TODO refresh
+    //
+    // m_bridge_port_list_port_based;
+    // m_cpu_port_id;
+    // m_default_1q_bridge;
+    // m_default_vlan_id;
+    //
+    // other objects/numbers if added (per switch also)
+
+    return SAI_STATUS_SUCCESS;
+}
+

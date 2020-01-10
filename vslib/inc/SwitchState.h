@@ -84,6 +84,8 @@ namespace saivs
 
             sai_object_id_t m_switch_id;
 
+        protected: // tap device related objects
+
             std::map<sai_object_id_t, std::string> m_port_id_to_tapname;
 
             swss::SelectableEvent m_link_thread_event;

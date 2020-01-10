@@ -17,40 +17,6 @@ using namespace saivs;
 
 static std::shared_ptr<SwitchStateBase> ss;
 
-static sai_status_t warm_boot_initialize_objects()
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_INFO("warm boot init objects");
-
-    /*
-     * We need to bring back previous state in case user will get some read
-     * only attributes and recalculation will need to be done.
-     *
-     * We only need to refresh ports since only ports are used in recalculation
-     * logic.
-     */
-
-    sai_object_id_t switch_id = ss->getSwitchId();
-
-    ss->m_port_list.resize(SAI_VS_MAX_PORTS);
-
-    sai_attribute_t attr;
-
-    attr.id = SAI_SWITCH_ATTR_PORT_LIST;
-
-    attr.value.objlist.count = SAI_VS_MAX_PORTS;
-    attr.value.objlist.list = ss->m_port_list.data();
-
-    CHECK_STATUS(vs_generic_get(SAI_OBJECT_TYPE_SWITCH, switch_id, 1, &attr));
-
-    ss->m_port_list.resize(attr.value.objlist.count);
-
-    SWSS_LOG_NOTICE("port list size: %zu", ss->m_port_list.size());
-
-    return SAI_STATUS_SUCCESS;
-}
-
 void init_switch_BCM56850(
         _In_ sai_object_id_t switch_id,
         _In_ std::shared_ptr<SwitchState> warmBootState)
@@ -69,7 +35,7 @@ void init_switch_BCM56850(
         // TODO cast right switch or different data pass
         ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
 
-        warm_boot_initialize_objects();
+        ss->warm_boot_initialize_objects();
 
         SWSS_LOG_NOTICE("initialized switch %s in WARM boot mode", sai_serialize_object_id(switch_id).c_str());
 
