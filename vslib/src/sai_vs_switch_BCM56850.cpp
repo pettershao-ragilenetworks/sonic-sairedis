@@ -17,62 +17,6 @@ using namespace saivs;
 
 static std::shared_ptr<SwitchStateBase> ss;
 
-static sai_status_t set_maximum_number_of_childs_per_scheduler_group()
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_INFO("create switch src mac address");
-
-    sai_attribute_t attr;
-
-    attr.id = SAI_SWITCH_ATTR_QOS_MAX_NUMBER_OF_CHILDS_PER_SCHEDULER_GROUP;
-    attr.value.u32 = 16;
-
-    return vs_generic_set(SAI_OBJECT_TYPE_SWITCH, ss->getSwitchId(), &attr);
-}
-
-static sai_status_t set_number_of_ecmp_groups()
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_INFO("set number of ecmp groups");
-
-    sai_attribute_t attr;
-
-    attr.id = SAI_SWITCH_ATTR_NUMBER_OF_ECMP_GROUPS;
-    attr.value.u32 = 512;
-
-    return vs_generic_set(SAI_OBJECT_TYPE_SWITCH, ss->getSwitchId(), &attr);
-}
-
-static sai_status_t initialize_default_objects()
-{
-    SWSS_LOG_ENTER();
-
-    CHECK_STATUS(ss->set_switch_mac_address());
-
-    CHECK_STATUS(ss->create_cpu_port());
-    CHECK_STATUS(ss->create_default_vlan());
-    CHECK_STATUS(ss->create_default_virtual_router());
-    CHECK_STATUS(ss->create_default_stp_instance());
-    CHECK_STATUS(ss->create_default_1q_bridge());
-    CHECK_STATUS(ss->create_default_trap_group());
-    CHECK_STATUS(ss->create_ports());
-    CHECK_STATUS(ss->set_port_list());
-    CHECK_STATUS(ss->create_bridge_ports());
-    CHECK_STATUS(ss->create_vlan_members());
-    CHECK_STATUS(ss->set_acl_entry_min_prio());
-    CHECK_STATUS(ss->set_acl_capabilities());
-    CHECK_STATUS(ss->create_ingress_priority_groups());
-    CHECK_STATUS(ss->create_qos_queues());
-    CHECK_STATUS(set_maximum_number_of_childs_per_scheduler_group());
-    CHECK_STATUS(set_number_of_ecmp_groups());
-    CHECK_STATUS(ss->set_switch_default_attributes());
-    CHECK_STATUS(ss->create_scheduler_groups());
-
-    return SAI_STATUS_SUCCESS;
-}
-
 static sai_status_t warm_boot_initialize_objects()
 {
     SWSS_LOG_ENTER();
@@ -141,7 +85,7 @@ void init_switch_BCM56850(
 
     ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
 
-    sai_status_t status = initialize_default_objects();
+    sai_status_t status = ss->initialize_default_objects();
 
     if (status != SAI_STATUS_SUCCESS)
     {

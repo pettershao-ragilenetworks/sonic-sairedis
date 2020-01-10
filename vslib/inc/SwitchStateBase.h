@@ -51,6 +51,12 @@ namespace saivs
 
             virtual sai_status_t set_acl_capabilities();
 
+            virtual sai_status_t set_maximum_number_of_childs_per_scheduler_group();
+
+            virtual sai_status_t set_number_of_ecmp_groups();
+
+            virtual sai_status_t initialize_default_objects();
+
         public: // TODO should be pure
 
             virtual sai_status_t create_qos_queues_per_port(

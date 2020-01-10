@@ -549,7 +549,6 @@ sai_status_t SwitchStateBase::create_scheduler_groups_per_port(
 {
     SWSS_LOG_ENTER();
 
-
     // TODO this method can be abstract, FIXME
 
     SWSS_LOG_ERROR("implement in child class");
@@ -572,3 +571,56 @@ sai_status_t SwitchStateBase::create_scheduler_groups()
 
     return SAI_STATUS_SUCCESS;
 }
+
+sai_status_t SwitchStateBase::set_maximum_number_of_childs_per_scheduler_group()
+{
+    SWSS_LOG_ENTER();
+
+    // TODO this method can be abstract, FIXME
+
+    SWSS_LOG_ERROR("implement in child class");
+
+    return SAI_STATUS_NOT_IMPLEMENTED;
+}
+
+sai_status_t SwitchStateBase::set_number_of_ecmp_groups()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_INFO("set number of ecmp groups");
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_SWITCH_ATTR_NUMBER_OF_ECMP_GROUPS;
+    attr.value.u32 = 512;
+
+    return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
+}
+
+sai_status_t SwitchStateBase::initialize_default_objects()
+{
+    SWSS_LOG_ENTER();
+
+    CHECK_STATUS(set_switch_mac_address());
+    CHECK_STATUS(create_cpu_port());
+    CHECK_STATUS(create_default_vlan());
+    CHECK_STATUS(create_default_virtual_router());
+    CHECK_STATUS(create_default_stp_instance());
+    CHECK_STATUS(create_default_1q_bridge());
+    CHECK_STATUS(create_default_trap_group());
+    CHECK_STATUS(create_ports());
+    CHECK_STATUS(set_port_list());
+    CHECK_STATUS(create_bridge_ports());
+    CHECK_STATUS(create_vlan_members());
+    CHECK_STATUS(set_acl_entry_min_prio());
+    CHECK_STATUS(set_acl_capabilities());
+    CHECK_STATUS(create_ingress_priority_groups());
+    CHECK_STATUS(create_qos_queues());
+    CHECK_STATUS(set_maximum_number_of_childs_per_scheduler_group());
+    CHECK_STATUS(set_number_of_ecmp_groups());
+    CHECK_STATUS(set_switch_default_attributes());
+    CHECK_STATUS(create_scheduler_groups());
+
+    return SAI_STATUS_SUCCESS;
+}
+

@@ -244,3 +244,18 @@ sai_status_t SwitchMLNX2700::create_scheduler_groups_per_port(
 
     return SAI_STATUS_SUCCESS;
 }
+
+sai_status_t SwitchMLNX2700::set_maximum_number_of_childs_per_scheduler_group()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_INFO("set maximum number of childs per SG");
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_SWITCH_ATTR_QOS_MAX_NUMBER_OF_CHILDS_PER_SCHEDULER_GROUP;
+    attr.value.u32 = 8;
+
+    return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
+}
+

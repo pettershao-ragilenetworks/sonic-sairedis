@@ -29,6 +29,8 @@ namespace saivs
             virtual sai_status_t create_scheduler_groups_per_port(
                     _In_ sai_object_id_t switch_id,
                     _In_ sai_object_id_t port_id) override;
+
+            virtual sai_status_t set_maximum_number_of_childs_per_scheduler_group() override;
     };
 }
 
