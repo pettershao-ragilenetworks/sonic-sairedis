@@ -47,6 +47,8 @@ namespace saivs
 
             virtual sai_status_t create_bridge_ports();
 
+            virtual sai_status_t set_acl_entry_min_prio();
+
         protected:
 
             virtual sai_status_t create(

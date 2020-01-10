@@ -341,25 +341,6 @@ static sai_status_t set_maximum_number_of_childs_per_scheduler_group()
     return vs_generic_set(SAI_OBJECT_TYPE_SWITCH, ss->getSwitchId(), &attr);
 }
 
-static sai_status_t create_acl_entry_min_prio()
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_INFO("create acl entry min prio");
-
-    sai_attribute_t attr;
-
-    attr.id = SAI_SWITCH_ATTR_ACL_ENTRY_MINIMUM_PRIORITY;
-    attr.value.u32 = 1;
-
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_SWITCH, ss->getSwitchId(), &attr));
-
-    attr.id = SAI_SWITCH_ATTR_ACL_ENTRY_MAXIMUM_PRIORITY;
-    attr.value.u32 = 16000;
-
-    return vs_generic_set(SAI_OBJECT_TYPE_SWITCH, ss->getSwitchId(), &attr);
-}
-
 static sai_status_t create_acl_capabilities()
 {
     SWSS_LOG_ENTER();
@@ -421,7 +402,7 @@ static sai_status_t initialize_default_objects()
     CHECK_STATUS(ss->set_port_list());
     CHECK_STATUS(ss->create_bridge_ports());
     CHECK_STATUS(ss->create_vlan_members());
-    CHECK_STATUS(create_acl_entry_min_prio());
+    CHECK_STATUS(ss->set_acl_entry_min_prio());
     CHECK_STATUS(create_acl_capabilities());
     CHECK_STATUS(ss->create_ingress_priority_groups());
     CHECK_STATUS(create_qos_queues());

@@ -452,4 +452,23 @@ sai_status_t SwitchStateBase::create_bridge_ports()
     return SAI_STATUS_SUCCESS;
 }
 
+sai_status_t SwitchStateBase::set_acl_entry_min_prio()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_INFO("create acl entry min prio");
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_SWITCH_ATTR_ACL_ENTRY_MINIMUM_PRIORITY;
+    attr.value.u32 = 1;
+
+    CHECK_STATUS(set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr));
+
+    attr.id = SAI_SWITCH_ATTR_ACL_ENTRY_MAXIMUM_PRIORITY;
+    attr.value.u32 = 16000;
+
+    return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
+}
+
 
