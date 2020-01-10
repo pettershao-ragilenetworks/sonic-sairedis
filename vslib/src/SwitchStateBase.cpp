@@ -223,4 +223,30 @@ sai_status_t SwitchStateBase::create_ports()
     return SAI_STATUS_SUCCESS;
 }
 
+sai_status_t SwitchStateBase::set_port_list()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_INFO("set port list");
+
+    /*
+     * TODO this is static, when we start to "create/remove" ports we need to
+     * update this list since it can change depends on profile.ini
+     */
+
+    sai_attribute_t attr;
+
+    uint32_t port_count = (uint32_t)m_port_list.size();
+
+    attr.id = SAI_SWITCH_ATTR_PORT_LIST;
+    attr.value.objlist.count = port_count;
+    attr.value.objlist.list = m_port_list.data();
+
+    CHECK_STATUS(set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr));
+
+    attr.id = SAI_SWITCH_ATTR_PORT_NUMBER;
+    attr.value.u32 = port_count;
+
+    return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
+}
 

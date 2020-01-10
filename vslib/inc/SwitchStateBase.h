@@ -29,6 +29,8 @@ namespace saivs
 
             virtual sai_status_t create_ports();
 
+            virtual sai_status_t set_port_list();
+
         protected:
 
             virtual sai_status_t create(

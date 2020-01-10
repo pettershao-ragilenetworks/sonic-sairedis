@@ -685,6 +685,7 @@ static sai_status_t initialize_default_objects()
     CHECK_STATUS(ss->create_default_1q_bridge());
     CHECK_STATUS(create_default_trap_group());
     CHECK_STATUS(ss->create_ports());
+    CHECK_STATUS(ss->set_port_list());
     CHECK_STATUS(create_bridge_ports());
     CHECK_STATUS(create_vlan_members());
     CHECK_STATUS(create_acl_entry_min_prio());
