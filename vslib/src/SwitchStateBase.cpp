@@ -268,3 +268,21 @@ sai_status_t SwitchStateBase::create_default_virtual_router()
     return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
 }
 
+sai_status_t SwitchStateBase::create_default_stp_instance()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_INFO("create default stp instance");
+
+    sai_object_id_t stp_instance_id;
+
+    CHECK_STATUS(create(SAI_OBJECT_TYPE_STP, &stp_instance_id, m_switch_id, 0, NULL));
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_SWITCH_ATTR_DEFAULT_STP_INST_ID;
+    attr.value.oid = stp_instance_id;
+
+    return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
+}
+

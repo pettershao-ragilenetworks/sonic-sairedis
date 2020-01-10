@@ -33,6 +33,8 @@ namespace saivs
 
             virtual sai_status_t create_default_virtual_router();
 
+            virtual sai_status_t create_default_stp_instance();
+
         protected:
 
             virtual sai_status_t create(

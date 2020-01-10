@@ -21,79 +21,6 @@ static std::vector<sai_acl_action_type_t> egress_acl_action_list;
 
 static sai_object_id_t default_bridge_port_1q_router;
 
-static sai_status_t create_default_stp_instance()
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_INFO("create default stp instance");
-
-    sai_object_id_t stp_instance_id;
-
-    sai_object_id_t switch_id = ss->getSwitchId();
-
-    CHECK_STATUS(vs_generic_create(SAI_OBJECT_TYPE_STP, &stp_instance_id, switch_id, 0, NULL));
-
-    sai_attribute_t attr;
-
-    attr.id = SAI_SWITCH_ATTR_DEFAULT_STP_INST_ID;
-    attr.value.oid = stp_instance_id;
-
-    return vs_generic_set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
-}
-
-/*
-static sai_status_t create_vlan_members_for_default_vlan(
-        std::vector<sai_object_id_t>& bridge_port_list,
-        std::vector<sai_object_id_t>& vlan_member_list)
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_INFO("create vlan members for all ports");
-
-    sai_object_id_t switch_id = ss->getSwitchId();
-
-    vlan_member_list.clear();
-
-    ss->vlan_members_map[ss->default_vlan_id] = {};
-
-    for (auto &bridge_port_id : bridge_port_list)
-    {
-        sai_object_id_t vlan_member_id;
-
-        std::vector<sai_attribute_t> attrs;
-
-        sai_attribute_t attr_vlan_id;
-
-        attr_vlan_id.id = SAI_VLAN_MEMBER_ATTR_VLAN_ID;
-        attr_vlan_id.value.u16 = DEFAULT_VLAN_NUMBER;
-
-        attrs.push_back(attr_vlan_id);
-
-        sai_attribute_t attr_port_id;
-
-        // TODO first we need to create bridge and bridge ports ?
-
-        attr_port_id.id = SAI_VLAN_MEMBER_ATTR_BRIDGE_PORT_ID;
-        attr_port_id.value.oid = bridge_port_id;
-
-        attrs.push_back(attr_port_id);
-
-        CHECK_STATUS(vs_generic_create(
-                    SAI_OBJECT_TYPE_VLAN_MEMBER,
-                    &vlan_member_id,
-                    switch_id,
-                    (uint32_t)attrs.size(),
-                    attrs.data()));
-
-        vlan_member_list.push_back(vlan_member_id);
-
-        ss->vlan_members_map[ss->default_vlan_id].insert(vlan_member_id);
-    }
-
-    return SAI_STATUS_SUCCESS;
-}
-*/
-
 static sai_status_t create_default_trap_group()
 {
     SWSS_LOG_ENTER();
@@ -579,7 +506,7 @@ static sai_status_t initialize_default_objects()
     CHECK_STATUS(ss->create_cpu_port());
     CHECK_STATUS(ss->create_default_vlan());
     CHECK_STATUS(ss->create_default_virtual_router());
-    CHECK_STATUS(create_default_stp_instance());
+    CHECK_STATUS(ss->create_default_stp_instance());
     CHECK_STATUS(ss->create_default_1q_bridge());
     CHECK_STATUS(create_default_trap_group());
     CHECK_STATUS(ss->create_ports());
