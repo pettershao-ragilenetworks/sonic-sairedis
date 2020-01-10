@@ -62,6 +62,23 @@ namespace saivs
                     _In_ uint32_t attr_count,
                     _In_ const sai_attribute_t *attr_list);
 
+        public: // refresh
+
+            sai_status_t refresh_ingress_priority_group(
+                    _In_ const sai_attr_metadata_t *meta,
+                    _In_ sai_object_id_t port_id,
+                    _In_ sai_object_id_t switch_id);
+
+            sai_status_t refresh_qos_queues(
+                    _In_ const sai_attr_metadata_t *meta,
+                    _In_ sai_object_id_t port_id,
+                    _In_ sai_object_id_t switch_id);
+
+            sai_status_t refresh_scheduler_groups(
+                    _In_ const sai_attr_metadata_t *meta,
+                    _In_ sai_object_id_t port_id,
+                    _In_ sai_object_id_t switch_id);
+
         public: // TODO should be pure
 
             virtual sai_status_t create_qos_queues_per_port(

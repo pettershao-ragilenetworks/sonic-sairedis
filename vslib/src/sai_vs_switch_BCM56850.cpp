@@ -301,54 +301,6 @@ static sai_status_t refresh_vlan_member_list(
     return vs_generic_set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
 }
 
-static sai_status_t refresh_ingress_priority_group(
-        _In_ const sai_attr_metadata_t *meta,
-        _In_ sai_object_id_t port_id,
-        _In_ sai_object_id_t switch_id)
-{
-    SWSS_LOG_ENTER();
-
-    /*
-     * TODO Currently we don't have index in groups, so we don't know how to
-     * sort.  Returning success, since assuming that we will not create more
-     * ingress priority groups.
-     */
-
-    return SAI_STATUS_SUCCESS;
-}
-
-static sai_status_t refresh_qos_queues(
-        _In_ const sai_attr_metadata_t *meta,
-        _In_ sai_object_id_t port_id,
-        _In_ sai_object_id_t switch_id)
-{
-    SWSS_LOG_ENTER();
-
-    /*
-     * TODO Currently we don't have index in groups, so we don't know how to
-     * sort.  Returning success, since assuming that we will not create more
-     * ingress priority groups.
-     */
-
-    return SAI_STATUS_SUCCESS;
-}
-
-static sai_status_t refresh_scheduler_groups(
-        _In_ const sai_attr_metadata_t *meta,
-        _In_ sai_object_id_t port_id,
-        _In_ sai_object_id_t switch_id)
-{
-    SWSS_LOG_ENTER();
-
-    /*
-     * TODO Currently we don't have index in groups, so we don't know how to
-     * sort.  Returning success, since assuming that we will not create more
-     * ingress priority groups.
-     */
-
-    return SAI_STATUS_SUCCESS;
-}
-
 static sai_status_t refresh_port_list(
         _In_ const sai_attr_metadata_t *meta,
         _In_ sai_object_id_t switch_id)
@@ -476,15 +428,15 @@ sai_status_t refresh_read_only_BCM56850(
         {
             case SAI_PORT_ATTR_QOS_NUMBER_OF_QUEUES:
             case SAI_PORT_ATTR_QOS_QUEUE_LIST:
-                return refresh_qos_queues(meta, object_id, switch_id);
+                return ss->refresh_qos_queues(meta, object_id, switch_id);
 
             case SAI_PORT_ATTR_NUMBER_OF_INGRESS_PRIORITY_GROUPS:
             case SAI_PORT_ATTR_INGRESS_PRIORITY_GROUP_LIST:
-                return refresh_ingress_priority_group(meta, object_id, switch_id);
+                return ss->refresh_ingress_priority_group(meta, object_id, switch_id);
 
             case SAI_PORT_ATTR_QOS_NUMBER_OF_SCHEDULER_GROUPS:
             case SAI_PORT_ATTR_QOS_SCHEDULER_GROUP_LIST:
-                return refresh_scheduler_groups(meta, object_id, switch_id);
+                return ss->refresh_scheduler_groups(meta, object_id, switch_id);
 
                 /*
                  * This status is based on hostif vEthernetX status.
@@ -501,7 +453,7 @@ sai_status_t refresh_read_only_BCM56850(
         {
             case SAI_SCHEDULER_GROUP_ATTR_CHILD_COUNT:
             case SAI_SCHEDULER_GROUP_ATTR_CHILD_LIST:
-                return refresh_scheduler_groups(meta, object_id, switch_id);
+                return ss->refresh_scheduler_groups(meta, object_id, switch_id);
         }
     }
 

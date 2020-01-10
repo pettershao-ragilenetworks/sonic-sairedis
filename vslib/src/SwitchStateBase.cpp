@@ -656,3 +656,51 @@ sai_status_t SwitchStateBase::create_port(
     return SAI_STATUS_SUCCESS;
 }
 
+sai_status_t SwitchStateBase::refresh_ingress_priority_group(
+        _In_ const sai_attr_metadata_t *meta,
+        _In_ sai_object_id_t port_id,
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    /*
+     * TODO Currently we don't have index in groups, so we don't know how to
+     * sort.  Returning success, since assuming that we will not create more
+     * ingress priority groups.
+     */
+
+    return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t SwitchStateBase::refresh_qos_queues(
+        _In_ const sai_attr_metadata_t *meta,
+        _In_ sai_object_id_t port_id,
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    /*
+     * TODO Currently we don't have index in groups, so we don't know how to
+     * sort.  Returning success, since assuming that we will not create more
+     * ingress priority groups.
+     */
+
+    return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t SwitchStateBase::refresh_scheduler_groups(
+        _In_ const sai_attr_metadata_t *meta,
+        _In_ sai_object_id_t port_id,
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    /*
+     * TODO Currently we don't have index in groups, so we don't know how to
+     * sort.  Returning success, since assuming that we will not create more
+     * ingress priority groups.
+     */
+
+    return SAI_STATUS_SUCCESS;
+}
+

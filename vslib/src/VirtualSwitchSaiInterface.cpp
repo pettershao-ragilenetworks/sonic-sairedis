@@ -107,6 +107,7 @@ static std::shared_ptr<SwitchState> vs_read_switch_database_for_warm_restart(
         return nullptr;
     }
 
+    // TODO must be respected switch created here or just data
     std::shared_ptr<SwitchState> ss = std::make_shared<SwitchStateBase>(switch_id);
 
     size_t count = 1; // count is 1 since switch_id was inserted to objectHash in SwitchState constructor
