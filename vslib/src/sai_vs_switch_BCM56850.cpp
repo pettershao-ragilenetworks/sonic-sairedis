@@ -19,70 +19,6 @@ static std::shared_ptr<SwitchStateBase> ss;
 static std::vector<sai_acl_action_type_t> ingress_acl_action_list;
 static std::vector<sai_acl_action_type_t> egress_acl_action_list;
 
-static sai_status_t create_bridge_ports()
-{
-    SWSS_LOG_ENTER();
-
-    sai_object_id_t switch_id = ss->getSwitchId();
-
-    /*
-     * Create bridge port for 1q router.
-     */
-
-    sai_attribute_t attr;
-
-    attr.id = SAI_BRIDGE_PORT_ATTR_TYPE;
-    attr.value.s32 = SAI_BRIDGE_PORT_TYPE_1Q_ROUTER;
-
-    sai_object_id_t default_bridge_port_1q_router;
-
-    CHECK_STATUS(vs_generic_create(SAI_OBJECT_TYPE_BRIDGE_PORT, &default_bridge_port_1q_router, ss->getSwitchId(), 1, &attr));
-
-    attr.id = SAI_BRIDGE_PORT_ATTR_PORT_ID;
-    attr.value.oid = SAI_NULL_OBJECT_ID;
-
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_BRIDGE_PORT, default_bridge_port_1q_router, &attr));
-
-    attr.id = SAI_SWITCH_ATTR_DEFAULT_1Q_BRIDGE_ID;
-
-    CHECK_STATUS(vs_generic_get(SAI_OBJECT_TYPE_SWITCH, switch_id, 1, &attr));
-
-    /*
-     * Create bridge ports for regular ports.
-     */
-
-    sai_object_id_t default_1q_bridge_id = attr.value.oid;
-
-    ss->m_bridge_port_list_port_based.clear();
-
-    for (const auto &port_id: ss->m_port_list)
-    {
-        SWSS_LOG_DEBUG("create bridge port for port %s", sai_serialize_object_id(port_id).c_str());
-
-        sai_attribute_t attrs[4];
-
-        attrs[0].id = SAI_BRIDGE_PORT_ATTR_BRIDGE_ID;
-        attrs[0].value.oid = default_1q_bridge_id;
-
-        attrs[1].id = SAI_BRIDGE_PORT_ATTR_FDB_LEARNING_MODE;
-        attrs[1].value.s32 = SAI_BRIDGE_PORT_FDB_LEARNING_MODE_HW;
-
-        attrs[2].id = SAI_BRIDGE_PORT_ATTR_PORT_ID;
-        attrs[2].value.oid = port_id;
-
-        attrs[3].id = SAI_BRIDGE_PORT_ATTR_TYPE;
-        attrs[3].value.s32 = SAI_BRIDGE_PORT_TYPE_PORT;
-
-        sai_object_id_t bridge_port_id;
-
-        CHECK_STATUS(vs_generic_create(SAI_OBJECT_TYPE_BRIDGE_PORT, &bridge_port_id, switch_id, 4, attrs));
-
-        ss->m_bridge_port_list_port_based.push_back(bridge_port_id);
-    }
-
-    return SAI_STATUS_SUCCESS;
-}
-
 static sai_status_t create_qos_queues_per_port(
         _In_ sai_object_id_t switch_object_id,
         _In_ sai_object_id_t port_id)
@@ -483,7 +419,7 @@ static sai_status_t initialize_default_objects()
     CHECK_STATUS(ss->create_default_trap_group());
     CHECK_STATUS(ss->create_ports());
     CHECK_STATUS(ss->set_port_list());
-    CHECK_STATUS(create_bridge_ports());
+    CHECK_STATUS(ss->create_bridge_ports());
     CHECK_STATUS(ss->create_vlan_members());
     CHECK_STATUS(create_acl_entry_min_prio());
     CHECK_STATUS(create_acl_capabilities());

@@ -145,12 +145,10 @@ sai_status_t SwitchStateBase::create_default_1q_bridge()
     attr.id = SAI_BRIDGE_ATTR_TYPE;
     attr.value.s32 = SAI_BRIDGE_TYPE_1Q;
 
-    sai_object_id_t default_1q_bridge;
-
-    CHECK_STATUS(create(SAI_OBJECT_TYPE_BRIDGE, &default_1q_bridge, m_switch_id, 1, &attr));
+    CHECK_STATUS(create(SAI_OBJECT_TYPE_BRIDGE, &m_default_1q_bridge, m_switch_id, 1, &attr));
 
     attr.id = SAI_SWITCH_ATTR_DEFAULT_1Q_BRIDGE_ID;
-    attr.value.oid = default_1q_bridge;
+    attr.value.oid = m_default_1q_bridge;
 
     return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
 }
@@ -399,6 +397,56 @@ sai_status_t SwitchStateBase::create_vlan_members()
         sai_object_id_t vlan_member_id;
 
         CHECK_STATUS(create(SAI_OBJECT_TYPE_VLAN_MEMBER, &vlan_member_id, m_switch_id, 3, attrs));
+    }
+
+    return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t SwitchStateBase::create_bridge_ports()
+{
+    SWSS_LOG_ENTER();
+
+    // Create bridge port for 1q router.
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_BRIDGE_PORT_ATTR_TYPE;
+    attr.value.s32 = SAI_BRIDGE_PORT_TYPE_1Q_ROUTER;
+
+    CHECK_STATUS(create(SAI_OBJECT_TYPE_BRIDGE_PORT, &m_default_bridge_port_1q_router, m_switch_id, 1, &attr));
+
+    attr.id = SAI_BRIDGE_PORT_ATTR_PORT_ID;
+    attr.value.oid = SAI_NULL_OBJECT_ID;
+
+    CHECK_STATUS(set(SAI_OBJECT_TYPE_BRIDGE_PORT, m_default_bridge_port_1q_router, &attr));
+
+    // Create bridge ports for regular ports.
+
+    m_bridge_port_list_port_based.clear();
+
+    for (const auto &port_id: m_port_list)
+    {
+        SWSS_LOG_DEBUG("create bridge port for port %s", sai_serialize_object_id(port_id).c_str());
+
+        sai_attribute_t attrs[4];
+
+        attrs[0].id = SAI_BRIDGE_PORT_ATTR_BRIDGE_ID;
+        attrs[0].value.oid = m_default_1q_bridge;
+
+        attrs[1].id = SAI_BRIDGE_PORT_ATTR_FDB_LEARNING_MODE;
+        attrs[1].value.s32 = SAI_BRIDGE_PORT_FDB_LEARNING_MODE_HW;
+
+        attrs[2].id = SAI_BRIDGE_PORT_ATTR_PORT_ID;
+        attrs[2].value.oid = port_id;
+
+        attrs[3].id = SAI_BRIDGE_PORT_ATTR_TYPE;
+        attrs[3].value.s32 = SAI_BRIDGE_PORT_TYPE_PORT;
+
+        sai_object_id_t bridge_port_id;
+
+        CHECK_STATUS(create(SAI_OBJECT_TYPE_BRIDGE_PORT, &bridge_port_id, m_switch_id, 4, attrs));
+
+        m_bridge_port_list_port_based.push_back(bridge_port_id);
     }
 
     return SAI_STATUS_SUCCESS;

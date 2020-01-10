@@ -45,6 +45,8 @@ namespace saivs
 
             virtual sai_status_t create_vlan_members();
 
+            virtual sai_status_t create_bridge_ports();
+
         protected:
 
             virtual sai_status_t create(
@@ -67,9 +69,10 @@ namespace saivs
             std::vector<sai_acl_action_type_t> ingress_acl_action_list;
             std::vector<sai_acl_action_type_t> m_egress_acl_action_list;
 
-            sai_object_id_t m_default_vlan_id;
-
             sai_object_id_t m_cpu_port_id;
+            sai_object_id_t m_default_1q_bridge;
+            sai_object_id_t m_default_bridge_port_1q_router;
+            sai_object_id_t m_default_vlan_id;
 
     };
 }
