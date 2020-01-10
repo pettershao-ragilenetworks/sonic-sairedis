@@ -4,6 +4,8 @@
 
 #include "sai_vs.h" // TODO to be removed
 
+#include <algorithm>
+
 using namespace saivs;
 
 SwitchStateBase::SwitchStateBase(
@@ -825,4 +827,69 @@ sai_status_t SwitchStateBase::refresh_vlan_member_list(
     return vs_generic_set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
 }
 
+sai_status_t SwitchStateBase::refresh_port_list(
+        _In_ const sai_attr_metadata_t *meta,
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    // since now port can be added or removed, we need to update port list
+    // dynamically
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_SWITCH_ATTR_CPU_PORT;
+
+    CHECK_STATUS(vs_generic_get(SAI_OBJECT_TYPE_SWITCH, switch_id, 1, &attr));
+
+    const sai_object_id_t cpu_port_id = attr.value.oid;
+
+    m_port_list.clear();
+
+    // iterate via ASIC state to find all the ports
+
+    for (const auto& it: m_objectHash.at(SAI_OBJECT_TYPE_PORT))
+    {
+        sai_object_id_t port_id;
+        sai_deserialize_object_id(it.first, port_id);
+
+        // don't put CPU port id on the list
+
+        if (port_id == cpu_port_id)
+            continue;
+
+        m_port_list.push_back(port_id);
+    }
+
+    /*
+     * TODO:
+     *
+     * Currently we don't know what's happen on brcm SAI implementation when
+     * port is removed and then added, will new port could get the same vendor
+     * OID or always different, and what is order of those new oids on the
+     * PORT_LIST attribute.
+     *
+     * This needs to be investigated, and to reflect exact behaviour here.
+     * Currently we just sort all the port oids.
+     */
+
+    std::sort(m_port_list.begin(), m_port_list.end());
+
+    uint32_t port_count = (uint32_t)m_port_list.size();
+
+    attr.id = SAI_SWITCH_ATTR_PORT_LIST;
+    attr.value.objlist.count = port_count;
+    attr.value.objlist.list = m_port_list.data();
+
+    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr));
+
+    attr.id = SAI_SWITCH_ATTR_PORT_NUMBER;
+    attr.value.u32 = port_count;
+
+    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr));
+
+    SWSS_LOG_NOTICE("refreshed port list, current port number: %zu, not counting cpu port", m_port_list.size());
+
+    return SAI_STATUS_SUCCESS;
+}
 

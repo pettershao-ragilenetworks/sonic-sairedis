@@ -39,9 +39,6 @@ sai_status_t refresh_read_only_MLNX2700(
     {
         switch (meta->attrid)
         {
-            case SAI_SWITCH_ATTR_PORT_NUMBER:
-                return SAI_STATUS_SUCCESS;
-
             case SAI_SWITCH_ATTR_CPU_PORT:
             case SAI_SWITCH_ATTR_DEFAULT_VIRTUAL_ROUTER_ID:
             case SAI_SWITCH_ATTR_DEFAULT_TRAP_GROUP:
@@ -59,13 +56,9 @@ sai_status_t refresh_read_only_MLNX2700(
             case SAI_SWITCH_ATTR_ACL_STAGE_EGRESS:
                 return SAI_STATUS_SUCCESS;
 
-                /*
-                 * We don't need to recalculate port list, since now we assume
-                 * that port list will not change.
-                 */
-
+            case SAI_SWITCH_ATTR_PORT_NUMBER:
             case SAI_SWITCH_ATTR_PORT_LIST:
-                return SAI_STATUS_SUCCESS;
+                return ss->refresh_port_list(meta, switch_id);
 
             case SAI_SWITCH_ATTR_QOS_MAX_NUMBER_OF_CHILDS_PER_SCHEDULER_GROUP:
                 return SAI_STATUS_SUCCESS;
