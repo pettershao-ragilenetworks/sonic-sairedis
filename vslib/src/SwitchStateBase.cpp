@@ -768,3 +768,61 @@ sai_status_t SwitchStateBase::refresh_bridge_port_list(
 
     return SAI_STATUS_NOT_IMPLEMENTED;
 }
+
+sai_status_t SwitchStateBase::refresh_vlan_member_list(
+        _In_ const sai_attr_metadata_t *meta,
+        _In_ sai_object_id_t vlan_id,
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    auto &all_vlan_members = m_objectHash.at(SAI_OBJECT_TYPE_VLAN_MEMBER);
+
+    auto m_member_list = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_VLAN, SAI_VLAN_ATTR_MEMBER_LIST);
+    auto md_vlan_id = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_VLAN_MEMBER, SAI_VLAN_MEMBER_ATTR_VLAN_ID);
+    //auto md_brportid = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_VLAN_MEMBER, SAI_VLAN_MEMBER_ATTR_BRIDGE_PORT_ID);
+
+    std::vector<sai_object_id_t> vlan_member_list;
+
+    /*
+     * We want order as bridge port order (so port order)
+     */
+
+    sai_attribute_t attr;
+
+    auto me = m_objectHash.at(SAI_OBJECT_TYPE_VLAN).at(sai_serialize_object_id(vlan_id));
+
+    for (auto vm: all_vlan_members)
+    {
+        if (vm.second.at(md_vlan_id->attridname)->getAttr()->value.oid != vlan_id)
+        {
+            /*
+             * Only interested in our vlan
+             */
+
+            continue;
+        }
+
+        // TODO we need order as bridge ports, but we need bridge id!
+
+        {
+            sai_object_id_t vlan_member_id;
+
+            sai_deserialize_object_id(vm.first, vlan_member_id);
+
+            vlan_member_list.push_back(vlan_member_id);
+        }
+    }
+
+    uint32_t vlan_member_list_count = (uint32_t)vlan_member_list.size();
+
+    SWSS_LOG_NOTICE("recalculated %s: %u", m_member_list->attridname, vlan_member_list_count);
+
+    attr.id = SAI_VLAN_ATTR_MEMBER_LIST;
+    attr.value.objlist.count = vlan_member_list_count;
+    attr.value.objlist.list = vlan_member_list.data();
+
+    return vs_generic_set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
+}
+
+
