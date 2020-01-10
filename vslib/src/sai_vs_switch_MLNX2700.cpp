@@ -15,66 +15,6 @@ using namespace saivs;
 
 static std::shared_ptr<SwitchStateBase> ss;
 
-void init_switch_MLNX2700(
-        _In_ sai_object_id_t switch_id,
-        _In_ std::shared_ptr<SwitchState> warmBootState)
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_TIMER("init");
-
-    if (switch_id == SAI_NULL_OBJECT_ID)
-    {
-        SWSS_LOG_THROW("init switch with NULL switch id is not allowed");
-    }
-
-    if (warmBootState != nullptr)
-    {
-        g_switch_state_map[switch_id] = warmBootState;
-
-        // TODO cast right switch or different data pass
-        ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
-
-        ss->warm_boot_initialize_objects();
-
-        SWSS_LOG_NOTICE("initialized switch %s in WARM boot mode", sai_serialize_object_id(switch_id).c_str());
-
-        return;
-    }
-
-    if (g_switch_state_map.find(switch_id) != g_switch_state_map.end())
-    {
-        SWSS_LOG_THROW("switch already exists %s", sai_serialize_object_id(switch_id).c_str());
-    }
-
-    g_switch_state_map[switch_id] = std::make_shared<SwitchMLNX2700>(switch_id);
-
-    ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
-
-    sai_status_t status = ss->initialize_default_objects();
-
-    if (status != SAI_STATUS_SUCCESS)
-    {
-        SWSS_LOG_THROW("unable to init switch %s", sai_serialize_status(status).c_str());
-    }
-
-    SWSS_LOG_NOTICE("initialized switch %s", sai_serialize_object_id(switch_id).c_str());
-}
-
-void uninit_switch_MLNX2700(
-        _In_ sai_object_id_t switch_id)
-{
-    SWSS_LOG_ENTER();
-
-    if (g_switch_state_map.find(switch_id) == g_switch_state_map.end())
-    {
-        SWSS_LOG_THROW("switch doesn't exist 0x%lx", switch_id);
-    }
-
-    SWSS_LOG_NOTICE("remove switch 0x%lx", switch_id);
-
-    g_switch_state_map.erase(switch_id);
-}
 
 /*
  * TODO develop a way to filter by oid attribute.
@@ -249,6 +189,8 @@ sai_status_t refresh_read_only_MLNX2700(
         _In_ sai_object_id_t switch_id)
 {
     SWSS_LOG_ENTER();
+
+    ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
 
     if (meta->objecttype == SAI_OBJECT_TYPE_SWITCH)
     {

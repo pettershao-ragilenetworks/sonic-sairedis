@@ -11,7 +11,10 @@
 #include "meta/sai_serialize.h"
 #include "sai_vs_switch_BCM56850.h"
 #include "sai_vs_switch_MLNX2700.h"
+
 #include "SwitchStateBase.h"
+#include "SwitchBCM56850.h"
+#include "SwitchMLNX2700.h"
 
 /*
  * Max number of counters used in 1 api call
@@ -517,6 +520,55 @@ DECLARE_SET_ENTRY(NEIGHBOR_ENTRY,neighbor_entry);
 DECLARE_SET_ENTRY(ROUTE_ENTRY,route_entry);
 DECLARE_SET_ENTRY(NAT_ENTRY,nat_entry);
 
+// TODO must be revisited
+template <class T>
+static void init_switch(
+        _In_ sai_object_id_t switch_id,
+        _In_ std::shared_ptr<SwitchState> warmBootState)
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_TIMER("init");
+
+    if (switch_id == SAI_NULL_OBJECT_ID)
+    {
+        SWSS_LOG_THROW("init switch with NULL switch id is not allowed");
+    }
+
+    if (warmBootState != nullptr)
+    {
+        g_switch_state_map[switch_id] = warmBootState;
+
+        // TODO cast right switch or different data pass
+        auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
+
+        ss->warm_boot_initialize_objects();
+
+        SWSS_LOG_NOTICE("initialized switch %s in WARM boot mode", sai_serialize_object_id(switch_id).c_str());
+
+        return;
+    }
+
+    if (g_switch_state_map.find(switch_id) != g_switch_state_map.end())
+    {
+        SWSS_LOG_THROW("switch already exists %s", sai_serialize_object_id(switch_id).c_str());
+    }
+
+    g_switch_state_map[switch_id] = std::make_shared<T>(switch_id);
+
+    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
+
+    sai_status_t status = ss->initialize_default_objects();
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_THROW("unable to init switch %s", sai_serialize_status(status).c_str());
+    }
+
+    SWSS_LOG_NOTICE("initialized switch %s", sai_serialize_object_id(switch_id).c_str());
+}
+
+
 sai_status_t VirtualSwitchSaiInterface::create(
         _In_ sai_object_type_t object_type,
         _In_ const std::string& serializedObjectId,
@@ -542,11 +594,11 @@ sai_status_t VirtualSwitchSaiInterface::create(
         switch (g_vs_switch_type)
         {
             case SAI_VS_SWITCH_TYPE_BCM56850:
-                init_switch_BCM56850(switch_id, warmBootState);
+                init_switch<SwitchBCM56850>(switch_id, warmBootState);
                 break;
 
             case SAI_VS_SWITCH_TYPE_MLNX2700:
-                init_switch_MLNX2700(switch_id, warmBootState);
+                init_switch<SwitchMLNX2700>(switch_id, warmBootState);
                 break;
 
             default:
@@ -730,6 +782,21 @@ static void vs_dump_switch_database_for_warm_restart(
     SWSS_LOG_NOTICE("dumped %zu objects to %s", count, g_warm_boot_write_file);
 }
 
+static void uninit_switch(
+        _In_ sai_object_id_t switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    if (g_switch_state_map.find(switch_id) == g_switch_state_map.end())
+    {
+        SWSS_LOG_THROW("switch doesn't exist 0x%lx", switch_id);
+    }
+
+    SWSS_LOG_NOTICE("remove switch 0x%lx", switch_id);
+
+    g_switch_state_map.erase(switch_id);
+}
+
 sai_status_t VirtualSwitchSaiInterface::remove(
         _In_ sai_object_type_t objectType,
         _In_ const std::string& serializedObjectId)
@@ -798,11 +865,8 @@ sai_status_t VirtualSwitchSaiInterface::remove(
         switch (g_vs_switch_type)
         {
             case SAI_VS_SWITCH_TYPE_BCM56850:
-                uninit_switch_BCM56850(object_id);
-                break;
-
             case SAI_VS_SWITCH_TYPE_MLNX2700:
-                uninit_switch_MLNX2700(object_id);
+                uninit_switch(object_id);
                 break;
 
             default:
