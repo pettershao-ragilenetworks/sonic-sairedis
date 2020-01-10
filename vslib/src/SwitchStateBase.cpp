@@ -111,4 +111,27 @@ sai_status_t SwitchStateBase::create_default_vlan()
     return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
 }
 
+sai_status_t SwitchStateBase::create_cpu_port()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_INFO("create cpu port");
+
+    sai_attribute_t attr;
+
+    CHECK_STATUS(create(SAI_OBJECT_TYPE_PORT, &m_cpu_port_id, m_switch_id, 0, &attr));
+
+    // populate cpu port object on switch
+    attr.id = SAI_SWITCH_ATTR_CPU_PORT;
+    attr.value.oid = m_cpu_port_id;
+
+    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr));
+
+    // set type on cpu
+    attr.id = SAI_PORT_ATTR_TYPE;
+    attr.value.s32 = SAI_PORT_TYPE_CPU;
+
+    return set(SAI_OBJECT_TYPE_PORT, m_cpu_port_id, &attr);
+}
+
 

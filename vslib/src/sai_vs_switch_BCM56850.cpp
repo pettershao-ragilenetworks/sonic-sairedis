@@ -22,33 +22,6 @@ static std::vector<sai_object_id_t> bridge_port_list_port_based;
 static std::vector<sai_acl_action_type_t> ingress_acl_action_list;
 static std::vector<sai_acl_action_type_t> egress_acl_action_list;
 
-static sai_status_t create_cpu_port()
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_INFO("create cpu port");
-
-    sai_attribute_t attr;
-
-    sai_object_id_t switch_id = ss->getSwitchId();
-
-    sai_object_id_t cpu_port_id;
-
-    CHECK_STATUS(vs_generic_create(SAI_OBJECT_TYPE_PORT, &cpu_port_id, switch_id, 0, &attr));
-
-    // populate cpu port object on switch
-    attr.id = SAI_SWITCH_ATTR_CPU_PORT;
-    attr.value.oid = cpu_port_id;
-
-    CHECK_STATUS(vs_generic_set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr));
-
-    // set type on cpu
-    attr.id = SAI_PORT_ATTR_TYPE;
-    attr.value.s32 = SAI_PORT_TYPE_CPU;
-
-    return vs_generic_set(SAI_OBJECT_TYPE_PORT, cpu_port_id, &attr);
-}
-
 static sai_status_t create_default_1q_bridge()
 {
     SWSS_LOG_ENTER();
@@ -801,7 +774,7 @@ static sai_status_t initialize_default_objects()
 
     CHECK_STATUS(ss->set_switch_mac_address());
 
-    CHECK_STATUS(create_cpu_port());
+    CHECK_STATUS(ss->create_cpu_port());
     CHECK_STATUS(ss->create_default_vlan());
     CHECK_STATUS(create_default_virtual_router());
     CHECK_STATUS(create_default_stp_instance());
