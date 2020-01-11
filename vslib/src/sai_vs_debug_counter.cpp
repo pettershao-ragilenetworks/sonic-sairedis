@@ -5,6 +5,8 @@
 
 const int maxDebugCounters = 32;
 
+// TODO those indexes would need to be updated during warm boot
+
 static std::unordered_set<uint32_t> indices;
 
 static uint32_t get_index()

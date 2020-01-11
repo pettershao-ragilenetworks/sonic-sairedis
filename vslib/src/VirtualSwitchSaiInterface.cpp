@@ -426,12 +426,33 @@ sai_status_t VirtualSwitchSaiInterface::remove(
             sai_serialize_object_id(objectId));
 }
 
+sai_status_t VirtualSwitchSaiInterface::preSet(
+        _In_ sai_object_type_t objectType,
+        _In_ sai_object_id_t objectId,
+        _In_ const sai_attribute_t *attr)
+{
+    SWSS_LOG_ENTER();
+
+    switch (objectType)
+    {
+        case SAI_OBJECT_TYPE_PORT:
+            return preSetPort(objectId, attr);
+
+        default:
+            return SAI_STATUS_SUCCESS;
+    }
+}
+
 sai_status_t VirtualSwitchSaiInterface::set(
         _In_ sai_object_type_t objectType,
         _In_ sai_object_id_t objectId,
         _In_ const sai_attribute_t *attr)
 {
     SWSS_LOG_ENTER();
+
+    auto status = preSet(objectType, objectId, attr);
+
+    CHECK_STATUS(status);
 
     return set(
             objectType,
