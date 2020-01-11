@@ -881,17 +881,7 @@ sai_status_t VirtualSwitchSaiInterface::remove(
 
         g_realObjectIdManager->releaseObjectId(object_id);
 
-        switch (g_vs_switch_type)
-        {
-            case SAI_VS_SWITCH_TYPE_BCM56850:
-            case SAI_VS_SWITCH_TYPE_MLNX2700:
-                uninit_switch(object_id);
-                break;
-
-            default:
-                SWSS_LOG_WARN("unknown switch type: %d", g_vs_switch_type);
-                break;
-        }
+        uninit_switch(object_id);
     }
 
     return status;
