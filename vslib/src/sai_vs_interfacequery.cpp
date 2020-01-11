@@ -856,13 +856,6 @@ sai_status_t sai_api_uninitialize(void)
     SWSS_LOG_ENTER();
     VS_CHECK_API_INITIALIZED();
 
-    if (!Globals::apiInitialized)
-    {
-        SWSS_LOG_ERROR("api not initialized");
-
-        return SAI_STATUS_FAILURE;
-    }
-
     SWSS_LOG_NOTICE("stopping threads");
 
     g_unittestChannelRun = false;
@@ -915,12 +908,6 @@ sai_status_t sai_api_query(
     {
         SWSS_LOG_ERROR("NULL method table passed to SAI API initialize");
         return SAI_STATUS_INVALID_PARAMETER;
-    }
-
-    if (!Globals::apiInitialized)
-    {
-        SWSS_LOG_ERROR("SAI API not initialized before calling API query");
-        return SAI_STATUS_UNINITIALIZED;
     }
 
     switch (sai_api_id)
