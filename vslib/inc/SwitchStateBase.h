@@ -121,6 +121,10 @@ namespace saivs
                     _In_ uint32_t attr_count,
                     _In_ const sai_attribute_t *attr_list);
 
+            virtual sai_status_t remove(
+                    _In_ sai_object_type_t object_type,
+                    _In_ sai_object_id_t object_id);
+
             virtual sai_status_t set(
                     _In_ sai_object_type_t objectType,
                     _In_ sai_object_id_t objectId,
@@ -140,6 +144,10 @@ namespace saivs
                     _In_ sai_object_id_t switch_id,
                     _In_ uint32_t attr_count,
                     _In_ const sai_attribute_t *attr_list);
+
+            virtual sai_status_t remove(
+                    _In_ sai_object_type_t object_type,
+                    _In_ const std::string &serializedObjectId);
 
             virtual sai_status_t set(
                     _In_ sai_object_type_t objectType,

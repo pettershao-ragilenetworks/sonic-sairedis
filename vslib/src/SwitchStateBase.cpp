@@ -84,6 +84,41 @@ sai_status_t SwitchStateBase::create(
     return SAI_STATUS_SUCCESS;
 }
 
+sai_status_t SwitchStateBase::remove(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    auto sid = sai_serialize_object_id(objectId);
+
+    return remove(object_type, sid);
+}
+
+sai_status_t SwitchStateBase::remove(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::string &serializedObjectId)
+{
+    SWSS_LOG_ENTER();
+
+    auto &objectHash = m_objectHash.at(object_type);
+
+    auto it = objectHash.find(serializedObjectId);
+
+    if (it == objectHash.end())
+    {
+        SWSS_LOG_ERROR("not found %s:%s",
+                sai_serialize_object_type(object_type).c_str(),
+                serializedObjectId.c_str());
+
+        return SAI_STATUS_ITEM_NOT_FOUND;
+    }
+
+    objectHash.erase(it);
+
+    return SAI_STATUS_SUCCESS;
+}
+
 sai_status_t SwitchStateBase::set(
         _In_ sai_object_type_t objectType,
         _In_ const std::string &serializedObjectId,

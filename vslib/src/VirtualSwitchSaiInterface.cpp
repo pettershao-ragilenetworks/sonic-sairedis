@@ -685,31 +685,6 @@ sai_status_t VirtualSwitchSaiInterface::create(
     return ss->create(object_type, serializedObjectId, switch_id, attr_count, attr_list);
 }
 
-static sai_status_t internal_vs_generic_remove(
-        _In_ sai_object_type_t object_type,
-        _In_ const std::string &serializedObjectId,
-        _In_ sai_object_id_t switch_id)
-{
-    SWSS_LOG_ENTER();
-
-    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(object_type);
-
-    auto it = objectHash.find(serializedObjectId);
-
-    if (it == objectHash.end())
-    {
-        SWSS_LOG_ERROR("not found %s:%s",
-                sai_serialize_object_type(object_type).c_str(),
-                serializedObjectId.c_str());
-
-        return SAI_STATUS_ITEM_NOT_FOUND;
-    }
-
-    objectHash.erase(it);
-
-    return SAI_STATUS_SUCCESS;
-}
-
 static void vs_dump_switch_database_for_warm_restart(
         _In_ sai_object_id_t switch_id)
 {
@@ -866,10 +841,10 @@ sai_status_t VirtualSwitchSaiInterface::remove(
         }
     }
 
-    sai_status_t status = internal_vs_generic_remove(
-            objectType,
-            serializedObjectId,
-            switch_id);
+    // TODO remove cast
+    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
+
+    auto status = ss->remove(objectType, serializedObjectId);
 
     if (objectType == SAI_OBJECT_TYPE_SWITCH &&
             status == SAI_STATUS_SUCCESS)
