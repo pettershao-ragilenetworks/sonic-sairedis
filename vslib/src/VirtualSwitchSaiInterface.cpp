@@ -664,6 +664,12 @@ sai_status_t VirtualSwitchSaiInterface::create(
 
     sai_object_id_t switch_id;
 
+    if (g_switch_state_map.size() == 0)
+    {
+        SWSS_LOG_ERROR("no switch!, was removed but some function still call");
+        return SAI_STATUS_FAILURE;
+    }
+
     if (g_switch_state_map.size() == 1)
     {
         switch_id = g_switch_state_map.begin()->first;
@@ -815,6 +821,12 @@ sai_status_t VirtualSwitchSaiInterface::remove(
 
     sai_object_id_t switch_id;
 
+    if (g_switch_state_map.size() == 0)
+    {
+        SWSS_LOG_ERROR("no switch!, was removed but some function still call");
+        return SAI_STATUS_FAILURE;
+    }
+
     if (g_switch_state_map.size() == 1)
     {
         switch_id = g_switch_state_map.begin()->first;
@@ -897,6 +909,12 @@ sai_status_t VirtualSwitchSaiInterface::set(
 
     sai_object_id_t switch_id = SAI_NULL_OBJECT_ID; // g_realObjectIdManager->saiSwitchIdQuery(objectId)
 
+    if (g_switch_state_map.size() == 0)
+    {
+        SWSS_LOG_ERROR("no switch!, was removed but some function still call");
+        return SAI_STATUS_FAILURE;
+    }
+
     if (g_switch_state_map.size() == 1)
     {
         switch_id = g_switch_state_map.begin()->first;
@@ -921,6 +939,12 @@ sai_status_t VirtualSwitchSaiInterface::get(
     SWSS_LOG_ENTER();
 
     sai_object_id_t switch_id = SAI_NULL_OBJECT_ID;
+
+    if (g_switch_state_map.size() == 0)
+    {
+        SWSS_LOG_ERROR("no switch!, was removed but some function still call");
+        return SAI_STATUS_FAILURE;
+    }
 
     if (g_switch_state_map.size() == 1)
     {

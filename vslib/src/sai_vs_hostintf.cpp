@@ -500,6 +500,9 @@ void hostif_info_t::process_packet_for_fdb_event(
 {
     MUTEX();
 
+    // TODO this function could be still called when switch is removed
+    // during syncd shutdown
+
     SWSS_LOG_ENTER();
 
     uint32_t frametime = (uint32_t)time(NULL);
