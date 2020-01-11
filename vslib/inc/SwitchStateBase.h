@@ -15,7 +15,7 @@ namespace saivs
 
             virtual ~SwitchStateBase() = default;
 
-        public: // TODO to protected
+        protected:
 
             virtual sai_status_t set_switch_mac_address();
 
@@ -54,6 +54,8 @@ namespace saivs
 
             virtual sai_status_t set_number_of_ecmp_groups();
 
+        public:
+
             virtual sai_status_t initialize_default_objects();
 
             virtual sai_status_t create_port(
@@ -61,7 +63,7 @@ namespace saivs
                     _In_ uint32_t attr_count,
                     _In_ const sai_attribute_t *attr_list);
 
-        public: // refresh
+        protected : // refresh
 
             virtual sai_status_t refresh_ingress_priority_group(
                     _In_ const sai_attr_metadata_t *meta,
@@ -86,13 +88,15 @@ namespace saivs
             virtual sai_status_t refresh_port_list(
                     _In_ const sai_attr_metadata_t *meta);
 
+        public:
+
             virtual sai_status_t warm_boot_initialize_objects();
 
             virtual sai_status_t refresh_read_only(
                     _In_ const sai_attr_metadata_t *meta,
                     _In_ sai_object_id_t object_id);
 
-        public: // TODO should be pure
+        protected: // TODO should be pure
 
             virtual sai_status_t create_qos_queues_per_port(
                     _In_ sai_object_id_t port_id);
@@ -139,7 +143,7 @@ namespace saivs
                     _In_ uint32_t attr_count,
                     _Out_ sai_attribute_t *attr_list);
 
-        public: // TODO to protected
+        protected:
 
             std::vector<sai_object_id_t> m_port_list;
             std::vector<sai_object_id_t> m_bridge_port_list_port_based;
