@@ -109,7 +109,7 @@ static std::shared_ptr<SwitchState> vs_read_switch_database_for_warm_restart(
     }
 
     // TODO must be respected switch created here or just data
-    std::shared_ptr<SwitchState> ss = std::make_shared<SwitchStateBase>(switch_id);
+    std::shared_ptr<SwitchStateBase> ss = std::make_shared<SwitchStateBase>(switch_id);
 
     size_t count = 1; // count is 1 since switch_id was inserted to objectHash in SwitchState constructor
 
@@ -137,7 +137,7 @@ static std::shared_ptr<SwitchState> vs_read_switch_database_for_warm_restart(
             {
                 FdbInfo fi = FdbInfo::deserialize(str_object_id);
 
-                g_fdb_info_set.insert(fi);
+                ss->m_fdb_info_set.insert(fi);
             }
 
             continue;
@@ -203,7 +203,7 @@ static std::shared_ptr<SwitchState> vs_read_switch_database_for_warm_restart(
 
     if (g_vs_hostif_use_tap_device)
     {
-        SWSS_LOG_NOTICE("loaded %zu fdb infos", g_fdb_info_set.size());
+        SWSS_LOG_NOTICE("loaded %zu fdb infos", ss->m_fdb_info_set.size());
     }
 
     SWSS_LOG_NOTICE("loaded %zu objects from: %s", count, g_warm_boot_read_file);
@@ -750,6 +750,9 @@ static void vs_dump_switch_database_for_warm_restart(
         }
     }
 
+    // TODO remove cast
+    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map.at(switch_id));
+
     if (g_vs_hostif_use_tap_device)
     {
         /*
@@ -757,12 +760,12 @@ static void vs_dump_switch_database_for_warm_restart(
          * data and restore it on warm start.
          */
 
-        for (auto fi: g_fdb_info_set)
+        for (auto fi: ss->m_fdb_info_set)
         {
             dumpFile << SAI_VS_FDB_INFO << " " << fi.serialize() << std::endl;
         }
 
-        SWSS_LOG_NOTICE("dumped %zu fdb infos", g_fdb_info_set.size());
+        SWSS_LOG_NOTICE("dumped %zu fdb infos", ss->m_fdb_info_set.size());
     }
 
     dumpFile.close();

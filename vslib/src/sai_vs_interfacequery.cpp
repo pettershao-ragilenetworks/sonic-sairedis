@@ -14,6 +14,7 @@
 #include "SwitchContainer.h"
 #include "RealObjectIdManager.h"
 #include "VirtualSwitchSaiInterface.h"
+#include "SwitchStateBase.h"
 
 using namespace saivs;
 
@@ -375,58 +376,22 @@ void processFdbEntriesForAging()
 
     if (!Globals::apimutex.try_lock())
     {
+        // if we are under mutex when calling uninitialize
+        // and doing thread join, this can cause deadlock if
+        // this will kick in, so try lock instead of mutex guard.
         return;
     }
 
-    SWSS_LOG_INFO("fdb infos to process: %zu", g_fdb_info_set.size());
+    // process for all switches
 
-    uint32_t current = (uint32_t)time(NULL);
-
-    // find aged fdb entries
-
-    for (auto it = g_fdb_info_set.begin(); it != g_fdb_info_set.end();)
+    for (auto& it: g_switch_state_map)
     {
-        sai_attribute_t attr;
-
-        attr.id = SAI_SWITCH_ATTR_FDB_AGING_TIME;
-
-        sai_status_t status = vs_generic_get(SAI_OBJECT_TYPE_SWITCH, it->getFdbEntry().switch_id, 1, &attr);
-
-        if (status != SAI_STATUS_SUCCESS)
-        {
-            SWSS_LOG_WARN("failed to get FDB aging time for switch %s",
-                    sai_serialize_object_id(it->getFdbEntry().switch_id).c_str());
-
-            ++it;
-            continue;
-        }
-
-        uint32_t aging_time = attr.value.u32;
-
-        if (aging_time == 0)
-        {
-            // aging is disabled
-            ++it;
-            continue;
-        }
-
-        if ((current - it->getTimestamp()) >= aging_time)
-        {
-            FdbInfo fi = *it;
-
-            processFdbInfo(fi, SAI_FDB_EVENT_AGED);
-
-            it = g_fdb_info_set.erase(it);
-        }
-        else
-        {
-            ++it;
-        }
+        // TODO remove cast
+        std::dynamic_pointer_cast<SwitchStateBase>(it.second)->processFdbEntriesForAging();
     }
 
     Globals::apimutex.unlock();
 }
-
 
 /**
  * @brief FDB aging thread timeout in milliseconds.
@@ -501,7 +466,6 @@ void clear_local_state()
     g_laneMap.clear();
 
     g_switch_state_map.clear();
-    g_fdb_info_set.clear();
 }
 
 bool check_ifname(
@@ -813,8 +777,6 @@ sai_status_t sai_api_initialize(
     g_unittestChannelRun = true;
 
     g_unittestChannelThread = std::make_shared<std::thread>(std::thread(unittestChannelThreadProc));
-
-    g_fdb_info_set.clear();
 
     g_fdbAgingThreadEvent = std::make_shared<swss::SelectableEvent>();
 

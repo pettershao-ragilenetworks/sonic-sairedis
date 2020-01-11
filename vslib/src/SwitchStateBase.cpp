@@ -1258,4 +1258,53 @@ sai_status_t SwitchStateBase::refresh_read_only(
     return SAI_STATUS_NOT_IMPLEMENTED;
 }
 
+void SwitchStateBase::processFdbEntriesForAging()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_NOTICE("fdb infos to process: %zu", m_fdb_info_set.size());
+
+    uint32_t current = (uint32_t)time(NULL);
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_SWITCH_ATTR_FDB_AGING_TIME;
+
+    sai_status_t status = get(SAI_OBJECT_TYPE_SWITCH, m_switch_id, 1, &attr);
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_WARN("failed to get FDB aging time for switch %s",
+                sai_serialize_object_id(m_switch_id).c_str());
+
+        return;
+    }
+
+    uint32_t aging_time = attr.value.u32;
+
+    if (aging_time == 0)
+    {
+        SWSS_LOG_NOTICE("aging is disabled");
+        // aging is disabled
+        return;
+    }
+
+    // find aged fdb entries
+
+    for (auto it = m_fdb_info_set.begin(); it != m_fdb_info_set.end();)
+    {
+        if ((current - it->getTimestamp()) >= aging_time)
+        {
+            FdbInfo fi = *it;
+
+            processFdbInfo(fi, SAI_FDB_EVENT_AGED);
+
+            it = m_fdb_info_set.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+}
 

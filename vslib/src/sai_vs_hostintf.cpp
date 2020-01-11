@@ -7,6 +7,7 @@
 #include "meta/sai_serialize.h"
 
 #include "SelectableFd.h"
+#include "SwitchStateBase.h"
 
 #include <string.h>
 #include <sys/types.h>
@@ -88,8 +89,6 @@ typedef struct _hostif_info_t
 // TODO must be per switch when multiple switch support will be used
 // since interface names can be the same in each switch
 std::map<std::string, std::shared_ptr<hostif_info_t>> hostif_info_map;
-
-std::set<FdbInfo> g_fdb_info_set;
 
 void updateLocalDB(
         _In_ const sai_fdb_event_notification_data_t &data,
@@ -624,9 +623,20 @@ void hostif_info_t::process_packet_for_fdb_event(
 
     memcpy(fi.m_fdbEntry.mac_address, eh->h_source, sizeof(sai_mac_t));
 
-    std::set<FdbInfo>::iterator it = g_fdb_info_set.find(fi);
+    if (g_switch_state_map.size()== 0)
+    {
+        // fdb arrived on destroyed switch, we need to move processing to switch
+        // and remove will close this thread
+        SWSS_LOG_WARN("g_switch_state_map.size is ZERO, but %s called, logic error, FIXME", __PRETTY_FUNCTION__);
+        return;
+    }
 
-    if (it != g_fdb_info_set.end())
+    // TODO cast right switch or different data pass
+    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map.begin()->second);
+
+    std::set<FdbInfo>::iterator it = ss->m_fdb_info_set.find(fi);
+
+    if (it != ss->m_fdb_info_set.end())
     {
         // this key was found, update timestamp
         // and since iterator is const we need to reinsert
@@ -635,7 +645,7 @@ void hostif_info_t::process_packet_for_fdb_event(
 
         fi.setTimestamp(frametime);
 
-        g_fdb_info_set.insert(fi);
+        ss->m_fdb_info_set.insert(fi);
 
         return;
     }
@@ -661,7 +671,7 @@ void hostif_info_t::process_packet_for_fdb_event(
             sai_serialize_fdb_entry(fi.getFdbEntry()).c_str(),
             fi.getVlanId());
 
-    g_fdb_info_set.insert(fi);
+    ss->m_fdb_info_set.insert(fi);
 
     processFdbInfo(fi, SAI_FDB_EVENT_LEARNED);
 }

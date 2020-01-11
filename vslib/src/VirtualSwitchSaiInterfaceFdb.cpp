@@ -1,4 +1,5 @@
 #include "VirtualSwitchSaiInterface.h"
+#include "SwitchStateBase.h"
 
 #include "swss/logger.h"
 
@@ -102,6 +103,9 @@ sai_status_t VirtualSwitchSaiInterface::flushFdbEntries(
     std::map<std::string, SwitchState::AttrHash> static_fdbs;
     std::map<std::string, SwitchState::AttrHash> dynamic_fdbs;
 
+    // TODO cast right switch or different data pass
+    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
+
     for (auto it = fdbs.begin(); it != fdbs.end();)
     {
         if (doesFdbEntryNotMatchFlushAttr(it->first, it->second, attr_count, attr_list))
@@ -170,16 +174,16 @@ sai_status_t VirtualSwitchSaiInterface::flushFdbEntries(
                 fi.setVlanId(attr.value.u16);
             }
 
-            auto fit = g_fdb_info_set.find(fi);
+            auto fit = ss->m_fdb_info_set.find(fi);
 
-            if (fit == g_fdb_info_set.end())
+            if (fit == ss->m_fdb_info_set.end())
             {
                 // this may happen if vlan is invalid
                 SWSS_LOG_ERROR("failed to find fdb entry in info set: %s, learn for this MAC will be disabled", it->first.c_str());
             }
             else
             {
-                g_fdb_info_set.erase(fit);
+                ss->m_fdb_info_set.erase(fit);
             }
 
             /*

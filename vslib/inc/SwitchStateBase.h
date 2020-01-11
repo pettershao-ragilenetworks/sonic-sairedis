@@ -2,6 +2,9 @@
 #pragma once
 
 #include "SwitchState.h"
+#include "FdbInfo.h"
+
+#include <set>
 
 namespace saivs
 {
@@ -160,6 +163,10 @@ namespace saivs
                     _In_ uint32_t attr_count,
                     _Out_ sai_attribute_t *attr_list);
 
+        public:
+
+            void processFdbEntriesForAging();
+
         protected:
 
             std::vector<sai_object_id_t> m_port_list;
@@ -173,6 +180,9 @@ namespace saivs
             sai_object_id_t m_default_bridge_port_1q_router;
             sai_object_id_t m_default_vlan_id;
 
+        public: // TODO private
+
+            std::set<FdbInfo> m_fdb_info_set;
     };
 }
 

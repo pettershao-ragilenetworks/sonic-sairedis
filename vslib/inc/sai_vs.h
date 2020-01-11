@@ -82,8 +82,6 @@ extern std::shared_ptr<saimeta::Meta>                    g_meta;
 
 #define SAI_VS_FDB_INFO "SAI_VS_FDB_INFO"
 
-extern std::set<saivs::FdbInfo> g_fdb_info_set;
-
 extern saivs::SwitchState::SwitchStateMap g_switch_state_map;
 
 sai_status_t vs_recreate_hostif_tap_interfaces(
