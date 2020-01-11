@@ -7137,8 +7137,6 @@ void Meta::meta_sai_on_port_state_change_single(
             break;
     }
 
-    SWSS_LOG_WARN("data.port_id has invalid type, skip snoop");
-
     if (valid && !m_oids.objectReferenceExists(data.port_id))
     {
         SWSS_LOG_NOTICE("data.port_id new object spotted %s not present in local DB (snoop!)",
