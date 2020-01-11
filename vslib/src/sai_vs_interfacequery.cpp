@@ -229,34 +229,12 @@ void channelOpSetStats(
     if (mapit == countersMap.end())
         countersMap[key] = std::map<int,uint64_t>();
 
-    /*
-     * Find stats enum based on object type.  In new metadata we have enum on
-     * object type, but here we need to find it manually enum is in format
-     * "sai_" + object_type + "_stat_t"
-     */
-
-    std::string lower_ot = sai_serialize_object_type(ot).substr(16);  // 16 = skip "SAI_OBJECT_TYPE_"
-
-    std::transform(lower_ot.begin(), lower_ot.end(), lower_ot.begin(), ::tolower);
-
-    std::string stat_enum_name = "sai_" + lower_ot + "_stat_t";
-
-    const sai_enum_metadata_t* statenum = NULL;
-
-    for (size_t i = 0; i < sai_metadata_all_enums_count; ++i)
-    {
-        if (sai_metadata_all_enums[i]->name == stat_enum_name)
-        {
-            SWSS_LOG_INFO("found enum %s", stat_enum_name.c_str());
-            // found
-            statenum = sai_metadata_all_enums[i];
-            break;
-        }
-    }
+    auto statenum = sai_metadata_get_object_type_info(ot)->statenum;
 
     if (statenum == NULL)
     {
-        SWSS_LOG_ERROR("failed to find stat enum: %s", stat_enum_name.c_str());
+        SWSS_LOG_ERROR("object %s does not support statistics",
+                sai_serialize_object_type(ot).c_str());
         return;
     }
 
