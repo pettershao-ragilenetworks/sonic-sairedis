@@ -649,46 +649,10 @@ sai_status_t VirtualSwitchSaiInterface::create(
         SWSS_LOG_THROW("multiple switches not supported, FIXME");
     }
 
-    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(object_type);
+    // TODO remove cast
+    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
 
-    auto it = objectHash.find(serializedObjectId);
-
-    if (object_type != SAI_OBJECT_TYPE_SWITCH)
-    {
-        /*
-         * Switch is special, and object is already created by init.
-         *
-         * XXX revisit this.
-         */
-
-        if (it != objectHash.end())
-        {
-            SWSS_LOG_ERROR("create failed, object already exists, object type: %s: id: %s",
-                    sai_serialize_object_type(object_type).c_str(),
-                    serializedObjectId.c_str());
-
-            return SAI_STATUS_ITEM_ALREADY_EXISTS;
-        }
-    }
-
-    if (objectHash.find(serializedObjectId) == objectHash.end())
-    {
-        /*
-         * Number of attributes may be zero, so see if actual entry was created
-         * with empty hash.
-         */
-
-        objectHash[serializedObjectId] = {};
-    }
-
-    for (uint32_t i = 0; i < attr_count; ++i)
-    {
-        auto a = std::make_shared<SaiAttrWrap>(object_type, &attr_list[i]);
-
-        objectHash[serializedObjectId][a->getAttrMetadata()->attridname] = a;
-    }
-
-    return SAI_STATUS_SUCCESS;
+    return ss->create(object_type, serializedObjectId, switch_id, attr_count, attr_list);
 }
 
 static sai_status_t internal_vs_generic_remove(

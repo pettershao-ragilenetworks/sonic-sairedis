@@ -26,7 +26,62 @@ sai_status_t SwitchStateBase::create(
 {
     SWSS_LOG_ENTER();
 
-    return vs_generic_create(object_type, object_id, switch_id, attr_count, attr_list);
+    *object_id = g_realObjectIdManager->allocateNewObjectId(object_type, switch_id);
+
+    auto sid = sai_serialize_object_id(*object_id);
+
+    return create(object_type, sid, switch_id, attr_count, attr_list);
+}
+
+sai_status_t SwitchStateBase::create(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::string &serializedObjectId,
+        _In_ sai_object_id_t switch_id,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(object_type);
+
+    auto it = objectHash.find(serializedObjectId);
+
+    if (object_type != SAI_OBJECT_TYPE_SWITCH)
+    {
+        /*
+         * Switch is special, and object is already created by init.
+         *
+         * XXX revisit this.
+         */
+
+        if (it != objectHash.end())
+        {
+            SWSS_LOG_ERROR("create failed, object already exists, object type: %s: id: %s",
+                    sai_serialize_object_type(object_type).c_str(),
+                    serializedObjectId.c_str());
+
+            return SAI_STATUS_ITEM_ALREADY_EXISTS;
+        }
+    }
+
+    if (objectHash.find(serializedObjectId) == objectHash.end())
+    {
+        /*
+         * Number of attributes may be zero, so see if actual entry was created
+         * with empty hash.
+         */
+
+        objectHash[serializedObjectId] = {};
+    }
+
+    for (uint32_t i = 0; i < attr_count; ++i)
+    {
+        auto a = std::make_shared<SaiAttrWrap>(object_type, &attr_list[i]);
+
+        objectHash[serializedObjectId][a->getAttrMetadata()->attridname] = a;
+    }
+
+    return SAI_STATUS_SUCCESS;
 }
 
 sai_status_t SwitchStateBase::set(
