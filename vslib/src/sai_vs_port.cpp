@@ -354,7 +354,7 @@ sai_status_t vs_check_port_dependencies(
 
     // check if port exists's
 
-    sai_object_id_t switch_id = sai_switch_id_query(port_id);
+    sai_object_id_t switch_id = g_realObjectIdManager->saiSwitchIdQuery(port_id);
 
     if (switch_id == SAI_NULL_OBJECT_ID)
     {
@@ -547,7 +547,7 @@ sai_status_t vs_set_port_attribute(
         // Get the interface name from the port id
         std::string if_name;
 
-        sai_object_id_t vs_switch_id = sai_switch_id_query(port_id);
+        sai_object_id_t vs_switch_id = g_realObjectIdManager->saiSwitchIdQuery(port_id);
         if (vs_switch_id == SAI_NULL_OBJECT_ID)
         {
               SWSS_LOG_ERROR("vs_switch_id is null");

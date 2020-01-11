@@ -225,7 +225,7 @@ void findBridgeVlanForPortVlan(
      * will be found.
      */
 
-    sai_object_id_t switch_id = sai_switch_id_query(port_id);
+    sai_object_id_t switch_id = g_realObjectIdManager->saiSwitchIdQuery(port_id);
 
     auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_BRIDGE_PORT);
 
@@ -382,7 +382,7 @@ bool getLagFromPort(
 
     lag_id = SAI_NULL_OBJECT_ID;
 
-    sai_object_id_t switch_id = sai_switch_id_query(port_id);
+    sai_object_id_t switch_id = g_realObjectIdManager->saiSwitchIdQuery(port_id);
 
     auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_LAG_MEMBER);
 
@@ -439,7 +439,7 @@ bool isLagOrPortRifBased(
 {
     SWSS_LOG_ENTER();
 
-    sai_object_id_t switch_id = sai_switch_id_query(lag_or_port_id);
+    sai_object_id_t switch_id = g_realObjectIdManager->saiSwitchIdQuery(lag_or_port_id);
 
     auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_ROUTER_INTERFACE);
 
@@ -641,7 +641,7 @@ void hostif_info_t::process_packet_for_fdb_event(
 
     fi.setTimestamp(frametime);
 
-    fi.m_fdbEntry.switch_id = sai_switch_id_query(portid);
+    fi.m_fdbEntry.switch_id = g_realObjectIdManager->saiSwitchIdQuery(portid);
 
     findBridgeVlanForPortVlan(portid, vlan_id, fi.m_fdbEntry.bv_id, fi.m_bridgePortId);
 
@@ -772,7 +772,7 @@ void send_port_up_notification(
 {
     SWSS_LOG_ENTER();
 
-    sai_object_id_t switch_id = sai_switch_id_query(port_id);
+    sai_object_id_t switch_id = g_realObjectIdManager->saiSwitchIdQuery(port_id);
 
     if (switch_id == SAI_NULL_OBJECT_ID)
     {
@@ -1503,7 +1503,7 @@ sai_status_t vs_remove_hostif_tap_interface(
 
     // get tap interface name
 
-    sai_object_id_t switch_id = sai_switch_id_query(hostif_id);
+    sai_object_id_t switch_id = g_realObjectIdManager->saiSwitchIdQuery(hostif_id);
 
     if (switch_id == SAI_NULL_OBJECT_ID)
     {

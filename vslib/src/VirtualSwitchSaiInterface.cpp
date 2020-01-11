@@ -886,7 +886,7 @@ sai_status_t VirtualSwitchSaiInterface::set(
     // TODO we will need switch id when multiple switches will be supported or
     // each switch will have it's own interface, then not needed
 
-    sai_object_id_t switch_id = SAI_NULL_OBJECT_ID; // sai_switch_id_query(object_id);
+    sai_object_id_t switch_id = SAI_NULL_OBJECT_ID; // g_realObjectIdManager->saiSwitchIdQuery(objectId)
 
     if (g_switch_state_map.size() == 1)
     {
@@ -1146,7 +1146,7 @@ sai_status_t VirtualSwitchSaiInterface::getStatsExt(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    sai_object_id_t switch_id = sai_switch_id_query(object_id);
+    sai_object_id_t switch_id = g_realObjectIdManager->saiSwitchIdQuery(object_id);
 
     if (switch_id == SAI_NULL_OBJECT_ID)
     {

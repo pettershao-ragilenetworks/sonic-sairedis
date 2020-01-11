@@ -109,7 +109,7 @@ void channelOpSetReadOnlyAttribute(
         return;
     }
 
-    sai_object_id_t switch_id = sai_switch_id_query(object_id);
+    sai_object_id_t switch_id = g_realObjectIdManager->saiSwitchIdQuery(object_id);
 
     if (switch_id == SAI_NULL_OBJECT_ID)
     {
@@ -195,7 +195,7 @@ void channelOpSetStats(
         return;
     }
 
-    sai_object_id_t switch_id = sai_switch_id_query(oid);
+    sai_object_id_t switch_id = g_realObjectIdManager->saiSwitchIdQuery(oid);
 
     if (switch_id == SAI_NULL_OBJECT_ID)
     {
@@ -1005,7 +1005,7 @@ sai_object_type_t sai_object_type_query(
 
     if (!Globals::apiInitialized)
     {
-        SWSS_LOG_ERROR("SAI API not initialized before calling sai_object_type_query");
+        SWSS_LOG_ERROR("%s: SAI API not initialized", __PRETTY_FUNCTION__);
 
         return SAI_OBJECT_TYPE_NULL;
     }
@@ -1020,7 +1020,7 @@ sai_object_id_t sai_switch_id_query(
 
     if (!Globals::apiInitialized)
     {
-        SWSS_LOG_ERROR("SAI API not initialized before calling sai_switch_id_query");
+        SWSS_LOG_ERROR("%s: SAI API not initialized", __PRETTY_FUNCTION__);
 
         return SAI_NULL_OBJECT_ID;
     }
