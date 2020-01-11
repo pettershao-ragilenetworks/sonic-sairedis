@@ -9,6 +9,7 @@ endif
 lib_LTLIBRARIES = libsaivs.la
 
 libsaivs_la_SOURCES = \
+					  LinkMsg.cpp \
 					  VirtualSwitchSaiInterfacePort.cpp \
 					  VirtualSwitchSaiInterfaceFdb.cpp \
 					  SwitchStateBase.cpp \
