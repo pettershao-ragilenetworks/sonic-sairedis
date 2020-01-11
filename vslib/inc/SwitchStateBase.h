@@ -112,7 +112,7 @@ namespace saivs
 
             virtual sai_status_t create_scheduler_groups();
 
-        public:
+        protected: // will generate new OID
 
             virtual sai_status_t create(
                     _In_ sai_object_type_t object_type,
@@ -126,16 +126,25 @@ namespace saivs
                     _In_ sai_object_id_t objectId,
                     _In_ const sai_attribute_t* attr);
 
-            virtual sai_status_t set(
-                    _In_ sai_object_type_t objectType,
-                    _In_ const std::string &serializedObjectId,
-                    _In_ const sai_attribute_t* attr);
-
             virtual sai_status_t get(
                     _In_ sai_object_type_t object_type,
                     _In_ sai_object_id_t object_id,
                     _In_ uint32_t attr_count,
                     _Out_ sai_attribute_t *attr_list);
+
+        public:
+
+            virtual sai_status_t create(
+                    _In_ sai_object_type_t object_type,
+                    _In_ const std::string &serializedObjectId,
+                    _In_ sai_object_id_t switch_id,
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
+
+            virtual sai_status_t set(
+                    _In_ sai_object_type_t objectType,
+                    _In_ const std::string &serializedObjectId,
+                    _In_ const sai_attribute_t* attr);
 
             virtual sai_status_t get(
                     _In_ sai_object_type_t object_type,

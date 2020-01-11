@@ -19,41 +19,6 @@ sai_status_t vs_clear_port_all_stats(
     return SAI_STATUS_NOT_IMPLEMENTED;
 }
 
-sai_status_t vs_create_port(
-            _Out_ sai_object_id_t *port_id,
-            _In_ sai_object_id_t switch_id,
-            _In_ uint32_t attr_count,
-            _In_ const sai_attribute_t *attr_list)
-{
-    MUTEX();
-    SWSS_LOG_ENTER();
-
-    /* create port */
-    CHECK_STATUS(meta_sai_create_oid(
-                (sai_object_type_t)SAI_OBJECT_TYPE_PORT,
-                port_id,
-                switch_id,
-                attr_count,
-                attr_list,
-                &vs_generic_create));
-
-    // TODO must be moved inside
-
-    switch (g_vs_switch_type)
-    {
-        case SAI_VS_SWITCH_TYPE_BCM56850:
-        case SAI_VS_SWITCH_TYPE_MLNX2700:
-
-            // TODO remove cast
-            return std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map.at(switch_id))->create_port(*port_id, attr_count, attr_list);
-
-        default:
-
-            SWSS_LOG_ERROR("unknown switch type: %d", g_vs_switch_type);
-            return SAI_STATUS_FAILURE;
-    }
-}
-
 static bool vs_get_object_list(
         _In_ sai_object_id_t object_id,
         _In_ sai_attr_id_t attr_id,
@@ -517,6 +482,7 @@ sai_status_t vs_remove_port(
     return SAI_STATUS_SUCCESS;
 }
 
+VS_CREATE(PORT,port);
 VS_GET(PORT,port);
 VS_SET(PORT,port);
 VS_GENERIC_QUAD(PORT_POOL,port_pool);
