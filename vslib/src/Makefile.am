@@ -9,6 +9,9 @@ endif
 lib_LTLIBRARIES = libsaivs.la
 
 libsaivs_la_SOURCES = \
+					  LaneMap.cpp \
+					  LaneMapContainer.cpp \
+					  LaneMapFileParser.cpp \
 					  LinkMsg.cpp \
 					  VirtualSwitchSaiInterfacePort.cpp \
 					  VirtualSwitchSaiInterfaceFdb.cpp \

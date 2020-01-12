@@ -50,8 +50,17 @@ void LinkMsg::onMsg(
     unsigned int    if_flags = rtnl_link_get_flags(link); // IFF_LOWER_UP and IFF_RUNNING
     const char*     if_name  = rtnl_link_get_name(link);
 
+    // TODO get index when we will have multiple switches
+    auto map = g_laneMapContainer->getLaneMap(0);
+
+    if (!map)
+    {
+        SWSS_LOG_ERROR("lane map for index %u don't exists", 0);
+        return;
+    }
+
     if (strncmp(if_name, SAI_VS_VETH_PREFIX, sizeof(SAI_VS_VETH_PREFIX) - 1) != 0 &&
-            g_ifname_to_lanes.find(if_name) == g_ifname_to_lanes.end())
+            !map->hasInterface(if_name))
     {
         SWSS_LOG_INFO("skipping newlink for %s", if_name);
         return;

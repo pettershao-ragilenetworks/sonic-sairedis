@@ -3,7 +3,6 @@
 #include "sai_vs_internal.h"
 #include <string.h>
 #include <unistd.h>
-#include <net/if.h>
 #include <inttypes.h>
 
 #include <algorithm>
@@ -15,6 +14,7 @@
 #include "RealObjectIdManager.h"
 #include "VirtualSwitchSaiInterface.h"
 #include "SwitchStateBase.h"
+#include "LaneMapFileParser.h"
 
 using namespace saivs;
 
@@ -33,10 +33,7 @@ std::shared_ptr<std::thread>                g_fdbAgingThread;
 
 sai_vs_boot_type_t g_vs_boot_type = SAI_VS_BOOT_TYPE_COLD;
 
-std::map<uint32_t,std::string> g_lane_to_ifname;
-std::map<std::string,std::vector<uint32_t>> g_ifname_to_lanes;
-std::vector<uint32_t> g_lane_order;
-std::vector<std::vector<uint32_t>> g_laneMap;
+std::shared_ptr<LaneMapContainer> g_laneMapContainer;
 
 std::shared_ptr<SwitchContainer>                g_switchContainer;
 std::shared_ptr<RealObjectIdManager>            g_realObjectIdManager;
@@ -46,8 +43,6 @@ std::shared_ptr<saimeta::Meta>                  g_meta;
 const char *g_boot_type             = NULL;
 const char *g_warm_boot_read_file   = NULL;
 const char *g_warm_boot_write_file  = NULL;
-
-const char *g_interface_lane_map_file = NULL;
 
 void channelOpEnableUnittests(
         _In_ const std::string &key,
@@ -460,215 +455,7 @@ void clear_local_state()
     // updated functions for query object type and switch id
     g_realObjectIdManager = std::make_shared<RealObjectIdManager>(0);
 
-    g_lane_to_ifname.clear();
-    g_ifname_to_lanes.clear();
-    g_lane_order.clear();
-    g_laneMap.clear();
-
     g_switch_state_map.clear();
-}
-
-bool check_ifname(
-        _In_ const std::string& name)
-{
-    SWSS_LOG_ENTER();
-
-    size_t size = name.size();
-
-    if (size == 0 || size > IFNAMSIZ)
-    {
-        SWSS_LOG_ERROR("invalid interface name %s length: %zu", name.c_str(), size);
-        return false;
-    }
-
-    for (size_t i = 0; i < size; i++)
-    {
-        char c = name[i];
-
-        if (c >= '0' && c <= '9')
-            continue;
-
-        if (c >= 'a' && c <= 'z')
-            continue;
-
-        if (c >= 'A' && c <= 'Z')
-            continue;
-
-        SWSS_LOG_ERROR("invalid character '%c' in interface name %s", c, name.c_str());
-        return false;
-    }
-
-    // interface name is valid
-    return true;
-}
-
-void load_interface_lane_map()
-{
-    SWSS_LOG_ENTER();
-
-    if (g_interface_lane_map_file == NULL)
-    {
-        SWSS_LOG_NOTICE("no interface lane map");
-        return;
-    }
-
-    std::ifstream lanemap(g_interface_lane_map_file);
-
-    if (!lanemap.is_open())
-    {
-        SWSS_LOG_ERROR("failed to open lane map file: %s", g_interface_lane_map_file);
-        return;
-    }
-
-    std::string line;
-
-    while(getline(lanemap, line))
-    {
-        if (line.size() > 0 && (line[0] == '#' || line[0] == ';'))
-        {
-            continue;
-        }
-
-        auto tokens = swss::tokenize(line, ':');
-
-        if (tokens.size() != 2)
-        {
-            SWSS_LOG_ERROR("expected 2 tokens in line %s, got %zu", line.c_str(), tokens.size());
-            continue;
-        }
-
-        auto ifname = tokens.at(0);
-        auto lanes = tokens.at(1);
-
-        if (!check_ifname(ifname))
-        {
-            continue;
-        }
-
-        if (g_ifname_to_lanes.find(ifname) != g_ifname_to_lanes.end())
-        {
-            SWSS_LOG_ERROR("interface %s was already defined", ifname.c_str());
-            continue;
-        }
-
-        tokens = swss::tokenize(lanes,',');
-
-        size_t n = tokens.size();
-
-        if (n != 1 && n != 2 && n != 4)
-        {
-            SWSS_LOG_ERROR("invalid number of lanes (%zu) assigned to interface %s", n, ifname.c_str());
-            continue;
-        }
-
-        std::vector<uint32_t> lanevec;
-
-        for (auto l: tokens)
-        {
-            uint32_t lanenumber;
-            if (sscanf(l.c_str(), "%u", &lanenumber) != 1)
-            {
-                SWSS_LOG_ERROR("failed to parse lane number: %s", l.c_str());
-                continue;
-            }
-
-            if (g_lane_to_ifname.find(lanenumber) != g_lane_to_ifname.end())
-            {
-                SWSS_LOG_ERROR("lane number %u used on %s was already defined on %s",
-                        lanenumber,
-                        ifname.c_str(),
-                        g_lane_to_ifname.at(lanenumber).c_str());
-                continue;
-            }
-
-            lanevec.push_back(lanenumber);
-            g_lane_order.push_back(lanenumber);
-
-            g_lane_to_ifname[lanenumber] = ifname;
-        }
-
-        g_ifname_to_lanes[ifname] = lanevec;
-        g_laneMap.push_back(lanevec);
-    }
-
-    SWSS_LOG_NOTICE("loaded %zu lanes and %zu interfaces", g_lane_to_ifname.size(), g_ifname_to_lanes.size());
-}
-
-void getPortLaneMap(
-        _Inout_ std::vector<std::vector<uint32_t>> &laneMap)
-{
-    SWSS_LOG_ENTER();
-
-    laneMap.clear();
-
-    for (auto v: g_laneMap)
-    {
-        size_t s = v.size();
-
-        if (s != 1 && s != 2 && s != 4)
-        {
-            SWSS_LOG_THROW("invald number of lanes for interface: %zu", s);
-        }
-
-        laneMap.push_back(v);
-    }
-
-    if (g_laneMap.size())
-    {
-        SWSS_LOG_NOTICE("got port lane map with %zu interfaces", laneMap.size());
-        return;
-    }
-
-    const uint32_t default_port_count = 32;
-
-    sai_uint32_t default_lanes[] = {
-        29,30,31,32,
-        25,26,27,28,
-        37,38,39,40,
-        33,34,35,36,
-        41,42,43,44,
-        45,46,47,48,
-        5,6,7,8,
-        1,2,3,4,
-        9,10,11,12,
-        13,14,15,16,
-        21,22,23,24,
-        17,18,19,20,
-        49,50,51,52,
-        53,54,55,56,
-        61,62,63,64,
-        57,58,59,60,
-        65,66,67,68,
-        69,70,71,72,
-        77,78,79,80,
-        73,74,75,76,
-        105,106,107,108,
-        109,110,111,112,
-        117,118,119,120,
-        113,114,115,116,
-        121,122,123,124,
-        125,126,127,128,
-        85,86,87,88,
-        81,82,83,84,
-        89,90,91,92,
-        93,94,95,96,
-        97,98,99,100,
-        101,102,103,104
-    };
-
-    // populate default lane map
-
-    for (size_t i = 0; i < default_port_count; i++)
-    {
-        std::vector<uint32_t> portLanes;
-
-        for(int j = 0; j < 4; j++)
-            portLanes.push_back(default_lanes[4*i + j]);
-
-        laneMap.push_back(portLanes);
-    }
-
-    SWSS_LOG_NOTICE("populated default port lane map with %zu interfaces", laneMap.size());
 }
 
 sai_status_t sai_api_initialize(
@@ -707,9 +494,9 @@ sai_status_t sai_api_initialize(
         return SAI_STATUS_FAILURE;
     }
 
-    g_interface_lane_map_file = service_method_table->profile_get_value(0, SAI_KEY_VS_INTERFACE_LANE_MAP_FILE);
+    auto *laneMapFile = service_method_table->profile_get_value(0, SAI_KEY_VS_INTERFACE_LANE_MAP_FILE);
 
-    load_interface_lane_map();
+    g_laneMapContainer = LaneMapFileParser::parseLaneMapFile(laneMapFile);
 
     g_boot_type             = service_method_table->profile_get_value(0, SAI_KEY_BOOT_TYPE);
     g_warm_boot_read_file   = service_method_table->profile_get_value(0, SAI_KEY_WARM_BOOT_READ_FILE);
@@ -824,9 +611,7 @@ sai_status_t sai_log_set(
         _In_ sai_api_t sai_api_id,
         _In_ sai_log_level_t log_level)
 {
-    MUTEX();
     SWSS_LOG_ENTER();
-    VS_CHECK_API_INITIALIZED();
 
     return SAI_STATUS_NOT_IMPLEMENTED;
 }

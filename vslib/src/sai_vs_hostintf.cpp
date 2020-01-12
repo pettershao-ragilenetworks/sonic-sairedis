@@ -499,10 +499,10 @@ void hostif_info_t::process_packet_for_fdb_event(
 {
     MUTEX();
 
+    SWSS_LOG_ENTER();
+
     // TODO this function could be still called when switch is removed
     // during syncd shutdown
-
-    SWSS_LOG_ENTER();
 
     uint32_t frametime = (uint32_t)time(NULL);
 
@@ -1210,17 +1210,20 @@ std::string vs_get_veth_name(
     }
     else
     {
-        auto it = g_lane_to_ifname.find(lanes[0]);
+        // TODO use actual map instead
+        auto map = g_laneMapContainer->getLaneMap(0); // TODO use index
 
-        if (it == g_lane_to_ifname.end())
+        auto ifname = map->getInterfaceFromLaneNumber(lanes[0]);
+
+        if (ifname == "")
         {
             SWSS_LOG_WARN("failed to get ifname from lane number %u", lanes[0]);
         }
         else
         {
-            SWSS_LOG_NOTICE("using %s instead of %s", it->second.c_str(), vethname.c_str());
+            SWSS_LOG_NOTICE("using %s instead of %s", ifname.c_str(), vethname.c_str());
 
-            vethname = it->second;
+            vethname = ifname;
         }
     }
 

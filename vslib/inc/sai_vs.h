@@ -16,6 +16,7 @@ extern "C" {
 #include "VirtualSwitchSaiInterface.h"
 #include "FdbInfo.h"
 #include "SwitchState.h"
+#include "LaneMapContainer.h"
 
 #include "swss/logger.h"
 #include "swss/tokenize.h"
@@ -56,15 +57,7 @@ extern sai_vs_boot_type_t g_vs_boot_type;
 extern const char *g_warm_boot_read_file;
 extern const char *g_warm_boot_write_file;
 
-extern const char *g_interface_lane_map_file;
-
-extern std::map<uint32_t,std::string> g_lane_to_ifname;
-extern std::map<std::string,std::vector<uint32_t>> g_ifname_to_lanes;
-extern std::vector<uint32_t> g_lane_order;
-extern std::vector<std::vector<uint32_t>> g_laneMap;
-
-extern void getPortLaneMap(
-        _Inout_ std::vector<std::vector<uint32_t>> &laneMap);
+extern std::shared_ptr<saivs::LaneMapContainer> g_laneMapContainer;
 
 extern std::shared_ptr<saivs::SwitchContainer>           g_switchContainer;
 extern std::shared_ptr<saivs::RealObjectIdManager>       g_realObjectIdManager;

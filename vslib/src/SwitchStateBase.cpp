@@ -420,11 +420,12 @@ sai_status_t SwitchStateBase::create_ports()
 
     SWSS_LOG_INFO("create ports");
 
-    std::vector<std::vector<uint32_t>> laneMap;
+    // TODO we should not use container but actual map instead in constructor
+    auto map = g_laneMapContainer->getLaneMap(0); // TODO get switch index
 
-    getPortLaneMap(laneMap); // TODO per switch !! on constructor !
+    auto& lanesVector = map->getLaneVector();
 
-    uint32_t port_count = (uint32_t)laneMap.size();
+    uint32_t port_count = (uint32_t)lanesVector.size();
 
     m_port_list.clear();
 
@@ -455,7 +456,7 @@ sai_status_t SwitchStateBase::create_ports()
 
         CHECK_STATUS(set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
 
-        std::vector<uint32_t> lanes = laneMap.at(i);
+        std::vector<uint32_t> lanes = lanesVector.at(i);
 
         attr.id = SAI_PORT_ATTR_HW_LANE_LIST;
         attr.value.u32list.count = (uint32_t)lanes.size();
@@ -1262,7 +1263,7 @@ void SwitchStateBase::processFdbEntriesForAging()
 {
     SWSS_LOG_ENTER();
 
-    SWSS_LOG_NOTICE("fdb infos to process: %zu", m_fdb_info_set.size());
+    SWSS_LOG_DEBUG("fdb infos to process: %zu", m_fdb_info_set.size());
 
     uint32_t current = (uint32_t)time(NULL);
 
@@ -1284,8 +1285,7 @@ void SwitchStateBase::processFdbEntriesForAging()
 
     if (aging_time == 0)
     {
-        SWSS_LOG_NOTICE("aging is disabled");
-        // aging is disabled
+        SWSS_LOG_DEBUG("aging is disabled");
         return;
     }
 
