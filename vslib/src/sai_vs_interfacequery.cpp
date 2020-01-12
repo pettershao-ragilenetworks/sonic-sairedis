@@ -433,11 +433,17 @@ void fdbAgingThreadProc()
  */
 static sai_service_method_table_t g_service_method_table;
 
+struct hostif_info_t;
+
+extern std::map<std::string, std::shared_ptr<hostif_info_t>> hostif_info_map;
+
 void clear_local_state()
 {
     SWSS_LOG_ENTER();
 
     SWSS_LOG_NOTICE("clearing local state");
+
+    hostif_info_map.clear();
 
     g_switchContainer = std::make_shared<SwitchContainer>();
 
