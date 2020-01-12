@@ -501,6 +501,12 @@ void hostif_info_t::process_packet_for_fdb_event(
 
     SWSS_LOG_ENTER();
 
+    if (!Globals::apiInitialized)
+    {
+        SWSS_LOG_ERROR("%s: api not initialized", __PRETTY_FUNCTION__);
+        return;
+    }
+
     // TODO this function could be still called when switch is removed
     // during syncd shutdown
 

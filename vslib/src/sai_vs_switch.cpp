@@ -114,6 +114,8 @@ void linkmsg_thread(
             return;
         }
     }
+
+    SWSS_LOG_NOTICE("ending ling message thread");
 }
 
 void vs_create_netlink_message_listener(
@@ -141,34 +143,6 @@ void vs_create_netlink_message_listener(
         std::make_shared<std::thread>(linkmsg_thread, switch_id);
 
     sw->setLinkThread(linkThread);
-}
-
-void vs_remove_netlink_message_listener(
-        _In_ sai_object_id_t switch_id)
-{
-    SWSS_LOG_ENTER();
-
-    if (g_vs_hostif_use_tap_device == false)
-    {
-        return;
-    }
-
-    auto sw = vs_get_switch_state(switch_id);
-
-    if (sw == nullptr)
-    {
-        SWSS_LOG_ERROR("failed to get switch state for switch id %s",
-                sai_serialize_object_id(switch_id).c_str());
-        return;
-    }
-
-    sw->setRunLinkThread(false);
-
-    sw->getLinkThreadEvent()->notify();
-
-    sw->getLinkThread()->join();
-
-    SWSS_LOG_NOTICE("removed netlink thread listener");
 }
 
 sai_status_t vs_create_switch(
@@ -206,8 +180,6 @@ sai_status_t vs_remove_switch(
     MUTEX();
     SWSS_LOG_ENTER();
     VS_CHECK_API_INITIALIZED();
-
-    vs_remove_netlink_message_listener(switch_id);
 
     sai_status_t status = meta_sai_remove_oid(
             SAI_OBJECT_TYPE_SWITCH,

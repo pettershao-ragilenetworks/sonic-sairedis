@@ -600,6 +600,10 @@ sai_status_t sai_api_uninitialize(void)
 
     // clear state after ending all threads
 
+    // will cause join on link thread?
+    // since switch state map is cleared
+    // yes, but syncd removes switch which will cause also to remove
+    // link and close the thread and potential deadlock
     clear_local_state();
 
     Globals::apiInitialized = false;

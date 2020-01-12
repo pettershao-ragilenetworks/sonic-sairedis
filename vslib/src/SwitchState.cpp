@@ -8,6 +8,7 @@
 using namespace saivs;
 
 extern std::shared_ptr<RealObjectIdManager>       g_realObjectIdManager;
+extern bool g_vs_hostif_use_tap_device; // TODO to be removed
 
 SwitchState::SwitchState(
         _In_ sai_object_id_t switch_id):
@@ -38,6 +39,13 @@ SwitchState::SwitchState(
      */
 
     m_objectHash[SAI_OBJECT_TYPE_SWITCH][sai_serialize_object_id(switch_id)] = {};
+}
+
+SwitchState::~SwitchState()
+{
+    SWSS_LOG_ENTER();
+
+    removeNetlinkMessageListener();
 }
 
 sai_object_id_t SwitchState::getSwitchId() const
@@ -149,3 +157,23 @@ bool SwitchState::getTapNameFromPortId(
 
     return false;
 }
+
+void SwitchState::removeNetlinkMessageListener()
+{
+    SWSS_LOG_ENTER();
+
+    if (g_vs_hostif_use_tap_device == false)
+    {
+        return;
+    }
+
+    m_run_link_thread = false;
+
+    m_link_thread_event.notify();
+
+    m_link_thread->join();
+
+    SWSS_LOG_NOTICE("removed netlink thread listener for switch: %s",
+            sai_serialize_object_id(m_switch_id).c_str());
+}
+

@@ -35,7 +35,7 @@ namespace saivs
             SwitchState(
                     _In_ sai_object_id_t switch_id);
 
-            virtual ~SwitchState() = default;
+            virtual ~SwitchState();
 
         public: // TODO make private
 
@@ -79,6 +79,10 @@ namespace saivs
             bool  getTapNameFromPortId(
                     _In_ const sai_object_id_t port_id,
                     _Out_ std::string& if_name);
+
+        protected:
+
+            void removeNetlinkMessageListener();
 
         protected:
 
