@@ -69,6 +69,7 @@ endl
 enum
 eth
 ethernet
+ethX
 fastfast
 fdb
 FDB
