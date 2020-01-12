@@ -47,18 +47,6 @@ namespace saivs
 
             sai_object_id_t getSwitchId() const;
 
-            bool getRunLinkThread() const;
-
-            void setRunLinkThread(
-                    _In_ bool run);
-
-            swss::SelectableEvent* getLinkThreadEvent();
-
-            void setLinkThread(
-                    _In_ std::shared_ptr<std::thread> thread);
-
-            std::shared_ptr<std::thread> getLinkThread() const;
-
             void setIfNameToPortId(
                     _In_ const std::string& ifname,
                     _In_ sai_object_id_t port_id);
@@ -82,7 +70,11 @@ namespace saivs
 
         protected:
 
+            void createNetlinkMessageListener();
+
             void removeNetlinkMessageListener();
+
+            void linkMessageThreadFunction();
 
         protected:
 

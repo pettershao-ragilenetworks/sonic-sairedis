@@ -1,7 +1,11 @@
 #include "SwitchState.h"
 #include "RealObjectIdManager.h"
+#include "LinkMsg.h"
 
 #include "swss/logger.h"
+#include "swss/netdispatcher.h"
+#include "swss/netlink.h"
+#include "swss/select.h"
 
 #include "meta/sai_serialize.h"
 
@@ -39,6 +43,8 @@ SwitchState::SwitchState(
      */
 
     m_objectHash[SAI_OBJECT_TYPE_SWITCH][sai_serialize_object_id(switch_id)] = {};
+
+    createNetlinkMessageListener();
 }
 
 SwitchState::~SwitchState()
@@ -53,43 +59,6 @@ sai_object_id_t SwitchState::getSwitchId() const
     SWSS_LOG_ENTER();
 
     return m_switch_id;
-}
-
-bool SwitchState::getRunLinkThread() const
-{
-    SWSS_LOG_ENTER();
-
-    return m_run_link_thread;
-}
-
-void SwitchState::setRunLinkThread(
-        _In_ bool run)
-{
-    SWSS_LOG_ENTER();
-
-    m_run_link_thread = run;
-}
-
-swss::SelectableEvent* SwitchState::getLinkThreadEvent()
-{
-    SWSS_LOG_ENTER();
-
-    return &m_link_thread_event;
-}
-
-void SwitchState::setLinkThread(
-        _In_ std::shared_ptr<std::thread> thread)
-{
-    SWSS_LOG_ENTER();
-
-    m_link_thread = thread;
-}
-
-std::shared_ptr<std::thread> SwitchState::getLinkThread() const
-{
-    SWSS_LOG_ENTER();
-
-    return m_link_thread;
 }
 
 void SwitchState::setIfNameToPortId(
@@ -158,6 +127,66 @@ bool SwitchState::getTapNameFromPortId(
     return false;
 }
 
+void SwitchState::linkMessageThreadFunction()
+{
+    SWSS_LOG_ENTER();
+
+    LinkMsg linkMsg(m_switch_id);
+
+    swss::NetDispatcher::getInstance().registerMessageHandler(RTM_NEWLINK, &linkMsg);
+    swss::NetDispatcher::getInstance().registerMessageHandler(RTM_DELLINK, &linkMsg);
+
+    SWSS_LOG_NOTICE("netlink msg listener started for switch %s",
+            sai_serialize_object_id(m_switch_id).c_str());
+
+    while (m_run_link_thread)
+    {
+        try
+        {
+            swss::NetLink netlink;
+
+            swss::Select s;
+
+            netlink.registerGroup(RTNLGRP_LINK);
+            netlink.dumpRequest(RTM_GETLINK);
+
+            s.addSelectable(&netlink);
+            s.addSelectable(&m_link_thread_event);
+
+            while (m_run_link_thread)
+            {
+                swss::Selectable *sel = NULL;
+
+                int result = s.select(&sel);
+
+                SWSS_LOG_INFO("select ended: %d", result);
+            }
+        }
+        catch (const std::exception& e)
+        {
+            SWSS_LOG_ERROR("exception: %s", e.what());
+            break;
+        }
+    }
+
+    SWSS_LOG_NOTICE("ending ling message thread for switch: %s",
+            sai_serialize_object_id(m_switch_id).c_str());
+}
+
+void SwitchState::createNetlinkMessageListener()
+{
+    SWSS_LOG_ENTER();
+
+    if (g_vs_hostif_use_tap_device == false)
+    {
+        return;
+    }
+
+    m_run_link_thread = false;
+
+    m_link_thread = std::make_shared<std::thread>(&SwitchState::linkMessageThreadFunction, this);
+}
+
 void SwitchState::removeNetlinkMessageListener()
 {
     SWSS_LOG_ENTER();
@@ -172,8 +201,5 @@ void SwitchState::removeNetlinkMessageListener()
     m_link_thread_event.notify();
 
     m_link_thread->join();
-
-    SWSS_LOG_NOTICE("removed netlink thread listener for switch: %s",
-            sai_serialize_object_id(m_switch_id).c_str());
 }
 

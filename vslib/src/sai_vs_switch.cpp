@@ -3,11 +3,7 @@
 
 #include "swss/selectableevent.h"
 #include "swss/netmsg.h"
-#include "swss/netlink.h"
 #include "swss/select.h"
-#include "swss/netdispatcher.h"
-
-#include "LinkMsg.h"
 
 #include <thread>
 
@@ -63,88 +59,6 @@ void update_port_oper_status(
     }
 }
 
-void linkmsg_thread(
-        _In_ sai_object_id_t switch_id)
-{
-    SWSS_LOG_ENTER();
-
-    std::shared_ptr<SwitchState> sw = vs_get_switch_state(switch_id);
-
-    if (sw == nullptr)
-    {
-        SWSS_LOG_ERROR("failed to get switch state for switch id %s",
-                sai_serialize_object_id(switch_id).c_str());
-        return;
-    }
-
-    LinkMsg linkMsg(switch_id);
-
-    swss::NetDispatcher::getInstance().registerMessageHandler(RTM_NEWLINK, &linkMsg);
-    swss::NetDispatcher::getInstance().registerMessageHandler(RTM_DELLINK, &linkMsg);
-
-    SWSS_LOG_NOTICE("netlink msg listener started for switch %s",
-            sai_serialize_object_id(switch_id).c_str());
-
-    while (sw->getRunLinkThread())
-    {
-        try
-        {
-            swss::NetLink netlink;
-
-            swss::Select s;
-
-            netlink.registerGroup(RTNLGRP_LINK);
-            netlink.dumpRequest(RTM_GETLINK);
-
-            s.addSelectable(&netlink);
-            s.addSelectable(sw->getLinkThreadEvent());
-
-            while (sw->getRunLinkThread())
-            {
-                swss::Selectable *temps = NULL;
-
-                int result = s.select(&temps);
-
-                SWSS_LOG_INFO("select ended: %d", result);
-            }
-        }
-        catch (const std::exception& e)
-        {
-            SWSS_LOG_ERROR("exception: %s", e.what());
-            return;
-        }
-    }
-
-    SWSS_LOG_NOTICE("ending ling message thread");
-}
-
-void vs_create_netlink_message_listener(
-        _In_ sai_object_id_t switch_id)
-{
-    SWSS_LOG_ENTER();
-
-    if (g_vs_hostif_use_tap_device == false)
-    {
-        return;
-    }
-
-    auto sw = vs_get_switch_state(switch_id);
-
-    if (sw == nullptr)
-    {
-        SWSS_LOG_ERROR("failed to get switch state for switch id %s",
-                sai_serialize_object_id(switch_id).c_str());
-        return;
-    }
-
-    sw->setRunLinkThread(true);
-
-    std::shared_ptr<std::thread> linkThread =
-        std::make_shared<std::thread>(linkmsg_thread, switch_id);
-
-    sw->setLinkThread(linkThread);
-}
-
 sai_status_t vs_create_switch(
         _Out_ sai_object_id_t *switch_id,
         _In_ uint32_t attr_count,
@@ -164,8 +78,6 @@ sai_status_t vs_create_switch(
 
     if (status == SAI_STATUS_SUCCESS)
     {
-        vs_create_netlink_message_listener(*switch_id);
-
         auto sw = std::make_shared<Switch>(*switch_id, attr_count, attr_list);
 
         g_switchContainer->insert(sw);
