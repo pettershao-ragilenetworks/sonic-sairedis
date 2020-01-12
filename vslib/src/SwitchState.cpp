@@ -131,6 +131,8 @@ void SwitchState::linkMessageThreadFunction()
 {
     SWSS_LOG_ENTER();
 
+    // TODO this is global ! we need this make as global register and per each
+    // switch we need to distinguish which indexes interfaces we want to listen
     LinkMsg linkMsg(m_switch_id);
 
     swss::NetDispatcher::getInstance().registerMessageHandler(RTM_NEWLINK, &linkMsg);
@@ -182,7 +184,7 @@ void SwitchState::createNetlinkMessageListener()
         return;
     }
 
-    m_run_link_thread = false;
+    m_run_link_thread = true;
 
     m_link_thread = std::make_shared<std::thread>(&SwitchState::linkMessageThreadFunction, this);
 }
