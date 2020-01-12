@@ -47,6 +47,7 @@ CreateObject
 currentObj
 currentObject
 currentView
+cv
 dbg
 deallocate
 decap
