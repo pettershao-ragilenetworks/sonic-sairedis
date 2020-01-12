@@ -11,6 +11,7 @@ extern "C" {
 #include <memory>
 #include <thread>
 #include <string>
+#include <mutex>
 
 namespace saivs
 {
@@ -70,11 +71,13 @@ namespace saivs
 
         protected:
 
-            void createNetlinkMessageListener();
+            void registerLinkCallback();
 
-            void removeNetlinkMessageListener();
+            void unregisterLinkCallback();
 
-            void linkMessageThreadFunction();
+            void asyncOnLinkMsg(
+                    _In_ int nlmsg_type,
+                    _In_ struct nl_object *obj);
 
         protected:
 
@@ -84,12 +87,12 @@ namespace saivs
 
             std::map<sai_object_id_t, std::string> m_port_id_to_tapname;
 
-            swss::SelectableEvent m_link_thread_event;
-
-            volatile bool m_run_link_thread;
-
-            std::shared_ptr<std::thread> m_link_thread;
-
             std::map<std::string, sai_object_id_t> m_ifname_to_port_id_map;
+
+            uint64_t m_linkCallbackIndex;
+
+            bool m_destroyed;
+
+            std::mutex m_mutex;
     };
 }

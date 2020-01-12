@@ -9,10 +9,10 @@ endif
 lib_LTLIBRARIES = libsaivs.la
 
 libsaivs_la_SOURCES = \
+					  NetMsgRegistrar.cpp \
 					  LaneMap.cpp \
 					  LaneMapContainer.cpp \
 					  LaneMapFileParser.cpp \
-					  LinkMsg.cpp \
 					  VirtualSwitchSaiInterfacePort.cpp \
 					  VirtualSwitchSaiInterfaceFdb.cpp \
 					  SwitchStateBase.cpp \

@@ -1284,7 +1284,9 @@ bool hostif_create_tap_veth_forwarding(
         return false;
     }
 
-    SWSS_LOG_INFO("interface index = %d %s\n", sock_address.sll_ifindex, vethname.c_str());
+    // TODO we should listen only to those interfaces indexes on link message
+
+    SWSS_LOG_NOTICE("interface index = %d, %s\n", sock_address.sll_ifindex, vethname.c_str());
 
     if (ifup(vethname.c_str(), port_id, true, true))
     {
