@@ -2,6 +2,7 @@
 #include "syncd_saiswitch.h"
 #include "sairediscommon.h"
 #include "syncd_flex_counter.h"
+#include "meta/sai_meta.h"
 #include "swss/tokenize.h"
 #include <inttypes.h>
 #include <limits.h>
@@ -2728,7 +2729,7 @@ sai_status_t handle_bulk_generic(
 
         if (status != SAI_STATUS_SUCCESS)
         {
-            if (!options.syncMode)
+            if (!g_commandLineOptions->m_enableSyncMode)
             {
                 SWSS_LOG_THROW("operation failed in async mode!");
             }
@@ -2811,7 +2812,7 @@ sai_status_t handle_bulk_non_object_id(
 
         if (status != SAI_STATUS_SUCCESS)
         {
-            if (!options.syncMode)
+            if (!g_commandLineOptions->m_enableSyncMode)
             {
                 SWSS_LOG_THROW("operation failed in async mode!");
             }
@@ -2925,7 +2926,7 @@ sai_status_t processBulkEvent(
                     sai_serialize_object_type(object_type).c_str());
     }
 
-    if (status != SAI_STATUS_SUCCESS && !options.syncMode)
+    if (status != SAI_STATUS_SUCCESS && !g_commandLineOptions->m_enableSyncMode)
     {
         SWSS_LOG_THROW("failed to execute bulk api: %s",
                 sai_serialize_status(status).c_str());

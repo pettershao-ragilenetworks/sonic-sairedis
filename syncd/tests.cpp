@@ -11,6 +11,7 @@ extern "C" {
 #include "sairedis.h"
 #include "meta/sai_serialize.h"
 #include "syncd.h"
+#include "sairediscommon.h"
 
 #include "meta/OidRefCounter.h"
 #include "meta/SaiAttrWrapper.h"
@@ -21,6 +22,21 @@ extern "C" {
 #include <vector>
 #include <thread>
 #include <tuple>
+
+// TODO remove when SAI will introduce bulk APIs to those objects
+sai_status_t sai_bulk_create_fdb_entry(
+        _In_ uint32_t object_count,
+        _In_ const sai_fdb_entry_t *fdb_entry,
+        _In_ const uint32_t *attr_count,
+        _In_ const sai_attribute_t **attr_list,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses);
+
+sai_status_t sai_bulk_remove_fdb_entry(
+        _In_ uint32_t object_count,
+        _In_ const sai_fdb_entry_t *fdb_entry,
+        _In_ sai_bulk_op_error_mode_t mode,
+        _Out_ sai_status_t *object_statuses);
 
 extern bool g_syncMode;
 
