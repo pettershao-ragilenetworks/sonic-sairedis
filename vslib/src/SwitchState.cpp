@@ -207,6 +207,8 @@ void SwitchState::asyncOnLinkMsg(
         return;
     }
 
+    // TODO we must check if_index also if index is registered under this switch
+
     if (strncmp(if_name, SAI_VS_VETH_PREFIX, sizeof(SAI_VS_VETH_PREFIX) - 1) != 0 &&
             !map->hasInterface(if_name))
     {
