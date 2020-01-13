@@ -51,6 +51,8 @@ cv
 dbg
 deallocate
 decap
+decrement
+Decrement
 del
 deserialize
 deserialized
