@@ -161,20 +161,6 @@ void test_enable_recording()
     ASSERT_SUCCESS("Failed to enable recording");
 }
 
-extern SaiObjectCollection g_saiObjectCollection;
-
-extern OidRefCounter g_oids;
-
-sai_object_id_t create_dummy_object_id(
-        _In_ sai_object_type_t objecttype)
-{
-    SWSS_LOG_ENTER();
-
-    static uint64_t index = 0;
-
-    return (((sai_object_id_t)objecttype) << 48) | ++index;
-}
-
 bool starts_with(const std::string& str, const std::string& substr)
 {
     SWSS_LOG_ENTER();
@@ -237,9 +223,11 @@ void test_bulk_next_hop_group_member_create()
 
     sai_status_t    status;
 
+    sai_next_hop_api_t  *sai_next_hop_api = NULL;
     sai_next_hop_group_api_t  *sai_next_hop_group_api = NULL;
     sai_switch_api_t *sai_switch_api = NULL;
 
+    sai_api_query(SAI_API_NEXT_HOP, (void**)&sai_next_hop_api);
     sai_api_query(SAI_API_NEXT_HOP_GROUP, (void**)&sai_next_hop_group_api);
     sai_api_query(SAI_API_SWITCH, (void**)&sai_switch_api);
 
@@ -262,22 +250,31 @@ void test_bulk_next_hop_group_member_create()
     std::vector<const sai_attribute_t *> nhgm_attrs_array;
     std::vector<uint32_t> nhgm_attrs_count;
 
-    // next hop group
-    sai_object_id_t hopgroup = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP_GROUP);
-    g_oids.objectReferenceInsert(hopgroup);
-    sai_object_meta_key_t meta_key_hopgruop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP_GROUP, .objectkey = { .key = { .object_id = hopgroup } } };
-    g_saiObjectCollection.createObject(meta_key_hopgruop);
-    sai_object_id_t hopgroup_vid = translate_rid_to_vid(hopgroup, switch_id);
+    sai_object_id_t hopgroup_vid;
+    sai_attribute_t nhgattr;
+
+    nhgattr.id = SAI_NEXT_HOP_GROUP_ATTR_TYPE;
+    nhgattr.value.s32 = SAI_NEXT_HOP_GROUP_TYPE_ECMP;
+    status = sai_next_hop_group_api->create_next_hop_group(&hopgroup_vid, switch_id, 1,&nhgattr);
+
+    ASSERT_SUCCESS("failed to create next hop group");
 
     for (uint32_t i = 0; i <  count; ++i)
     {
-        // next hop
-        sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP);
-        g_oids.objectReferenceInsert(hop);
-        sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
-        std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
-        g_saiObjectCollection.createObject(meta_key_hop);
-        sai_object_id_t hop_vid = translate_rid_to_vid(hop, switch_id);
+        sai_object_id_t hop_vid;
+
+        sai_attribute_t nhattr[3] = { };
+
+        nhattr[0].id = SAI_NEXT_HOP_ATTR_TYPE;
+        nhattr[0].value.s32 = SAI_NEXT_HOP_TYPE_SEGMENTROUTE_ENDPOINT;
+
+        nhattr[1].id = SAI_NEXT_HOP_ATTR_SEGMENTROUTE_ENDPOINT_TYPE;
+
+        nhattr[2].id = SAI_NEXT_HOP_ATTR_SEGMENTROUTE_ENDPOINT_POP_TYPE;
+
+        status = sai_next_hop_api->create_next_hop(&hop_vid, switch_id, 3, nhattr);
+
+        ASSERT_SUCCESS("failed to create next hop");
 
         std::vector<sai_attribute_t> list(2);
         sai_attribute_t &attr1 = list[0];
@@ -287,6 +284,7 @@ void test_bulk_next_hop_group_member_create()
         attr1.value.oid = hopgroup_vid;
         attr2.id = SAI_NEXT_HOP_GROUP_MEMBER_ATTR_NEXT_HOP_ID;
         attr2.value.oid = hop_vid;
+
         nhgm_attrs.push_back(list);
         nhgm_attrs_count.push_back(2);
     }
@@ -336,8 +334,14 @@ void test_bulk_fdb_create()
     sai_status_t    status;
 
     sai_switch_api_t *sai_switch_api = NULL;
+    sai_lag_api_t *sai_lag_api = NULL;
+    sai_bridge_api_t *sai_bridge_api = NULL;
+    sai_virtual_router_api_t * sai_virtual_router_api = NULL;
 
+    sai_api_query(SAI_API_BRIDGE, (void**)&sai_bridge_api);
+    sai_api_query(SAI_API_LAG, (void**)&sai_lag_api);
     sai_api_query(SAI_API_SWITCH, (void**)&sai_switch_api);
+    sai_api_query(SAI_API_VIRTUAL_ROUTER, (void**)&sai_virtual_router_api);
 
     uint32_t count = 3;
 
@@ -362,25 +366,42 @@ void test_bulk_fdb_create()
     for (uint32_t i = index; i < index + count; ++i)
     {
         // virtual router
-        sai_object_id_t vr = create_dummy_object_id(SAI_OBJECT_TYPE_VIRTUAL_ROUTER);
-        g_oids.objectReferenceInsert(vr);
-        sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
-        std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
-        g_saiObjectCollection.createObject(meta_key_vr);
+        sai_object_id_t vr;
 
-        // bridge port
-        sai_object_id_t bridge_port = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE_PORT);
-        g_oids.objectReferenceInsert(bridge_port);
-        sai_object_meta_key_t meta_key_bridge_port = { .objecttype = SAI_OBJECT_TYPE_BRIDGE_PORT, .objectkey = { .key = { .object_id = bridge_port } } };
-        std::string bridge_port_key = sai_serialize_object_meta_key(meta_key_bridge_port);
-        g_saiObjectCollection.createObject(meta_key_bridge_port);
+        status = sai_virtual_router_api->create_virtual_router(&vr, switch_id, 0, NULL);
+
+        ASSERT_SUCCESS("failed to create virtual router");
 
         // bridge
-        sai_object_id_t bridge = create_dummy_object_id(SAI_OBJECT_TYPE_BRIDGE);
-        g_oids.objectReferenceInsert(bridge);
-        sai_object_meta_key_t meta_key_bridge = { .objecttype = SAI_OBJECT_TYPE_BRIDGE, .objectkey = { .key = { .object_id = bridge } } };
-        std::string bridge_key = sai_serialize_object_meta_key(meta_key_bridge);
-        g_saiObjectCollection.createObject(meta_key_bridge);
+        sai_object_id_t bridge;
+
+        sai_attribute_t battr;
+
+        battr.id = SAI_BRIDGE_ATTR_TYPE;
+        battr.value.s32 = SAI_BRIDGE_TYPE_1Q;
+
+        status = sai_bridge_api->create_bridge(&bridge, switch_id, 1, &battr);
+
+        ASSERT_SUCCESS("failed to create bridge");
+
+        sai_object_id_t lag;
+        status = sai_lag_api->create_lag(&lag, switch_id, 0, NULL);
+
+        ASSERT_SUCCESS("failed to create lag");
+
+        // bridge port
+        sai_object_id_t bridge_port;
+
+        sai_attribute_t bpattr[2];
+
+        bpattr[0].id = SAI_BRIDGE_PORT_ATTR_TYPE;
+        bpattr[0].value.s32 = SAI_BRIDGE_PORT_TYPE_PORT;
+        bpattr[1].id = SAI_BRIDGE_PORT_ATTR_PORT_ID;
+        bpattr[1].value.oid = lag;
+
+        status = sai_bridge_api->create_bridge_port(&bridge_port, switch_id, 2, bpattr);
+
+        ASSERT_SUCCESS("failed to create bridge port");
 
         sai_fdb_entry_t fdb_entry;
         fdb_entry.switch_id = switch_id;
@@ -443,9 +464,13 @@ void test_bulk_route_set()
 
     sai_route_api_t  *sai_route_api = NULL;
     sai_switch_api_t *sai_switch_api = NULL;
+    sai_virtual_router_api_t * sai_virtual_router_api = NULL;
+    sai_next_hop_api_t  *sai_next_hop_api = NULL;
 
     sai_api_query(SAI_API_ROUTE, (void**)&sai_route_api);
     sai_api_query(SAI_API_SWITCH, (void**)&sai_switch_api);
+    sai_api_query(SAI_API_VIRTUAL_ROUTER, (void**)&sai_virtual_router_api);
+    sai_api_query(SAI_API_NEXT_HOP, (void**)&sai_next_hop_api);
 
     uint32_t count = 3;
 
@@ -473,18 +498,25 @@ void test_bulk_route_set()
         sai_route_entry_t route_entry;
 
         // virtual router
-        sai_object_id_t vr = create_dummy_object_id(SAI_OBJECT_TYPE_VIRTUAL_ROUTER);
-        g_oids.objectReferenceInsert(vr);
-        sai_object_meta_key_t meta_key_vr = { .objecttype = SAI_OBJECT_TYPE_VIRTUAL_ROUTER, .objectkey = { .key = { .object_id = vr } } };
-        std::string vr_key = sai_serialize_object_meta_key(meta_key_vr);
-        g_saiObjectCollection.createObject(meta_key_vr);
+        sai_object_id_t vr;
+
+        status = sai_virtual_router_api->create_virtual_router(&vr, switch_id, 0, NULL);
+
+        ASSERT_SUCCESS("failed to create virtual router");
 
         // next hop
-        sai_object_id_t hop = create_dummy_object_id(SAI_OBJECT_TYPE_NEXT_HOP);
-        g_oids.objectReferenceInsert(hop);
-        sai_object_meta_key_t meta_key_hop = { .objecttype = SAI_OBJECT_TYPE_NEXT_HOP, .objectkey = { .key = { .object_id = hop } } };
-        std::string hop_key = sai_serialize_object_meta_key(meta_key_hop);
-        g_saiObjectCollection.createObject(meta_key_hop);
+        sai_object_id_t hop;
+
+        sai_attribute_t nhattr[3] = { };
+
+        nhattr[0].id = SAI_NEXT_HOP_ATTR_TYPE;
+        nhattr[0].value.s32 = SAI_NEXT_HOP_TYPE_SEGMENTROUTE_ENDPOINT;
+        nhattr[1].id = SAI_NEXT_HOP_ATTR_SEGMENTROUTE_ENDPOINT_TYPE;
+        nhattr[2].id = SAI_NEXT_HOP_ATTR_SEGMENTROUTE_ENDPOINT_POP_TYPE;
+
+        status = sai_next_hop_api->create_next_hop(&hop, switch_id, 3, nhattr);
+
+        ASSERT_SUCCESS("failed to create next hop");
 
         route_entry.destination.addr_family = SAI_IP_ADDR_FAMILY_IPV4;
         route_entry.destination.addr.ip4 = htonl(0x0a000000 | i);
