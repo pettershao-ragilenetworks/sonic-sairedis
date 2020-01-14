@@ -6,6 +6,8 @@
 
 #include <algorithm>
 
+#define MAX_OBJLIST_LEN 128
+
 using namespace saivs;
 
 SwitchStateBase::SwitchStateBase(
@@ -25,9 +27,6 @@ sai_status_t SwitchStateBase::create(
         _In_ const sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
-
-    if (object_type == SAI_OBJECT_TYPE_DEBUG_COUNTER)
-        return createDebugCounter(object_id, switch_id, attr_count, attr_list);
 
     *object_id = g_realObjectIdManager->allocateNewObjectId(object_type, switch_id);
 
@@ -73,7 +72,7 @@ sai_status_t SwitchStateBase::createDebugCounter(
 
     auto sid = sai_serialize_object_id(*object_id);
 
-    CHECK_STATUS(create(SAI_OBJECT_TYPE_DEBUG_COUNTER, sid, switch_id, attr_count, attr_list));
+    CHECK_STATUS(create_internal(SAI_OBJECT_TYPE_DEBUG_COUNTER, sid, switch_id, attr_count, attr_list));
 
     sai_attribute_t attr;
 
@@ -84,6 +83,25 @@ sai_status_t SwitchStateBase::createDebugCounter(
 }
 
 sai_status_t SwitchStateBase::create(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::string &serializedObjectId,
+        _In_ sai_object_id_t switch_id,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    if (object_type == SAI_OBJECT_TYPE_DEBUG_COUNTER)
+    {
+        sai_object_id_t object_id;
+        sai_deserialize_object_id(serializedObjectId, object_id);
+        return createDebugCounter(&object_id, switch_id, attr_count, attr_list);
+    }
+
+    return create_internal(object_type, serializedObjectId, switch_id, attr_count, attr_list);
+}
+
+sai_status_t SwitchStateBase::create_internal(
         _In_ sai_object_type_t object_type,
         _In_ const std::string &serializedObjectId,
         _In_ sai_object_id_t switch_id,
@@ -148,9 +166,6 @@ sai_status_t SwitchStateBase::remove(
 {
     SWSS_LOG_ENTER();
 
-    if (object_type == SAI_OBJECT_TYPE_DEBUG_COUNTER)
-        return removeDebugCounter(objectId);
-
     auto sid = sai_serialize_object_id(objectId);
 
     return remove(object_type, sid);
@@ -169,14 +184,84 @@ sai_status_t SwitchStateBase::removeDebugCounter(
 
     auto sid = sai_serialize_object_id(objectId);
 
-    CHECK_STATUS(remove(SAI_OBJECT_TYPE_DEBUG_COUNTER, sid));
+    CHECK_STATUS(remove_internal(SAI_OBJECT_TYPE_DEBUG_COUNTER, sid));
 
     releaseDebugCounterIndex(attr.value.u32);
 
     return SAI_STATUS_SUCCESS;
 }
 
+sai_status_t SwitchStateBase::removePort(
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    if (!isPortReadyToBeRemove(objectId))
+    {
+        SWSS_LOG_ERROR("port %s still have some active dependencies, can't remove",
+                sai_serialize_object_id(objectId).c_str());
+
+        return SAI_STATUS_OBJECT_IN_USE;
+    }
+
+    auto dep = getPortDependencies(objectId);
+
+    auto sid = sai_serialize_object_id(objectId);
+
+    CHECK_STATUS(remove_internal(SAI_OBJECT_TYPE_PORT, sid));
+
+    SWSS_LOG_NOTICE("port %s was successfully removed, removing depending objects now",
+            sai_serialize_object_id(objectId).c_str());
+
+    for (auto oid: dep)
+    {
+        // meta_sai_remove_oid automatically removed related oids internally
+        // so we just need to execute remove for virtual switch db
+
+        auto status = vs_generic_remove(
+                g_realObjectIdManager->saiObjectTypeQuery(oid),
+                oid);
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            // we can't continue, there is a bug somewhere if we can't remove
+            // port related objects: queues, ipgs, sg
+
+            SWSS_LOG_THROW("FATAL: failed to removed port related oid: %s: %s, bug!",
+                    sai_serialize_object_type(g_realObjectIdManager->saiObjectTypeQuery(oid)).c_str(),
+                    sai_serialize_object_id(oid).c_str());
+        }
+    }
+
+    SWSS_LOG_NOTICE("successfully removed all %zu port related objects", dep.size());
+
+    return SAI_STATUS_SUCCESS;
+}
+
 sai_status_t SwitchStateBase::remove(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::string &serializedObjectId)
+{
+    SWSS_LOG_ENTER();
+
+    if (object_type == SAI_OBJECT_TYPE_DEBUG_COUNTER)
+    {
+        sai_object_id_t objectId;
+        sai_deserialize_object_id(serializedObjectId, objectId);
+        return removeDebugCounter(objectId);
+    }
+
+    if (object_type == SAI_OBJECT_TYPE_PORT)
+    {
+        sai_object_id_t objectId;
+        sai_deserialize_object_id(serializedObjectId, objectId);
+        return removePort(objectId);
+    }
+
+    return remove_internal(object_type, serializedObjectId);
+}
+
+sai_status_t SwitchStateBase::remove_internal(
         _In_ sai_object_type_t object_type,
         _In_ const std::string &serializedObjectId)
 {
@@ -1410,5 +1495,430 @@ void SwitchStateBase::processFdbEntriesForAging()
             ++it;
         }
     }
+}
+
+bool SwitchStateBase::isPortReadyToBeRemove(
+        _In_ sai_object_id_t portId)
+{
+    SWSS_LOG_ENTER();
+
+    std::vector<sai_object_id_t> dep;
+
+    auto status = check_port_dependencies(portId, dep);
+
+    return status == SAI_STATUS_SUCCESS;
+}
+
+std::vector<sai_object_id_t> SwitchStateBase::getPortDependencies(
+        _In_ sai_object_id_t portId)
+{
+    SWSS_LOG_ENTER();
+
+    std::vector<sai_object_id_t> dep;
+
+    check_port_dependencies(portId, dep);
+
+    return dep;
+}
+
+bool SwitchStateBase::check_port_reference_count(
+        _In_ sai_object_id_t port_id)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO currently when switch is initialized, there is no metadata yet
+    // and objects are created without reference count, this needs to be
+    // addressed in refactoring metadata and meta_create_oid to correct
+    // count references, but now we need to check if port is used in any
+    // bridge port (and bridge port in any vlan member), after metadata
+    // refactor this function can be removed.
+
+    // check if port is used on any bridge port object (only switch init one
+    // matters, user created bridge ports will have correct reference count
+
+    auto& bridgePorts = m_objectHash.at(SAI_OBJECT_TYPE_BRIDGE_PORT);
+
+    auto* meta = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_BRIDGE_PORT, SAI_BRIDGE_PORT_ATTR_PORT_ID);
+
+    for (auto& bp: bridgePorts)
+    {
+        for (auto&attr: bp.second)
+        {
+            if (attr.first != meta->attridname)
+                continue; // not this attribute
+
+            if (attr.second->getAttr()->value.oid == port_id)
+            {
+                SWSS_LOG_ERROR("port id %s is in use on bridge port %s",
+                        sai_serialize_object_id(port_id).c_str(),
+                        bp.first.c_str());
+
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+sai_status_t SwitchStateBase::check_port_dependencies(
+        _In_ sai_object_id_t port_id,
+        _Out_ std::vector<sai_object_id_t>& dep)
+{
+    SWSS_LOG_ENTER();
+
+    // check if port exists's
+
+    sai_object_id_t switch_id = g_realObjectIdManager->saiSwitchIdQuery(port_id);
+
+    if (switch_id == SAI_NULL_OBJECT_ID)
+    {
+        SWSS_LOG_ERROR("failed to obtain switch_id from object %s",
+                sai_serialize_object_id(port_id).c_str());
+
+        return SAI_STATUS_FAILURE;
+    }
+
+    sai_object_type_t ot = g_realObjectIdManager->saiObjectTypeQuery(port_id);
+
+    if (ot != SAI_OBJECT_TYPE_PORT)
+    {
+        SWSS_LOG_ERROR("expected object type PORT but object %s has type %s",
+                sai_serialize_object_id(port_id).c_str(),
+                sai_serialize_object_type(ot).c_str());
+
+        return SAI_STATUS_FAILURE;
+    }
+
+    std::string str_port_id = sai_serialize_object_id(port_id);
+
+    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(ot);
+
+    auto it = objectHash.find(str_port_id);
+
+    if (it == objectHash.end())
+    {
+        SWSS_LOG_ERROR("port not found %s:%s",
+                sai_serialize_object_type(ot).c_str(),
+                str_port_id.c_str());
+
+        return SAI_STATUS_ITEM_NOT_FOUND;
+    }
+
+    // port was found
+    SWSS_LOG_NOTICE("port %s found, for removal",
+                sai_serialize_object_id(port_id).c_str());
+
+    // check port reference count on bridge port
+
+    if (!check_port_reference_count(port_id))
+    {
+        SWSS_LOG_ERROR("port %s reference count IS NOT ZERO, can't remove, remove dependencies first",
+                sai_serialize_object_id(port_id).c_str());
+
+        return SAI_STATUS_FAILURE;
+    }
+
+
+    // obtain objects to examine
+
+    std::vector<sai_object_id_t> queues;
+    std::vector<sai_object_id_t> ipgs;
+    std::vector<sai_object_id_t> sg;
+
+    bool result = true;
+
+    result &= get_port_queues(port_id, queues);
+    result &= get_port_ipgs(port_id, ipgs);
+    result &= get_port_sg(port_id, sg);
+
+    if (!result)
+    {
+        SWSS_LOG_ERROR("failed to obtain required objects on port %s",
+                sai_serialize_object_id(port_id).c_str());
+
+        return SAI_STATUS_FAILURE;
+    }
+
+    // check if all objects are in default state
+
+    result &= check_object_default_state(port_id);
+    result &= check_object_list_default_state(queues);
+    result &= check_object_list_default_state(ipgs);
+    result &= check_object_list_default_state(sg);
+
+    if (!result)
+    {
+        SWSS_LOG_ERROR("one of objects is not in default state, can't remove port %s",
+                sai_serialize_object_id(port_id).c_str());
+
+        return SAI_STATUS_FAILURE;
+    }
+
+    SWSS_LOG_NOTICE("all depending objects on port %s are in default state",
+                sai_serialize_object_id(port_id).c_str());
+
+    dep.insert(dep.end(), queues.begin(), queues.end());
+    dep.insert(dep.end(), ipgs.begin(), ipgs.end());
+    dep.insert(dep.end(), sg.begin(), sg.end());
+
+    // BRIDGE PORT (and also VLAN MEMBER using that bridge port) must be
+    // removed before removing port itself, since bridge port holds reference
+    // to port being removed.
+
+    // bridge ports and vlan members must be removed before port can be removed
+
+    return SAI_STATUS_SUCCESS;
+}
+
+
+bool SwitchStateBase::get_object_list(
+        _In_ sai_object_id_t object_id,
+        _In_ sai_attr_id_t attr_id,
+        _Out_ std::vector<sai_object_id_t>& objlist)
+{
+    SWSS_LOG_ENTER();
+
+    objlist.clear();
+
+    sai_object_type_t object_type = g_realObjectIdManager->saiObjectTypeQuery(object_id);
+
+    auto* meta = sai_metadata_get_attr_metadata(object_type, attr_id);
+
+    if (meta == nullptr)
+    {
+        SWSS_LOG_THROW("failed to get metadata for OID %s and attrid: %d",
+                sai_serialize_object_id(object_id).c_str(),
+                attr_id);
+    }
+
+    if (meta->attrvaluetype != SAI_ATTR_VALUE_TYPE_OBJECT_LIST)
+    {
+        SWSS_LOG_THROW("attr %s is not objlist attribute", meta->attridname);
+    }
+
+    sai_status_t status;
+
+    sai_attribute_t attr;
+
+    objlist.resize(MAX_OBJLIST_LEN);
+
+    attr.id = attr_id;
+
+    attr.value.objlist.count = MAX_OBJLIST_LEN;
+    attr.value.objlist.list = objlist.data();
+
+    status = get(object_type, object_id, 1, &attr);
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_ERROR("failed to obtain %s for %s queues: %s",
+                meta->attridname,
+                sai_serialize_object_id(object_id).c_str(),
+                sai_serialize_status(status).c_str());
+
+        objlist.clear();
+        return false;
+    }
+
+    objlist.resize(attr.value.objlist.count);
+
+    SWSS_LOG_NOTICE("%s returned %zu objects for %s",
+            meta->attridname,
+            objlist.size(),
+            sai_serialize_object_id(object_id).c_str());
+
+    return true;
+}
+
+bool SwitchStateBase::get_port_queues(
+        _In_ sai_object_id_t port_id,
+        _Out_ std::vector<sai_object_id_t>& queues)
+{
+    SWSS_LOG_ENTER();
+
+    return get_object_list(port_id, SAI_PORT_ATTR_QOS_QUEUE_LIST, queues);
+}
+
+bool SwitchStateBase::get_port_ipgs(
+        _In_ sai_object_id_t port_id,
+        _Out_ std::vector<sai_object_id_t>& ipgs)
+{
+    SWSS_LOG_ENTER();
+
+    return get_object_list(port_id, SAI_PORT_ATTR_INGRESS_PRIORITY_GROUP_LIST, ipgs);
+}
+
+bool SwitchStateBase::get_port_sg(
+        _In_ sai_object_id_t port_id,
+        _Out_ std::vector<sai_object_id_t>& sg)
+{
+    SWSS_LOG_ENTER();
+
+    // scheduler groups are organized in tree, but
+    // SAI_PORT_ATTR_INGRESS_PRIORITY_GROUP_LIST should return all scheduler groups in that tree
+
+    return get_object_list(port_id, SAI_PORT_ATTR_QOS_SCHEDULER_GROUP_LIST, sg);
+}
+
+bool SwitchStateBase::check_object_default_state(
+        _In_ sai_object_id_t object_id)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_type_t object_type = g_realObjectIdManager->saiObjectTypeQuery(object_id);
+
+    if (object_type == SAI_OBJECT_TYPE_NULL)
+    {
+        SWSS_LOG_ERROR("failed to get object type for oid: %s",
+                sai_serialize_object_id(object_id).c_str());
+
+        return false;
+    }
+
+    auto* oti = sai_metadata_get_object_type_info(object_type);
+
+    if (oti == nullptr)
+    {
+        SWSS_LOG_THROW("failed to get object type info for object type: %s",
+                sai_serialize_object_type(object_type).c_str());
+    }
+
+    // iterate over all attributes
+
+    for (size_t i = 0; i < oti->attrmetadatalength; i++)
+    {
+        auto* meta = oti->attrmetadata[i];
+
+        // skip readonly, mandatory on create and non oid attributes
+
+        if (meta->isreadonly)
+            continue;
+
+        if (!meta->isoidattribute)
+            continue;
+
+        // those attributes must be skipped since those dependencies will be automatically broken
+        if (meta->objecttype == SAI_OBJECT_TYPE_SCHEDULER_GROUP && meta->attrid == SAI_SCHEDULER_GROUP_ATTR_PORT_ID)
+            continue;
+
+        if (meta->objecttype == SAI_OBJECT_TYPE_SCHEDULER_GROUP && meta->attrid == SAI_SCHEDULER_GROUP_ATTR_PARENT_NODE)
+            continue;
+
+        if (meta->objecttype == SAI_OBJECT_TYPE_QUEUE && meta->attrid == SAI_QUEUE_ATTR_PORT)
+            continue;
+
+        if (meta->objecttype == SAI_OBJECT_TYPE_QUEUE && meta->attrid == SAI_QUEUE_ATTR_PARENT_SCHEDULER_NODE)
+            continue;
+
+        if (meta->objecttype == SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP && meta->attrid == SAI_INGRESS_PRIORITY_GROUP_ATTR_PORT)
+            continue;
+
+        // here we have only oid/object list attrs and we expect each of this
+        // attribute will be in default state which for oid is usually NULL,
+        // and for object list is empty
+
+        sai_attribute_t attr;
+
+        attr.id = meta->attrid;
+
+        sai_status_t status;
+
+        std::vector<sai_object_id_t> objlist;
+
+        if (meta->attrvaluetype == SAI_ATTR_VALUE_TYPE_OBJECT_ID)
+        {
+            // ok
+        }
+        else if (meta->attrvaluetype == SAI_ATTR_VALUE_TYPE_OBJECT_LIST)
+        {
+            objlist.resize(MAX_OBJLIST_LEN);
+
+            attr.value.objlist.count = MAX_OBJLIST_LEN;
+            attr.value.objlist.list = objlist.data();
+        }
+        else
+        {
+            // unable to check whether object is in default state, need fix
+
+            SWSS_LOG_ERROR("unsupported oid attribute: %s, FIX ME!", meta->attridname);
+            return false;
+        }
+
+        status = get(object_type, object_id, 1, &attr);
+
+        switch (status)
+        {
+            case SAI_STATUS_NOT_IMPLEMENTED:
+            case SAI_STATUS_NOT_SUPPORTED:
+                continue;
+
+            case SAI_STATUS_SUCCESS:
+                break;
+
+            default:
+
+                SWSS_LOG_ERROR("unexpected status %s on %s obj %s",
+                        sai_serialize_status(status).c_str(),
+                        meta->attridname,
+                        sai_serialize_object_id(object_id).c_str());
+                return false;
+
+        }
+
+
+        if (meta->attrvaluetype == SAI_ATTR_VALUE_TYPE_OBJECT_ID)
+        {
+            if (attr.value.oid != SAI_NULL_OBJECT_ID)
+            {
+                SWSS_LOG_ERROR("expected null object id on %s on %s, but got: %s",
+                        meta->attridname,
+                        sai_serialize_object_id(object_id).c_str(),
+                        sai_serialize_object_id(attr.value.oid).c_str());
+
+                return false;
+            }
+
+        }
+        else if (meta->attrvaluetype == SAI_ATTR_VALUE_TYPE_OBJECT_LIST)
+        {
+            if (objlist.size())
+            {
+                SWSS_LOG_ERROR("expected empty list on %s on %s, contents:",
+                        meta->attridname,
+                        sai_serialize_object_id(object_id).c_str());
+
+                for (auto oid: objlist)
+                {
+                    SWSS_LOG_ERROR(" - oid: %s", sai_serialize_object_id(oid).c_str());
+                }
+
+                return false;
+            }
+        }
+        else
+        {
+            // unable to check whether object is in default state, need fix
+
+            SWSS_LOG_ERROR("unsupported oid attribute: %s, FIX ME!", meta->attridname);
+            return false;
+        }
+    }
+
+    // TODO later there can be issue when we for example add extra queues to
+    // the port those new queues should be removed by user first before
+    // removing port, and currently we don't have a way to differentiate those
+
+    // object is in default state
+    return true;
+}
+
+bool SwitchStateBase::check_object_list_default_state(
+        _Out_ const std::vector<sai_object_id_t>& objlist)
+{
+    SWSS_LOG_ENTER();
+
+    return std::all_of(objlist.begin(), objlist.end(),
+            [&](sai_object_id_t oid) { return check_object_default_state(oid); });
 }
 

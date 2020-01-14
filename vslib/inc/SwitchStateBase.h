@@ -164,11 +164,65 @@ namespace saivs
                     _In_ uint32_t attr_count,
                     _Out_ sai_attribute_t *attr_list);
 
+        protected:
+
+            virtual sai_status_t remove_internal(
+                    _In_ sai_object_type_t object_type,
+                    _In_ const std::string &serializedObjectId);
+
+            virtual sai_status_t create_internal(
+                    _In_ sai_object_type_t object_type,
+                    _In_ const std::string &serializedObjectId,
+                    _In_ sai_object_id_t switch_id,
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
+
         public:
 
             void processFdbEntriesForAging();
 
-        protected:
+        protected: // custom port
+
+            sai_status_t removePort(
+                    _In_ sai_object_id_t objectId);
+
+            bool isPortReadyToBeRemove(
+                    _In_ sai_object_id_t portId);
+
+            std::vector<sai_object_id_t> getPortDependencies(
+                    _In_ sai_object_id_t portId);
+
+            sai_status_t check_port_dependencies(
+                    _In_ sai_object_id_t port_id,
+                    _Out_ std::vector<sai_object_id_t>& dep);
+
+            bool check_port_reference_count(
+                    _In_ sai_object_id_t port_id);
+
+            bool get_object_list(
+                    _In_ sai_object_id_t object_id,
+                    _In_ sai_attr_id_t attr_id,
+                    _Out_ std::vector<sai_object_id_t>& objlist);
+
+            bool get_port_queues(
+                    _In_ sai_object_id_t port_id,
+                    _Out_ std::vector<sai_object_id_t>& queues);
+
+            bool get_port_ipgs(
+                    _In_ sai_object_id_t port_id,
+                    _Out_ std::vector<sai_object_id_t>& ipgs);
+
+            bool get_port_sg(
+                    _In_ sai_object_id_t port_id,
+                    _Out_ std::vector<sai_object_id_t>& sg);
+
+            bool check_object_default_state(
+                    _In_ sai_object_id_t object_id);
+
+            bool check_object_list_default_state(
+                    _Out_ const std::vector<sai_object_id_t>& objlist);
+
+        protected: // custom debug counter
 
             uint32_t getNewDebugCounterIndex();
 
