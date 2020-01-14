@@ -17,7 +17,7 @@ namespace saivs
             SwitchStateBase(
                     _In_ sai_object_id_t switch_id);
 
-            virtual ~SwitchStateBase() = default;
+            virtual ~SwitchStateBase();
 
         protected:
 

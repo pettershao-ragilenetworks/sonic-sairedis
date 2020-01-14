@@ -19,6 +19,13 @@ SwitchStateBase::SwitchStateBase(
     // empty
 }
 
+SwitchStateBase::~SwitchStateBase()
+{
+    SWSS_LOG_ENTER();
+
+    // empty
+}
+
 sai_status_t SwitchStateBase::create(
         _In_ sai_object_type_t object_type,
         _Out_ sai_object_id_t *object_id,
