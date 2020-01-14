@@ -14,6 +14,8 @@
 
 using namespace sairedis;
 
+extern volatile bool g_recordStats;
+
 std::string joinFieldValues(
         _In_ const std::vector<swss::FieldValueTuple> &values);
 
@@ -549,6 +551,9 @@ void Recorder::recordGenericGetStats(
 {
     SWSS_LOG_ENTER();
 
+    if (!g_recordStats)
+        return;
+
     auto stats_enum = sai_metadata_get_object_type_info(object_type)->statenum;
 
     auto entry = serialize_counter_id_list(stats_enum, number_of_counters, counter_ids);
@@ -568,6 +573,9 @@ void Recorder::recordGenericGetStats(
 {
     SWSS_LOG_ENTER();
 
+    if (!g_recordStats)
+        return;
+
     recordLine("q|get_stats|" + key + "|" + joinFieldValues(arguments));
 }
 
@@ -577,6 +585,9 @@ void Recorder::recordGenericGetStatsResponse(
         _In_ const uint64_t *counters)
 {
     SWSS_LOG_ENTER();
+
+    if (!g_recordStats)
+        return;
 
     std::string joined;
 
@@ -596,6 +607,9 @@ void Recorder::recordGenericClearStats(
 {
     SWSS_LOG_ENTER();
 
+    if (!g_recordStats)
+        return;
+
     auto stats_enum = sai_metadata_get_object_type_info(object_type)->statenum;
 
     auto values = serialize_counter_id_list(stats_enum, number_of_counters, counter_ids);
@@ -614,6 +628,9 @@ void Recorder::recordGenericClearStats(
 {
     SWSS_LOG_ENTER();
 
+    if (!g_recordStats)
+        return;
+
     recordLine("q|clear_stats|" + key + "|" + joinFieldValues(arguments));
 }
 
@@ -621,6 +638,9 @@ void Recorder::recordGenericClearStatsResponse(
         _In_ sai_status_t status)
 {
     SWSS_LOG_ENTER();
+
+    if (!g_recordStats)
+        return;
 
     recordLine("Q|clear_stats|" + sai_serialize_status(status));
 }
