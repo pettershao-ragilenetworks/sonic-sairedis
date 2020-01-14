@@ -326,6 +326,21 @@ sai_status_t SwitchStateBase::set_switch_default_attributes()
 
     sai_attribute_t attr;
 
+    attr.id = SAI_SWITCH_ATTR_AVAILABLE_SNAT_ENTRY;
+    attr.value.u32 = 100;
+
+    CHECK_STATUS(set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr));
+
+    attr.id = SAI_SWITCH_ATTR_AVAILABLE_DNAT_ENTRY;
+    attr.value.u32 = 100;
+
+    CHECK_STATUS(set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr));
+
+    attr.id = SAI_SWITCH_ATTR_AVAILABLE_DOUBLE_NAT_ENTRY;
+    attr.value.u32 = 50; /* Half of single NAT entry */
+
+    CHECK_STATUS(set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr));
+
     attr.id = SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY;
     attr.value.ptr = NULL;
 
@@ -1193,6 +1208,11 @@ sai_status_t SwitchStateBase::refresh_read_only(
                 return refresh_port_list(meta);
 
             case SAI_SWITCH_ATTR_QOS_MAX_NUMBER_OF_CHILDS_PER_SCHEDULER_GROUP:
+                return SAI_STATUS_SUCCESS;
+
+            case SAI_SWITCH_ATTR_AVAILABLE_SNAT_ENTRY:
+            case SAI_SWITCH_ATTR_AVAILABLE_DNAT_ENTRY:
+            case SAI_SWITCH_ATTR_AVAILABLE_DOUBLE_NAT_ENTRY:
                 return SAI_STATUS_SUCCESS;
         }
     }
