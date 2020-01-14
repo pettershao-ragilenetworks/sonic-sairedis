@@ -5,6 +5,7 @@
 #include "FdbInfo.h"
 
 #include <set>
+#include <unordered_set>
 
 namespace saivs
 {
@@ -166,6 +167,28 @@ namespace saivs
         public:
 
             void processFdbEntriesForAging();
+
+        protected:
+
+            uint32_t getNewDebugCounterIndex();
+
+            void releaseDebugCounterIndex(
+                    _In_ uint32_t index);
+
+            sai_status_t createDebugCounter(
+                    _Out_ sai_object_id_t *object_id,
+                    _In_ sai_object_id_t switch_id,
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
+
+            sai_status_t removeDebugCounter(
+                    _In_ sai_object_id_t objectId);
+
+        protected:
+
+            constexpr static const int maxDebugCounters = 32;
+
+            std::unordered_set<uint32_t> m_indices;
 
         protected:
 

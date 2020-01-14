@@ -26,11 +26,61 @@ sai_status_t SwitchStateBase::create(
 {
     SWSS_LOG_ENTER();
 
+    if (object_type == SAI_OBJECT_TYPE_DEBUG_COUNTER)
+        return createDebugCounter(object_id, switch_id, attr_count, attr_list);
+
     *object_id = g_realObjectIdManager->allocateNewObjectId(object_type, switch_id);
 
     auto sid = sai_serialize_object_id(*object_id);
 
     return create(object_type, sid, switch_id, attr_count, attr_list);
+}
+
+uint32_t SwitchStateBase::getNewDebugCounterIndex()
+{
+    SWSS_LOG_ENTER();
+
+    for (uint32_t i = 0; i < maxDebugCounters; i++)
+    {
+        if (m_indices.find(i) == m_indices.end())
+        {
+            m_indices.insert(i);
+            return i;
+        }
+    }
+
+    return UINT32_MAX;
+}
+
+sai_status_t SwitchStateBase::createDebugCounter(
+        _Out_ sai_object_id_t *object_id,
+        _In_ sai_object_id_t switch_id,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    auto index = getNewDebugCounterIndex();
+
+    if (index > maxDebugCounters)
+    {
+        SWSS_LOG_ERROR("Cannot create more than %d debug counters", maxDebugCounters);
+
+        return SAI_STATUS_FAILURE;
+    }
+
+    *object_id = g_realObjectIdManager->allocateNewObjectId(SAI_OBJECT_TYPE_DEBUG_COUNTER, switch_id);
+
+    auto sid = sai_serialize_object_id(*object_id);
+
+    CHECK_STATUS(create(SAI_OBJECT_TYPE_DEBUG_COUNTER, sid, switch_id, attr_count, attr_list));
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_DEBUG_COUNTER_ATTR_INDEX;
+    attr.value.u32 = index;
+
+    return set(SAI_OBJECT_TYPE_DEBUG_COUNTER, sid, &attr);
 }
 
 sai_status_t SwitchStateBase::create(
@@ -84,15 +134,46 @@ sai_status_t SwitchStateBase::create(
     return SAI_STATUS_SUCCESS;
 }
 
+void SwitchStateBase::releaseDebugCounterIndex(
+        _In_ uint32_t index)
+{
+    SWSS_LOG_ENTER();
+
+    m_indices.erase(index);
+}
+
 sai_status_t SwitchStateBase::remove(
         _In_ sai_object_type_t object_type,
         _In_ sai_object_id_t objectId)
 {
     SWSS_LOG_ENTER();
 
+    if (object_type == SAI_OBJECT_TYPE_DEBUG_COUNTER)
+        return removeDebugCounter(objectId);
+
     auto sid = sai_serialize_object_id(objectId);
 
     return remove(object_type, sid);
+}
+
+sai_status_t SwitchStateBase::removeDebugCounter(
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_DEBUG_COUNTER_ATTR_INDEX;
+
+    CHECK_STATUS(get(SAI_OBJECT_TYPE_DEBUG_COUNTER, objectId, 1, &attr));
+
+    auto sid = sai_serialize_object_id(objectId);
+
+    CHECK_STATUS(remove(SAI_OBJECT_TYPE_DEBUG_COUNTER, sid));
+
+    releaseDebugCounterIndex(attr.value.u32);
+
+    return SAI_STATUS_SUCCESS;
 }
 
 sai_status_t SwitchStateBase::remove(
@@ -1022,6 +1103,9 @@ sai_status_t SwitchStateBase::warm_boot_initialize_objects()
     // m_default_vlan_id;
     //
     // other objects/numbers if added (per switch also)
+
+    // TODO update
+    // std::unordered_set<uint32_t> m_indices;
 
     return SAI_STATUS_SUCCESS;
 }
