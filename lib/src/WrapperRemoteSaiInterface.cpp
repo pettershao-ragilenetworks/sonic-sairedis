@@ -7,6 +7,7 @@
 #include "SwitchContainer.h"
 #include "VirtualObjectIdManager.h"
 #include "Recorder.h"
+#include "SkipRecordAttrContainer.h"
 
 #include <memory>
 
@@ -16,6 +17,8 @@ using namespace sairedis;
 extern std::shared_ptr<SwitchContainer>            g_switchContainer;
 extern std::shared_ptr<VirtualObjectIdManager>     g_virtualObjectIdManager;
 extern std::shared_ptr<Recorder>                   g_recorder;
+
+static auto g_skipRecordAttrContainer = std::make_shared<SkipRecordAttrContainer>();
 
 WrapperRemoteSaiInterface::WrapperRemoteSaiInterface(
         _In_ std::shared_ptr<RemoteSaiInterface> impl):
@@ -156,11 +159,19 @@ sai_status_t WrapperRemoteSaiInterface::get(
 
     Utils::clearOidValues(objectType, attr_count, attr_list);
 
-    g_recorder->recordGenericGet(objectType, objectId, attr_count, attr_list);
+    bool skipRecord = g_skipRecordAttrContainer->canSkipRecording(objectType, attr_count, attr_list);
+
+    if (!skipRecord)
+    {
+        g_recorder->recordGenericGet(objectType, objectId, attr_count, attr_list);
+    }
 
     auto status = m_implementation->get(objectType, objectId, attr_count, attr_list);
 
-    g_recorder->recordGenericGetResponse(status, objectType, attr_count, attr_list);
+    if (!skipRecord)
+    {
+        g_recorder->recordGenericGetResponse(status, objectType, attr_count, attr_list);
+    }
 
     return status;
 }
@@ -243,9 +254,13 @@ sai_status_t WrapperRemoteSaiInterface::get(                                \
 {                                                                           \
     SWSS_LOG_ENTER();                                                       \
     Utils::clearOidValues(SAI_OBJECT_TYPE_ ## OT, attr_count, attr_list);   \
-    g_recorder->recordGet(ot, attr_count, attr_list);                       \
+    bool skipRecord = g_skipRecordAttrContainer->canSkipRecording(          \
+            SAI_OBJECT_TYPE_ ## OT,                                         \
+            attr_count,                                                     \
+            attr_list);                                                     \
+    if (!skipRecord) g_recorder->recordGet(ot, attr_count, attr_list);      \
     auto status = m_implementation->get(ot, attr_count, attr_list);         \
-    g_recorder->recordGenericGetResponse(                                   \
+    if (!skipRecord) g_recorder->recordGenericGetResponse(                  \
             status,                                                         \
             SAI_OBJECT_TYPE_ ## OT,                                         \
             attr_count,                                                     \

@@ -32,6 +32,7 @@ libsairedis_la_SOURCES = \
 						 RedisRemoteSaiInterface.cpp \
 						 Utils.cpp \
 						 WrapperRemoteSaiInterface.cpp \
+						 SkipRecordAttrContainer.cpp \
 						 sai_redis_acl.cpp \
 						 sai_redis_bfd.cpp \
 						 sai_redis_bmtor.cpp \
