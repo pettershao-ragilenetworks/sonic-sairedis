@@ -19,6 +19,7 @@ extern bool g_vs_hostif_use_tap_device; // TODO to be removed
 
 // TODO MUTEX must be used when adding and removing interface index by system
 
+#define VS_COUNTERS_COUNT_MSB (0x80000000)
 
 #define MUTEX std::lock_guard<std::mutex> _lock(m_mutex);
 
@@ -279,5 +280,71 @@ void SwitchState::asyncOnLinkMsg(
     // TODO we should also call Meta for this notification
 
     callback(1, &data);
+}
+
+sai_status_t SwitchState::getStatsExt(
+        _In_ sai_object_type_t object_type,
+        _In_ sai_object_id_t object_id,
+        _In_ uint32_t number_of_counters,
+        _In_ const sai_stat_id_t* counter_ids,
+        _In_ sai_stats_mode_t mode,
+        _Out_ uint64_t *counters)
+{
+    SWSS_LOG_ENTER();
+
+    bool perform_set = false;
+
+    auto info = sai_metadata_get_object_type_info(object_type);
+
+    if (meta_unittests_enabled() && (number_of_counters & VS_COUNTERS_COUNT_MSB ))
+    {
+        number_of_counters &= ~VS_COUNTERS_COUNT_MSB;
+
+        SWSS_LOG_NOTICE("unittests are enabled and counters count MSB is set to 1, performing SET on %s counters (%s)",
+                sai_serialize_object_id(object_id).c_str(),
+                info->statenum->name);
+
+        perform_set = true;
+    }
+
+    auto str_object_id = sai_serialize_object_id(object_id);
+
+    auto mapit = m_countersMap.find(str_object_id);
+
+    if (mapit == m_countersMap.end())
+        m_countersMap[str_object_id] = { };
+
+    auto& localcounters = m_countersMap[str_object_id];
+
+    for (uint32_t i = 0; i < number_of_counters; ++i)
+    {
+        int32_t id = counter_ids[i];
+
+        if (perform_set)
+        {
+            localcounters[ id ] = counters[i];
+        }
+        else
+        {
+            auto it = localcounters.find(id);
+
+            if (it == localcounters.end())
+            {
+                // if counter is not found on list, just return 0
+                counters[i] = 0;
+            }
+            else
+            {
+                counters[i] = it->second;
+            }
+
+            if (mode == SAI_STATS_MODE_READ_AND_CLEAR)
+            {
+                localcounters[ id ] = 0;
+            }
+        }
+    }
+
+    return SAI_STATUS_SUCCESS;
 }
 

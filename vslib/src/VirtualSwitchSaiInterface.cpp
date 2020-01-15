@@ -19,8 +19,6 @@
  */
 #define VS_MAX_COUNTERS 128
 
-#define VS_COUNTERS_COUNT_MSB (0x80000000)
-
 using namespace saivs;
 
 #pragma GCC diagnostic push
@@ -1046,72 +1044,6 @@ sai_status_t VirtualSwitchSaiInterface::getStats(
             counters);
 }
 
-static sai_status_t internal_vs_generic_stats_function(
-        _In_ sai_object_type_t obejct_type,
-        _In_ sai_object_id_t object_id,
-        _In_ sai_object_id_t switch_id,
-        _In_ const sai_enum_metadata_t *enum_metadata,
-        _In_ uint32_t number_of_counters,
-        _In_ const sai_stat_id_t*counter_ids,
-        _In_ sai_stats_mode_t mode,
-        _Out_ uint64_t *counters)
-{
-    SWSS_LOG_ENTER();
-
-    bool perform_set = false;
-
-    if (meta_unittests_enabled() && (number_of_counters & VS_COUNTERS_COUNT_MSB ))
-    {
-        number_of_counters &= ~VS_COUNTERS_COUNT_MSB;
-
-        SWSS_LOG_NOTICE("unittests are enabled and counters count MSB is set to 1, performing SET on %s counters (%s)",
-                sai_serialize_object_id(object_id).c_str(),
-                enum_metadata->name);
-
-        perform_set = true;
-    }
-
-    auto &countersMap = g_switch_state_map.at(switch_id)->m_countersMap;
-
-    auto str_object_id = sai_serialize_object_id(object_id);
-
-    auto mapit = countersMap.find(str_object_id);
-
-    if (mapit == countersMap.end())
-        countersMap[str_object_id] = std::map<int,uint64_t>();
-
-    std::map<int,uint64_t>& localcounters = countersMap[str_object_id];
-
-    for (uint32_t i = 0; i < number_of_counters; ++i)
-    {
-        int32_t id = counter_ids[i];
-
-        if (perform_set)
-        {
-            localcounters[ id ] = counters[i];
-        }
-        else
-        {
-            auto it = localcounters.find(id);
-
-            if (it == localcounters.end())
-            {
-                // if counter is not found on list, just return 0
-                counters[i] = 0;
-            }
-            else
-                counters[i] = it->second;
-
-            if (mode == SAI_STATS_MODE_READ_AND_CLEAR)
-            {
-                localcounters[ id ] = 0;
-            }
-        }
-    }
-
-    return SAI_STATUS_SUCCESS;
-}
-
 sai_status_t VirtualSwitchSaiInterface::getStatsExt(
         _In_ sai_object_type_t object_type,
         _In_ sai_object_id_t object_id,
@@ -1122,103 +1054,36 @@ sai_status_t VirtualSwitchSaiInterface::getStatsExt(
 {
     SWSS_LOG_ENTER();
 
-    /*
-     * Do all parameter validation.
-     *
-     * TODO this should be done in metadata
-     */
+    sai_object_id_t switch_id = SAI_NULL_OBJECT_ID;
 
-    if (object_id == SAI_NULL_OBJECT_ID)
+    if (g_switch_state_map.size() == 0)
     {
-        SWSS_LOG_ERROR("object id is NULL");
-
-        return SAI_STATUS_INVALID_PARAMETER;
+        SWSS_LOG_ERROR("no switch!, was removed but some function still call");
+        return SAI_STATUS_FAILURE;
     }
 
-    sai_object_type_t ot = g_realObjectIdManager->saiObjectTypeQuery(object_id);
-
-    if (ot != object_type)
+    if (g_switch_state_map.size() == 1)
     {
-        SWSS_LOG_ERROR("object %s is %s but expected %s",
-                sai_serialize_object_id(object_id).c_str(),
-                sai_serialize_object_type(ot).c_str(),
-                sai_serialize_object_type(object_type).c_str());
-
-        return SAI_STATUS_INVALID_PARAMETER;
+        switch_id = g_switch_state_map.begin()->first;
+    }
+    else
+    {
+        SWSS_LOG_THROW("multiple switches not supported, FIXME");
     }
 
-    sai_object_id_t switch_id = g_realObjectIdManager->saiSwitchIdQuery(object_id);
-
-    if (switch_id == SAI_NULL_OBJECT_ID)
+    if (g_switch_state_map.find(switch_id) == g_switch_state_map.end())
     {
-        SWSS_LOG_ERROR("object %s does not correspond to any switch object",
-                sai_serialize_object_id(object_id).c_str());
-
-        return SAI_STATUS_INVALID_PARAMETER;
-    }
-
-    uint32_t count = number_of_counters & ~VS_COUNTERS_COUNT_MSB;
-
-    if (count > VS_MAX_COUNTERS)
-    {
-        SWSS_LOG_ERROR("max supported counters to get/clear is %u, but %u given",
-                VS_MAX_COUNTERS,
-                count);
-
-        return SAI_STATUS_INVALID_PARAMETER;
-    }
-
-    if (counter_ids == NULL)
-    {
-        SWSS_LOG_ERROR("counter ids pointer is NULL");
-
-        return SAI_STATUS_INVALID_PARAMETER;
-    }
-
-    if (counters == NULL)
-    {
-        SWSS_LOG_ERROR("counters output pointer is NULL");
-
-        return SAI_STATUS_INVALID_PARAMETER;
-    }
-
-    auto enum_metadata = sai_metadata_get_object_type_info(object_type)->statenum;
-
-    if (enum_metadata == NULL)
-    {
-        SWSS_LOG_ERROR("enum metadata pointer is NULL, bug?");
+        SWSS_LOG_ERROR("failed to find switch %s in switch state map", sai_serialize_object_id(switch_id).c_str());
 
         return SAI_STATUS_FAILURE;
     }
 
-    for (uint32_t i = 0; i < count; i++)
-    {
-        if (sai_metadata_get_enum_value_name(enum_metadata, counter_ids[i]) == NULL)
-        {
-            SWSS_LOG_ERROR("counter id %u is not allowed on %s", counter_ids[i], enum_metadata->name);
+    // TODO remove cast
+    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
 
-            return SAI_STATUS_INVALID_PARAMETER;
-        }
-    }
-
-    switch (mode)
-    {
-        case SAI_STATS_MODE_READ:
-        case SAI_STATS_MODE_READ_AND_CLEAR:
-            break;
-
-        default:
-
-            SWSS_LOG_ERROR("counters mode is invalid %d", mode);
-
-            return SAI_STATUS_INVALID_PARAMETER;
-    }
-
-    return internal_vs_generic_stats_function(
+    return ss->getStatsExt(
             object_type,
             object_id,
-            switch_id,
-            enum_metadata,
             number_of_counters,
             counter_ids,
             mode,

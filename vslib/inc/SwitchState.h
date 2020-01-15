@@ -38,11 +38,15 @@ namespace saivs
 
             virtual ~SwitchState();
 
-        public: // TODO make private
+        public:
 
-            ObjectHash m_objectHash;
-
-            std::map<std::string, std::map<int, uint64_t>> m_countersMap;
+            sai_status_t getStatsExt(
+                    _In_ sai_object_type_t obejct_type,
+                    _In_ sai_object_id_t object_id,
+                    _In_ uint32_t number_of_counters,
+                    _In_ const sai_stat_id_t* counter_ids,
+                    _In_ sai_stats_mode_t mode,
+                    _Out_ uint64_t *counters);
 
         public:
 
@@ -78,6 +82,12 @@ namespace saivs
             void asyncOnLinkMsg(
                     _In_ int nlmsg_type,
                     _In_ struct nl_object *obj);
+
+        public: // TODO make private
+
+            ObjectHash m_objectHash;
+
+            std::map<std::string, std::map<int, uint64_t>> m_countersMap;
 
         protected:
 
