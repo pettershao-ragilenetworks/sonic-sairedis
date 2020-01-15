@@ -250,6 +250,7 @@ unistd
 unittest
 unittests
 unix
+unregister
 untagged
 updatable
 upgradable
