@@ -62,10 +62,8 @@ namespace saivs
 
             virtual sai_status_t initialize_default_objects();
 
-            virtual sai_status_t create_port(
-                    _In_ sai_object_id_t port_id,
-                    _In_ uint32_t attr_count,
-                    _In_ const sai_attribute_t *attr_list);
+            virtual sai_status_t create_port_dependencies(
+                    _In_ sai_object_id_t port_id);
 
         protected : // refresh
 
@@ -183,6 +181,12 @@ namespace saivs
 
         protected: // custom port
 
+            sai_status_t createPort(
+                    _In_ sai_object_id_t object_id,
+                    _In_ sai_object_id_t switch_id,
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
+
             sai_status_t removePort(
                     _In_ sai_object_id_t objectId);
 
@@ -230,7 +234,7 @@ namespace saivs
                     _In_ uint32_t index);
 
             sai_status_t createDebugCounter(
-                    _Out_ sai_object_id_t *object_id,
+                    _In_ sai_object_id_t object_id,
                     _In_ sai_object_id_t switch_id,
                     _In_ uint32_t attr_count,
                     _In_ const sai_attribute_t *attr_list);

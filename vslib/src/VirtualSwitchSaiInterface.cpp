@@ -406,35 +406,11 @@ sai_status_t VirtualSwitchSaiInterface::create(
 
     std::string str_object_id = sai_serialize_object_id(*objectId);
 
-    auto status = create(
+    return create(
             objectType,
             str_object_id,
             attr_count,
             attr_list);
-
-    CHECK_STATUS(status);
-
-    if (objectType == SAI_OBJECT_TYPE_PORT)
-    {
-        // TODO could this be moved inside switch state base?
-        // TODO also attributes may not be needed since they are already SET inside switch state
-
-        switch (g_vs_switch_type)
-        {
-            case SAI_VS_SWITCH_TYPE_BCM56850:
-            case SAI_VS_SWITCH_TYPE_MLNX2700:
-
-                // TODO remove cast
-                return std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map.at(switchId))->create_port(*objectId, attr_count, attr_list);
-
-            default:
-
-                SWSS_LOG_ERROR("unknown switch type: %d", g_vs_switch_type);
-                return SAI_STATUS_FAILURE;
-        }
-    }
-
-    return SAI_STATUS_SUCCESS;
 }
 
 sai_status_t VirtualSwitchSaiInterface::remove(

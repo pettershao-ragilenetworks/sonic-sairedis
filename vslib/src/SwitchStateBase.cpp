@@ -59,7 +59,7 @@ uint32_t SwitchStateBase::getNewDebugCounterIndex()
 }
 
 sai_status_t SwitchStateBase::createDebugCounter(
-        _Out_ sai_object_id_t *object_id,
+        _In_ sai_object_id_t object_id,
         _In_ sai_object_id_t switch_id,
         _In_ uint32_t attr_count,
         _In_ const sai_attribute_t *attr_list)
@@ -75,9 +75,7 @@ sai_status_t SwitchStateBase::createDebugCounter(
         return SAI_STATUS_FAILURE;
     }
 
-    *object_id = g_realObjectIdManager->allocateNewObjectId(SAI_OBJECT_TYPE_DEBUG_COUNTER, switch_id);
-
-    auto sid = sai_serialize_object_id(*object_id);
+    auto sid = sai_serialize_object_id(object_id);
 
     CHECK_STATUS(create_internal(SAI_OBJECT_TYPE_DEBUG_COUNTER, sid, switch_id, attr_count, attr_list));
 
@@ -102,7 +100,14 @@ sai_status_t SwitchStateBase::create(
     {
         sai_object_id_t object_id;
         sai_deserialize_object_id(serializedObjectId, object_id);
-        return createDebugCounter(&object_id, switch_id, attr_count, attr_list);
+        return createDebugCounter(object_id, switch_id, attr_count, attr_list);
+    }
+
+    if (object_type == SAI_OBJECT_TYPE_PORT)
+    {
+        sai_object_id_t object_id;
+        sai_deserialize_object_id(serializedObjectId, object_id);
+        return createPort(object_id, switch_id, attr_count, attr_list);
     }
 
     return create_internal(object_type, serializedObjectId, switch_id, attr_count, attr_list);
@@ -196,6 +201,21 @@ sai_status_t SwitchStateBase::removeDebugCounter(
     releaseDebugCounterIndex(attr.value.u32);
 
     return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t SwitchStateBase::createPort(
+        _In_ sai_object_id_t object_id,
+        _In_ sai_object_id_t switch_id,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    auto sid = sai_serialize_object_id(object_id);
+
+    CHECK_STATUS(create_internal(SAI_OBJECT_TYPE_PORT, sid, switch_id, attr_count, attr_list));
+
+    return create_port_dependencies(object_id);
 }
 
 sai_status_t SwitchStateBase::removePort(
@@ -1071,12 +1091,12 @@ sai_status_t SwitchStateBase::initialize_default_objects()
     return SAI_STATUS_SUCCESS;
 }
 
-sai_status_t SwitchStateBase::create_port(
-        _In_ sai_object_id_t port_id,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list)
+sai_status_t SwitchStateBase::create_port_dependencies(
+        _In_ sai_object_id_t port_id)
 {
     SWSS_LOG_ENTER();
+
+    // params are not needed since they were already set
 
     SWSS_LOG_WARN("check attributes and set, FIXME");
 
