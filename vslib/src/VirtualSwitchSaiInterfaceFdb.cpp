@@ -159,7 +159,7 @@ sai_status_t VirtualSwitchSaiInterface::flushFdbEntries(
 
                 attr.id = SAI_VLAN_ATTR_VLAN_ID;
 
-                sai_status_t status = vs_generic_get(SAI_OBJECT_TYPE_VLAN, fdb_entry.bv_id, 1, &attr);
+                sai_status_t status = get(SAI_OBJECT_TYPE_VLAN, fdb_entry.bv_id, 1, &attr);
 
                 if (status != SAI_STATUS_SUCCESS)
                 {
@@ -236,7 +236,7 @@ sai_status_t VirtualSwitchSaiInterface::flushFdbEntries(
 
     attr.id = SAI_SWITCH_ATTR_FDB_EVENT_NOTIFY;
 
-    sai_status_t status = vs_generic_get(SAI_OBJECT_TYPE_SWITCH, switch_id, 1, &attr);
+    sai_status_t status = get(SAI_OBJECT_TYPE_SWITCH, switch_id, 1, &attr);
 
     if (status != SAI_STATUS_SUCCESS)
     {

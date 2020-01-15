@@ -90,7 +90,7 @@ sai_status_t VirtualSwitchSaiInterface::preSetPort(
 
             samplepacket_attr.id = SAI_SAMPLEPACKET_ATTR_SAMPLE_RATE;
 
-            if (SAI_STATUS_SUCCESS == vs_generic_get(SAI_OBJECT_TYPE_SAMPLEPACKET, samplepacket_oid, 1, &samplepacket_attr))
+            if (SAI_STATUS_SUCCESS == get(SAI_OBJECT_TYPE_SAMPLEPACKET, samplepacket_oid, 1, &samplepacket_attr))
             {
                 int rate = samplepacket_attr.value.u32;
 
@@ -105,7 +105,7 @@ sai_status_t VirtualSwitchSaiInterface::preSetPort(
                 // When the sampling parameters are updated,
                 // a delete and add operation is performed on the sampling session.
                 // If the sampling session is already created, it is deleted below.
-                if ((vs_generic_get(SAI_OBJECT_TYPE_PORT, port_id, 1, &port_attr) == SAI_STATUS_SUCCESS) &&
+                if ((get(SAI_OBJECT_TYPE_PORT, port_id, 1, &port_attr) == SAI_STATUS_SUCCESS) &&
                         (port_attr.value.oid != SAI_NULL_OBJECT_ID))
                 {
                     //Sampling session is already created

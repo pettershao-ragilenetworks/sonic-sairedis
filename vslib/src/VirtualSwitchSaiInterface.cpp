@@ -816,7 +816,7 @@ sai_status_t VirtualSwitchSaiInterface::remove(
         sai_object_id_t object_id;
         sai_deserialize_object_id(serializedObjectId, object_id);
 
-        if (vs_generic_get(objectType, object_id, 1, &attr) == SAI_STATUS_SUCCESS)
+        if (get(objectType, object_id, 1, &attr) == SAI_STATUS_SUCCESS)
         {
             SWSS_LOG_NOTICE("SAI_SWITCH_ATTR_RESTART_WARM = %s", attr.value.booldata ? "true" : "false");
 

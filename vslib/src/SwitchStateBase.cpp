@@ -245,7 +245,7 @@ sai_status_t SwitchStateBase::removePort(
         // meta_sai_remove_oid automatically removed related oids internally
         // so we just need to execute remove for virtual switch db
 
-        auto status = vs_generic_remove(
+        auto status = remove(
                 g_realObjectIdManager->saiObjectTypeQuery(oid),
                 oid);
 
