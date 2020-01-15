@@ -786,6 +786,33 @@ int vs_set_dev_mac_address(
     return err;
 }
 
+/**
+ * @brief Get SwitchState by switch id.
+ *
+ * Function will get shared object for switch state.  This function is thread
+ * safe and it's only intended to use inside threads.
+ *
+ * @param switch_id Switch ID
+ *
+ * @return SwitchState object or null ptr if not found.
+ */
+std::shared_ptr<SwitchState> vs_get_switch_state(
+        _In_ sai_object_id_t switch_id)
+{
+    MUTEX();
+
+    SWSS_LOG_ENTER();
+
+    auto it = g_switch_state_map.find(switch_id);
+
+    if (it == g_switch_state_map.end())
+    {
+        return nullptr;
+    }
+
+    return it->second;
+}
+
 void send_port_up_notification(
         _In_ sai_object_id_t port_id)
 {

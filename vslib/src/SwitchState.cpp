@@ -165,8 +165,6 @@ void SwitchState::asyncOnLinkMsg(
 
     MUTEX;
 
-    // TODO this content must be executed under global mutex
-
     if (m_destroyed)
     {
         SWSS_LOG_WARN("called on destroyed switch: %s",
@@ -174,6 +172,8 @@ void SwitchState::asyncOnLinkMsg(
 
         return;
     }
+
+    // TODO this content must be executed under global mutex
 
     if (nlmsg_type == RTM_DELLINK)
     {
@@ -223,16 +223,7 @@ void SwitchState::asyncOnLinkMsg(
 
     std::string ifname(if_name);
 
-    std::shared_ptr<SwitchState> sw = vs_get_switch_state(m_switch_id);
-
-    if (sw == nullptr)
-    {
-        SWSS_LOG_ERROR("failed to get switch state for switch id %s",
-                sai_serialize_object_id(m_switch_id).c_str());
-        return;
-    }
-
-    auto port_id = sw->getPortIdFromIfName(ifname); // TODO needs to be protected under lock
+    auto port_id = getPortIdFromIfName(ifname); // TODO needs to be protected under lock
 
     if (port_id == SAI_NULL_OBJECT_ID)
     {
