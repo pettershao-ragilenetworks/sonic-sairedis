@@ -194,6 +194,11 @@ sai_status_t SwitchMLNX2700::create_scheduler_group_tree(
         attr.value.u32 = 2;
 
         CHECK_STATUS(set(SAI_OBJECT_TYPE_SCHEDULER_GROUP, sg, &attr));
+
+        attr.id = SAI_SCHEDULER_GROUP_ATTR_PORT_ID;
+        attr.value.oid = port_id;
+
+        CHECK_STATUS(set(SAI_OBJECT_TYPE_SCHEDULER_GROUP, sg, &attr));
     }
 
 

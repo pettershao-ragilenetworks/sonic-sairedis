@@ -45,6 +45,11 @@ sai_status_t SwitchBCM56850::create_qos_queues_per_port(
         attr.value.u8 = (uint8_t)i;
 
         CHECK_STATUS(set(SAI_OBJECT_TYPE_QUEUE, queue_id, &attr));
+
+        attr.id = SAI_QUEUE_ATTR_PORT;
+        attr.value.oid = port_id;
+
+        CHECK_STATUS(set(SAI_OBJECT_TYPE_QUEUE, queue_id, &attr));
     }
 
     attr.id = SAI_PORT_ATTR_QOS_NUMBER_OF_QUEUES;
@@ -197,6 +202,11 @@ sai_status_t SwitchBCM56850::create_scheduler_group_tree(
             attr.value.u32 = 2;
 
             CHECK_STATUS(set(SAI_OBJECT_TYPE_SCHEDULER_GROUP, list.at(i), &attr));
+
+            attr.id = SAI_SCHEDULER_GROUP_ATTR_PORT_ID;
+            attr.value.oid = port_id;
+
+            CHECK_STATUS(set(SAI_OBJECT_TYPE_SCHEDULER_GROUP, list.at(i), &attr));
         }
     }
 
@@ -246,6 +256,11 @@ sai_status_t SwitchBCM56850::create_scheduler_group_tree(
 
             attr.id = SAI_SCHEDULER_GROUP_ATTR_CHILD_COUNT;
             attr.value.u32 = 2;
+
+            CHECK_STATUS(set(SAI_OBJECT_TYPE_SCHEDULER_GROUP, list.at(i), &attr));
+
+            attr.id = SAI_SCHEDULER_GROUP_ATTR_PORT_ID;
+            attr.value.oid = port_id;
 
             CHECK_STATUS(set(SAI_OBJECT_TYPE_SCHEDULER_GROUP, list.at(i), &attr));
         }
