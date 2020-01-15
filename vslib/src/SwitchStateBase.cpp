@@ -39,7 +39,7 @@ sai_status_t SwitchStateBase::create(
 
     auto sid = sai_serialize_object_id(*object_id);
 
-    return create(object_type, sid, switch_id, attr_count, attr_list);
+    return create_internal(object_type, sid, switch_id, attr_count, attr_list);
 }
 
 uint32_t SwitchStateBase::getNewDebugCounterIndex()
@@ -792,19 +792,13 @@ sai_status_t SwitchStateBase::create_ingress_priority_groups_per_port(
         attr[0].id = SAI_INGRESS_PRIORITY_GROUP_ATTR_BUFFER_PROFILE;
         attr[0].value.oid = SAI_NULL_OBJECT_ID;
 
-        /*
-         * not in headers yet
-         *
-         * attr[1].id = SAI_INGRESS_PRIORITY_GROUP_ATTR_PORT;
-         * attr[1].value.oid = port_id;
+        attr[1].id = SAI_INGRESS_PRIORITY_GROUP_ATTR_PORT;
+        attr[1].value.oid = port_id;
 
-         * attr[2].id = SAI_INGRESS_PRIORITY_GROUP_ATTR_INDEX;
-         * attr[2].value.oid = i;
+        attr[2].id = SAI_INGRESS_PRIORITY_GROUP_ATTR_INDEX;
+        attr[2].value.oid = i;
 
-         * TODO fix number of attributes
-         */
-
-        CHECK_STATUS(create(SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP, &pg_id, m_switch_id, 1, attr));
+        CHECK_STATUS(create(SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP, &pg_id, m_switch_id, 3, attr));
 
         pgs.push_back(pg_id);
     }
@@ -1619,7 +1613,7 @@ sai_status_t SwitchStateBase::check_port_dependencies(
 
     std::string str_port_id = sai_serialize_object_id(port_id);
 
-    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(ot);
+    auto &objectHash = m_objectHash.at(ot);
 
     auto it = objectHash.find(str_port_id);
 

@@ -106,8 +106,22 @@ static std::shared_ptr<SwitchState> vs_read_switch_database_for_warm_restart(
         return nullptr;
     }
 
+    std::shared_ptr<SwitchStateBase> ss;
+
     // TODO must be respected switch created here or just data
-    std::shared_ptr<SwitchStateBase> ss = std::make_shared<SwitchStateBase>(switch_id);
+    switch (g_vs_switch_type)
+    {
+        case SAI_VS_SWITCH_TYPE_BCM56850:
+            ss = std::make_shared<SwitchBCM56850>(switch_id);
+            break;
+
+        case SAI_VS_SWITCH_TYPE_MLNX2700:
+            ss = std::make_shared<SwitchMLNX2700>(switch_id);
+            break;
+
+        default:
+            SWSS_LOG_THROW("unknown switch type: %d", g_vs_switch_type);
+    }
 
     size_t count = 1; // count is 1 since switch_id was inserted to objectHash in SwitchState constructor
 
@@ -623,6 +637,7 @@ sai_status_t VirtualSwitchSaiInterface::create(
                 return SAI_STATUS_FAILURE;
         }
 
+
         if (warmBootState != nullptr)
         {
             vs_update_real_object_ids(warmBootState);
@@ -994,7 +1009,7 @@ sai_status_t VirtualSwitchSaiInterface::queryAattributeEnumValuesCapability(
 
         return SAI_STATUS_SUCCESS;
     }
-        
+
     return SAI_STATUS_NOT_SUPPORTED;
 }
 
