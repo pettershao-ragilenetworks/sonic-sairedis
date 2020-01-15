@@ -276,6 +276,8 @@ void SwitchState::asyncOnLinkMsg(
             sai_serialize_object_id(data.port_id).c_str(),
             sai_serialize_port_oper_status(data.port_state).c_str());
 
+    // TODO we should also call Meta for this notification
+
     callback(1, &data);
 }
 

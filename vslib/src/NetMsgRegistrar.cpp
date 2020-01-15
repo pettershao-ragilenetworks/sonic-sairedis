@@ -134,6 +134,8 @@ void NetMsgRegistrar::run()
         }
     }
 
+    // TODO unregister messages when swss common pointer will be advanced
+
     SWSS_LOG_NOTICE("netlink msg listener ended");
 }
 

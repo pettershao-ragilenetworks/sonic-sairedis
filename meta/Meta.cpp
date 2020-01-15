@@ -44,6 +44,9 @@ Meta::Meta(
 
     m_unittestsEnabled = false;
 
+    // TODO if metadata supports multiple switches
+    // then warm boot must be per each switch
+
     m_warmBoot = false;
 }
 
