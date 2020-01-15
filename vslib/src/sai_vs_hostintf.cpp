@@ -813,6 +813,29 @@ std::shared_ptr<SwitchState> vs_get_switch_state(
     return it->second;
 }
 
+void update_port_oper_status(
+        _In_ sai_object_id_t port_id,
+        _In_ sai_port_oper_status_t port_oper_status)
+{
+    MUTEX();
+
+    SWSS_LOG_ENTER();
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_PORT_ATTR_OPER_STATUS;
+    attr.value.s32 = port_oper_status;
+
+    sai_status_t status = vs_generic_set(SAI_OBJECT_TYPE_PORT, port_id, &attr);
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_ERROR("failed to update port status %s: %s",
+                sai_serialize_object_id(port_id).c_str(),
+                sai_serialize_port_oper_status(port_oper_status).c_str());
+    }
+}
+
 void send_port_up_notification(
         _In_ sai_object_id_t port_id)
 {
