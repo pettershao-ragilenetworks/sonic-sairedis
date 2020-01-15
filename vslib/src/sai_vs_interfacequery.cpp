@@ -10,7 +10,6 @@
 #include "swss/notificationconsumer.h"
 #include "swss/select.h"
 
-#include "SwitchContainer.h"
 #include "RealObjectIdManager.h"
 #include "VirtualSwitchSaiInterface.h"
 #include "SwitchStateBase.h"
@@ -35,7 +34,6 @@ sai_vs_boot_type_t g_vs_boot_type = SAI_VS_BOOT_TYPE_COLD;
 
 std::shared_ptr<LaneMapContainer> g_laneMapContainer;
 
-std::shared_ptr<SwitchContainer>                g_switchContainer;
 std::shared_ptr<RealObjectIdManager>            g_realObjectIdManager;
 std::shared_ptr<VirtualSwitchSaiInterface>      g_vs;
 std::shared_ptr<saimeta::Meta>                  g_meta;
@@ -445,7 +443,6 @@ void clear_local_state()
 
     hostif_info_map.clear();
 
-    g_switchContainer = std::make_shared<SwitchContainer>();
 
     /*
      * Initialize metadata database.

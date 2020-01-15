@@ -11,7 +11,6 @@ extern "C" {
 #include "meta/Meta.h"
 
 #include "Globals.h"
-#include "SwitchContainer.h"
 #include "RealObjectIdManager.h"
 #include "VirtualSwitchSaiInterface.h"
 #include "FdbInfo.h"
@@ -59,7 +58,6 @@ extern const char *g_warm_boot_write_file;
 
 extern std::shared_ptr<saivs::LaneMapContainer> g_laneMapContainer;
 
-extern std::shared_ptr<saivs::SwitchContainer>           g_switchContainer;
 extern std::shared_ptr<saivs::RealObjectIdManager>       g_realObjectIdManager;
 extern std::shared_ptr<saivs::VirtualSwitchSaiInterface> g_vs;
 extern std::shared_ptr<saimeta::Meta>                    g_meta;
