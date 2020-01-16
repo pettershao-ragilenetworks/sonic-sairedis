@@ -26,8 +26,7 @@ extern bool g_vs_hostif_use_tap_device; // TODO to be removed
 SwitchState::SwitchState(
         _In_ sai_object_id_t switch_id):
     m_switch_id(switch_id),
-    m_linkCallbackIndex(-1),
-    m_destroyed(false)
+    m_linkCallbackIndex(-1)
 {
     SWSS_LOG_ENTER();
 
@@ -71,13 +70,10 @@ SwitchState::~SwitchState()
     if (g_vs_hostif_use_tap_device)
     {
         NetMsgRegistrar::getInstance().unregisterCallback(m_linkCallbackIndex);
+
+        // if unregister ended then no new messages will arrive for this class
+        // so there is no need to protect this using mutex
     }
-
-    m_destroyed = true;
-
-    MUTEX;
-
-    // mutex make sure that async method ended
 
     SWSS_LOG_NOTICE("switch %s",
             sai_serialize_object_id(m_switch_id).c_str());
@@ -166,13 +162,7 @@ void SwitchState::asyncOnLinkMsg(
 
     MUTEX;
 
-    if (m_destroyed)
-    {
-        SWSS_LOG_WARN("called on destroyed switch: %s",
-                sai_serialize_object_id(m_switch_id).c_str());
-
-        return;
-    }
+    // TODO insert to event queue
 
     // TODO this content must be executed under global mutex
 

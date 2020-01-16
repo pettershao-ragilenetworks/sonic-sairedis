@@ -101,8 +101,6 @@ namespace saivs
 
             uint64_t m_linkCallbackIndex;
 
-            bool m_destroyed;
-
             std::mutex m_mutex;
     };
 }
