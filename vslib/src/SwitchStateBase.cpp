@@ -110,6 +110,13 @@ sai_status_t SwitchStateBase::create(
         return createPort(object_id, switch_id, attr_count, attr_list);
     }
 
+    if (object_type == SAI_OBJECT_TYPE_HOSTIF)
+    {
+        sai_object_id_t object_id;
+        sai_deserialize_object_id(serializedObjectId, object_id);
+        return createHostif(object_id, switch_id, attr_count, attr_list);
+    }
+
     return create_internal(object_type, serializedObjectId, switch_id, attr_count, attr_list);
 }
 
@@ -283,6 +290,13 @@ sai_status_t SwitchStateBase::remove(
         sai_object_id_t objectId;
         sai_deserialize_object_id(serializedObjectId, objectId);
         return removePort(objectId);
+    }
+
+    if (object_type == SAI_OBJECT_TYPE_HOSTIF)
+    {
+        sai_object_id_t objectId;
+        sai_deserialize_object_id(serializedObjectId, objectId);
+        return removeHostif(objectId);
     }
 
     return remove_internal(object_type, serializedObjectId);

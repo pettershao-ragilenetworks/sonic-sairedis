@@ -1,6 +1,7 @@
 #include "NetMsgRegistrar.h"
 #include "SwitchState.h"
 #include "RealObjectIdManager.h"
+#include "SwitchStateBase.h"
 
 #include "swss/logger.h"
 
@@ -261,7 +262,10 @@ void SwitchState::asyncOnLinkMsg(
         }
     }
 
-    update_port_oper_status(port_id, data.port_state);
+    // TODO remove cast
+    auto*base = dynamic_cast<SwitchStateBase*>(this);
+
+    base->update_port_oper_status(port_id, data.port_state);
 
     SWSS_LOG_DEBUG("executing callback SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY for port %s: %s",
             sai_serialize_object_id(data.port_id).c_str(),

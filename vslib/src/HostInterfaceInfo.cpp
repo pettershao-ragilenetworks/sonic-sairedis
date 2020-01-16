@@ -34,9 +34,9 @@ HostInterfaceInfo::HostInterfaceInfo(
         _In_ sai_object_id_t portId):
     m_ifindex(ifindex),
     m_packet_socket(socket),
-    m_tapfd(tapfd),
     m_name(tapname),
-    m_portId(portId)
+    m_portId(portId),
+    m_tapfd(tapfd)
 {
     SWSS_LOG_ENTER();
 
@@ -63,6 +63,15 @@ HostInterfaceInfo::~HostInterfaceInfo()
     if (m_e2t)
     {
         m_e2t->join();
+    }
+
+    // remove tap device
+
+    int err = close(m_tapfd);
+
+    if (err)
+    {
+        SWSS_LOG_ERROR("failed to remove tap device: %s, err: %d", m_name.c_str(), err);
     }
 
     SWSS_LOG_NOTICE("joined threads for hostif: %s", m_name.c_str());

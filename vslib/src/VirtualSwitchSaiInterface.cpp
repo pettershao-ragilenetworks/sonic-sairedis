@@ -82,7 +82,7 @@ static void vs_update_real_object_ids(
 }
 
 // TODO must be done on api initialize
-static std::shared_ptr<SwitchState> vs_read_switch_database_for_warm_restart(
+static std::shared_ptr<SwitchStateBase> vs_read_switch_database_for_warm_restart(
         _In_ sai_object_id_t switch_id)
 {
     SWSS_LOG_ENTER();
@@ -613,7 +613,7 @@ sai_status_t VirtualSwitchSaiInterface::create(
         sai_object_id_t switch_id;
         sai_deserialize_object_id(serializedObjectId, switch_id);
 
-        std::shared_ptr<SwitchState> warmBootState = nullptr;
+        std::shared_ptr<SwitchStateBase> warmBootState = nullptr;
 
         if (g_vs_boot_type == SAI_VS_BOOT_TYPE_WARM)
         {
@@ -637,7 +637,6 @@ sai_status_t VirtualSwitchSaiInterface::create(
                 return SAI_STATUS_FAILURE;
         }
 
-
         if (warmBootState != nullptr)
         {
             vs_update_real_object_ids(warmBootState);
@@ -646,7 +645,7 @@ sai_status_t VirtualSwitchSaiInterface::create(
 
             if (g_vs_hostif_use_tap_device)
             {
-                vs_recreate_hostif_tap_interfaces(switch_id);
+                warmBootState->vs_recreate_hostif_tap_interfaces();
             }
         }
     }

@@ -3,6 +3,7 @@
 
 #include "SwitchState.h"
 #include "FdbInfo.h"
+#include "HostInterfaceInfo.h"
 
 #include <set>
 #include <unordered_set>
@@ -242,6 +243,63 @@ namespace saivs
             sai_status_t removeDebugCounter(
                     _In_ sai_object_id_t objectId);
 
+        protected: // custom hostif
+
+            sai_status_t createHostif(
+                    _In_ sai_object_id_t object_id,
+                    _In_ sai_object_id_t switch_id,
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
+
+            sai_status_t removeHostif(
+                    _In_ sai_object_id_t objectId);
+            
+            sai_status_t vs_remove_hostif_tap_interface(
+                    _In_ sai_object_id_t hostif_id);
+
+            sai_status_t vs_create_hostif_tap_interface(
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
+
+            bool hostif_create_tap_veth_forwarding(
+                    _In_ const std::string &tapname,
+                    _In_ int tapfd,
+                    _In_ sai_object_id_t port_id);
+
+            static int vs_create_tap_device(
+                    _In_ const char *dev,
+                    _In_ int flags);
+
+            static int vs_set_dev_mac_address(
+                    _In_ const char *dev,
+                    _In_ const sai_mac_t& mac);
+
+            static int promisc(
+                    _In_ const char *dev);
+
+            int vs_set_dev_mtu(
+                    _In_ const char*name,
+                    _In_ int mtu);
+
+            int ifup(
+                    _In_ const char *dev,
+                    _In_ sai_object_id_t port_id);
+
+            std::string vs_get_veth_name(
+                    _In_ const std::string& tapname,
+                    _In_ sai_object_id_t port_id);
+
+            void send_port_up_notification(
+                    _In_ sai_object_id_t port_id);
+
+        public: // TODO move inside warm boot load state
+
+            sai_status_t vs_recreate_hostif_tap_interfaces();
+
+            void update_port_oper_status(
+                    _In_ sai_object_id_t port_id,
+                    _In_ sai_port_oper_status_t port_oper_status);
+
         protected:
 
             constexpr static const int maxDebugCounters = 32;
@@ -264,6 +322,8 @@ namespace saivs
         public: // TODO private
 
             std::set<FdbInfo> m_fdb_info_set;
+
+            std::map<std::string, std::shared_ptr<HostInterfaceInfo>> m_hostif_info_map;
     };
 }
 

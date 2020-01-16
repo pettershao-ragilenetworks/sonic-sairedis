@@ -47,8 +47,6 @@ namespace saivs
 
             int m_packet_socket;
 
-            int m_tapfd;
-
             std::string m_name;
 
             sai_object_id_t m_portId;
@@ -58,6 +56,8 @@ namespace saivs
             bool m_run_thread;
 
         private:
+
+            int m_tapfd;
 
             std::shared_ptr<std::thread> m_e2t;
             std::shared_ptr<std::thread> m_t2e;

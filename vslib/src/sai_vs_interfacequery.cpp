@@ -433,16 +433,11 @@ void fdbAgingThreadProc()
  */
 static sai_service_method_table_t g_service_method_table;
 
-extern std::map<std::string, std::shared_ptr<HostInterfaceInfo>> g_hostif_info_map;
-
-void clear_local_state()
+static void clear_local_state()
 {
     SWSS_LOG_ENTER();
 
     SWSS_LOG_NOTICE("clearing local state");
-
-    g_hostif_info_map.clear();
-
 
     /*
      * Initialize metadata database.
