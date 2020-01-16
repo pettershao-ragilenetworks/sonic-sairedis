@@ -118,7 +118,7 @@ void SwitchStateBase::update_port_oper_status(
     attr.id = SAI_PORT_ATTR_OPER_STATUS;
     attr.value.s32 = port_oper_status;
 
-    sai_status_t status = vs_generic_set(SAI_OBJECT_TYPE_PORT, port_id, &attr);
+    sai_status_t status = set(SAI_OBJECT_TYPE_PORT, port_id, &attr);
 
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -340,7 +340,7 @@ std::string SwitchStateBase::vs_get_veth_name(
     attr.value.u32list.count = 4;
     attr.value.u32list.list = lanes;
 
-    if (vs_generic_get(SAI_OBJECT_TYPE_PORT, port_id, 1, &attr) != SAI_STATUS_SUCCESS)
+    if (get(SAI_OBJECT_TYPE_PORT, port_id, 1, &attr) != SAI_STATUS_SUCCESS)
     {
         SWSS_LOG_WARN("failed to get port %s lanes, using veth: %s",
                 sai_serialize_object_id(port_id).c_str(),
