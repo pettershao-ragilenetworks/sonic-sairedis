@@ -3,7 +3,7 @@
 
 using namespace saivs;
 
-sai_status_t internal_vs_flush_fdb_entries(
+static sai_status_t internal_vs_flush_fdb_entries(
         _In_ sai_object_id_t switch_id,
         _In_ uint32_t attr_count,
         _In_ const sai_attribute_t *attr_list)
@@ -13,7 +13,7 @@ sai_status_t internal_vs_flush_fdb_entries(
     return g_vs->flushFdbEntries(switch_id, attr_count, attr_list);
 }
 
-sai_status_t vs_flush_fdb_entries(
+static sai_status_t vs_flush_fdb_entries(
         _In_ sai_object_id_t switch_id,
         _In_ uint32_t attr_count,
         _In_ const sai_attribute_t *attr_list)
