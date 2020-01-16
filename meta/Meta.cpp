@@ -9,6 +9,8 @@
 
 #include <set>
 
+// TODO add validation for all oids belong to the same switch
+
 #define MAX_LIST_COUNT 0x1000
 
 #define DEFAULT_VLAN_NUMBER 1
