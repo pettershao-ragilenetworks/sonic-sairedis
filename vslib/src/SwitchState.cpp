@@ -227,6 +227,7 @@ void SwitchState::asyncOnLinkMsg(
 
     attr.id = SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY;
 
+    // TODO to be removed
     if (vs_switch_api.get_switch_attribute(m_switch_id, 1, &attr) != SAI_STATUS_SUCCESS)
     {
         SWSS_LOG_ERROR("failed to get SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY for switch %s",
@@ -249,6 +250,7 @@ void SwitchState::asyncOnLinkMsg(
 
     attr.id = SAI_PORT_ATTR_OPER_STATUS;
 
+    // TODO to be removed
     if (vs_port_api.get_port_attribute(port_id, 1, &attr) != SAI_STATUS_SUCCESS)
     {
         SWSS_LOG_ERROR("failed to get port attribute SAI_PORT_ATTR_OPER_STATUS");

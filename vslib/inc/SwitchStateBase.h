@@ -180,6 +180,37 @@ namespace saivs
 
             void processFdbEntriesForAging();
 
+        private: // fdb related
+
+            void updateLocalDB(
+                    _In_ const sai_fdb_event_notification_data_t &data,
+                    _In_ sai_fdb_event_t fdb_event);
+
+            void processFdbInfo(
+                    _In_ const FdbInfo &fi,
+                    _In_ sai_fdb_event_t fdb_event);
+
+            void findBridgeVlanForPortVlan(
+                    _In_ sai_object_id_t port_id,
+                    _In_ sai_vlan_id_t vlan_id,
+                    _Inout_ sai_object_id_t &bv_id,
+                    _Inout_ sai_object_id_t &bridge_port_id);
+
+            bool getLagFromPort(
+                    _In_ sai_object_id_t port_id,
+                    _Inout_ sai_object_id_t& lag_id);
+
+            bool isLagOrPortRifBased(
+                    _In_ sai_object_id_t lag_or_port_id);
+
+        public: 
+
+            void process_packet_for_fdb_event(
+                    _In_ sai_object_id_t portId,
+                    _In_ const std::string& name,
+                    _In_ const uint8_t *buffer,
+                    _In_ size_t size);
+
         protected: // custom port
 
             sai_status_t createPort(

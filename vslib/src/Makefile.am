@@ -9,6 +9,7 @@ endif
 lib_LTLIBRARIES = libsaivs.la
 
 libsaivs_la_SOURCES = \
+					  SwitchStateBaseFdb.cpp \
 					  SwitchStateBaseHostif.cpp \
 					  HostInterfaceInfo.cpp \
 					  SwitchStateBase.cpp \

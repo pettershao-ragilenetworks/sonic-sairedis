@@ -146,7 +146,7 @@ void SwitchStateBase::send_port_up_notification(
 
     attr.id = SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY;
 
-    if (vs_switch_api.get_switch_attribute(switch_id, 1, &attr) != SAI_STATUS_SUCCESS)
+    if (get(SAI_OBJECT_TYPE_SWITCH, switch_id, 1, &attr) != SAI_STATUS_SUCCESS)
     {
         SWSS_LOG_ERROR("failed to get SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY for switch %s",
                 sai_serialize_object_id(switch_id).c_str());
@@ -447,6 +447,7 @@ bool SwitchStateBase::hostif_create_tap_veth_forwarding(
         return false;
     }
 
+    // TODO pass correct if index
     m_hostif_info_map[tapname] =
         std::make_shared<HostInterfaceInfo>(0, packet_socket, tapfd, tapname, port_id);
 
