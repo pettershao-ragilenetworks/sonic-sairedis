@@ -1,11 +1,6 @@
 #include "saivs.h"
 #include "sai_vs.h"
 #include "sai_vs_internal.h"
-#include <string.h>
-#include <unistd.h>
-#include <inttypes.h>
-
-#include <algorithm>
 
 #include "swss/notificationconsumer.h"
 #include "swss/select.h"
@@ -14,6 +9,13 @@
 #include "VirtualSwitchSaiInterface.h"
 #include "SwitchStateBase.h"
 #include "LaneMapFileParser.h"
+#include "HostInterfaceInfo.h"
+
+#include <string.h>
+#include <unistd.h>
+#include <inttypes.h>
+
+#include <algorithm>
 
 using namespace saivs;
 
@@ -431,9 +433,7 @@ void fdbAgingThreadProc()
  */
 static sai_service_method_table_t g_service_method_table;
 
-struct hostif_info_t;
-
-extern std::map<std::string, std::shared_ptr<hostif_info_t>> hostif_info_map;
+extern std::map<std::string, std::shared_ptr<HostInterfaceInfo>> g_hostif_info_map;
 
 void clear_local_state()
 {
@@ -441,7 +441,7 @@ void clear_local_state()
 
     SWSS_LOG_NOTICE("clearing local state");
 
-    hostif_info_map.clear();
+    g_hostif_info_map.clear();
 
 
     /*
