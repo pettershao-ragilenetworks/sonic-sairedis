@@ -38,6 +38,22 @@ VirtualSwitchSaiInterface::~VirtualSwitchSaiInterface()
     // empty
 }
 
+sai_status_t VirtualSwitchSaiInterface::initialize(
+        _In_ uint64_t flags,
+        _In_ const sai_service_method_table_t *service_method_table)
+{
+    SWSS_LOG_ENTER();
+
+    return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t VirtualSwitchSaiInterface::sai_api_uninitialize(void)
+{
+    SWSS_LOG_ENTER();
+
+    return SAI_STATUS_SUCCESS;
+}
+
 SwitchState::SwitchStateMap g_switch_state_map;
 
 static void vs_update_real_object_ids(
