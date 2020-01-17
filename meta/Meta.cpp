@@ -52,6 +52,22 @@ Meta::Meta(
     m_warmBoot = false;
 }
 
+sai_status_t Meta::initialize(
+        _In_ uint64_t flags,
+        _In_ const sai_service_method_table_t *service_method_table)
+{
+    SWSS_LOG_ENTER();
+
+    return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t Meta::sai_api_uninitialize(void)
+{
+    SWSS_LOG_ENTER();
+
+    return SAI_STATUS_SUCCESS;
+}
+
 void Meta::meta_init_db()
 {
     SWSS_LOG_ENTER();

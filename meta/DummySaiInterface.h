@@ -70,6 +70,14 @@ namespace saimeta
             void setStatus(
                     _In_ sai_status_t status);
 
+        public:
+
+            virtual sai_status_t initialize(
+                    _In_ uint64_t flags,
+                    _In_ const sai_service_method_table_t *service_method_table) override;
+
+            virtual sai_status_t sai_api_uninitialize(void) override;
+
         public: // SAI interface overrides
 
             virtual sai_status_t create(
