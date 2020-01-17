@@ -335,6 +335,10 @@ namespace saimeta
 
             bool meta_unittests_enabled();
 
+            sai_status_t meta_unittests_allow_readonly_set_once(
+                    _In_ sai_object_type_t object_type,
+                    _In_ int32_t attr_id);
+
         public: // unittests method helpers
 
             int32_t getObjectReferenceCount(
@@ -364,7 +368,7 @@ namespace saimeta
                     _In_ sai_object_id_t port_id,
                     _In_ const sai_object_list_t& list);
 
-        private: // validation post QUAD
+        public: // validation post QUAD
 
             void meta_generic_validation_post_create(
                     _In_ const sai_object_meta_key_t& meta_key,
@@ -458,6 +462,10 @@ namespace saimeta
             sai_status_t meta_sai_validate_inseg_entry(
                     _In_ const sai_inseg_entry_t* inseg_entry,
                     _In_ bool create);
+
+        public:
+
+            void meta_warm_boot_notify();
 
         private:
 

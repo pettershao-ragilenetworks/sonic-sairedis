@@ -68,6 +68,15 @@ sai_status_t Meta::uninitialize(void)
     return SAI_STATUS_SUCCESS;
 }
 
+void Meta::meta_warm_boot_notify()
+{
+    SWSS_LOG_ENTER();
+
+    m_warmBoot = true;
+
+    SWSS_LOG_NOTICE("warmBoot = true");
+}
+
 void Meta::meta_init_db()
 {
     SWSS_LOG_ENTER();
@@ -84,6 +93,8 @@ void Meta::meta_init_db()
     m_saiObjectCollection.clear();
     m_attrKeys.clear();
     m_portRelatedSet.clear();
+
+    m_warmBoot = false;
 }
 
 sai_status_t Meta::remove(
@@ -6776,6 +6787,39 @@ bool Meta::meta_unittests_enabled()
     SWSS_LOG_ENTER();
 
     return m_unittestsEnabled;
+}
+
+sai_status_t Meta::meta_unittests_allow_readonly_set_once(
+        _In_ sai_object_type_t object_type,
+        _In_ int32_t attr_id)
+{
+    SWSS_LOG_ENTER();
+
+    if (!m_unittestsEnabled)
+    {
+        SWSS_LOG_NOTICE("unittests are not enabled");
+        return SAI_STATUS_FAILURE;
+    }
+
+    auto *md = sai_metadata_get_attr_metadata(object_type, attr_id);
+
+    if (md == NULL)
+    {
+        SWSS_LOG_ERROR("failed to get metadata for object type %d and attr id %d", object_type, attr_id);
+        return SAI_STATUS_FAILURE;
+    }
+
+    if (!SAI_HAS_FLAG_READ_ONLY(md->flags))
+    {
+        SWSS_LOG_ERROR("attribute %s is not marked as READ_ONLY", md->attridname);
+        return SAI_STATUS_FAILURE;
+    }
+
+    m_meta_unittests_set_readonly_set.insert(md->attridname);
+
+    SWSS_LOG_INFO("enabling SET for readonly attribute: %s", md->attridname);
+
+    return SAI_STATUS_SUCCESS;
 }
 
 static const sai_mac_t zero_mac = { 0, 0, 0, 0, 0, 0 };
