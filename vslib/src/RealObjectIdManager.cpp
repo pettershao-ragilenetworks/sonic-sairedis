@@ -108,7 +108,7 @@ sai_object_id_t RealObjectIdManager::saiSwitchIdQuery(
 
     if (objectType == SAI_OBJECT_TYPE_NULL)
     {
-        SWSS_LOG_THROW("invalid object type of oid %s", 
+        SWSS_LOG_THROW("invalid object type of oid %s",
                 sai_serialize_object_id(objectId).c_str());
     }
 
@@ -233,7 +233,7 @@ sai_object_id_t RealObjectIdManager::allocateNewObjectId(
         // in case of object type switch, object index is same as switch index
         sai_object_id_t objectId = constructObjectId(SAI_OBJECT_TYPE_SWITCH, switchIndex, switchIndex, m_globalContext);
 
-        SWSS_LOG_NOTICE("created SWITCH VID %s", 
+        SWSS_LOG_NOTICE("created SWITCH VID %s",
                 sai_serialize_object_id(objectId).c_str());
 
         return objectId;
@@ -251,7 +251,7 @@ sai_object_id_t RealObjectIdManager::allocateNewObjectId(
     uint32_t switchIndex = (uint32_t)SAI_VS_GET_SWITCH_INDEX(switchId);
 
     // count from zero
-    uint64_t objectIndex = m_indexer[objectType]++; // allocation ! 
+    uint64_t objectIndex = m_indexer[objectType]++; // allocation !
 
     if (objectIndex > SAI_VS_OBJECT_INDEX_MAX)
     {
@@ -288,10 +288,74 @@ sai_object_id_t RealObjectIdManager::constructObjectId(
     SWSS_LOG_ENTER();
 
     return (sai_object_id_t)(
-            ((uint64_t)globalContext << ( SAI_VS_SWITCH_INDEX_BITS_SIZE + SAI_VS_OBJECT_TYPE_BITS_SIZE + SAI_VS_OBJECT_INDEX_BITS_SIZE )) | 
-            ((uint64_t)switchIndex << ( SAI_VS_OBJECT_TYPE_BITS_SIZE + SAI_VS_OBJECT_INDEX_BITS_SIZE )) | 
-            ((uint64_t)objectType << ( SAI_VS_OBJECT_INDEX_BITS_SIZE)) | 
+            ((uint64_t)globalContext << ( SAI_VS_SWITCH_INDEX_BITS_SIZE + SAI_VS_OBJECT_TYPE_BITS_SIZE + SAI_VS_OBJECT_INDEX_BITS_SIZE )) |
+            ((uint64_t)switchIndex << ( SAI_VS_OBJECT_TYPE_BITS_SIZE + SAI_VS_OBJECT_INDEX_BITS_SIZE )) |
+            ((uint64_t)objectType << ( SAI_VS_OBJECT_INDEX_BITS_SIZE)) |
             objectIndex);
+}
+
+sai_object_id_t RealObjectIdManager::switchIdQuery(
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    if (objectId == SAI_NULL_OBJECT_ID)
+    {
+        return SAI_NULL_OBJECT_ID;
+    }
+
+    sai_object_type_t objectType = objectTypeQuery(objectId);
+
+    if (objectType == SAI_OBJECT_TYPE_NULL)
+    {
+        SWSS_LOG_ERROR("invalid object type of oid %s",
+                sai_serialize_object_id(objectId).c_str());
+
+        return SAI_NULL_OBJECT_ID;
+    }
+
+    if (objectType == SAI_OBJECT_TYPE_SWITCH)
+    {
+        return objectId;
+    }
+
+    uint32_t switchIndex = (uint32_t)SAI_VS_GET_SWITCH_INDEX(objectId);
+    uint32_t globalContext = (uint32_t)SAI_VS_GET_GLOBAL_CONTEXT(objectId);
+
+    return constructObjectId(SAI_OBJECT_TYPE_SWITCH, switchIndex, switchIndex, globalContext);
+}
+
+sai_object_type_t RealObjectIdManager::objectTypeQuery(
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    if (objectId == SAI_NULL_OBJECT_ID)
+    {
+        return SAI_OBJECT_TYPE_NULL;
+    }
+
+    sai_object_type_t objectType = (sai_object_type_t)(SAI_VS_GET_OBJECT_TYPE(objectId));
+
+    if (!sai_metadata_is_object_type_valid(objectType))
+    {
+        SWSS_LOG_ERROR("invalid object id 0x%s",
+                sai_serialize_object_id(objectId).c_str());
+
+        return SAI_OBJECT_TYPE_NULL;
+    }
+
+    return objectType;
+}
+
+uint32_t RealObjectIdManager::getSwitchIndex(
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    auto switchId = switchIdQuery(objectId);
+
+    return SAI_VS_GET_SWITCH_INDEX(switchId);
 }
 
 // TODO this must be considered per all switches if we are doing warm boot on VS
@@ -320,9 +384,9 @@ void RealObjectIdManager::updateWarmBootObjectIndex(
 
         m_indexer[objectType] = index + 1; // +1 since this will be next object number
 
-        SWSS_LOG_INFO("update %s:%s real id to from %lu to %lu", 
+        SWSS_LOG_INFO("update %s:%s real id to from %lu to %lu",
                 sai_serialize_object_type(objectType).c_str(),
-                sai_serialize_object_id(oid).c_str(), 
+                sai_serialize_object_id(oid).c_str(),
                 prev,
                 index + 1);
     }
