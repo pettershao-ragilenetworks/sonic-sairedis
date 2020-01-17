@@ -29,6 +29,22 @@ WrapperRemoteSaiInterface::WrapperRemoteSaiInterface(
     // empty
 }
 
+sai_status_t WrapperRemoteSaiInterface::initialize(
+        _In_ uint64_t flags,
+        _In_ const sai_service_method_table_t *service_method_table)
+{
+    SWSS_LOG_ENTER();
+
+    return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t WrapperRemoteSaiInterface::sai_api_uninitialize(void)
+{
+    SWSS_LOG_ENTER();
+
+    return SAI_STATUS_SUCCESS;
+}
+
 sai_status_t WrapperRemoteSaiInterface::create(
         _In_ sai_object_type_t objectType,
         _Out_ sai_object_id_t* objectId,
