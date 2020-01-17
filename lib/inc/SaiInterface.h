@@ -62,6 +62,14 @@ namespace sairedis
 
             virtual ~SaiInterface() = default;
 
+        public:
+
+            virtual sai_status_t initialize(
+                    _In_ uint64_t flags,
+                    _In_ const sai_service_method_table_t *service_method_table) = 0;
+
+            virtual sai_status_t sai_api_uninitialize(void) = 0;
+
         public: // QUAD oid
 
             virtual sai_status_t create(
