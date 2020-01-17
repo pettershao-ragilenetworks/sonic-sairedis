@@ -61,7 +61,7 @@ sai_status_t Meta::initialize(
     return SAI_STATUS_SUCCESS;
 }
 
-sai_status_t Meta::sai_api_uninitialize(void)
+sai_status_t Meta::uninitialize(void)
 {
     SWSS_LOG_ENTER();
 

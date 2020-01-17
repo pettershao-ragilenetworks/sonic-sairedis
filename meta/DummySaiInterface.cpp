@@ -30,7 +30,7 @@ sai_status_t DummySaiInterface::initialize(
     return SAI_STATUS_SUCCESS;
 }
 
-sai_status_t  DummySaiInterface::sai_api_uninitialize(void)
+sai_status_t  DummySaiInterface::uninitialize(void)
 {
     SWSS_LOG_ENTER();
 

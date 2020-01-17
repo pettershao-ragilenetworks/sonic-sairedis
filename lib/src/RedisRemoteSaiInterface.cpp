@@ -72,7 +72,7 @@ sai_status_t RedisRemoteSaiInterface::initialize(
     return SAI_STATUS_SUCCESS;
 }
 
-sai_status_t RedisRemoteSaiInterface::sai_api_uninitialize(void)
+sai_status_t RedisRemoteSaiInterface::uninitialize(void)
 {
     SWSS_LOG_ENTER();
 

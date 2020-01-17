@@ -47,7 +47,7 @@ sai_status_t VirtualSwitchSaiInterface::initialize(
     return SAI_STATUS_SUCCESS;
 }
 
-sai_status_t VirtualSwitchSaiInterface::sai_api_uninitialize(void)
+sai_status_t VirtualSwitchSaiInterface::uninitialize(void)
 {
     SWSS_LOG_ENTER();
 

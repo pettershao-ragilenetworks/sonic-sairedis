@@ -190,6 +190,8 @@ void SwitchState::asyncOnLinkMsg(
     unsigned int    if_flags = rtnl_link_get_flags(link); // IFF_LOWER_UP and IFF_RUNNING
     const char*     if_name  = rtnl_link_get_name(link);
 
+    // TODO on warm boot we must recreate lane map
+    // or lane map should only be used on create
     // TODO get index when we will have multiple switches
     auto map = g_laneMapContainer->getLaneMap(0);
 
