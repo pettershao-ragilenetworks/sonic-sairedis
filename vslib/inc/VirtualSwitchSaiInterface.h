@@ -1,6 +1,10 @@
 #pragma once
 
+#include "SwitchStateBase.h"
+
 #include "lib/inc/SaiInterface.h"
+
+#include "meta/Meta.h"
 
 #include <string>
 #include <vector>
@@ -291,6 +295,21 @@ namespace saivs
                     _In_ const sai_attribute_t *attr);
 
         private:
+
+            void vs_update_local_metadata(
+                    _In_ sai_object_id_t switch_id);
+
+            std::shared_ptr<SwitchStateBase> vs_read_switch_database_for_warm_restart(
+                    _In_ sai_object_id_t switch_id);
+
+        public:
+
+            void setMeta(
+                    _In_ std::weak_ptr<saimeta::Meta> meta);
+
+        private:
+
+            std::weak_ptr<saimeta::Meta> m_meta;
 
     };
 }

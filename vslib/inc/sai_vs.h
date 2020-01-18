@@ -6,7 +6,6 @@ extern "C" {
 #include "saiextensions.h"
 }
 
-#include "meta/sai_meta.h"
 #include "meta/sai_serialize.h"
 #include "meta/Meta.h"
 
@@ -16,6 +15,7 @@ extern "C" {
 #include "FdbInfo.h"
 #include "SwitchState.h"
 #include "LaneMapContainer.h"
+#include "Sai.h"
 
 #include "swss/logger.h"
 #include "swss/tokenize.h"
@@ -47,7 +47,6 @@ typedef enum _sai_vs_boot_type_t
 } sai_vs_boot_type_t;
 
 
-
 extern bool                             g_vs_hostif_use_tap_device;
 extern sai_vs_switch_type_t             g_vs_switch_type;
 
@@ -59,8 +58,6 @@ extern const char *g_warm_boot_write_file;
 extern std::shared_ptr<saivs::LaneMapContainer> g_laneMapContainer;
 
 extern std::shared_ptr<saivs::RealObjectIdManager>       g_realObjectIdManager;
-extern std::shared_ptr<saivs::VirtualSwitchSaiInterface> g_vs;
-extern std::shared_ptr<saimeta::Meta>                    g_meta;
 
 #define CHECK_STATUS(status)            \
     {                                   \
@@ -134,6 +131,8 @@ PRIVATE extern const sai_udf_api_t              vs_udf_api;
 PRIVATE extern const sai_virtual_router_api_t   vs_virtual_router_api;
 PRIVATE extern const sai_vlan_api_t             vs_vlan_api;
 PRIVATE extern const sai_wred_api_t             vs_wred_api;
+
+PRIVATE extern std::shared_ptr<saivs::Sai> g_sai;
 
 // OID QUAD
 

@@ -54,6 +54,14 @@ sai_status_t VirtualSwitchSaiInterface::uninitialize(void)
     return SAI_STATUS_SUCCESS;
 }
 
+void VirtualSwitchSaiInterface::setMeta(
+        _In_ std::weak_ptr<saimeta::Meta> meta)
+{
+    SWSS_LOG_ENTER();
+
+    m_meta = meta;
+}
+
 SwitchState::SwitchStateMap g_switch_state_map;
 
 static void vs_update_real_object_ids(
@@ -98,7 +106,7 @@ static void vs_update_real_object_ids(
 }
 
 // TODO must be done on api initialize
-static std::shared_ptr<SwitchStateBase> vs_read_switch_database_for_warm_restart(
+std::shared_ptr<SwitchStateBase> VirtualSwitchSaiInterface::vs_read_switch_database_for_warm_restart(
         _In_ sai_object_id_t switch_id)
 {
     SWSS_LOG_ENTER();
@@ -138,6 +146,8 @@ static std::shared_ptr<SwitchStateBase> vs_read_switch_database_for_warm_restart
         default:
             SWSS_LOG_THROW("unknown switch type: %d", g_vs_switch_type);
     }
+
+    ss->setMeta(m_meta);
 
     size_t count = 1; // count is 1 since switch_id was inserted to objectHash in SwitchState constructor
 
@@ -271,10 +281,17 @@ static void vs_validate_switch_warm_boot_atributes(
     }
 }
 
-static void vs_update_local_metadata(
+void VirtualSwitchSaiInterface::vs_update_local_metadata(
         _In_ sai_object_id_t switch_id)
 {
     SWSS_LOG_ENTER();
+
+    auto mmeta = m_meta.lock();
+
+    if (!mmeta)
+    {
+        SWSS_LOG_THROW("meta pointer expired");
+    }
 
     /*
      * After warm boot we recreated all ASIC state, but since we are using
@@ -300,7 +317,7 @@ static void vs_update_local_metadata(
     mk.objecttype = SAI_OBJECT_TYPE_SWITCH;
     mk.objectkey.key.object_id = switch_id;
 
-    meta_generic_validation_post_create(mk, switch_id, 0, NULL);
+    mmeta->meta_generic_validation_post_create(mk, switch_id, 0, NULL);
 
     /*
      * Create every non object id except switch. Switch object was already
@@ -333,7 +350,7 @@ static void vs_update_local_metadata(
         {
             sai_deserialize_object_id(obj.first, mk.objectkey.key.object_id);
 
-            meta_generic_validation_post_create(mk, switch_id, 0, NULL);
+            mmeta->meta_generic_validation_post_create(mk, switch_id, 0, NULL);
         }
     }
 
@@ -363,7 +380,7 @@ static void vs_update_local_metadata(
 
             sai_deserialize_object_meta_key(key, mk);
 
-            meta_generic_validation_post_create(mk, switch_id, 0, NULL);
+            mmeta->meta_generic_validation_post_create(mk, switch_id, 0, NULL);
         }
     }
 
@@ -397,7 +414,7 @@ static void vs_update_local_metadata(
                 if (meta->isreadonly)
                     continue;
 
-                meta_generic_validation_post_set(mk, a.second->getAttr());
+                mmeta->meta_generic_validation_post_set(mk, a.second->getAttr());
             }
         }
     }
@@ -409,7 +426,7 @@ static void vs_update_local_metadata(
      * so we need to notify metadata that this is warm boot.
      */
 
-    meta_warm_boot_notify();
+    mmeta->meta_warm_boot_notify();
 }
 
 sai_status_t VirtualSwitchSaiInterface::create(
@@ -571,7 +588,8 @@ DECLARE_SET_ENTRY(NAT_ENTRY,nat_entry);
 template <class T>
 static void init_switch(
         _In_ sai_object_id_t switch_id,
-        _In_ std::shared_ptr<SwitchState> warmBootState)
+        _In_ std::shared_ptr<SwitchState> warmBootState,
+        _In_ std::weak_ptr<saimeta::Meta> meta)
 {
     SWSS_LOG_ENTER();
 
@@ -604,6 +622,8 @@ static void init_switch(
     g_switch_state_map[switch_id] = std::make_shared<T>(switch_id);
 
     auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
+
+    ss->setMeta(meta);
 
     sai_status_t status = ss->initialize_default_objects();
 
@@ -641,11 +661,11 @@ sai_status_t VirtualSwitchSaiInterface::create(
         switch (g_vs_switch_type)
         {
             case SAI_VS_SWITCH_TYPE_BCM56850:
-                init_switch<SwitchBCM56850>(switch_id, warmBootState);
+                init_switch<SwitchBCM56850>(switch_id, warmBootState, m_meta);
                 break;
 
             case SAI_VS_SWITCH_TYPE_MLNX2700:
-                init_switch<SwitchMLNX2700>(switch_id, warmBootState);
+                init_switch<SwitchMLNX2700>(switch_id, warmBootState, m_meta);
                 break;
 
             default:

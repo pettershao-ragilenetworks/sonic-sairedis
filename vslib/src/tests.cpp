@@ -195,10 +195,18 @@ void test_set_readonly_attribute()
 
     ASSERT_TRUE(sai_metadata_sai_switch_api->set_switch_attribute(switch_id, &attr) != SAI_STATUS_SUCCESS);
 
-    meta_unittests_enable(true);
+    attr.id = SAI_VS_SWITCH_ATTR_META_ENABLE_UNITTESTS;
+    attr.value.booldata = true;
+    ASSERT_TRUE(sai_metadata_sai_switch_api->set_switch_attribute(switch_id, &attr) == SAI_STATUS_SUCCESS);
 
     // allow set on readonly attribute
-    SUCCESS(meta_unittests_allow_readonly_set_once(SAI_OBJECT_TYPE_SWITCH, SAI_SWITCH_ATTR_PORT_MAX_MTU));
+
+    attr.id = SAI_VS_SWITCH_ATTR_META_ALLOW_READ_ONLY_ONCE;
+    attr.value.s32 = SAI_SWITCH_ATTR_PORT_MAX_MTU;
+    ASSERT_TRUE(sai_metadata_sai_switch_api->set_switch_attribute(switch_id, &attr) == SAI_STATUS_SUCCESS);
+
+    attr.id = SAI_SWITCH_ATTR_PORT_MAX_MTU;
+    attr.value.u32 = 42;
 
     // set on readonly attribute should pass
     SUCCESS(sai_metadata_sai_switch_api->set_switch_attribute(switch_id, &attr));
@@ -746,7 +754,9 @@ void test_get_stats()
     ASSERT_TRUE(values[0] == 0);
     ASSERT_TRUE(values[1] == 0);
 
-    meta_unittests_enable(true);
+    attr.id = SAI_VS_SWITCH_ATTR_META_ENABLE_UNITTESTS;
+    attr.value.booldata = true;
+    ASSERT_TRUE(sai_metadata_sai_switch_api->set_switch_attribute(switch_id, &attr) == SAI_STATUS_SUCCESS);
 
     values[0] = 77;
     values[1] = 127;
@@ -757,7 +767,9 @@ void test_get_stats()
     values[0] = 42;
     values[1] = 42;
 
-    meta_unittests_enable(false);
+    attr.id = SAI_VS_SWITCH_ATTR_META_ENABLE_UNITTESTS;
+    attr.value.booldata = true;
+    ASSERT_TRUE(sai_metadata_sai_switch_api->set_switch_attribute(switch_id, &attr) == SAI_STATUS_SUCCESS);
 
     ids[0] = SAI_PORT_STAT_IF_OUT_OCTETS;
     ids[1] = SAI_PORT_STAT_IF_IN_OCTETS;
@@ -777,7 +789,6 @@ int main()
     swss::Logger::getInstance().setMinPrio(swss::Logger::SWSS_NOTICE);
 
     SUCCESS(sai_api_initialize(0, (sai_service_method_table_t*)&test_services));
-
     sai_apis_t apis;
     sai_metadata_apis_query(sai_api_query, &apis);
 

@@ -23,7 +23,9 @@ void SwitchStateBase::updateLocalDB(
         case SAI_FDB_EVENT_LEARNED:
 
             {
-                status = vs_generic_create_fdb_entry(&data.fdb_entry, data.attr_count, data.attr);
+                auto sid = sai_serialize_fdb_entry(data.fdb_entry);
+
+                status = create(SAI_OBJECT_TYPE_FDB_ENTRY, sid, m_switch_id, data.attr_count, data.attr);
 
                 if (status != SAI_STATUS_SUCCESS)
                 {
@@ -37,7 +39,9 @@ void SwitchStateBase::updateLocalDB(
         case SAI_FDB_EVENT_AGED:
 
             {
-                status = vs_generic_remove_fdb_entry(&data.fdb_entry);
+                auto sid = sai_serialize_fdb_entry(data.fdb_entry);
+
+                status = remove(SAI_OBJECT_TYPE_FDB_ENTRY, sid);
 
                 if (status != SAI_STATUS_SUCCESS)
                 {
@@ -77,8 +81,19 @@ void SwitchStateBase::processFdbInfo(
     data.attr_count = 2;
     data.attr = attrs;
 
-    // update metadata DB
-    meta_sai_on_fdb_event(1, &data);
+    // TODO revisit m_meta here
+
+    auto meta = m_meta.lock();
+
+    if (meta)
+    {
+        // update metadata DB
+        meta->meta_sai_on_fdb_event(1, &data);
+    }
+    else
+    {
+        SWSS_LOG_WARN("meta pointer expired");
+    }
 
     // update local DB
     updateLocalDB(data, fdb_event);

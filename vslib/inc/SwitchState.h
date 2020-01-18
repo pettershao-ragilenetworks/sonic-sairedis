@@ -5,6 +5,9 @@ extern "C" {
 }
 
 #include "SaiAttrWrap.h"
+
+#include "meta/Meta.h"
+
 #include "swss/selectableevent.h"
 
 #include <map>
@@ -37,6 +40,11 @@ namespace saivs
                     _In_ sai_object_id_t switch_id);
 
             virtual ~SwitchState();
+
+        public:
+
+            void setMeta(
+                    std::weak_ptr<saimeta::Meta> meta);
 
         public:
 
@@ -102,5 +110,7 @@ namespace saivs
             uint64_t m_linkCallbackIndex;
 
             std::mutex m_mutex;
+
+            std::weak_ptr<saimeta::Meta> m_meta;
     };
 }

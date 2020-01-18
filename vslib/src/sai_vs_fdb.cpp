@@ -3,30 +3,17 @@
 
 using namespace saivs;
 
-static sai_status_t internal_vs_flush_fdb_entries(
-        _In_ sai_object_id_t switch_id,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    return g_vs->flushFdbEntries(switch_id, attr_count, attr_list);
-}
-
 static sai_status_t vs_flush_fdb_entries(
         _In_ sai_object_id_t switch_id,
         _In_ uint32_t attr_count,
         _In_ const sai_attribute_t *attr_list)
 {
-    MUTEX();
     SWSS_LOG_ENTER();
-    VS_CHECK_API_INITIALIZED();
 
-    return meta_sai_flush_fdb_entries(
+    return g_sai->flushFdbEntries(
             switch_id,
             attr_count,
-            attr_list,
-            internal_vs_flush_fdb_entries);
+            attr_list);
 }
 
 VS_GENERIC_QUAD_ENTRY(FDB_ENTRY,fdb_entry);

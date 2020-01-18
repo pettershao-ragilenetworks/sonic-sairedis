@@ -9,6 +9,8 @@ endif
 lib_LTLIBRARIES = libsaivs.la
 
 libsaivs_la_SOURCES = \
+					  SaiUnittests.cpp \
+					  Sai.cpp \
 					  SwitchStateBaseFdb.cpp \
 					  SwitchStateBaseHostif.cpp \
 					  HostInterfaceInfo.cpp \
@@ -36,10 +38,6 @@ libsaivs_la_SOURCES = \
 					  sai_vs_port.cpp \
 					  sai_vs_switch.cpp \
 					  sai_vs_debug_counter.cpp\
-					  sai_vs_generic_create.cpp \
-					  sai_vs_generic_get.cpp \
-					  sai_vs_generic_remove.cpp \
-					  sai_vs_generic_set.cpp \
 					  sai_vs_acl.cpp \
 					  sai_vs_bfd.cpp \
 					  sai_vs_bmtor.cpp \

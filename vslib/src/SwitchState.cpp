@@ -82,6 +82,14 @@ SwitchState::~SwitchState()
     SWSS_LOG_NOTICE("end");
 }
 
+void SwitchState::setMeta(
+        std::weak_ptr<saimeta::Meta> meta)
+{
+    SWSS_LOG_ENTER();
+
+    m_meta = meta;
+}
+
 sai_object_id_t SwitchState::getSwitchId() const
 {
     SWSS_LOG_ENTER();
@@ -294,7 +302,20 @@ sai_status_t SwitchState::getStatsExt(
 
     auto info = sai_metadata_get_object_type_info(object_type);
 
-    if (meta_unittests_enabled() && (number_of_counters & VS_COUNTERS_COUNT_MSB ))
+    bool enabled = false;
+
+    auto meta = m_meta.lock();
+
+    if (meta)
+    {
+        enabled = meta->meta_unittests_enabled();
+    }
+    else
+    {
+        SWSS_LOG_WARN("meta poiner expired");
+    }
+
+    if (enabled && (number_of_counters & VS_COUNTERS_COUNT_MSB ))
     {
         number_of_counters &= ~VS_COUNTERS_COUNT_MSB;
 

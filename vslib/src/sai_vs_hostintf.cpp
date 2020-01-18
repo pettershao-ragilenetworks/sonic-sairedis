@@ -8,9 +8,7 @@ static sai_status_t vs_recv_hostif_packet(
         _Inout_ uint32_t *attr_count,
         _Out_ sai_attribute_t *attr_list)
 {
-    MUTEX();
     SWSS_LOG_ENTER();
-    VS_CHECK_API_INITIALIZED();
 
     return SAI_STATUS_NOT_IMPLEMENTED;
 }
@@ -22,9 +20,7 @@ static sai_status_t vs_send_hostif_packet(
         _In_ uint32_t attr_count,
         _In_ const sai_attribute_t *attr_list)
 {
-    MUTEX();
     SWSS_LOG_ENTER();
-    VS_CHECK_API_INITIALIZED();
 
     return SAI_STATUS_NOT_IMPLEMENTED;
 }

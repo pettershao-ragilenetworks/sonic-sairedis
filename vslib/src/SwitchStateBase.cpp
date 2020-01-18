@@ -1471,11 +1471,20 @@ sai_status_t SwitchStateBase::refresh_read_only(
         return SAI_STATUS_SUCCESS;
     }
 
-    if (meta_unittests_enabled())
-    {
-        SWSS_LOG_NOTICE("unittests enabled, SET could be performed on %s, not recalculating", meta->attridname);
+    auto mmeta = m_meta.lock();
 
-        return SAI_STATUS_SUCCESS;
+    if (mmeta)
+    {
+        if (mmeta->meta_unittests_enabled())
+        {
+            SWSS_LOG_NOTICE("unittests enabled, SET could be performed on %s, not recalculating", meta->attridname);
+
+            return SAI_STATUS_SUCCESS;
+        }
+    }
+    else
+    {
+        SWSS_LOG_WARN("meta pointer expired");
     }
 
     SWSS_LOG_WARN("need to recalculate RO: %s", meta->attridname);

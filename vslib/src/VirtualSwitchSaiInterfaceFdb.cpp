@@ -286,8 +286,21 @@ sai_status_t VirtualSwitchSaiInterface::flushFdbEntries(
         attrs[0].id        = SAI_FDB_ENTRY_ATTR_TYPE;
         attrs[0].value.s32 = SAI_FDB_ENTRY_TYPE_STATIC;
 
-        meta_sai_on_fdb_event(1, &data); // update metadata
+        // TODO since this is explicit call this could be moved to metadata itself
 
+        auto meta = m_meta.lock();
+
+        if (meta)
+        {
+            // update metadata DB
+            meta->meta_sai_on_fdb_event(1, &data);
+        }
+        else
+        {
+            SWSS_LOG_WARN("meta pointer expired");
+        }
+
+        // TODO schedule event
         if (ntf != NULL)
         {
             ntf(1, &data);
@@ -301,8 +314,20 @@ sai_status_t VirtualSwitchSaiInterface::flushFdbEntries(
         attrs[0].id        = SAI_FDB_ENTRY_ATTR_TYPE;
         attrs[0].value.s32 = SAI_FDB_ENTRY_TYPE_DYNAMIC;
 
-        meta_sai_on_fdb_event(1, &data); // update metadata
+        auto meta = m_meta.lock();
 
+        // TODO since this is explicit call this could be moved to metadata itself when calling
+        if (meta)
+        {
+            // update metadata DB
+            meta->meta_sai_on_fdb_event(1, &data);
+        }
+        else
+        {
+            SWSS_LOG_WARN("meta pointer expired");
+        }
+
+        // TODO schedule event
         if (ntf != NULL)
         {
             ntf(1, &data);

@@ -1,5 +1,9 @@
 #pragma once
 
+extern "C" {
+#include "sai.h"
+}
+
 #define SAI_KEY_VS_SWITCH_TYPE              "SAI_VS_SWITCH_TYPE"
 
 /**
@@ -64,3 +68,28 @@
  * Notification operation for enabling unittests.
  */
 #define SAI_VS_UNITTEST_ENABLE_UNITTESTS  "enable_unittests"
+
+typedef enum _sai_vs_switch_attr_t
+{
+    /**
+     * @brief Will enable metadata unittests.
+     *
+     * @type bool
+     * @flags CREATE_AND_SET
+     * @default false
+     */
+    SAI_VS_SWITCH_ATTR_META_ENABLE_UNITTESTS = SAI_SWITCH_ATTR_CUSTOM_RANGE_START,
+
+    /**
+     * @brief Will allow to set value that is read only.
+     *
+     * Unittests must be enabled.
+     *
+     * Value is the attribute to be allowed.
+     *
+     * @type sai_int32_t
+     * @flags CREATE_AND_SET
+     */
+    SAI_VS_SWITCH_ATTR_META_ALLOW_READ_ONLY_ONCE,
+
+} sau_vs_switch_attr_t;
