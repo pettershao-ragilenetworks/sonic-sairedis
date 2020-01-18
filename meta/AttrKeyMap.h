@@ -5,6 +5,7 @@ extern "C" {
 }
 
 #include <string>
+#include <vector>
 #include <unordered_map>
 
 namespace saimeta
@@ -38,6 +39,8 @@ namespace saimeta
                     _In_ const sai_object_meta_key_t& metaKey,
                     _In_ uint32_t attrCount,
                     _In_ const sai_attribute_t* attrList);
+
+            std::vector<std::string> getAllKeys() const;
 
         private:
 

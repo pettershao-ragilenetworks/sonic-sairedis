@@ -58,3 +58,17 @@ void PortRelatedSet::removePort(
     }
 }
 
+std::vector<sai_object_id_t> PortRelatedSet::getAllPorts() const
+{
+    SWSS_LOG_ENTER();
+
+    std::vector<sai_object_id_t> vec;
+
+    for (auto& it: m_mapset)
+    {
+        vec.push_back(it.first);
+    }
+
+    return vec;
+}
+

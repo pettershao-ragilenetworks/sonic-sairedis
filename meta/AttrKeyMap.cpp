@@ -145,3 +145,17 @@ std::string AttrKeyMap::constructKey(
     return key;
 }
 
+std::vector<std::string> AttrKeyMap::getAllKeys() const
+{
+    SWSS_LOG_ENTER();
+
+    std::vector<std::string> vec;
+
+    for (auto& it: m_map)
+    {
+        vec.push_back(it.first);
+    }
+
+    return vec;
+}
+

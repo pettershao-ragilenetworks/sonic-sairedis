@@ -146,3 +146,16 @@ std::shared_ptr<SaiObject> SaiObjectCollection::getObject(
     return m_objects.at(key);
 }
 
+std::vector<std::string> SaiObjectCollection::getAllKeys() const
+{
+    SWSS_LOG_ENTER();
+
+    std::vector<std::string> vec;
+
+    for (auto& it: m_objects)
+    {
+        vec.push_back(it.first);
+    }
+
+    return vec;
+}

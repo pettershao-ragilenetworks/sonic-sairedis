@@ -6,6 +6,7 @@ extern "C" {
 
 #include <map>
 #include <set>
+#include <vector>
 
 namespace saimeta
 {
@@ -31,6 +32,7 @@ namespace saimeta
             void removePort(
                     _In_ sai_object_id_t portId);
 
+            std::vector<sai_object_id_t> getAllPorts() const;
 
         private:
 

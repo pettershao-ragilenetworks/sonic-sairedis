@@ -5,6 +5,7 @@ extern "C" {
 }
 
 #include <unordered_map>
+#include <vector>
 
 namespace saimeta
 {
@@ -71,6 +72,15 @@ namespace saimeta
                     _In_ sai_object_id_t oid);
 
             /**
+             * @brief Clear object reference.
+             *
+             * Throws if object don't exists. Removes reference even if there
+             * is count on it.
+             */
+            void objectReferenceClear(
+                    _In_ sai_object_id_t oid);
+
+            /**
              * @brief Get reference count on given object.
              * 
              * Throws if object don't exists.
@@ -90,6 +100,8 @@ namespace saimeta
              * @brief Get copy of entire reference hash.
              */
             std::unordered_map<sai_object_id_t, int32_t> getAllReferences() const;
+
+            std::vector<sai_object_id_t> getAllOids() const;
 
         private:
 

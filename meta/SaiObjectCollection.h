@@ -56,6 +56,8 @@ namespace saimeta
             std::shared_ptr<SaiObject> getObject(
                     _In_ const sai_object_meta_key_t& metaKey) const;
 
+            std::vector<std::string> getAllKeys() const;
+
         private:
 
             std::unordered_map<std::string, std::shared_ptr<SaiObject>> m_objects;

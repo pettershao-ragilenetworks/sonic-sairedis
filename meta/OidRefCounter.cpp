@@ -123,6 +123,10 @@ void OidRefCounter::objectReferenceRemove(
             SWSS_LOG_THROW("FATAL: removing object oid 0x%" PRIx64 " but reference count is: %d", oid, count);
         }
     }
+    else
+    {
+        SWSS_LOG_THROW("FATAL: object oid 0x%" PRIx64 " reference not in map", oid);
+    }
 
     SWSS_LOG_DEBUG("removing object oid 0x%" PRIx64 " reference", oid);
 
@@ -161,3 +165,33 @@ std::unordered_map<sai_object_id_t, int32_t> OidRefCounter::getAllReferences() c
     return m_hash; // copy
 }
 
+std::vector<sai_object_id_t> OidRefCounter::getAllOids() const
+{
+    SWSS_LOG_ENTER();
+
+    std::vector<sai_object_id_t> vec;
+
+    for (auto& it: m_hash)
+    {
+        vec.push_back(it.first);
+    }
+
+    return vec;
+}
+
+void OidRefCounter::objectReferenceClear(
+        _In_ sai_object_id_t oid)
+{
+    SWSS_LOG_ENTER();
+
+    if (objectReferenceExists(oid))
+    {
+        SWSS_LOG_DEBUG("removing object oid 0x%" PRIx64 " reference", oid);
+
+        m_hash.erase(oid);
+    }
+    else
+    {
+        SWSS_LOG_THROW("FATAL: object oid 0x%" PRIx64 " reference not in map", oid);
+    }
+}
