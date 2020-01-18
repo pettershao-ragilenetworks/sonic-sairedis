@@ -12,7 +12,12 @@
 
 extern std::shared_ptr<CommandLineOptions> g_commandLineOptions; // TODO move to syncd object
 // TODO part of sai meta (valid only when used with vslib)
-void dump_object_reference();
+void dump_object_reference()
+{
+    SWSS_LOG_ENTER();
+
+    // TODO implement
+}
 
 /*
  * NOTE: All methods taking current and temporary view could be moved to

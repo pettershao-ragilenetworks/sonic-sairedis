@@ -2,7 +2,6 @@
 #include "syncd_saiswitch.h"
 #include "sairediscommon.h"
 #include "syncd_flex_counter.h"
-#include "meta/sai_meta.h"
 #include "swss/tokenize.h"
 #include <inttypes.h>
 #include <limits.h>
@@ -3999,8 +3998,6 @@ int syncd_main(int argc, char **argv)
 #pragma GCC diagnostic ignored "-Wsuggest-attribute=format"
     sai_metadata_log = &sai_meta_log_syncd;
 #pragma GCC diagnostic pop
-
-    meta_init_db();
 
     // TODO move to syncd object
     g_commandLineOptions = CommandLineOptionsParser::parseCommandLine(argc, argv);
