@@ -1,4 +1,3 @@
-#include "sai_meta.h"
 #include "sai_serialize.h"
 
 #include "OidRefCounter.h"
@@ -119,7 +118,6 @@ void test_switch_set()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
     sai_attribute_t attr;
@@ -250,7 +248,6 @@ void test_switch_get()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
     sai_attribute_t attr;
@@ -368,7 +365,6 @@ void test_fdb_entry_create()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
     sai_attribute_t attr;
@@ -470,7 +466,6 @@ void test_fdb_entry_remove()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
 
@@ -586,7 +581,6 @@ void test_fdb_entry_set()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
     sai_attribute_t attr;
@@ -642,7 +636,6 @@ void test_fdb_entry_get()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
     sai_attribute_t attr;
@@ -698,7 +691,6 @@ void test_fdb_entry_flow()
     SWSS_LOG_TIMER("fdb flow");
 
     clear_local();
-    meta_init_db();
 
     sai_object_id_t switch_id = create_switch();
     sai_status_t    status;
@@ -816,7 +808,6 @@ void test_neighbor_entry_create()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_object_id_t switch_id = create_switch();
     sai_status_t    status;
@@ -955,7 +946,6 @@ void test_neighbor_entry_remove()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
 
@@ -1040,7 +1030,6 @@ void test_neighbor_entry_set()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
 
@@ -1116,7 +1105,6 @@ void test_neighbor_entry_get()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
 
@@ -1202,7 +1190,6 @@ void test_neighbor_entry_flow()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
 
@@ -1310,7 +1297,6 @@ void test_vlan_create()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
 
@@ -1359,7 +1345,6 @@ void test_vlan_remove()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t status;
 
@@ -1409,7 +1394,6 @@ void test_vlan_set()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t status;
 
@@ -1513,7 +1497,6 @@ void test_vlan_get()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_object_id_t switch_id = create_switch();
     sai_status_t status;
@@ -1630,7 +1613,6 @@ void test_vlan_flow()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_attribute_t attr;
 
@@ -1784,7 +1766,6 @@ void test_route_entry_create()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
     sai_attribute_t attr;
@@ -1904,7 +1885,6 @@ void test_route_entry_remove()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
     sai_object_id_t switch_id = create_switch();
@@ -2001,7 +1981,6 @@ void test_route_entry_set()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
     sai_attribute_t attr;
@@ -2092,7 +2071,6 @@ void test_route_entry_get()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
     sai_attribute_t attr;
@@ -2177,7 +2155,6 @@ void test_route_entry_flow()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
     sai_attribute_t attr;
@@ -2310,7 +2287,6 @@ void test_serialization_type_vlan_list()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
 
@@ -2348,7 +2324,6 @@ void test_serialization_type_bool()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
 
@@ -2386,7 +2361,6 @@ void test_serialization_type_char()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
 
@@ -2471,7 +2445,6 @@ void test_serialization_type_int32_list()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
 
@@ -2512,7 +2485,6 @@ void test_serialization_type_uint32_list()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
 
@@ -2729,7 +2701,6 @@ void test_acl_entry_field_and_action()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_object_id_t switch_id = create_switch();
     sai_status_t    status;
@@ -2906,7 +2877,6 @@ void test_construct_key()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_attribute_t attr;
 
@@ -2956,7 +2926,6 @@ void test_queue_create()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_object_id_t switch_id = create_switch();
 
@@ -3006,7 +2975,6 @@ void test_null_list()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_status_t    status;
 
@@ -3037,7 +3005,6 @@ void test_priority_group()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_object_id_t switch_id = create_switch();
 
@@ -3066,7 +3033,6 @@ void test_serialize_bool()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_attribute_t attr;
     const sai_attr_metadata_t* meta;
@@ -3116,7 +3082,6 @@ void test_serialize_chardata()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_attribute_t attr;
     const sai_attr_metadata_t* meta;
@@ -3209,7 +3174,6 @@ void test_serialize_uint64()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_attribute_t attr;
     const sai_attr_metadata_t* meta;
@@ -3268,7 +3232,6 @@ void test_serialize_enum()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_attribute_t attr;
     const sai_attr_metadata_t* meta;
@@ -3333,7 +3296,6 @@ void test_serialize_mac()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_attribute_t attr;
     const sai_attr_metadata_t* meta;
@@ -3370,7 +3332,6 @@ void test_serialize_ip_address()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_attribute_t attr;
     const sai_attr_metadata_t* meta;
@@ -3462,7 +3423,6 @@ void test_serialize_uint32_list()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_attribute_t attr;
     const sai_attr_metadata_t* meta;
@@ -3523,7 +3483,6 @@ void test_serialize_enum_list()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_attribute_t attr;
     const sai_attr_metadata_t* meta;
@@ -3581,7 +3540,6 @@ void test_serialize_oid()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_attribute_t attr;
     const sai_attr_metadata_t* meta;
@@ -3619,7 +3577,6 @@ void test_serialize_oid_list()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_attribute_t attr;
     const sai_attr_metadata_t* meta;
@@ -3685,7 +3642,6 @@ void test_serialize_acl_action()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_attribute_t attr;
     const sai_attr_metadata_t* meta;
@@ -3737,7 +3693,6 @@ void test_serialize_qos_map()
     SWSS_LOG_ENTER();
 
     clear_local();
-    meta_init_db();
 
     sai_attribute_t attr;
     const sai_attr_metadata_t* meta;

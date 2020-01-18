@@ -74,7 +74,6 @@ clean-local:
 	make -C $(top_srcdir)/SAI/meta clean
 
 libsaimetadata_la_SOURCES = \
-							sai_meta.cpp \
 							saiattributelist.cpp \
 							saiserialize.cpp \
 							SaiAttrWrapper.cpp \
