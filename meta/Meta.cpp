@@ -13,10 +13,6 @@
 
 #define MAX_LIST_COUNT 0x1000
 
-#define DEFAULT_VLAN_NUMBER 1
-#define MINIMUM_VLAN_NUMBER 1
-#define MAXIMUM_VLAN_NUMBER 4094
-
 #define CHECK_STATUS_SUCCESS(s) { if ((s) != SAI_STATUS_SUCCESS) return (s); }
 
 #define VALIDATION_LIST(md,vlist) \
@@ -93,6 +89,9 @@ void Meta::meta_init_db()
     m_saiObjectCollection.clear();
     m_attrKeys.clear();
     m_portRelatedSet.clear();
+
+    // m_meta_unittests_set_readonly_set.clear();
+    // m_unittestsEnabled = false
 
     m_warmBoot = false;
 }
@@ -1864,7 +1863,11 @@ sai_status_t Meta::meta_validate_stats(
      * If last bit of counters count is set to high, and unittests are enabled,
      * then this api can be used to SET counter values by user for debugging purposes.
      */
-    number_of_counters &= ~(META_COUNTERS_COUNT_MSB);
+
+    if (m_unittestsEnabled)
+    {
+        number_of_counters &= ~(META_COUNTERS_COUNT_MSB);
+    }
 
     PARAMETER_CHECK_OBJECT_TYPE_VALID(object_type);
     PARAMETER_CHECK_OID_OBJECT_TYPE(object_id, object_type);
