@@ -112,7 +112,6 @@ sai_status_t sai_api_initialize(
 
 sai_status_t sai_api_uninitialize(void)
 {
-    MUTEX();
     SWSS_LOG_ENTER();
     REDIS_CHECK_API_INITIALIZED();
 

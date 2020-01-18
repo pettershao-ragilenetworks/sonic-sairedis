@@ -45,14 +45,30 @@ static sai_switch_notifications_t processNotification(
         _In_ std::shared_ptr<Notification> notification)
 {
     MUTEX();
-
     SWSS_LOG_ENTER();
+
+    if (!sairedis::Globals::apiInitialized)
+    {
+        SWSS_LOG_ERROR("%s: api not initialized", __PRETTY_FUNCTION__);
+        return { };
+    }
+
+    // TODO it may happen that at this point sai will be already uninitialized
+    // since uninitialize is not waiting for processNotification to wait
 
     // NOTE: process metadata must be executed under sairedis API mutex since
     // it will access meta database and notification comes from different
     // thread, and this method is executed from notifications thread
 
-    notification->processMetadata(g_meta);
+    auto meta = g_meta;
+
+    if (!meta)
+    {
+        SWSS_LOG_WARN("meta is already null");
+        return { };
+    }
+
+    notification->processMetadata(meta);
 
     auto objectId = notification->getAnyObjectId();
 
