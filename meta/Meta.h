@@ -249,6 +249,8 @@ namespace saimeta
 
             void meta_init_db();
 
+            bool isEmpty();
+
         public: // notifications
 
             void meta_sai_on_fdb_event(
@@ -523,6 +525,11 @@ namespace saimeta
              */
 
             void meta_warm_boot_notify();
+
+        private:
+
+            void clean_after_switch_remove(
+                    _In_ sai_object_id_t switchId);
 
         private:
 

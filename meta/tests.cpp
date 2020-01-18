@@ -102,15 +102,31 @@ sai_object_id_t create_switch()
 
     sai_attribute_t attr;
 
-    sai_object_id_t switchid;
+    sai_object_id_t switch_id;
 
     attr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
     attr.value.booldata = true;
 
-    auto status = g_meta->create(SAI_OBJECT_TYPE_SWITCH, &switchid, SAI_NULL_OBJECT_ID, 1, &attr);
+    auto status = g_meta->create(SAI_OBJECT_TYPE_SWITCH, &switch_id, SAI_NULL_OBJECT_ID, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
-    return switchid;
+    return switch_id;
+}
+
+void remove_switch(
+        _In_ sai_object_id_t switchId)
+{
+    SWSS_LOG_ENTER();
+
+    META_ASSERT_TRUE(g_meta->isEmpty() == false);
+
+    SWSS_LOG_NOTICE("removing: %lX", switchId);
+
+    auto status = g_meta->remove(SAI_OBJECT_TYPE_SWITCH, switchId);
+
+    META_ASSERT_SUCCESS(status);
+
+    META_ASSERT_TRUE(g_meta->isEmpty());
 }
 
 void test_switch_set()
@@ -122,44 +138,44 @@ void test_switch_set()
     sai_status_t    status;
     sai_attribute_t attr;
 
-    sai_object_id_t switchid = create_switch();
+    sai_object_id_t switch_id = create_switch();
 
-    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, NULL);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switch_id, NULL);
     META_ASSERT_FAIL(status);
 
-    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
     META_ASSERT_FAIL(status);
 
     // id outside range
     attr.id = -1;
-    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
     META_ASSERT_FAIL(status);
 
     g_sai->setStatus(SAI_STATUS_FAILURE);
     attr.id = SAI_SWITCH_ATTR_PORT_NUMBER;
-    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
     META_ASSERT_FAIL(status);
     g_sai->setStatus(SAI_STATUS_SUCCESS);
 
     attr.id = SAI_SWITCH_ATTR_PORT_NUMBER;
-    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
     META_ASSERT_FAIL(status);
 
     attr.id = SAI_SWITCH_ATTR_SWITCHING_MODE;
     attr.value.s32 = 0x1000;
-    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
     META_ASSERT_FAIL(status);
 
     // enum
     attr.id = SAI_SWITCH_ATTR_SWITCHING_MODE;
     attr.value.s32 = SAI_SWITCH_SWITCHING_MODE_STORE_AND_FORWARD;
-    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
     META_ASSERT_SUCCESS(status);
 
     // bool
     attr.id = SAI_SWITCH_ATTR_BCAST_CPU_FLOOD_ENABLE;
     attr.value.booldata = SAI_SWITCH_SWITCHING_MODE_STORE_AND_FORWARD;
-    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
     META_ASSERT_SUCCESS(status);
 
     // mac
@@ -167,13 +183,13 @@ void test_switch_set()
 
     attr.id = SAI_SWITCH_ATTR_SRC_MAC_ADDRESS;
     memcpy(attr.value.mac, mac, sizeof(mac));
-    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
     META_ASSERT_SUCCESS(status);
 
     // uint8
     attr.id = SAI_SWITCH_ATTR_QOS_DEFAULT_TC;
     attr.value.u8 = 0x11;
-    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
     META_ASSERT_SUCCESS(status);
 
     // object id with not allowed null
@@ -183,20 +199,20 @@ void test_switch_set()
 //    // null oid
 //    attr.id = SAI_SWITCH_ATTR_LAG_HASH_IPV6;
 //    attr.value.oid = SAI_NULL_OBJECT_ID;
-//    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
+//    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
 //    META_ASSERT_FAIL(status);
 //
 //    // wrong object type
 //    attr.id = SAI_SWITCH_ATTR_LAG_HASH_IPV6;
 //    attr.value.oid = create_dummy_object_id(SAI_OBJECT_TYPE_LAG);
-//    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
+//    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
 //    META_ASSERT_FAIL(status);
 //
 //    // valid object (object must exist)
 //    attr.id = SAI_SWITCH_ATTR_LAG_HASH_IPV6;
-//    attr.value.oid = create_hash(switchid);
+//    attr.value.oid = create_hash(switch_id);
 //
-//    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
+//    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
 //    META_ASSERT_SUCCESS(status);
 //
 //    META_ASSERT_TRUE(g_meta->getObjectReferenceCount(attr.value.oid) == 1);
@@ -206,15 +222,15 @@ void test_switch_set()
     // null oid
     attr.id = SAI_SWITCH_ATTR_QOS_DOT1P_TO_TC_MAP;
     attr.value.oid = SAI_NULL_OBJECT_ID;
-    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
     META_ASSERT_SUCCESS(status);
 
     // wrong object
     attr.id = SAI_SWITCH_ATTR_QOS_DOT1P_TO_TC_MAP;
-    status = g_meta->create(SAI_OBJECT_TYPE_LAG, &attr.value.oid, switchid, 0, NULL);
+    status = g_meta->create(SAI_OBJECT_TYPE_LAG, &attr.value.oid, switch_id, 0, NULL);
     META_ASSERT_SUCCESS(status);
 
-    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
     META_ASSERT_FAIL(status);
 
     // good object
@@ -224,23 +240,25 @@ void test_switch_set()
     a[0].id = SAI_QOS_MAP_ATTR_TYPE;
     a[0].value.s32 = 1;
     a[1].id = SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST;
-    status = g_meta->create(SAI_OBJECT_TYPE_QOS_MAP, &attr.value.oid, switchid, 2, a);
+    status = g_meta->create(SAI_OBJECT_TYPE_QOS_MAP, &attr.value.oid, switch_id, 2, a);
     META_ASSERT_SUCCESS(status);
 
     sai_object_id_t oid = attr.value.oid;
 
-    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
     META_ASSERT_SUCCESS(status);
 
     META_ASSERT_TRUE(g_meta->getObjectReferenceCount(attr.value.oid) == 1);
 
     attr.id = SAI_SWITCH_ATTR_QOS_DOT1P_TO_TC_MAP;
     attr.value.oid = SAI_NULL_OBJECT_ID;
-    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switchid, &attr);
+    status = g_meta->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
     META_ASSERT_SUCCESS(status);
 
     // check if it was decreased
     META_ASSERT_TRUE(g_meta->getObjectReferenceCount(oid) == 0);
+
+    remove_switch(switch_id);
 }
 
 void test_switch_get()
@@ -252,31 +270,31 @@ void test_switch_get()
     sai_status_t    status;
     sai_attribute_t attr;
 
-    sai_object_id_t switchid = create_switch();
+    sai_object_id_t switch_id = create_switch();
 
     attr.id = SAI_SWITCH_ATTR_PORT_NUMBER;
-    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switchid, 0, &attr);
+    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switch_id, 0, &attr);
     META_ASSERT_FAIL(status);
 
-    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switchid, 1000, &attr);
+    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switch_id, 1000, &attr);
     META_ASSERT_FAIL(status);
 
-    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switchid, 1, NULL);
+    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switch_id, 1, NULL);
     META_ASSERT_FAIL(status);
 
-    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switchid, 1, NULL);
+    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switch_id, 1, NULL);
     META_ASSERT_FAIL(status);
 
-    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switchid, 1, &attr);
+    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switch_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     attr.id = -1;
-    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switchid, 1, &attr);
+    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switch_id, 1, &attr);
     META_ASSERT_FAIL(status);
 
     attr.id = SAI_SWITCH_ATTR_PORT_NUMBER;
     attr.value.u32 = 0;
-    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switchid, 1, &attr);
+    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switch_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
 
     sai_attribute_t attr1;
@@ -286,8 +304,10 @@ void test_switch_get()
     attr2.id = SAI_SWITCH_ATTR_DEFAULT_VIRTUAL_ROUTER_ID;
     sai_attribute_t list[2] = { attr1, attr2 };
 
-    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switchid, 2, list);
+    status = g_meta->get(SAI_OBJECT_TYPE_SWITCH, switch_id, 2, list);
     META_ASSERT_SUCCESS(status);
+
+    remove_switch(switch_id);
 }
 
 // FDB TESTS
@@ -459,6 +479,8 @@ void test_fdb_entry_create()
     SWSS_LOG_NOTICE("already exists");
     status = g_meta->create(&fdb_entry, 3, list2);
     META_ASSERT_FAIL(status);
+
+    remove_switch(switch_id);
 }
 
 void test_fdb_entry_remove()
@@ -530,6 +552,8 @@ void test_fdb_entry_remove()
     META_ASSERT_SUCCESS(status);
 
     META_ASSERT_TRUE(!g_meta->objectExists(key));
+
+    remove_switch(switch_id);
 }
 
 static sai_fdb_entry_t create_fdb_entry()
@@ -629,6 +653,8 @@ void test_fdb_entry_set()
     META_ASSERT_SUCCESS(status);
 
     // TODO check references ?
+
+    remove_switch(fdb_entry.switch_id);
 }
 
 void test_fdb_entry_get()
@@ -682,6 +708,8 @@ void test_fdb_entry_get()
 
     status = g_meta->get(&fdb_entry, 2, list);
     META_ASSERT_SUCCESS(status);
+
+    remove_switch(fdb_entry.switch_id);
 }
 
 void test_fdb_entry_flow()
@@ -758,6 +786,8 @@ void test_fdb_entry_flow()
     SWSS_LOG_NOTICE("remove non existing");
     status = g_meta->remove(&fdb_entry);
     META_ASSERT_FAIL(status);
+
+    remove_switch(switch_id);
 }
 
 // NEIGHBOR TESTS
@@ -884,6 +914,8 @@ void test_neighbor_entry_create()
     SWSS_LOG_NOTICE("already exists");
     status = g_meta->create(&neighbor_entry, 2, list2);
     META_ASSERT_FAIL(status);
+
+    remove_switch(switch_id);
 }
 
 sai_neighbor_entry_t create_neighbor_entry()
@@ -1023,6 +1055,8 @@ void test_neighbor_entry_remove()
     META_ASSERT_SUCCESS(status);
 
     META_ASSERT_TRUE(!g_meta->objectExists(key));
+
+    remove_switch(switch_id);
 }
 
 void test_neighbor_entry_set()
@@ -1098,6 +1132,8 @@ void test_neighbor_entry_set()
     attr.value.s32 = SAI_PACKET_ACTION_DROP;
     status = g_meta->set(&neighbor_entry, &attr);
     META_ASSERT_SUCCESS(status);
+
+    remove_switch(switch_id);
 }
 
 void test_neighbor_entry_get()
@@ -1183,6 +1219,8 @@ void test_neighbor_entry_get()
     sai_attribute_t list2[2] = { attr3, attr4 };
     status = g_meta->get(&neighbor_entry, 2, list2);
     META_ASSERT_SUCCESS(status);
+
+    remove_switch(switch_id);
 }
 
 void test_neighbor_entry_flow()
@@ -1257,6 +1295,8 @@ void test_neighbor_entry_flow()
     SWSS_LOG_NOTICE("remove existing");
     status = g_meta->remove(&neighbor_entry);
     META_ASSERT_FAIL(status);
+
+    remove_switch(switch_id);
 }
 
 // VLAN TESTS
@@ -1338,6 +1378,8 @@ void test_vlan_create()
     SWSS_LOG_NOTICE("existing");
     status = g_meta->create(SAI_OBJECT_TYPE_VLAN, &vlan_id, switch_id, 1, &vlan);
     META_ASSERT_FAIL(status);
+
+    remove_switch(switch_id);
 }
 
 void test_vlan_remove()
@@ -1387,6 +1429,8 @@ void test_vlan_remove()
     SWSS_LOG_NOTICE("non existing");
     status = g_meta->remove(SAI_OBJECT_TYPE_VLAN, vlan_id);
     META_ASSERT_FAIL(status);
+
+    remove_switch(switch_id);
 }
 
 void test_vlan_set()
@@ -1490,6 +1534,8 @@ void test_vlan_set()
     attr.value.u32 = 1;
     status = g_meta->set(SAI_OBJECT_TYPE_VLAN, vlan_id, &attr);
     META_ASSERT_SUCCESS(status);
+
+    remove_switch(switch_id);
 }
 
 void test_vlan_get()
@@ -1606,6 +1652,8 @@ void test_vlan_get()
     attr.id = SAI_VLAN_ATTR_META_DATA;
     status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
+
+    remove_switch(switch_id);
 }
 
 void test_vlan_flow()
@@ -1732,6 +1780,8 @@ void test_vlan_flow()
     attr.id = SAI_VLAN_ATTR_LEARN_DISABLE;
     status = g_meta->get(SAI_OBJECT_TYPE_VLAN, vlan_id, 1, &attr);
     META_ASSERT_FAIL(status);
+
+    remove_switch(switch_id);
 }
 
 // ROUTE TESTS
@@ -1878,6 +1928,8 @@ void test_route_entry_create()
     SWSS_LOG_NOTICE("already exists");
     status = g_meta->create(&route_entry, 2, list);
     META_ASSERT_FAIL(status);
+
+    remove_switch(switch_id);
 }
 
 void test_route_entry_remove()
@@ -1974,6 +2026,8 @@ void test_route_entry_remove()
     SWSS_LOG_NOTICE("success");
     status = g_meta->remove(&route_entry);
     META_ASSERT_SUCCESS(status);
+
+    remove_switch(switch_id);
 }
 
 void test_route_entry_set()
@@ -2064,6 +2118,8 @@ void test_route_entry_set()
     attr.value.u32 = 0x12345678;
     status = g_meta->set(&route_entry, &attr);
     META_ASSERT_SUCCESS(status);
+
+    remove_switch(switch_id);
 }
 
 void test_route_entry_get()
@@ -2148,6 +2204,8 @@ void test_route_entry_get()
     attr.id = SAI_ROUTE_ENTRY_ATTR_META_DATA;
     status = g_meta->get(&route_entry, 1, &attr);
     META_ASSERT_SUCCESS(status);
+
+    remove_switch(switch_id);
 }
 
 void test_route_entry_flow()
@@ -2278,6 +2336,8 @@ void test_route_entry_flow()
     SWSS_LOG_NOTICE("non existing");
     status = g_meta->remove(&route_entry);
     META_ASSERT_FAIL(status);
+
+    remove_switch(switch_id);
 }
 
 // SERIALIZATION TYPES TESTS
@@ -2317,6 +2377,8 @@ void test_serialization_type_vlan_list()
 
     status = g_meta->remove(SAI_OBJECT_TYPE_STP, stp);
     META_ASSERT_SUCCESS(status);
+
+    remove_switch(switch_id);
 }
 
 void test_serialization_type_bool()
@@ -2354,6 +2416,8 @@ void test_serialization_type_bool()
 
     status = g_meta->remove(SAI_OBJECT_TYPE_VIRTUAL_ROUTER, vr);
     META_ASSERT_SUCCESS(status);
+
+    remove_switch(switch_id);
 }
 
 void test_serialization_type_char()
@@ -2438,6 +2502,8 @@ void test_serialization_type_char()
     SWSS_LOG_NOTICE("create hostif with mandatory missing");
     status = g_meta->create(SAI_OBJECT_TYPE_HOSTIF, &hostif, switch_id, 1, list3);
     META_ASSERT_FAIL(status);
+
+    remove_switch(switch_id);
 }
 
 void test_serialization_type_int32_list()
@@ -2478,6 +2544,8 @@ void test_serialization_type_int32_list()
 
     status = g_meta->remove(SAI_OBJECT_TYPE_HASH, hash);
     META_ASSERT_SUCCESS(status);
+
+    remove_switch(switch_id);
 }
 
 void test_serialization_type_uint32_list()
@@ -2518,6 +2586,8 @@ void test_serialization_type_uint32_list()
 
     status = g_meta->remove(SAI_OBJECT_TYPE_HASH, hash);
     META_ASSERT_SUCCESS(status);
+
+    remove_switch(switch_id);
 }
 
 // OTHER
@@ -2870,6 +2940,8 @@ void test_acl_entry_field_and_action()
 
     status = g_meta->remove(SAI_OBJECT_TYPE_ACL_ENTRY, aclentry);
     META_ASSERT_SUCCESS(status);
+
+    remove_switch(switch_id);
 }
 
 void test_construct_key()
@@ -2968,6 +3040,8 @@ void test_queue_create()
     SWSS_LOG_NOTICE("create queue");
     status = g_meta->create(SAI_OBJECT_TYPE_QUEUE, &queue, switch_id, 4, list);
     META_ASSERT_SUCCESS(status);
+
+    remove_switch(switch_id);
 }
 
 void test_null_list()
@@ -2998,6 +3072,8 @@ void test_null_list()
     SWSS_LOG_NOTICE("0 count, null list");
     status = g_meta->create(SAI_OBJECT_TYPE_HASH, &hash, switch_id, 1, &attr);
     META_ASSERT_SUCCESS(status);
+
+    remove_switch(switch_id);
 }
 
 void test_priority_group()
@@ -3020,6 +3096,8 @@ void test_priority_group()
     attr.value.oid = SAI_NULL_OBJECT_ID;
     status = g_meta->set(SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP, pg, &attr);
     META_ASSERT_SUCCESS(status);
+
+    remove_switch(switch_id);
 }
 
 #define ASSERT_TRUE(x,y)\

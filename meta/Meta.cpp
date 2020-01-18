@@ -96,6 +96,16 @@ void Meta::meta_init_db()
     m_warmBoot = false;
 }
 
+bool Meta::isEmpty()
+{
+    SWSS_LOG_ENTER();
+
+    return m_portRelatedSet.getAllPorts().empty()
+        && m_oids.getAllOids().empty()
+        && m_attrKeys.getAllKeys().empty()
+        && m_saiObjectCollection.getAllKeys().empty();
+}
+
 sai_status_t Meta::remove(
         _In_ sai_object_type_t object_type,
         _In_ sai_object_id_t object_id)
@@ -2736,6 +2746,75 @@ sai_object_id_t Meta::switchIdQuery(
     return m_implementation->switchIdQuery(objectId);
 }
 
+void Meta::clean_after_switch_remove(
+        _In_ sai_object_id_t switchId)
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_NOTICE("cleaning metadata for switch: %s",
+            sai_serialize_object_id(switchId).c_str());
+
+    if (objectTypeQuery(switchId) != SAI_OBJECT_TYPE_SWITCH)
+    {
+        SWSS_LOG_THROW("oid %s is not SWITCH!",
+                sai_serialize_object_id(switchId).c_str());
+    }
+
+    // clear port related objects
+
+    for (auto port: m_portRelatedSet.getAllPorts())
+    {
+        if (switchIdQuery(port) == switchId)
+        {
+            m_portRelatedSet.removePort(port);
+        }
+    }
+
+    // clear oid references
+
+    for (auto oid: m_oids.getAllOids())
+    {
+        SWSS_LOG_NOTICE("swid = %lX oid %lX query %lX", switchId, oid, switchIdQuery(oid));
+        if (switchIdQuery(oid) == switchId)
+        {
+            m_oids.objectReferenceClear(oid);
+        }
+    }
+
+    // clear attr keys
+
+    for (auto& key: m_attrKeys.getAllKeys())
+    {
+        sai_object_meta_key_t mk;
+        sai_deserialize_object_meta_key(key, mk);
+
+        // we guarantee that switch_id is first in the key structure so we can
+        // use that as object_id as well
+
+        if (switchIdQuery(mk.objectkey.key.object_id) == switchId)
+        {
+            m_attrKeys.eraseMetaKey(key);
+        }
+    }
+
+    for (auto& key: m_saiObjectCollection.getAllKeys())
+    {
+        sai_object_meta_key_t mk;
+        sai_deserialize_object_meta_key(key, mk);
+
+        // we guarantee that switch_id is first in the key structure so we can
+        // use that as object_id as well
+
+        if (switchIdQuery(mk.objectkey.key.object_id) == switchId)
+        {
+            m_saiObjectCollection.removeObject(mk);
+        }
+    }
+
+    SWSS_LOG_NOTICE("removed all objects related to switch %s",
+            sai_serialize_object_id(switchId).c_str());
+}
+
 sai_status_t Meta::meta_generic_validation_remove(
         _In_ const sai_object_meta_key_t& meta_key)
 {
@@ -2805,10 +2884,6 @@ sai_status_t Meta::meta_generic_validation_remove(
              */
 
             SWSS_LOG_WARN("removing switch object 0x%" PRIx64 " reference count is %d, removing all objects from meta DB", oid, count);
-
-            // TODO must remove only this switch objects (unless 1 meta per switch)
-
-            meta_init_db();
 
             return SAI_STATUS_SUCCESS;
         }
@@ -3060,10 +3135,9 @@ void Meta::meta_generic_validation_post_remove(
         /*
          * If switch object was removed then meta db was cleared and there are
          * no other attributes, no need for reference counting.
-         *
-         * TODO we can have multiple switches, then we need to remove
-         * objects associated with specific switch!
          */
+
+        clean_after_switch_remove(meta_key.objectkey.key.object_id);
 
         return;
     }
