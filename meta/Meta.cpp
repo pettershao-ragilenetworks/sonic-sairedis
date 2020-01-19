@@ -2774,7 +2774,6 @@ void Meta::clean_after_switch_remove(
 
     for (auto oid: m_oids.getAllOids())
     {
-        SWSS_LOG_NOTICE("swid = %lX oid %lX query %lX", switchId, oid, switchIdQuery(oid));
         if (switchIdQuery(oid) == switchId)
         {
             m_oids.objectReferenceClear(oid);
