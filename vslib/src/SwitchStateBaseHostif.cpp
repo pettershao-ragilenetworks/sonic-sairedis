@@ -333,11 +333,11 @@ std::string SwitchStateBase::vs_get_veth_name(
 
     sai_attribute_t attr;
 
-    uint32_t lanes[4];
+    uint32_t lanes[8];
 
     attr.id = SAI_PORT_ATTR_HW_LANE_LIST;
 
-    attr.value.u32list.count = 4;
+    attr.value.u32list.count = 8;
     attr.value.u32list.list = lanes;
 
     if (get(SAI_OBJECT_TYPE_PORT, port_id, 1, &attr) != SAI_STATUS_SUCCESS)
@@ -348,20 +348,26 @@ std::string SwitchStateBase::vs_get_veth_name(
     }
     else
     {
-        // TODO use actual map instead
-        auto map = g_laneMapContainer->getLaneMap(0); // TODO use index
-
-        auto ifname = map->getInterfaceFromLaneNumber(lanes[0]);
-
-        if (ifname == "")
+        if (m_switchConfig->m_laneMap)
         {
-            SWSS_LOG_WARN("failed to get ifname from lane number %u", lanes[0]);
+            auto ifname = m_switchConfig->m_laneMap->getInterfaceFromLaneNumber(lanes[0]);
+
+            if (ifname == "")
+            {
+                SWSS_LOG_WARN("failed to get ifname from lane number %u", lanes[0]);
+            }
+            else
+            {
+                SWSS_LOG_NOTICE("using %s instead of %s", ifname.c_str(), vethname.c_str());
+
+                vethname = ifname;
+            }
         }
         else
         {
-            SWSS_LOG_NOTICE("using %s instead of %s", ifname.c_str(), vethname.c_str());
-
-            vethname = ifname;
+            SWSS_LOG_WARN("laneMap is NULL for switch %s, index: %u",
+                    sai_serialize_object_id(m_switch_id).c_str(),
+                    m_switchConfig->m_switchIndex);
         }
     }
 

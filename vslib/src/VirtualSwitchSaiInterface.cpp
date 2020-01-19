@@ -500,6 +500,8 @@ static std::shared_ptr<SwitchStateBase> init_switch(
 
         SWSS_LOG_NOTICE("initialized switch %s in WARM boot mode", sai_serialize_object_id(switch_id).c_str());
 
+        // TODO lane map may be different after warm boot if ports were added/removed
+
         return ss;
     }
 

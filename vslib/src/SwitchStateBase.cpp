@@ -674,8 +674,15 @@ sai_status_t SwitchStateBase::create_ports()
 
     SWSS_LOG_INFO("create ports");
 
-    // TODO we should not use container but actual map instead in constructor
-    auto map = g_laneMapContainer->getLaneMap(0); // TODO get switch index
+    auto map = m_switchConfig->m_laneMap;
+
+    if (!map)
+    {
+        SWSS_LOG_ERROR("lane map for switch %s is NULL",
+                sai_serialize_object_id(m_switch_id).c_str());
+
+        return SAI_STATUS_FAILURE;
+    }
 
     auto& lanesVector = map->getLaneVector();
 

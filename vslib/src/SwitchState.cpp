@@ -201,8 +201,11 @@ void SwitchState::asyncOnLinkMsg(
 
     // TODO on warm boot we must recreate lane map
     // or lane map should only be used on create
+    // if during switch shutdown lane map changed (port added/removed)
+    // then loaded lane map will point to wrong mapping
+
     // TODO get index when we will have multiple switches
-    auto map = g_laneMapContainer->getLaneMap(0);
+    auto map = m_switchConfig->m_laneMap;
 
     if (!map)
     {

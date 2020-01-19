@@ -24,8 +24,6 @@ extern "C" {
 
 #define SAI_VS_VETH_PREFIX   "v"
 
-extern std::shared_ptr<saivs::LaneMapContainer> g_laneMapContainer;
-
 extern std::shared_ptr<saivs::RealObjectIdManager>       g_realObjectIdManager;
 
 #define CHECK_STATUS(status) {                                  \

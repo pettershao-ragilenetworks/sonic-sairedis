@@ -24,8 +24,6 @@
 
 using namespace saivs;
 
-std::shared_ptr<LaneMapContainer> g_laneMapContainer;
-
 std::shared_ptr<RealObjectIdManager>            g_realObjectIdManager;
 
 Sai::Sai()
@@ -91,7 +89,7 @@ sai_status_t Sai::initialize(
 
     auto *laneMapFile = service_method_table->profile_get_value(0, SAI_KEY_VS_INTERFACE_LANE_MAP_FILE);
 
-    g_laneMapContainer = LaneMapFileParser::parseLaneMapFile(laneMapFile);
+    m_laneMapContainer = LaneMapFileParser::parseLaneMapFile(laneMapFile);
 
     auto boot_type          = service_method_table->profile_get_value(0, SAI_KEY_BOOT_TYPE);
     m_warm_boot_read_file   = service_method_table->profile_get_value(0, SAI_KEY_WARM_BOOT_READ_FILE);
@@ -123,6 +121,7 @@ sai_status_t Sai::initialize(
     sc->m_bootType = bootType;
     sc->m_switchIndex = 0;
     sc->m_useTapDevice = useTapDevice;
+    sc->m_laneMap = m_laneMapContainer->getLaneMap(sc->m_switchIndex);
 
     auto scc = std::make_shared<SwitchConfigContainer>();
 

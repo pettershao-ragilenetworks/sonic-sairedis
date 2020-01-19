@@ -4,6 +4,7 @@
 
 #include "lib/inc/SaiInterface.h"
 #include "meta/Meta.h"
+#include "LaneMapContainer.h"
 
 #include "swss/selectableevent.h"
 #include "swss/dbconnector.h"
@@ -370,5 +371,6 @@ namespace saivs
 
             const char *m_warm_boot_write_file;
 
+            std::shared_ptr<LaneMapContainer> m_laneMapContainer;
     };
 }
