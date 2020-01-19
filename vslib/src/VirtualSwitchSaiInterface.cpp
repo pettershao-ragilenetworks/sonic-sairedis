@@ -629,7 +629,7 @@ sai_status_t VirtualSwitchSaiInterface::create(
     return ss->create(object_type, serializedObjectId, switch_id, attr_count, attr_list);
 }
 
-static void uninit_switch(
+void VirtualSwitchSaiInterface::removeSwitch(
         _In_ sai_object_id_t switch_id)
 {
     SWSS_LOG_ENTER();
@@ -713,7 +713,7 @@ sai_status_t VirtualSwitchSaiInterface::remove(
 
         g_realObjectIdManager->releaseObjectId(object_id);
 
-        uninit_switch(object_id);
+        removeSwitch(object_id);
     }
 
     return status;

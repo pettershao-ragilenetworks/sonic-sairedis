@@ -313,6 +313,11 @@ namespace saivs
                     _In_ uint32_t attr_count,
                     _In_ const sai_attribute_t *attr_list) const;
 
+        private:
+
+            void removeSwitch(
+                    _In_ sai_object_id_t switchId);
+
         public:
 
             void setMeta(
