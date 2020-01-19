@@ -16,7 +16,6 @@
 using namespace saivs;
 
 extern std::shared_ptr<RealObjectIdManager>       g_realObjectIdManager;
-extern bool g_vs_hostif_use_tap_device; // TODO to be removed
 
 // TODO MUTEX must be used when adding and removing interface index by system
 
@@ -25,9 +24,11 @@ extern bool g_vs_hostif_use_tap_device; // TODO to be removed
 #define MUTEX std::lock_guard<std::mutex> _lock(m_mutex);
 
 SwitchState::SwitchState(
-        _In_ sai_object_id_t switch_id):
+        _In_ sai_object_id_t switch_id,
+        _In_ std::shared_ptr<SwitchConfig> config):
     m_switch_id(switch_id),
-    m_linkCallbackIndex(-1)
+    m_linkCallbackIndex(-1),
+    m_switchConfig(config)
 {
     SWSS_LOG_ENTER();
 
@@ -55,7 +56,7 @@ SwitchState::SwitchState(
 
     m_objectHash[SAI_OBJECT_TYPE_SWITCH][sai_serialize_object_id(switch_id)] = {};
 
-    if (g_vs_hostif_use_tap_device)
+    if (m_switchConfig->m_useTapDevice)
     {
         m_linkCallbackIndex = NetMsgRegistrar::getInstance().registerCallback(
                 std::bind(&SwitchState::asyncOnLinkMsg, this, std::placeholders::_1, std::placeholders::_2));
@@ -68,7 +69,7 @@ SwitchState::~SwitchState()
 
     SWSS_LOG_NOTICE("begin");
 
-    if (g_vs_hostif_use_tap_device)
+    if (m_switchConfig->m_useTapDevice)
     {
         NetMsgRegistrar::getInstance().unregisterCallback(m_linkCallbackIndex);
 

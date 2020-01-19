@@ -24,8 +24,6 @@
 
 using namespace saivs;
 
-bool                    g_vs_hostif_use_tap_device = false;
-
 std::shared_ptr<swss::SelectableEvent>      g_fdbAgingThreadEvent;
 volatile bool                               g_fdbAgingThreadRun;
 std::shared_ptr<std::thread>                g_fdbAgingThread;
@@ -180,17 +178,16 @@ sai_status_t Sai::initialize(
 
     const char *use_tap_dev = service_method_table->profile_get_value(0, SAI_KEY_VS_HOSTIF_USE_TAP_DEVICE);
 
-    g_vs_hostif_use_tap_device = SwitchConfig::parseUseTapDevice(use_tap_dev);
+    auto useTapDevice = SwitchConfig::parseUseTapDevice(use_tap_dev);
 
-    SWSS_LOG_NOTICE("hostif use TAP device: %s",
-            g_vs_hostif_use_tap_device ? "true" : "false");
+    SWSS_LOG_NOTICE("hostif use TAP device: %s", (useTapDevice ? "true" : "false"));
 
     auto sc = std::make_shared<SwitchConfig>();
 
     sc->m_switchType = switchType;
     sc->m_bootType = bootType;
     sc->m_switchIndex = 0;
-    sc->m_useTapDevice = g_vs_hostif_use_tap_device;
+    sc->m_useTapDevice = useTapDevice;
 
     auto scc = std::make_shared<SwitchConfigContainer>();
 

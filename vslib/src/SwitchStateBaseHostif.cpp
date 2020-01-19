@@ -610,7 +610,7 @@ sai_status_t SwitchStateBase::vs_recreate_hostif_tap_interfaces()
 {
     SWSS_LOG_ENTER();
 
-    if (g_vs_hostif_use_tap_device == false)
+    if (m_switchConfig->m_useTapDevice == false)
     {
         return SAI_STATUS_SUCCESS;
     }
@@ -702,7 +702,7 @@ sai_status_t SwitchStateBase::createHostif(
 {
     SWSS_LOG_ENTER();
 
-    if (g_vs_hostif_use_tap_device == true)
+    if (m_switchConfig->m_useTapDevice == true)
     {
         auto status = vs_create_hostif_tap_interface(attr_count, attr_list);
 
@@ -721,7 +721,7 @@ sai_status_t SwitchStateBase::removeHostif(
 {
     SWSS_LOG_ENTER();
 
-    if (g_vs_hostif_use_tap_device == true)
+    if (m_switchConfig->m_useTapDevice == true)
     {
         auto status = vs_remove_hostif_tap_interface(objectId);
 

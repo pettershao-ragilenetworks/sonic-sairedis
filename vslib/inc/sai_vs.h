@@ -22,11 +22,7 @@ extern "C" {
 
 #include <mutex>
 
-#define SAI_VS_MAX_PORTS 1024
-
 #define SAI_VS_VETH_PREFIX   "v"
-
-extern bool                             g_vs_hostif_use_tap_device;
 
 extern std::shared_ptr<saivs::LaneMapContainer> g_laneMapContainer;
 

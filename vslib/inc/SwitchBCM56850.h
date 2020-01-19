@@ -10,10 +10,12 @@ namespace saivs
         public:
 
             SwitchBCM56850(
-                    _In_ sai_object_id_t switch_id);
+                    _In_ sai_object_id_t switch_id,
+                    _In_ std::shared_ptr<SwitchConfig> config);
 
             SwitchBCM56850(
                     _In_ sai_object_id_t switch_id,
+                    _In_ std::shared_ptr<SwitchConfig> config,
                     _In_ std::shared_ptr<WarmBootState> warmBootState);
 
             virtual ~SwitchBCM56850() = default;

@@ -6,10 +6,10 @@
 
 using namespace saivs;
 
-
 SwitchMLNX2700::SwitchMLNX2700(
-        _In_ sai_object_id_t switch_id):
-    SwitchStateBase(switch_id)
+        _In_ sai_object_id_t switch_id,
+        _In_ std::shared_ptr<SwitchConfig> config):
+    SwitchStateBase(switch_id, config)
 {
     SWSS_LOG_ENTER();
 
@@ -18,8 +18,9 @@ SwitchMLNX2700::SwitchMLNX2700(
 
 SwitchMLNX2700::SwitchMLNX2700(
         _In_ sai_object_id_t switch_id,
+        _In_ std::shared_ptr<SwitchConfig> config,
         _In_ std::shared_ptr<WarmBootState> warmBootState):
-    SwitchStateBase(switch_id, warmBootState)
+    SwitchStateBase(switch_id, config, warmBootState)
 {
     SWSS_LOG_ENTER();
 

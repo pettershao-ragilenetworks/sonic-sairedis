@@ -8,11 +8,14 @@
 
 #define MAX_OBJLIST_LEN 128
 
+#define SAI_VS_MAX_PORTS 1024
+
 using namespace saivs;
 
 SwitchStateBase::SwitchStateBase(
-                    _In_ sai_object_id_t switch_id):
-    SwitchState(switch_id)
+        _In_ sai_object_id_t switch_id,
+        _In_ std::shared_ptr<SwitchConfig> config):
+    SwitchState(switch_id, config)
 {
     SWSS_LOG_ENTER();
 
@@ -21,8 +24,9 @@ SwitchStateBase::SwitchStateBase(
 
 SwitchStateBase::SwitchStateBase(
         _In_ sai_object_id_t switch_id,
+        _In_ std::shared_ptr<SwitchConfig> config,
         _In_ std::shared_ptr<WarmBootState> warmBootState):
-    SwitchState(switch_id)
+    SwitchState(switch_id, config)
 {
     SWSS_LOG_ENTER();
 
@@ -35,7 +39,10 @@ SwitchStateBase::SwitchStateBase(
             m_objectHash[kvp.first] = kvp.second;
         }
 
-        m_fdb_info_set = warmBootState->m_fdbInfoSet;
+        if (m_switchConfig->m_useTapDevice)
+        {
+            m_fdb_info_set = warmBootState->m_fdbInfoSet;
+        }
     }
 }
 
@@ -2031,7 +2038,7 @@ std::string SwitchStateBase::dump_switch_database_for_warm_restart() const
         }
     }
 
-    if (g_vs_hostif_use_tap_device)
+    if (m_switchConfig->m_useTapDevice)
     {
         /*
          * If user is using tap devices we also need to dump local fdb info

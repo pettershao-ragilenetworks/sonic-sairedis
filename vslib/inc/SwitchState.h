@@ -5,6 +5,7 @@ extern "C" {
 }
 
 #include "SaiAttrWrap.h"
+#include "SwitchConfig.h"
 
 #include "meta/Meta.h"
 
@@ -37,7 +38,8 @@ namespace saivs
         public:
 
             SwitchState(
-                    _In_ sai_object_id_t switch_id);
+                    _In_ sai_object_id_t switch_id,
+                    _In_ std::shared_ptr<SwitchConfig> config);
 
             virtual ~SwitchState();
 
@@ -112,5 +114,7 @@ namespace saivs
             std::mutex m_mutex;
 
             std::weak_ptr<saimeta::Meta> m_meta;
+
+            std::shared_ptr<SwitchConfig> m_switchConfig;
     };
 }

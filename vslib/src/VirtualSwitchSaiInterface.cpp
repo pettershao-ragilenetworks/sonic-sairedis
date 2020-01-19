@@ -472,6 +472,7 @@ DECLARE_SET_ENTRY(NAT_ENTRY,nat_entry);
 template <class T>
 static std::shared_ptr<SwitchStateBase> init_switch(
         _In_ sai_object_id_t switch_id,
+        _In_ std::shared_ptr<SwitchConfig> config,
         _In_ std::shared_ptr<WarmBootState> warmBootState,
         _In_ std::weak_ptr<saimeta::Meta> meta)
 {
@@ -488,7 +489,7 @@ static std::shared_ptr<SwitchStateBase> init_switch(
 
     if (warmBootState != nullptr)
     {
-        g_switch_state_map[switch_id] = std::make_shared<T>(switch_id, warmBootState);
+        g_switch_state_map[switch_id] = std::make_shared<T>(switch_id, config, warmBootState);
 
         // TODO cast right switch or different data pass
         auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
@@ -507,7 +508,7 @@ static std::shared_ptr<SwitchStateBase> init_switch(
         SWSS_LOG_THROW("switch already exists %s", sai_serialize_object_id(switch_id).c_str());
     }
 
-    g_switch_state_map[switch_id] = std::make_shared<T>(switch_id);
+    g_switch_state_map[switch_id] = std::make_shared<T>(switch_id, config);
 
     auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
 
@@ -577,12 +578,12 @@ sai_status_t VirtualSwitchSaiInterface::create(
         {
             case SAI_VS_SWITCH_TYPE_BCM56850:
 
-                ss = init_switch<SwitchBCM56850>(switch_id, warmBootState, m_meta);
+                ss = init_switch<SwitchBCM56850>(switch_id, config, warmBootState, m_meta);
                 break;
 
             case SAI_VS_SWITCH_TYPE_MLNX2700:
 
-                ss = init_switch<SwitchMLNX2700>(switch_id, warmBootState, m_meta);
+                ss = init_switch<SwitchMLNX2700>(switch_id, config, warmBootState, m_meta);
                 break;
 
             default:
@@ -598,7 +599,7 @@ sai_status_t VirtualSwitchSaiInterface::create(
 
             vs_update_local_metadata(switch_id);
 
-            if (g_vs_hostif_use_tap_device)
+            if (config->m_useTapDevice)
             {
                 ss->vs_recreate_hostif_tap_interfaces();
             }
@@ -1376,25 +1377,22 @@ bool VirtualSwitchSaiInterface::readWarmBootFile(
              * just parse line and repopulate fdb info set.
              */
 
-            if (g_vs_hostif_use_tap_device)
+            FdbInfo fi = FdbInfo::deserialize(strObjectId);
+
+            auto switchId = RealObjectIdManager::switchIdQuery(fi.m_portId);
+
+            if (switchId == SAI_NULL_OBJECT_ID)
             {
-                FdbInfo fi = FdbInfo::deserialize(strObjectId);
+                SWSS_LOG_ERROR("switchIdQuery returned NULL on fi.m_port = %s",
+                        sai_serialize_object_id(fi.m_portId).c_str());
 
-                auto switchId = RealObjectIdManager::switchIdQuery(fi.m_portId);
-
-                if (switchId == SAI_NULL_OBJECT_ID)
-                {
-                    SWSS_LOG_ERROR("switchIdQuery returned NULL on fi.m_port = %s",
-                            sai_serialize_object_id(fi.m_portId).c_str());
-
-                    m_warmBootState.clear();
-                    return false;
-                }
-
-                m_warmBootState[switchId].m_switchId = switchId;
-
-                m_warmBootState[switchId].m_fdbInfoSet.insert(fi);
+                m_warmBootState.clear();
+                return false;
             }
+
+            m_warmBootState[switchId].m_switchId = switchId;
+
+            m_warmBootState[switchId].m_fdbInfoSet.insert(fi);
 
             continue;
         }
@@ -1455,12 +1453,9 @@ bool VirtualSwitchSaiInterface::readWarmBootFile(
                 sai_serialize_object_id(kvp.first).c_str(),
                 count);
 
-        if (g_vs_hostif_use_tap_device)
-        {
-            SWSS_LOG_NOTICE("switch %s loaded %zu fdb infos",
-                    sai_serialize_object_id(kvp.first).c_str(),
-                    kvp.second.m_fdbInfoSet.size());
-        }
+        SWSS_LOG_NOTICE("switch %s loaded %zu fdb infos",
+                sai_serialize_object_id(kvp.first).c_str(),
+                kvp.second.m_fdbInfoSet.size());
     }
 
     return true;
