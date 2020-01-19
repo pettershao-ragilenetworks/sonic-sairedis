@@ -166,12 +166,16 @@ sai_status_t Sai::uninitialize(void)
 
     // no mutex on uninitialized to prevent deadlock
     // if some thread would try to gram api mutex
+    // so threads must be stopped first
 
     SWSS_LOG_NOTICE("stopping threads");
 
     stopUnittestThread();
 
     stopFdbAgingThread();
+
+    // at this point some api maybe under execution
+    // and hostif threads are still running
 
     // clear state after ending all threads
 
@@ -281,9 +285,9 @@ sai_status_t Sai::create(                                   \
         _In_ uint32_t attr_count,                           \
         _In_ const sai_attribute_t *attr_list)              \
 {                                                           \
-    MUTEX();                                             \
+    MUTEX();                                                \
     SWSS_LOG_ENTER();                                       \
-    VS_CHECK_API_INITIALIZED();                                \
+    VS_CHECK_API_INITIALIZED();                             \
     return m_meta->create(entry, attr_count, attr_list);    \
 }
 
@@ -301,9 +305,9 @@ DECLARE_CREATE_ENTRY(NAT_ENTRY,nat_entry);
 sai_status_t Sai::remove(                                   \
         _In_ const sai_ ## ot ## _t* entry)                 \
 {                                                           \
-    MUTEX();                                             \
+    MUTEX();                                                \
     SWSS_LOG_ENTER();                                       \
-    VS_CHECK_API_INITIALIZED();                                \
+    VS_CHECK_API_INITIALIZED();                             \
     return m_meta->remove(entry);                           \
 }
 
@@ -321,9 +325,9 @@ sai_status_t Sai::set(                                      \
         _In_ const sai_ ## ot ## _t* entry,                 \
         _In_ const sai_attribute_t *attr)                   \
 {                                                           \
-    MUTEX();                                             \
+    MUTEX();                                                \
     SWSS_LOG_ENTER();                                       \
-    VS_CHECK_API_INITIALIZED();                                \
+    VS_CHECK_API_INITIALIZED();                             \
     return m_meta->set(entry, attr);                        \
 }
 
@@ -342,9 +346,9 @@ sai_status_t Sai::get(                                      \
         _In_ uint32_t attr_count,                           \
         _Inout_ sai_attribute_t *attr_list)                 \
 {                                                           \
-    MUTEX();                                             \
+    MUTEX();                                                \
     SWSS_LOG_ENTER();                                       \
-    VS_CHECK_API_INITIALIZED();                                \
+    VS_CHECK_API_INITIALIZED();                             \
     return m_meta->get(entry, attr_count, attr_list);       \
 }
 
@@ -575,9 +579,9 @@ sai_status_t Sai::bulkCreate(                               \
         _In_ sai_bulk_op_error_mode_t mode,                 \
         _Out_ sai_status_t *object_statuses)                \
 {                                                           \
-    MUTEX();                                             \
+    MUTEX();                                                \
     SWSS_LOG_ENTER();                                       \
-    VS_CHECK_API_INITIALIZED();                                \
+    VS_CHECK_API_INITIALIZED();                             \
     return m_meta->bulkCreate(                              \
             object_count,                                   \
             entries,                                        \
@@ -601,9 +605,9 @@ sai_status_t Sai::bulkRemove(                               \
         _In_ sai_bulk_op_error_mode_t mode,                 \
         _Out_ sai_status_t *object_statuses)                \
 {                                                           \
-    MUTEX();                                             \
+    MUTEX();                                                \
     SWSS_LOG_ENTER();                                       \
-    VS_CHECK_API_INITIALIZED();                                \
+    VS_CHECK_API_INITIALIZED();                             \
     return m_meta->bulkRemove(                              \
             object_count,                                   \
             entries,                                        \
@@ -625,9 +629,9 @@ sai_status_t Sai::bulkSet(                                  \
         _In_ sai_bulk_op_error_mode_t mode,                 \
         _Out_ sai_status_t *object_statuses)                \
 {                                                           \
-    MUTEX();                                             \
+    MUTEX();                                                \
     SWSS_LOG_ENTER();                                       \
-    VS_CHECK_API_INITIALIZED();                                \
+    VS_CHECK_API_INITIALIZED();                             \
     return m_meta->bulkSet(                                 \
             object_count,                                   \
             entries,                                        \
