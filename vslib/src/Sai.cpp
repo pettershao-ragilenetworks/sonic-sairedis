@@ -24,74 +24,9 @@
 
 using namespace saivs;
 
-std::shared_ptr<swss::SelectableEvent>      g_fdbAgingThreadEvent;
-volatile bool                               g_fdbAgingThreadRun;
-std::shared_ptr<std::thread>                g_fdbAgingThread;
-
 std::shared_ptr<LaneMapContainer> g_laneMapContainer;
 
 std::shared_ptr<RealObjectIdManager>            g_realObjectIdManager;
-
-void processFdbEntriesForAging()
-{
-    SWSS_LOG_ENTER();
-
-    if (!Globals::apimutex.try_lock())
-    {
-        // if we are under mutex when calling uninitialize
-        // and doing thread join, this can cause deadlock if
-        // this will kick in, so try lock instead of mutex guard.
-        return;
-    }
-
-    // process for all switches
-
-    for (auto& it: g_switch_state_map)
-    {
-        // TODO remove cast
-        std::dynamic_pointer_cast<SwitchStateBase>(it.second)->processFdbEntriesForAging();
-    }
-
-    Globals::apimutex.unlock();
-}
-
-/**
- * @brief FDB aging thread timeout in milliseconds.
- *
- * Every timeout aging FDB will be performed.
- */
-#define FDB_AGING_THREAD_TIMEOUT_MS (1000)
-
-void fdbAgingThreadProc()
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_NOTICE("starting fdb aging thread");
-
-    swss::Select s;
-
-    s.addSelectable(g_fdbAgingThreadEvent.get());
-
-    while (g_fdbAgingThreadRun)
-    {
-        swss::Selectable *sel = nullptr;
-
-        int result = s.select(&sel, FDB_AGING_THREAD_TIMEOUT_MS);
-
-        if (sel == g_fdbAgingThreadEvent.get())
-        {
-            // user requested shutdown_switch
-            break;
-        }
-
-        if (result == swss::Select::TIMEOUT)
-        {
-            processFdbEntriesForAging();
-        }
-    }
-
-    SWSS_LOG_NOTICE("ending fdb aging thread");
-}
 
 Sai::Sai()
 {
@@ -215,18 +150,9 @@ sai_status_t Sai::initialize(
         }
     }
 
-    // start unittest thread
-
     startUnittestThread();
 
-    // start fdb aging thread
-
-    g_fdbAgingThreadEvent = std::make_shared<swss::SelectableEvent>();
-
-    g_fdbAgingThreadRun = true;
-
-    // TODO should this be moved to create switch and SwitchState?
-    g_fdbAgingThread = std::make_shared<std::thread>(std::thread(fdbAgingThreadProc));
+    startFdbAgingThread();
 
     Globals::apiInitialized = true;
 
@@ -245,11 +171,7 @@ sai_status_t Sai::uninitialize(void)
 
     stopUnittestThread();
 
-    g_fdbAgingThreadEvent->notify();
-
-    g_fdbAgingThreadRun = false;
-
-    g_fdbAgingThread->join();
+    stopFdbAgingThread();
 
     // clear state after ending all threads
 

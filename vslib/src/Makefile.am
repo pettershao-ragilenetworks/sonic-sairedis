@@ -9,6 +9,7 @@ endif
 lib_LTLIBRARIES = libsaivs.la
 
 libsaivs_la_SOURCES = \
+					  SaiFdbAging.cpp \
 					  SwitchConfigContainer.cpp \
 					  SwitchConfig.cpp \
 					  SaiUnittests.cpp \

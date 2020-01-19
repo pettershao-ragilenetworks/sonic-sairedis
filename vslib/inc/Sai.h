@@ -324,6 +324,16 @@ namespace saivs
                     _In_ const std::string &key,
                     _In_ const std::vector<swss::FieldValueTuple> &values);
 
+        private: // FDB aging
+
+            void processFdbEntriesForAging();
+
+            void fdbAgingThreadProc();
+
+            void startFdbAgingThread();
+
+            void stopFdbAgingThread();
+
         private: // unittests
 
             bool m_unittestChannelRun;
@@ -335,6 +345,14 @@ namespace saivs
             std::shared_ptr<swss::NotificationConsumer> m_unittestChannelNotificationConsumer;
 
             std::shared_ptr<swss::DBConnector> m_dbNtf;
+
+        private: // FDB aging thread
+
+            bool m_fdbAgingThreadRun;
+
+            std::shared_ptr<swss::SelectableEvent> m_fdbAgingThreadEvent;
+
+            std::shared_ptr<std::thread> m_fdbAgingThread;
 
         private:
 
