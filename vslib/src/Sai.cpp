@@ -237,7 +237,12 @@ sai_status_t Sai::initialize(
 
     if (g_vs_boot_type == SAI_VS_BOOT_TYPE_WARM)
     {
-        m_vsSai->readWarmBootFile(m_warm_boot_read_file);
+        if (!m_vsSai->readWarmBootFile(m_warm_boot_read_file))
+        {
+            SWSS_LOG_WARN("failed to read warm boot read file, switching to COLD BOOT");
+
+            g_vs_boot_type = SAI_VS_BOOT_TYPE_COLD;
+        }
     }
 
     Globals::apiInitialized = true;

@@ -1330,9 +1330,7 @@ bool VirtualSwitchSaiInterface::readWarmBootFile(
 
     if (!ifs.is_open())
     {
-        SWSS_LOG_ERROR("failed to open: %s, switching to cold boot", warmBootFile);
-
-        g_vs_boot_type = SAI_VS_BOOT_TYPE_COLD;
+        SWSS_LOG_ERROR("failed to open: %s", warmBootFile);
 
         return false;
     }
@@ -1341,6 +1339,8 @@ bool VirtualSwitchSaiInterface::readWarmBootFile(
 
     while (std::getline(ifs, line))
     {
+        SWSS_LOG_DEBUG("line: %s", line.c_str());
+
         // line format: OBJECT_TYPE OBJECT_ID ATTR_ID ATTR_VALUE
         std::istringstream iss(line);
 
