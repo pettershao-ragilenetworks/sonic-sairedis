@@ -19,6 +19,21 @@ SwitchStateBase::SwitchStateBase(
     // empty
 }
 
+SwitchStateBase::SwitchStateBase(
+        _In_ sai_object_id_t switch_id,
+        _In_ std::shared_ptr<WarmBootState> warmBootState):
+    SwitchState(switch_id)
+{
+    SWSS_LOG_ENTER();
+
+    if (warmBootState)
+    {
+        m_objectHash = warmBootState->m_objectHash;
+
+        m_fdb_info_set = warmBootState->m_fdbInfoSet;
+    }
+}
+
 SwitchStateBase::~SwitchStateBase()
 {
     SWSS_LOG_ENTER();
@@ -34,6 +49,11 @@ sai_status_t SwitchStateBase::create(
         _In_ const sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
+
+    if (object_type == SAI_OBJECT_TYPE_SWITCH)
+    {
+        SWSS_LOG_THROW("this method can't be used to create switch");
+    }
 
     *object_id = g_realObjectIdManager->allocateNewObjectId(object_type, switch_id);
 

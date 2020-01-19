@@ -12,6 +12,10 @@ namespace saivs
             SwitchMLNX2700(
                     _In_ sai_object_id_t switch_id);
 
+            SwitchMLNX2700(
+                    _In_ sai_object_id_t switch_id,
+                    _In_ std::shared_ptr<WarmBootState> warmBootState);
+
             virtual ~SwitchMLNX2700() = default;
 
         protected:

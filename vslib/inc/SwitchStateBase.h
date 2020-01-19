@@ -4,9 +4,12 @@
 #include "SwitchState.h"
 #include "FdbInfo.h"
 #include "HostInterfaceInfo.h"
+#include "WarmBootState.h"
 
 #include <set>
 #include <unordered_set>
+
+#define SAI_VS_FDB_INFO "SAI_VS_FDB_INFO"
 
 namespace saivs
 {
@@ -17,6 +20,10 @@ namespace saivs
 
             SwitchStateBase(
                     _In_ sai_object_id_t switch_id);
+
+            SwitchStateBase(
+                    _In_ sai_object_id_t switch_id,
+                    std::shared_ptr<WarmBootState> warmBootState);
 
             virtual ~SwitchStateBase();
 

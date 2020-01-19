@@ -16,6 +16,16 @@ SwitchBCM56850::SwitchBCM56850(
     // empty
 }
 
+SwitchBCM56850::SwitchBCM56850(
+        _In_ sai_object_id_t switch_id,
+        _In_ std::shared_ptr<WarmBootState> warmBootState):
+    SwitchStateBase(switch_id, warmBootState)
+{
+    SWSS_LOG_ENTER();
+
+    // empty
+}
+
 sai_status_t SwitchBCM56850::create_qos_queues_per_port(
         _In_ sai_object_id_t port_id)
 {
