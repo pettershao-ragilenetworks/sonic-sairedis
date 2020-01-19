@@ -63,9 +63,6 @@ extern std::shared_ptr<saivs::RealObjectIdManager>       g_realObjectIdManager;
 
 extern saivs::SwitchState::SwitchStateMap g_switch_state_map;
 
-sai_status_t vs_recreate_hostif_tap_interfaces(
-        _In_ sai_object_id_t switch_id);
-
 void processFdbInfo(
         _In_ const saivs::FdbInfo& fi,
         _In_ sai_fdb_event_t fdb_event);
