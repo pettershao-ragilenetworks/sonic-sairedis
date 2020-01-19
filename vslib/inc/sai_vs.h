@@ -36,10 +36,6 @@ extern std::shared_ptr<saivs::RealObjectIdManager>       g_realObjectIdManager;
 
 extern saivs::SwitchState::SwitchStateMap g_switch_state_map;
 
-void update_port_oper_status(
-        _In_ sai_object_id_t port_id,
-        _In_ sai_port_oper_status_t port_oper_status);
-
 #define PRIVATE __attribute__((visibility("hidden")))
 
 PRIVATE extern const sai_acl_api_t              vs_acl_api;
