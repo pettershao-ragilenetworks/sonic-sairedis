@@ -51,9 +51,6 @@ extern sai_vs_switch_type_t             g_vs_switch_type;
 
 extern sai_vs_boot_type_t g_vs_boot_type;
 
-extern const char *g_warm_boot_read_file;
-extern const char *g_warm_boot_write_file;
-
 extern std::shared_ptr<saivs::LaneMapContainer> g_laneMapContainer;
 
 extern std::shared_ptr<saivs::RealObjectIdManager>       g_realObjectIdManager;
@@ -63,8 +60,6 @@ extern std::shared_ptr<saivs::RealObjectIdManager>       g_realObjectIdManager;
     if (_status != SAI_STATUS_SUCCESS) { return _status; } }
 
 #define DEFAULT_VLAN_NUMBER 1
-
-#define SAI_VS_FDB_INFO "SAI_VS_FDB_INFO"
 
 extern saivs::SwitchState::SwitchStateMap g_switch_state_map;
 

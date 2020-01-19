@@ -347,5 +347,10 @@ namespace saivs
             std::shared_ptr<VirtualSwitchSaiInterface> m_vsSai;
 
             sai_service_method_table_t m_service_method_table;
+
+            const char *m_warm_boot_read_file;
+
+            const char *m_warm_boot_write_file;
+
     };
 }

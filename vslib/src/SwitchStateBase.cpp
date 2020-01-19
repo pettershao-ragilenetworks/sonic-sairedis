@@ -28,7 +28,12 @@ SwitchStateBase::SwitchStateBase(
 
     if (warmBootState)
     {
-        m_objectHash = warmBootState->m_objectHash;
+        for (auto& kvp: warmBootState->m_objectHash)
+        {
+            // we write only existing ones, since base constructor
+            // created empty entries for non existing object types
+            m_objectHash[kvp.first] = kvp.second;
+        }
 
         m_fdb_info_set = warmBootState->m_fdbInfoSet;
     }
@@ -407,7 +412,7 @@ sai_status_t SwitchStateBase::get(
 {
     SWSS_LOG_ENTER();
 
-    auto &objectHash = m_objectHash.at(objectType);
+    const auto &objectHash = m_objectHash.at(objectType);
 
     auto it = objectHash.find(serializedObjectId);
 

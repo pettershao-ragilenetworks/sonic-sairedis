@@ -37,8 +37,6 @@ std::shared_ptr<LaneMapContainer> g_laneMapContainer;
 std::shared_ptr<RealObjectIdManager>            g_realObjectIdManager;
 
 const char *g_boot_type             = NULL;
-const char *g_warm_boot_read_file   = NULL;
-const char *g_warm_boot_write_file  = NULL;
 
 void processFdbEntriesForAging()
 {
@@ -161,8 +159,8 @@ sai_status_t Sai::initialize(
     g_laneMapContainer = LaneMapFileParser::parseLaneMapFile(laneMapFile);
 
     g_boot_type             = service_method_table->profile_get_value(0, SAI_KEY_BOOT_TYPE);
-    g_warm_boot_read_file   = service_method_table->profile_get_value(0, SAI_KEY_WARM_BOOT_READ_FILE);
-    g_warm_boot_write_file  = service_method_table->profile_get_value(0, SAI_KEY_WARM_BOOT_WRITE_FILE);
+    m_warm_boot_read_file   = service_method_table->profile_get_value(0, SAI_KEY_WARM_BOOT_READ_FILE);
+    m_warm_boot_write_file  = service_method_table->profile_get_value(0, SAI_KEY_WARM_BOOT_WRITE_FILE);
 
     std::string bt = (g_boot_type == NULL) ? "cold" : g_boot_type;
 
@@ -237,6 +235,11 @@ sai_status_t Sai::initialize(
 
     m_vsSai->setMeta(m_meta);
 
+    if (g_vs_boot_type == SAI_VS_BOOT_TYPE_WARM)
+    {
+        m_vsSai->readWarmBootFile(m_warm_boot_read_file);
+    }
+
     Globals::apiInitialized = true;
 
     return SAI_STATUS_SUCCESS;
@@ -262,7 +265,7 @@ sai_status_t Sai::uninitialize(void)
 
     // clear state after ending all threads
 
-    m_vsSai->writeWarmBootFile(g_warm_boot_write_file);
+    m_vsSai->writeWarmBootFile(m_warm_boot_write_file);
 
     m_vsSai = nullptr;
     m_meta = nullptr;

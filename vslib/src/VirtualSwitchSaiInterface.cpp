@@ -72,7 +72,7 @@ static void vs_update_real_object_ids(
      * not have the same ID as existing ones.
      */
 
-    for (auto oh: warmBootState->m_objectHash)
+    for (const auto& oh: warmBootState->m_objectHash)
     {
         sai_object_type_t ot = oh.first;
 
@@ -89,7 +89,7 @@ static void vs_update_real_object_ids(
         if (oi->isnonobjectid)
             continue;
 
-        for (auto o: oh.second)
+        for (const auto& o: oh.second)
         {
             sai_object_id_t oid;
 
@@ -102,153 +102,33 @@ static void vs_update_real_object_ids(
     }
 }
 
-// TODO must be done on api initialize
-std::shared_ptr<SwitchStateBase> VirtualSwitchSaiInterface::vs_read_switch_database_for_warm_restart(
-        _In_ sai_object_id_t switch_id)
+std::shared_ptr<WarmBootState> VirtualSwitchSaiInterface::extractWarmBootState(
+        _In_ sai_object_id_t switchId)
 {
     SWSS_LOG_ENTER();
 
-    if (g_warm_boot_read_file == NULL)
+    auto it = m_warmBootState.find(switchId);
+
+    if (it == m_warmBootState.end())
     {
-        SWSS_LOG_ERROR("warm boot read file is NULL");
-        return nullptr;
-    }
-
-    std::ifstream dumpFile;
-
-    dumpFile.open(g_warm_boot_read_file);
-
-    if (!dumpFile.is_open())
-    {
-        SWSS_LOG_ERROR("failed to open: %s, switching to cold boot", g_warm_boot_read_file);
-
-        g_vs_boot_type = SAI_VS_BOOT_TYPE_COLD;
+        SWSS_LOG_WARN("no warm boot state for switch %s",
+                sai_serialize_object_id(switchId).c_str());
 
         return nullptr;
     }
 
-    std::shared_ptr<SwitchStateBase> ss;
+    auto state = std::make_shared<WarmBootState>(it->second); // copy ctr
 
-    // TODO must be respected switch created here or just data
-    switch (g_vs_switch_type)
-    {
-        case SAI_VS_SWITCH_TYPE_BCM56850:
-            ss = std::make_shared<SwitchBCM56850>(switch_id);
-            break;
+    // remove warm boot state for switch, each switch can only warm boot once
 
-        case SAI_VS_SWITCH_TYPE_MLNX2700:
-            ss = std::make_shared<SwitchMLNX2700>(switch_id);
-            break;
+    m_warmBootState.erase(it);
 
-        default:
-            SWSS_LOG_THROW("unknown switch type: %d", g_vs_switch_type);
-    }
-
-    ss->setMeta(m_meta);
-
-    size_t count = 1; // count is 1 since switch_id was inserted to objectHash in SwitchState constructor
-
-    std::string line;
-    while (std::getline(dumpFile, line))
-    {
-        // line format: OBJECT_TYPE OBJECT_ID ATTR_ID ATTR_VALUE
-        std::istringstream iss(line);
-
-        std::string str_object_type;
-        std::string str_object_id;
-        std::string str_attr_id;
-        std::string str_attr_value;
-
-        iss >> str_object_type >> str_object_id;
-
-        if (str_object_type == SAI_VS_FDB_INFO)
-        {
-            /*
-             * If we read line from fdb info set and use tap device is enabled
-             * just parse line and repopulate fdb info set.
-             */
-
-            if (g_vs_hostif_use_tap_device)
-            {
-                FdbInfo fi = FdbInfo::deserialize(str_object_id);
-
-                ss->m_fdb_info_set.insert(fi);
-            }
-
-            continue;
-        }
-
-        iss >> str_attr_id >> str_attr_value;
-
-        sai_object_meta_key_t meta_key;
-
-        sai_deserialize_object_meta_key(str_object_type + ":" + str_object_id, meta_key);
-
-        auto &objectHash = ss->m_objectHash.at(meta_key.objecttype);
-
-        if (objectHash.find(str_object_id) == objectHash.end())
-        {
-            count++;
-
-            objectHash[str_object_id] = {};
-        }
-
-        if (str_attr_id == "NULL")
-        {
-            // skip empty attributes
-            continue;
-        }
-
-        if (meta_key.objecttype == SAI_OBJECT_TYPE_SWITCH)
-        {
-            if (meta_key.objectkey.key.object_id != switch_id)
-            {
-                SWSS_LOG_THROW("created switch id is %s but warm boot serialized is %s",
-                        sai_serialize_object_id(switch_id).c_str(),
-                        str_object_id.c_str());
-            }
-        }
-
-        auto meta = sai_metadata_get_attr_metadata_by_attr_id_name(str_attr_id.c_str());
-
-        if (meta == NULL)
-        {
-            SWSS_LOG_THROW("failed to find metadata for %s", str_attr_id.c_str());
-        }
-
-        // populate attributes
-
-        sai_attribute_t attr;
-
-        attr.id = meta->attrid;
-
-        sai_deserialize_attr_value(str_attr_value.c_str(), *meta, attr, false);
-
-        auto a = std::make_shared<SaiAttrWrap>(meta_key.objecttype, &attr);
-
-        objectHash[str_object_id][a->getAttrMetadata()->attridname] = a;
-
-        // free possible list attributes
-        sai_deserialize_free_attribute_value(meta->attrvaluetype, attr);
-    }
-
-    // NOTE notification pointers should be restored by attr_list when creating switch
-
-    dumpFile.close();
-
-    if (g_vs_hostif_use_tap_device)
-    {
-        SWSS_LOG_NOTICE("loaded %zu fdb infos", ss->m_fdb_info_set.size());
-    }
-
-    SWSS_LOG_NOTICE("loaded %zu objects from: %s", count, g_warm_boot_read_file);
-
-    return ss;
+    return state;
 }
 
-static void vs_validate_switch_warm_boot_atributes(
+bool VirtualSwitchSaiInterface::validate_switch_warm_boot_atributes(
         _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list)
+        _In_ const sai_attribute_t *attr_list) const
 {
     SWSS_LOG_ENTER();
 
@@ -271,11 +151,18 @@ static void vs_validate_switch_warm_boot_atributes(
         if (meta->attrid == SAI_SWITCH_ATTR_INIT_SWITCH)
             continue;
 
+        if (meta->attrid == SAI_SWITCH_ATTR_SWITCH_HARDWARE_INFO)
+            continue;
+
         if (meta->attrvaluetype == SAI_ATTR_VALUE_TYPE_POINTER)
             continue;
 
-        SWSS_LOG_THROW("attribute %s ist not INIT and not notification, not supported in warm boot", meta->attridname);
+        SWSS_LOG_ERROR("attribute %s not supported in warm boot, expected INIT_SWITCH, HARDWARE_INFO or notification pointer", meta->attridname);
+
+        return false;
     }
+
+    return true;
 }
 
 void VirtualSwitchSaiInterface::vs_update_local_metadata(
@@ -297,7 +184,7 @@ void VirtualSwitchSaiInterface::vs_update_local_metadata(
      * called, we could check the actual state.
      */
 
-    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash;//.at(object_type);
+    const auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash;//.at(object_type);
 
     // first create switch
     // first we need to create all "oid" objects to have reference base
@@ -323,7 +210,7 @@ void VirtualSwitchSaiInterface::vs_update_local_metadata(
      * those objects, they must exists first.
      */
 
-    for (auto kvp: objectHash)
+    for (auto& kvp: objectHash)
     {
         sai_object_type_t ot = kvp.first;
 
@@ -356,7 +243,7 @@ void VirtualSwitchSaiInterface::vs_update_local_metadata(
      * *_entry structs can be referenced correctly.
      */
 
-    for (auto kvp: objectHash)
+    for (auto& kvp: objectHash)
     {
         sai_object_type_t ot = kvp.first;
 
@@ -386,7 +273,7 @@ void VirtualSwitchSaiInterface::vs_update_local_metadata(
      * we need to set them too for correct reference count.
      */
 
-    for (auto kvp: objectHash)
+    for (auto& kvp: objectHash)
     {
         sai_object_type_t ot = kvp.first;
 
@@ -582,9 +469,9 @@ DECLARE_SET_ENTRY(NAT_ENTRY,nat_entry);
 
 // TODO must be revisited
 template <class T>
-static void init_switch(
+static std::shared_ptr<SwitchStateBase> init_switch(
         _In_ sai_object_id_t switch_id,
-        _In_ std::shared_ptr<SwitchState> warmBootState,
+        _In_ std::shared_ptr<WarmBootState> warmBootState,
         _In_ std::weak_ptr<saimeta::Meta> meta)
 {
     SWSS_LOG_ENTER();
@@ -596,18 +483,22 @@ static void init_switch(
         SWSS_LOG_THROW("init switch with NULL switch id is not allowed");
     }
 
+    // TODO remove switch state map
+
     if (warmBootState != nullptr)
     {
-        g_switch_state_map[switch_id] = warmBootState;
+        g_switch_state_map[switch_id] = std::make_shared<T>(switch_id, warmBootState);
 
         // TODO cast right switch or different data pass
         auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
+
+        ss->setMeta(meta);
 
         ss->warm_boot_initialize_objects();
 
         SWSS_LOG_NOTICE("initialized switch %s in WARM boot mode", sai_serialize_object_id(switch_id).c_str());
 
-        return;
+        return ss;
     }
 
     if (g_switch_state_map.find(switch_id) != g_switch_state_map.end())
@@ -629,6 +520,8 @@ static void init_switch(
     }
 
     SWSS_LOG_NOTICE("initialized switch %s", sai_serialize_object_id(switch_id).c_str());
+
+    return ss;
 }
 
 sai_status_t VirtualSwitchSaiInterface::create(
@@ -644,23 +537,36 @@ sai_status_t VirtualSwitchSaiInterface::create(
         sai_object_id_t switch_id;
         sai_deserialize_object_id(serializedObjectId, switch_id);
 
-        std::shared_ptr<SwitchStateBase> warmBootState = nullptr;
+        std::shared_ptr<WarmBootState> warmBootState = nullptr;
 
         if (g_vs_boot_type == SAI_VS_BOOT_TYPE_WARM)
         {
-            warmBootState = vs_read_switch_database_for_warm_restart(switch_id);
+            if (!validate_switch_warm_boot_atributes(attr_count, attr_list))
+            {
+                SWSS_LOG_ERROR("invalid attribute passed during warm boot");
 
-            vs_validate_switch_warm_boot_atributes(attr_count, attr_list);
+                return SAI_STATUS_FAILURE;
+            }
+
+            warmBootState = extractWarmBootState(switch_id);
+
+            if (warmBootState == nullptr)
+            {
+                SWSS_LOG_WARN("warm boot was requested on switch %s, but warm boot state is NULL, will perform COLD boot",
+                        sai_serialize_object_id(switch_id).c_str());
+            }
         }
+
+        std::shared_ptr<SwitchStateBase> ss;
 
         switch (g_vs_switch_type)
         {
             case SAI_VS_SWITCH_TYPE_BCM56850:
-                init_switch<SwitchBCM56850>(switch_id, warmBootState, m_meta);
+                ss = init_switch<SwitchBCM56850>(switch_id, warmBootState, m_meta);
                 break;
 
             case SAI_VS_SWITCH_TYPE_MLNX2700:
-                init_switch<SwitchMLNX2700>(switch_id, warmBootState, m_meta);
+                ss = init_switch<SwitchMLNX2700>(switch_id, warmBootState, m_meta);
                 break;
 
             default:
@@ -670,13 +576,13 @@ sai_status_t VirtualSwitchSaiInterface::create(
 
         if (warmBootState != nullptr)
         {
-            vs_update_real_object_ids(warmBootState);
+            vs_update_real_object_ids(ss);
 
             vs_update_local_metadata(switch_id);
 
             if (g_vs_hostif_use_tap_device)
             {
-                warmBootState->vs_recreate_hostif_tap_interfaces();
+                ss->vs_recreate_hostif_tap_interfaces();
             }
         }
     }
@@ -1406,3 +1312,138 @@ bool VirtualSwitchSaiInterface::writeWarmBootFile(
     return false;
 }
 
+bool VirtualSwitchSaiInterface::readWarmBootFile(
+        _In_ const char* warmBootFile)
+{
+    SWSS_LOG_ENTER();
+
+    if (warmBootFile == NULL)
+    {
+        SWSS_LOG_ERROR("warm boot read file is NULL");
+
+        return false;
+    }
+
+    std::ifstream ifs;
+
+    ifs.open(warmBootFile);
+
+    if (!ifs.is_open())
+    {
+        SWSS_LOG_ERROR("failed to open: %s, switching to cold boot", warmBootFile);
+
+        g_vs_boot_type = SAI_VS_BOOT_TYPE_COLD;
+
+        return false;
+    }
+
+    std::string line;
+
+    while (std::getline(ifs, line))
+    {
+        // line format: OBJECT_TYPE OBJECT_ID ATTR_ID ATTR_VALUE
+        std::istringstream iss(line);
+
+        std::string strObjectType;
+        std::string strObjectId;
+        std::string strAttrId;
+        std::string strAttrValue;
+
+        iss >> strObjectType >> strObjectId;
+
+        if (strObjectType == SAI_VS_FDB_INFO)
+        {
+            /*
+             * If we read line from fdb info set and use tap device is enabled
+             * just parse line and repopulate fdb info set.
+             */
+
+            if (g_vs_hostif_use_tap_device)
+            {
+                FdbInfo fi = FdbInfo::deserialize(strObjectId);
+
+                auto switchId = RealObjectIdManager::switchIdQuery(fi.m_portId);
+
+                if (switchId == SAI_NULL_OBJECT_ID)
+                {
+                    SWSS_LOG_ERROR("switchIdQuery returned NULL on fi.m_port = %s",
+                            sai_serialize_object_id(fi.m_portId).c_str());
+
+                    m_warmBootState.clear();
+                    return false;
+                }
+
+                m_warmBootState[switchId].m_switchId = switchId;
+
+                m_warmBootState[switchId].m_fdbInfoSet.insert(fi);
+            }
+
+            continue;
+        }
+
+        iss >> strAttrId >> strAttrValue;
+
+        sai_object_meta_key_t metaKey;
+        sai_deserialize_object_meta_key(strObjectType + ":" + strObjectId, metaKey);
+
+        // query each object for switch id
+
+        auto switchId = RealObjectIdManager::switchIdQuery(metaKey.objectkey.key.object_id);
+
+        if (switchId == SAI_NULL_OBJECT_ID)
+        {
+            SWSS_LOG_ERROR("switchIdQuery returned NULL on oid = %s",
+                    sai_serialize_object_id(metaKey.objectkey.key.object_id).c_str());
+
+            m_warmBootState.clear();
+            return false;
+        }
+
+        m_warmBootState[switchId].m_switchId = switchId;
+
+        auto &objectHash = m_warmBootState[switchId].m_objectHash[metaKey.objecttype]; // will create if not exist
+
+        if (objectHash.find(strObjectId) == objectHash.end())
+        {
+            objectHash[strObjectId] = {};
+        }
+
+        if (strAttrId == "NULL")
+        {
+            // skip empty attributes
+            continue;
+        }
+
+        objectHash[strObjectId][strAttrId] =
+            std::make_shared<SaiAttrWrap>(strAttrId, strAttrValue);
+    }
+
+    // NOTE notification pointers should be restored by attr_list when creating switch
+
+    ifs.close();
+
+    SWSS_LOG_NOTICE("warm boot file %s stats:", warmBootFile);
+
+    for (auto& kvp: m_warmBootState)
+    {
+        size_t count = 0;
+
+        for (auto& o: kvp.second.m_objectHash)
+        {
+            count += o.second.size();
+        }
+
+        SWSS_LOG_NOTICE("switch %s loaded %zu objects",
+                sai_serialize_object_id(kvp.first).c_str(),
+                count);
+
+        if (g_vs_hostif_use_tap_device)
+        {
+            SWSS_LOG_NOTICE("switch %s loaded %zu fdb infos",
+                    sai_serialize_object_id(kvp.first).c_str(),
+                    kvp.second.m_fdbInfoSet.size());
+        }
+    }
+
+    return true;
+}

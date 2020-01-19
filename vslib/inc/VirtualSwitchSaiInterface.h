@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SwitchStateBase.h"
+#include "WarmBootState.h"
 
 #include "lib/inc/SaiInterface.h"
 
@@ -303,6 +304,13 @@ namespace saivs
             std::shared_ptr<SwitchStateBase> vs_read_switch_database_for_warm_restart(
                     _In_ sai_object_id_t switch_id);
 
+            std::shared_ptr<WarmBootState> extractWarmBootState(
+                    _In_ sai_object_id_t switch_id);
+
+            bool validate_switch_warm_boot_atributes(
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list) const;
+
         public:
 
             void setMeta(
@@ -311,11 +319,15 @@ namespace saivs
             bool writeWarmBootFile(
                     _In_ const char* warmBootFile) const;
 
+            bool readWarmBootFile(
+                    _In_ const char* warmBootFile);
+
         private:
 
             std::weak_ptr<saimeta::Meta> m_meta;
 
             std::map<sai_object_id_t, std::string> m_warmBootData;
 
+            std::map<sai_object_id_t, WarmBootState> m_warmBootState;
     };
 }
