@@ -22,6 +22,10 @@ namespace saivs
                         _In_ sai_object_type_t object_type,
                         _In_ const sai_attribute_t *attr);
 
+                SaiAttrWrap(
+                        _In_ const std::string& attrId,
+                        _In_ const std::string& attrValue);
+
                 virtual ~SaiAttrWrap();
 
         public:

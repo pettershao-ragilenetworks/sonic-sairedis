@@ -29,6 +29,22 @@ SaiAttrWrap::SaiAttrWrap(
     sai_deserialize_attr_value(m_value, *m_meta, m_attr, false);
 }
 
+SaiAttrWrap::SaiAttrWrap(
+        _In_ const std::string& attrId,
+        _In_ const std::string& attrValue)
+{
+    SWSS_LOG_ENTER();
+
+    m_meta = sai_metadata_get_attr_metadata_by_attr_id_name(attrId.c_str());
+
+    if (m_meta == NULL)
+    {
+        SWSS_LOG_THROW("failed to find metadata for %s", attrId.c_str());
+    }
+
+    sai_deserialize_attr_value(attrValue.c_str(), *m_meta, m_attr, false);
+}
+
 SaiAttrWrap::~SaiAttrWrap()
 {
     SWSS_LOG_ENTER();
