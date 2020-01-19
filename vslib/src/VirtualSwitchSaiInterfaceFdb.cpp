@@ -7,7 +7,7 @@
 
 using namespace saivs;
 
-static bool doesFdbEntryNotMatchFlushAttr(
+bool VirtualSwitchSaiInterface::doesFdbEntryNotMatchFlushAttr(
         _In_ const std::string &str_fdb_entry,
         _In_ SwitchState::AttrHash &fdb_attrs,
         _In_ uint32_t attr_count,
@@ -108,7 +108,7 @@ sai_status_t VirtualSwitchSaiInterface::flushFdbEntries(
 
     for (auto it = fdbs.begin(); it != fdbs.end();)
     {
-        if (doesFdbEntryNotMatchFlushAttr(it->first, it->second, attr_count, attr_list))
+        if (VirtualSwitchSaiInterface::doesFdbEntryNotMatchFlushAttr(it->first, it->second, attr_count, attr_list))
         {
             /*
              * If fdb entry does not match flush attributes, we will skip this entry.

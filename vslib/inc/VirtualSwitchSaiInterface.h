@@ -315,6 +315,12 @@ namespace saivs
 
         private:
 
+            static bool doesFdbEntryNotMatchFlushAttr(
+                    _In_ const std::string &str_fdb_entry,
+                    _In_ SwitchState::AttrHash &fdb_attrs,
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
+
             void removeSwitch(
                     _In_ sai_object_id_t switchId);
 
