@@ -14,29 +14,25 @@
 #include "SwitchStateBase.h"
 #include "LaneMapFileParser.h"
 #include "HostInterfaceInfo.h"
+#include "SwitchConfigContainer.h"
 
-#include <string.h>
 #include <unistd.h>
 #include <inttypes.h>
 
 #include <algorithm>
+#include <cstring>
 
 using namespace saivs;
 
 bool                    g_vs_hostif_use_tap_device = false;
-sai_vs_switch_type_t    g_vs_switch_type = SAI_VS_SWITCH_TYPE_NONE;
 
 std::shared_ptr<swss::SelectableEvent>      g_fdbAgingThreadEvent;
 volatile bool                               g_fdbAgingThreadRun;
 std::shared_ptr<std::thread>                g_fdbAgingThread;
 
-sai_vs_boot_type_t g_vs_boot_type = SAI_VS_BOOT_TYPE_COLD;
-
 std::shared_ptr<LaneMapContainer> g_laneMapContainer;
 
 std::shared_ptr<RealObjectIdManager>            g_realObjectIdManager;
-
-const char *g_boot_type             = NULL;
 
 void processFdbEntriesForAging()
 {
@@ -133,6 +129,13 @@ sai_status_t Sai::initialize(
         return SAI_STATUS_FAILURE;
     }
 
+    if (flags != 0)
+    {
+        SWSS_LOG_ERROR("invalid flags passed to SAI API initialize");
+
+        return SAI_STATUS_INVALID_PARAMETER;
+    }
+
     if ((service_method_table == NULL) ||
             (service_method_table->profile_get_next_value == NULL) ||
             (service_method_table->profile_get_value == NULL))
@@ -144,10 +147,9 @@ sai_status_t Sai::initialize(
 
     memcpy(&m_service_method_table, service_method_table, sizeof(m_service_method_table));
 
-    // TODO maybe this query should be done right before switch create
-    const char *type = service_method_table->profile_get_value(0, SAI_KEY_VS_SWITCH_TYPE);
+    auto switch_type = service_method_table->profile_get_value(0, SAI_KEY_VS_SWITCH_TYPE);
 
-    if (type == NULL)
+    if (switch_type == NULL)
     {
         SWSS_LOG_ERROR("failed to obtain service method table value: %s", SAI_KEY_VS_SWITCH_TYPE);
 
@@ -158,70 +160,41 @@ sai_status_t Sai::initialize(
 
     g_laneMapContainer = LaneMapFileParser::parseLaneMapFile(laneMapFile);
 
-    g_boot_type             = service_method_table->profile_get_value(0, SAI_KEY_BOOT_TYPE);
+    auto boot_type          = service_method_table->profile_get_value(0, SAI_KEY_BOOT_TYPE);
     m_warm_boot_read_file   = service_method_table->profile_get_value(0, SAI_KEY_WARM_BOOT_READ_FILE);
     m_warm_boot_write_file  = service_method_table->profile_get_value(0, SAI_KEY_WARM_BOOT_WRITE_FILE);
 
-    std::string bt = (g_boot_type == NULL) ? "cold" : g_boot_type;
+    sai_vs_boot_type_t bootType;
 
-    if (bt == "cold" || bt == SAI_VALUE_VS_BOOT_TYPE_COLD)
+    if (!SwitchConfig::parseBootType(boot_type, bootType))
     {
-        g_vs_boot_type = SAI_VS_BOOT_TYPE_COLD;
-    }
-    else if (bt == "warm" || bt == SAI_VALUE_VS_BOOT_TYPE_WARM)
-    {
-        g_vs_boot_type = SAI_VS_BOOT_TYPE_WARM;
-    }
-    else if (bt == "fast" || bt == SAI_VALUE_VS_BOOT_TYPE_COLD)
-    {
-        g_vs_boot_type = SAI_VS_BOOT_TYPE_FAST;
-    }
-    else
-    {
-        SWSS_LOG_ERROR("unsupported boot type: %s", g_boot_type);
-
         return SAI_STATUS_FAILURE;
     }
 
-    std::string strType = type;
+    sai_vs_switch_type_t switchType;
 
-    if (strType == SAI_VALUE_VS_SWITCH_TYPE_BCM56850)
+    if (!SwitchConfig::parseSwitchType(switch_type, switchType))
     {
-        g_vs_switch_type = SAI_VS_SWITCH_TYPE_BCM56850;
-    }
-    else if (strType == SAI_VALUE_VS_SWITCH_TYPE_MLNX2700)
-    {
-        g_vs_switch_type = SAI_VS_SWITCH_TYPE_MLNX2700;
-    }
-    else
-    {
-        SWSS_LOG_ERROR("unknown switch type: '%s'", type);
-
         return SAI_STATUS_FAILURE;
     }
 
     const char *use_tap_dev = service_method_table->profile_get_value(0, SAI_KEY_VS_HOSTIF_USE_TAP_DEVICE);
 
-    g_vs_hostif_use_tap_device = use_tap_dev != NULL && strcmp(use_tap_dev, "true") == 0;
+    g_vs_hostif_use_tap_device = SwitchConfig::parseUseTapDevice(use_tap_dev);
 
     SWSS_LOG_NOTICE("hostif use TAP device: %s",
             g_vs_hostif_use_tap_device ? "true" : "false");
 
-    if (flags != 0)
-    {
-        SWSS_LOG_ERROR("invalid flags passed to SAI API initialize");
+    auto sc = std::make_shared<SwitchConfig>();
 
-        return SAI_STATUS_INVALID_PARAMETER;
-    }
+    sc->m_switchType = switchType;
+    sc->m_bootType = bootType;
+    sc->m_switchIndex = 0;
+    sc->m_useTapDevice = g_vs_hostif_use_tap_device;
 
-    startUnittestThread();
+    auto scc = std::make_shared<SwitchConfigContainer>();
 
-    g_fdbAgingThreadEvent = std::make_shared<swss::SelectableEvent>();
-
-    g_fdbAgingThreadRun = true;
-
-    // TODO should this be moved to create switch and SwitchState?
-    g_fdbAgingThread = std::make_shared<std::thread>(std::thread(fdbAgingThreadProc));
+    scc->insert(sc);
 
     // most important
 
@@ -229,21 +202,34 @@ sai_status_t Sai::initialize(
 
     g_switch_state_map.clear();
 
-    m_vsSai = std::make_shared<VirtualSwitchSaiInterface>();
+    m_vsSai = std::make_shared<VirtualSwitchSaiInterface>(scc);
 
     m_meta = std::make_shared<saimeta::Meta>(m_vsSai);
 
     m_vsSai->setMeta(m_meta);
 
-    if (g_vs_boot_type == SAI_VS_BOOT_TYPE_WARM)
+    if (bootType == SAI_VS_BOOT_TYPE_WARM)
     {
         if (!m_vsSai->readWarmBootFile(m_warm_boot_read_file))
         {
             SWSS_LOG_WARN("failed to read warm boot read file, switching to COLD BOOT");
 
-            g_vs_boot_type = SAI_VS_BOOT_TYPE_COLD;
+            sc->m_bootType = SAI_VS_BOOT_TYPE_COLD;
         }
     }
+
+    // start unittest thread
+
+    startUnittestThread();
+
+    // start fdb aging thread
+
+    g_fdbAgingThreadEvent = std::make_shared<swss::SelectableEvent>();
+
+    g_fdbAgingThreadRun = true;
+
+    // TODO should this be moved to create switch and SwitchState?
+    g_fdbAgingThread = std::make_shared<std::thread>(std::thread(fdbAgingThreadProc));
 
     Globals::apiInitialized = true;
 

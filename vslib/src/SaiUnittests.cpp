@@ -95,7 +95,7 @@ void Sai::channelOpSetReadOnlyAttribute(
 
     sai_deserialize_object_id(str_object_id, object_id);
 
-    sai_object_type_t ot = g_realObjectIdManager->saiObjectTypeQuery(object_id);
+    sai_object_type_t ot = objectTypeQuery(object_id);
 
     if (ot != object_type)
     {
@@ -104,7 +104,7 @@ void Sai::channelOpSetReadOnlyAttribute(
         return;
     }
 
-    sai_object_id_t switch_id = g_realObjectIdManager->saiSwitchIdQuery(object_id);
+    sai_object_id_t switch_id = switchIdQuery(object_id);
 
     if (switch_id == SAI_NULL_OBJECT_ID)
     {
@@ -182,7 +182,7 @@ void Sai::channelOpSetStats(
 
     sai_deserialize_object_id(key, oid);
 
-    sai_object_type_t ot = g_realObjectIdManager->saiObjectTypeQuery(oid);
+    sai_object_type_t ot = objectTypeQuery(oid);
 
     if (ot == SAI_OBJECT_TYPE_NULL)
     {
@@ -190,7 +190,7 @@ void Sai::channelOpSetStats(
         return;
     }
 
-    sai_object_id_t switch_id = g_realObjectIdManager->saiSwitchIdQuery(oid);
+    sai_object_id_t switch_id = switchIdQuery(oid);
 
     if (switch_id == SAI_NULL_OBJECT_ID)
     {
@@ -279,6 +279,13 @@ void Sai::handleUnittestChannelOp(
     MUTEX();
 
     SWSS_LOG_ENTER();
+
+    if (!Globals::apiInitialized)
+    {
+        SWSS_LOG_ERROR("%s: SAI API not initialized", __PRETTY_FUNCTION__);
+
+        return;
+    }
 
     /*
      * Since we will access and modify DB we need to be under mutex.

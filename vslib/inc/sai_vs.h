@@ -8,6 +8,7 @@ extern "C" {
 #include "meta/sai_serialize.h"
 #include "meta/Meta.h"
 
+#include "SwitchConfig.h"
 #include "Globals.h"
 #include "RealObjectIdManager.h"
 #include "VirtualSwitchSaiInterface.h"
@@ -25,31 +26,7 @@ extern "C" {
 
 #define SAI_VS_VETH_PREFIX   "v"
 
-typedef enum _sai_vs_switch_type_t
-{
-    SAI_VS_SWITCH_TYPE_NONE,
-
-    SAI_VS_SWITCH_TYPE_BCM56850,
-
-    SAI_VS_SWITCH_TYPE_MLNX2700,
-
-} sai_vs_switch_type_t;
-
-typedef enum _sai_vs_boot_type_t
-{
-    SAI_VS_BOOT_TYPE_COLD,
-
-    SAI_VS_BOOT_TYPE_WARM,
-
-    SAI_VS_BOOT_TYPE_FAST,
-
-} sai_vs_boot_type_t;
-
-
 extern bool                             g_vs_hostif_use_tap_device;
-extern sai_vs_switch_type_t             g_vs_switch_type;
-
-extern sai_vs_boot_type_t g_vs_boot_type;
 
 extern std::shared_ptr<saivs::LaneMapContainer> g_laneMapContainer;
 

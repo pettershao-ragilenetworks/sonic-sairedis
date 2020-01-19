@@ -154,7 +154,7 @@ sai_status_t SwitchStateBase::create_internal(
 {
     SWSS_LOG_ENTER();
 
-    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(object_type);
+    auto &objectHash = m_objectHash.at(object_type);
 
     auto it = objectHash.find(serializedObjectId);
 

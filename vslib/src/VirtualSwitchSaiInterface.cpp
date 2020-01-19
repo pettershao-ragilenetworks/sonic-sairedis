@@ -21,11 +21,12 @@
 
 using namespace saivs;
 
-VirtualSwitchSaiInterface::VirtualSwitchSaiInterface()
+VirtualSwitchSaiInterface::VirtualSwitchSaiInterface(
+        _In_ const std::shared_ptr<SwitchConfigContainer> scc)
 {
     SWSS_LOG_ENTER();
 
-    // empty
+    m_switchConfigContainer = scc;
 }
 
 VirtualSwitchSaiInterface::~VirtualSwitchSaiInterface()
@@ -537,9 +538,22 @@ sai_status_t VirtualSwitchSaiInterface::create(
         sai_object_id_t switch_id;
         sai_deserialize_object_id(serializedObjectId, switch_id);
 
+        auto switchIndex = RealObjectIdManager::getSwitchIndex(switch_id);
+
+        auto config = m_switchConfigContainer->getConfig(switchIndex);
+
+        if (config == nullptr)
+        {
+            SWSS_LOG_ERROR("failed to get switch config for switch %s, and index %u",
+                    serializedObjectId.c_str(),
+                    switchIndex);
+
+            return SAI_STATUS_FAILURE;
+        }
+
         std::shared_ptr<WarmBootState> warmBootState = nullptr;
 
-        if (g_vs_boot_type == SAI_VS_BOOT_TYPE_WARM)
+        if (config->m_bootType == SAI_VS_BOOT_TYPE_WARM)
         {
             if (!validate_switch_warm_boot_atributes(attr_count, attr_list))
             {
@@ -559,18 +573,22 @@ sai_status_t VirtualSwitchSaiInterface::create(
 
         std::shared_ptr<SwitchStateBase> ss;
 
-        switch (g_vs_switch_type)
+        switch (config->m_switchType)
         {
             case SAI_VS_SWITCH_TYPE_BCM56850:
+
                 ss = init_switch<SwitchBCM56850>(switch_id, warmBootState, m_meta);
                 break;
 
             case SAI_VS_SWITCH_TYPE_MLNX2700:
+
                 ss = init_switch<SwitchMLNX2700>(switch_id, warmBootState, m_meta);
                 break;
 
             default:
-                SWSS_LOG_WARN("unknown switch type: %d", g_vs_switch_type);
+
+                SWSS_LOG_WARN("unknown switch type: %d", config->m_switchType);
+
                 return SAI_STATUS_FAILURE;
         }
 
