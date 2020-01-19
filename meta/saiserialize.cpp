@@ -425,7 +425,7 @@ sai_status_t transfer_attributes(
 
         if (src_attr.id != dst_attr.id)
         {
-            SWSS_LOG_THROW("src vs dst attr id don't match GET mismatch");
+            SWSS_LOG_THROW("src (%d) vs dst (%d) attr id don't match GET mismatch", src_attr.id, dst_attr.id);
         }
 
         if (meta == NULL)
