@@ -44,6 +44,8 @@ SaiAttrWrap::SaiAttrWrap(
 
     m_attr.id = m_meta->attrid;
 
+    m_value = attrValue;
+
     sai_deserialize_attr_value(attrValue.c_str(), *m_meta, m_attr, false);
 }
 
