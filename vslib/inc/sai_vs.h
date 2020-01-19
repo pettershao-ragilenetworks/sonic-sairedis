@@ -1,5 +1,4 @@
-#ifndef __SAI_VS__
-#define __SAI_VS__
+#pragma once
 
 extern "C" {
 #include "sai.h"
@@ -59,12 +58,9 @@ extern std::shared_ptr<saivs::LaneMapContainer> g_laneMapContainer;
 
 extern std::shared_ptr<saivs::RealObjectIdManager>       g_realObjectIdManager;
 
-#define CHECK_STATUS(status)            \
-    {                                   \
-        sai_status_t s = (status);      \
-        if (s != SAI_STATUS_SUCCESS)    \
-            { return s; }               \
-    }
+#define CHECK_STATUS(status) {                                  \
+    sai_status_t _status = (status);                            \
+    if (_status != SAI_STATUS_SUCCESS) { return _status; } }
 
 #define DEFAULT_VLAN_NUMBER 1
 
@@ -82,9 +78,6 @@ void processFdbInfo(
 void update_port_oper_status(
         _In_ sai_object_id_t port_id,
         _In_ sai_port_oper_status_t port_oper_status);
-
-std::shared_ptr<saivs::SwitchState> vs_get_switch_state(
-        _In_ sai_object_id_t switch_id);
 
 #define PRIVATE __attribute__((visibility("hidden")))
 
@@ -132,68 +125,4 @@ PRIVATE extern const sai_virtual_router_api_t   vs_virtual_router_api;
 PRIVATE extern const sai_vlan_api_t             vs_vlan_api;
 PRIVATE extern const sai_wred_api_t             vs_wred_api;
 
-PRIVATE extern std::shared_ptr<saivs::Sai> g_sai;
-
-// OID QUAD
-
-sai_status_t vs_generic_create(
-        _In_ sai_object_type_t object_type,
-        _Out_ sai_object_id_t *object_id,
-        _In_ sai_object_id_t switch_id,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list);
-
-sai_status_t vs_generic_remove(
-        _In_ sai_object_type_t object_type,
-        _In_ sai_object_id_t object_id);
-
-sai_status_t vs_generic_set(
-        _In_ sai_object_type_t object_type,
-        _In_ sai_object_id_t object_id,
-        _In_ const sai_attribute_t *attr);
-
-sai_status_t vs_generic_get(
-        _In_ sai_object_type_t object_type,
-        _In_ sai_object_id_t object_id,
-        _In_ uint32_t attr_count,
-        _Out_ sai_attribute_t *attr_list);
-
-// ENTRY QUAD
-
-#define VS_CREATE_ENTRY_DEF(ot)                     \
-    sai_status_t vs_generic_create_ ## ot(          \
-            _In_ const sai_ ## ot ## _t * ot,       \
-            _In_ uint32_t attr_count,               \
-            _In_ const sai_attribute_t *attr_list);
-
-#define VS_REMOVE_ENTRY_DEF(ot)                     \
-    sai_status_t vs_generic_remove_ ## ot(          \
-            _In_ const sai_ ## ot ## _t * ot);
-
-#define VS_SET_ENTRY_DEF(ot)                        \
-    sai_status_t vs_generic_set_ ## ot(             \
-            _In_ const sai_ ## ot ## _t * ot,       \
-            _In_ const sai_attribute_t *attr);
-
-#define VS_GET_ENTRY_DEF(ot)                        \
-    sai_status_t vs_generic_get_ ## ot(             \
-            _In_ const sai_ ## ot ## _t * ot,       \
-            _In_ uint32_t attr_count,               \
-            _Out_ sai_attribute_t *attr_list);
-
-#define VS_ENTRY_QUAD(ot)       \
-    VS_CREATE_ENTRY_DEF(ot)     \
-    VS_REMOVE_ENTRY_DEF(ot)     \
-    VS_SET_ENTRY_DEF(ot)        \
-    VS_GET_ENTRY_DEF(ot)
-
-VS_ENTRY_QUAD(fdb_entry);
-VS_ENTRY_QUAD(inseg_entry);
-VS_ENTRY_QUAD(ipmc_entry);
-VS_ENTRY_QUAD(l2mc_entry);
-VS_ENTRY_QUAD(mcast_fdb_entry);
-VS_ENTRY_QUAD(neighbor_entry);
-VS_ENTRY_QUAD(route_entry);
-VS_ENTRY_QUAD(nat_entry);
-
-#endif // __SAI_VS__
+PRIVATE extern std::shared_ptr<saivs::Sai>      g_sai;

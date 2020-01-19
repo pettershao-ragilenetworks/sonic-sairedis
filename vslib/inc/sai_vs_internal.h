@@ -6,7 +6,7 @@
         SWSS_LOG_ERROR("%s: api not initialized", __PRETTY_FUNCTION__);     \
         return SAI_STATUS_FAILURE; }
 
-// object id
+// QUAD OID
 
 #define VS_CREATE(OT,ot)                                \
     static sai_status_t vs_create_ ## ot(               \
@@ -60,13 +60,15 @@
             attr_list);                                 \
 }
 
+// QUAD DECLARE
+
 #define VS_GENERIC_QUAD(OT,ot)  \
     VS_CREATE(OT,ot);           \
     VS_REMOVE(OT,ot);           \
     VS_SET(OT,ot);              \
     VS_GET(OT,ot);
 
-// struct object id
+// QUAD ENTRY
 
 #define VS_CREATE_ENTRY(OT,ot)                          \
     static sai_status_t vs_create_ ## ot(               \
@@ -82,7 +84,7 @@
 }
 
 #define VS_REMOVE_ENTRY(OT,ot)                          \
-    sai_status_t vs_remove_ ## ot(                      \
+    static sai_status_t vs_remove_ ## ot(               \
             _In_ const sai_ ## ot ## _t *entry)         \
 {                                                       \
     SWSS_LOG_ENTER();                                   \
@@ -91,7 +93,7 @@
 }
 
 #define VS_SET_ENTRY(OT,ot)                             \
-    sai_status_t vs_set_ ## ot ## _attribute(           \
+    static sai_status_t vs_set_ ## ot ## _attribute(    \
             _In_ const sai_ ## ot ## _t *entry,         \
             _In_ const sai_attribute_t *attr)           \
 {                                                       \
@@ -102,7 +104,7 @@
 }
 
 #define VS_GET_ENTRY(OT,ot)                             \
-    sai_status_t vs_get_ ## ot ## _attribute(           \
+    static sai_status_t vs_get_ ## ot ## _attribute(    \
             _In_ const sai_ ## ot ## _t *entry,         \
             _In_ uint32_t attr_count,                   \
             _Inout_ sai_attribute_t *attr_list)         \
@@ -114,13 +116,15 @@
             attr_list);                                 \
 }
 
-#define VS_GENERIC_QUAD_ENTRY(OT,ot)  \
-    VS_CREATE_ENTRY(OT,ot);           \
-    VS_REMOVE_ENTRY(OT,ot);           \
-    VS_SET_ENTRY(OT,ot);              \
+// QUAD ENTRY DECLARE
+
+#define VS_GENERIC_QUAD_ENTRY(OT,ot)    \
+    VS_CREATE_ENTRY(OT,ot);             \
+    VS_REMOVE_ENTRY(OT,ot);             \
+    VS_SET_ENTRY(OT,ot);                \
     VS_GET_ENTRY(OT,ot);
 
-// common api
+// QUAD API
 
 #define VS_GENERIC_QUAD_API(ot)     \
     vs_create_ ## ot,               \
@@ -128,10 +132,10 @@
     vs_set_ ## ot ##_attribute,     \
     vs_get_ ## ot ##_attribute,
 
-// stats
+// STATS
 
 #define VS_GET_STATS(OT,ot)                             \
-    sai_status_t vs_get_ ## ot ## _stats(               \
+    static sai_status_t vs_get_ ## ot ## _stats(        \
             _In_ sai_object_id_t object_id,             \
             _In_ uint32_t number_of_counters,           \
             _In_ const sai_stat_id_t *counter_ids,      \
@@ -147,7 +151,7 @@
 }
 
 #define VS_GET_STATS_EXT(OT,ot)                         \
-    sai_status_t vs_get_ ## ot ## _stats_ext(           \
+    static sai_status_t vs_get_ ## ot ## _stats_ext(    \
             _In_ sai_object_id_t object_id,             \
             _In_ uint32_t number_of_counters,           \
             _In_ const sai_stat_id_t *counter_ids,      \
@@ -165,7 +169,7 @@
 }
 
 #define VS_CLEAR_STATS(OT,ot)                           \
-    sai_status_t vs_clear_ ## ot ## _stats(             \
+    static sai_status_t vs_clear_ ## ot ## _stats(      \
             _In_ sai_object_id_t object_id,             \
             _In_ uint32_t number_of_counters,           \
             _In_ const sai_stat_id_t *counter_ids)      \
@@ -178,19 +182,21 @@
             counter_ids);                               \
 }
 
+// STATS DECLARE
+
 #define VS_GENERIC_STATS(OT, ot)    \
     VS_GET_STATS(OT,ot);            \
     VS_GET_STATS_EXT(OT,ot);        \
     VS_CLEAR_STATS(OT,ot);
 
-// common stats api
+// STATS API
 
 #define VS_GENERIC_STATS_API(ot)    \
     vs_get_ ## ot ## _stats,        \
     vs_get_ ## ot ## _stats_ext,    \
     vs_clear_ ## ot ## _stats,
 
-// BULK OID
+// BULK QUAD
 
 #define VS_BULK_CREATE(OT,fname)                    \
     static sai_status_t vs_bulk_create_ ## fname(   \
@@ -262,6 +268,16 @@
     return SAI_STATUS_NOT_IMPLEMENTED;              \
 }
 
+// BULK QUAD DECLARE
+
+#define VS_BULK_QUAD(OT,ot)     \
+    VS_BULK_CREATE(OT,ot);      \
+    VS_BULK_REMOVE(OT,ot);      \
+    VS_BULK_SET(OT,ot);         \
+    VS_BULK_GET(OT,ot);
+
+// BULK QUAD ENTRY
+
 #define VS_BULK_CREATE_ENTRY(OT,ot)                 \
     static sai_status_t vs_bulk_create_ ## ot(      \
             _In_ uint32_t object_count,             \
@@ -327,15 +343,19 @@
     return SAI_STATUS_NOT_IMPLEMENTED;              \
 }
 
-#define VS_BULK_QUAD_ENTRY(OT,ot)    \
-    VS_BULK_CREATE_ENTRY(OT,ot);     \
-    VS_BULK_REMOVE_ENTRY(OT,ot);     \
-    VS_BULK_SET_ENTRY(OT,ot);        \
+// BULK QUAD ENTRY DECLARE
+
+#define VS_BULK_QUAD_ENTRY(OT,ot)   \
+    VS_BULK_CREATE_ENTRY(OT,ot);    \
+    VS_BULK_REMOVE_ENTRY(OT,ot);    \
+    VS_BULK_SET_ENTRY(OT,ot);       \
     VS_BULK_GET_ENTRY(OT,ot);
 
-#define VS_BULK_QUAD_API(ot)         \
-    vs_bulk_create_ ## ot,           \
-    vs_bulk_remove_ ## ot,           \
-    vs_bulk_set_ ## ot,              \
+// BULK QUAD API
+
+#define VS_BULK_QUAD_API(ot)        \
+    vs_bulk_create_ ## ot,          \
+    vs_bulk_remove_ ## ot,          \
+    vs_bulk_set_ ## ot,             \
     vs_bulk_get_ ## ot,
 
