@@ -331,6 +331,8 @@ namespace saivs
                     _In_ sai_object_id_t port_id,
                     _In_ sai_port_oper_status_t port_oper_status);
 
+            std::string dump_switch_database_for_warm_restart() const;
+
         protected:
 
             constexpr static const int maxDebugCounters = 32;

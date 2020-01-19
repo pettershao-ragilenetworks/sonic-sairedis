@@ -704,94 +704,6 @@ sai_status_t VirtualSwitchSaiInterface::create(
     return ss->create(object_type, serializedObjectId, switch_id, attr_count, attr_list);
 }
 
-static void vs_dump_switch_database_for_warm_restart(
-        _In_ sai_object_id_t switch_id)
-{
-    SWSS_LOG_ENTER();
-
-    auto it = g_switch_state_map.find(switch_id);
-
-    if (it == g_switch_state_map.end())
-    {
-        SWSS_LOG_THROW("switch don't exists 0x%" PRIx64, switch_id);
-    }
-
-    if (g_warm_boot_write_file == NULL)
-    {
-        SWSS_LOG_ERROR("warm boot write file is NULL");
-        return;
-    }
-
-    std::ofstream dumpFile;
-
-    dumpFile.open(g_warm_boot_write_file);
-
-    if (!dumpFile.is_open())
-    {
-        SWSS_LOG_ERROR("failed to open: %s", g_warm_boot_write_file);
-        return;
-    }
-
-    auto switchState = it->second;
-
-    const auto& objectHash = switchState->m_objectHash;
-
-    // dump all objects and attributes to file
-
-    size_t count = 0;
-
-    for (auto kvp: objectHash)
-    {
-        auto singleTypeObjectMap = kvp.second;
-
-        count += singleTypeObjectMap.size();
-
-        for (auto o: singleTypeObjectMap)
-        {
-            // if object don't have attributes, size can be zero
-            if (o.second.size() == 0)
-            {
-                dumpFile << sai_serialize_object_type(kvp.first) << " " << o.first << " NULL NULL" << std::endl;
-            }
-            else
-            {
-                for (auto a: o.second)
-                {
-                    dumpFile << sai_serialize_object_type(kvp.first) << " ";
-                    dumpFile << o.first.c_str();
-                    dumpFile << " ";
-                    dumpFile << a.first.c_str();
-                    dumpFile << " ";
-                    dumpFile << a.second->getAttrStrValue();
-                    dumpFile << std::endl;
-                }
-            }
-        }
-    }
-
-    // TODO remove cast
-    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map.at(switch_id));
-
-    if (g_vs_hostif_use_tap_device)
-    {
-        /*
-         * If user is using tap devices we also need to dump local fdb info
-         * data and restore it on warm start.
-         */
-
-        for (auto fi: ss->m_fdb_info_set)
-        {
-            dumpFile << SAI_VS_FDB_INFO << " " << fi.serialize() << std::endl;
-        }
-
-        SWSS_LOG_NOTICE("dumped %zu fdb infos", ss->m_fdb_info_set.size());
-    }
-
-    dumpFile.close();
-
-    SWSS_LOG_NOTICE("dumped %zu objects to %s", count, g_warm_boot_write_file);
-}
-
 static void uninit_switch(
         _In_ sai_object_id_t switch_id)
 {
@@ -833,9 +745,10 @@ sai_status_t VirtualSwitchSaiInterface::remove(
         SWSS_LOG_THROW("multiple switches not supported, FIXME");
     }
 
-    /*
-     * Perform db dump if warm restart was requested.
-     */
+    // TODO remove cast
+    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
+
+    // Perform db dump if warm restart was requested.
 
     if (objectType == SAI_OBJECT_TYPE_SWITCH)
     {
@@ -848,13 +761,13 @@ sai_status_t VirtualSwitchSaiInterface::remove(
 
         if (get(objectType, object_id, 1, &attr) == SAI_STATUS_SUCCESS)
         {
-            SWSS_LOG_NOTICE("SAI_SWITCH_ATTR_RESTART_WARM = %s", attr.value.booldata ? "true" : "false");
+            SWSS_LOG_NOTICE("switch %s SAI_SWITCH_ATTR_RESTART_WARM = %s",
+                    sai_serialize_object_id(switch_id).c_str(),
+                    attr.value.booldata ? "true" : "false");
 
             if (attr.value.booldata)
             {
-                // TODO should be done on uninitialize and contain all switches
-                // that has this flag true on multiple switches scenario
-                vs_dump_switch_database_for_warm_restart(object_id);
+                m_warmBootData[switch_id] = ss->dump_switch_database_for_warm_restart();
             }
         }
         else
@@ -862,9 +775,6 @@ sai_status_t VirtualSwitchSaiInterface::remove(
             SWSS_LOG_ERROR("failed to get SAI_SWITCH_ATTR_RESTART_WARM, no DB dump will be performed");
         }
     }
-
-    // TODO remove cast
-    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
 
     auto status = ss->remove(objectType, serializedObjectId);
 
@@ -1459,5 +1369,40 @@ sai_object_id_t VirtualSwitchSaiInterface::switchIdQuery(
     SWSS_LOG_ENTER();
 
     return g_realObjectIdManager->saiSwitchIdQuery(objectId);
+}
+
+bool VirtualSwitchSaiInterface::writeWarmBootFile(
+        _In_ const char* warmBootFile) const
+{
+    SWSS_LOG_ENTER();
+
+    if (warmBootFile)
+    {
+        std::ofstream ofs;
+
+        ofs.open(warmBootFile);
+
+        if (!ofs.is_open())
+        {
+            SWSS_LOG_ERROR("failed to open: %s", warmBootFile);
+            return false;
+        }
+
+        for (auto& kvp: m_warmBootData)
+        {
+            ofs << kvp.second;
+        }
+
+        ofs.close();
+
+        return true;
+    }
+
+    if (m_warmBootData.size())
+    {
+        SWSS_LOG_WARN("warm boot write file is not specified, but SAI_SWITCH_ATTR_RESTART_WARM was set to true!");
+    }
+
+    return false;
 }
 

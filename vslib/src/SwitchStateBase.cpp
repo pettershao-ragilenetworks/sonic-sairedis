@@ -1966,3 +1966,67 @@ bool SwitchStateBase::check_object_list_default_state(
             [&](sai_object_id_t oid) { return check_object_default_state(oid); });
 }
 
+std::string SwitchStateBase::dump_switch_database_for_warm_restart() const
+{
+    SWSS_LOG_ENTER();
+
+    std::stringstream ss;
+
+    const auto& objectHash = m_objectHash;
+
+    // dump all objects and attributes to file
+
+    size_t count = 0;
+
+    for (auto kvp: objectHash)
+    {
+        auto singleTypeObjectMap = kvp.second;
+
+        count += singleTypeObjectMap.size();
+
+        for (auto o: singleTypeObjectMap)
+        {
+            // if object don't have attributes, size can be zero
+            if (o.second.size() == 0)
+            {
+                ss << sai_serialize_object_type(kvp.first) << " " << o.first << " NULL NULL" << std::endl;
+                continue;
+            }
+
+            for (auto a: o.second)
+            {
+                ss << sai_serialize_object_type(kvp.first) << " ";
+                ss << o.first.c_str();
+                ss << " ";
+                ss << a.first.c_str();
+                ss << " ";
+                ss << a.second->getAttrStrValue();
+                ss << std::endl;
+            }
+        }
+    }
+
+    if (g_vs_hostif_use_tap_device)
+    {
+        /*
+         * If user is using tap devices we also need to dump local fdb info
+         * data and restore it on warm start.
+         */
+
+        for (auto fi: m_fdb_info_set)
+        {
+            ss << SAI_VS_FDB_INFO << " " << fi.serialize() << std::endl;
+        }
+
+        SWSS_LOG_NOTICE("dumped %zu fdb infos for switch %s",
+                m_fdb_info_set.size(),
+                sai_serialize_object_id(m_switch_id).c_str());
+    }
+
+    SWSS_LOG_NOTICE("dumped %zu objects from switch %s",
+            count,
+            sai_serialize_object_id(m_switch_id).c_str());
+
+    return ss.str();
+}
+

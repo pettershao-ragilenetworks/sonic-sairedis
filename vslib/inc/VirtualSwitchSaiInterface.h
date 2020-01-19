@@ -8,6 +8,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 #define SAIVS_VIRTUALSWITCHSAIINTERFACE_DECLARE_REMOVE_ENTRY(ot)    \
     virtual sai_status_t remove(                                    \
@@ -307,9 +308,14 @@ namespace saivs
             void setMeta(
                     _In_ std::weak_ptr<saimeta::Meta> meta);
 
+            bool writeWarmBootFile(
+                    _In_ const char* warmBootFile) const;
+
         private:
 
             std::weak_ptr<saimeta::Meta> m_meta;
+
+            std::map<sai_object_id_t, std::string> m_warmBootData;
 
     };
 }

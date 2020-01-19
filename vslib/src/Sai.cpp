@@ -35,7 +35,6 @@ sai_vs_boot_type_t g_vs_boot_type = SAI_VS_BOOT_TYPE_COLD;
 std::shared_ptr<LaneMapContainer> g_laneMapContainer;
 
 std::shared_ptr<RealObjectIdManager>            g_realObjectIdManager;
-std::shared_ptr<VirtualSwitchSaiInterface>      g_vs;
 
 const char *g_boot_type             = NULL;
 const char *g_warm_boot_read_file   = NULL;
@@ -263,7 +262,9 @@ sai_status_t Sai::uninitialize(void)
 
     // clear state after ending all threads
 
-    g_vs = nullptr;
+    m_vsSai->writeWarmBootFile(g_warm_boot_write_file);
+
+    m_vsSai = nullptr;
     m_meta = nullptr;
 
     g_switch_state_map.clear();
