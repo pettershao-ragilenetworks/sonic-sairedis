@@ -21,9 +21,6 @@
 
 using namespace saivs;
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmissing-noreturn"
-
 VirtualSwitchSaiInterface::VirtualSwitchSaiInterface()
 {
     SWSS_LOG_ENTER();
@@ -520,7 +517,6 @@ sai_status_t VirtualSwitchSaiInterface::get(
             attr_list);
 }
 
-
 #define DECLARE_REMOVE_ENTRY(OT,ot)                             \
 sai_status_t VirtualSwitchSaiInterface::remove(                 \
         _In_ const sai_ ## ot ## _t* ot)                        \
@@ -634,7 +630,6 @@ static void init_switch(
 
     SWSS_LOG_NOTICE("initialized switch %s", sai_serialize_object_id(switch_id).c_str());
 }
-
 
 sai_status_t VirtualSwitchSaiInterface::create(
         _In_ sai_object_type_t object_type,
@@ -1150,7 +1145,7 @@ sai_status_t VirtualSwitchSaiInterface::bulkRemove(
     SWSS_LOG_ENTER();
 
     // TODO implement
-    throw;
+    return SAI_STATUS_NOT_IMPLEMENTED;
 }
 
 sai_status_t VirtualSwitchSaiInterface::bulkRemove(
@@ -1312,7 +1307,7 @@ sai_status_t VirtualSwitchSaiInterface::bulkSet(
 {
     SWSS_LOG_ENTER();
 
-    throw; // TODO
+    return SAI_STATUS_NOT_IMPLEMENTED;
 }
 
 sai_status_t VirtualSwitchSaiInterface::bulkCreate(
@@ -1357,7 +1352,7 @@ sai_status_t VirtualSwitchSaiInterface::bulkCreate(
 {
     SWSS_LOG_ENTER();
 
-    throw; // TODO
+    return SAI_STATUS_NOT_IMPLEMENTED;
 }
 
 sai_status_t VirtualSwitchSaiInterface::bulkCreate(
@@ -1390,7 +1385,6 @@ sai_status_t VirtualSwitchSaiInterface::bulkCreate(
             object_statuses);
 }
 
-
 sai_status_t VirtualSwitchSaiInterface::bulkCreate(
         _In_ uint32_t object_count,
         _In_ const sai_fdb_entry_t* fdb_entry,
@@ -1420,7 +1414,6 @@ sai_status_t VirtualSwitchSaiInterface::bulkCreate(
             mode,
             object_statuses);
 }
-
 
 sai_status_t VirtualSwitchSaiInterface::bulkCreate(
         _In_ uint32_t object_count,
@@ -1468,4 +1461,3 @@ sai_object_id_t VirtualSwitchSaiInterface::switchIdQuery(
     return g_realObjectIdManager->saiSwitchIdQuery(objectId);
 }
 
-#pragma GCC diagnostic pop
