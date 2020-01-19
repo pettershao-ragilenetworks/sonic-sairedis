@@ -42,6 +42,8 @@ SaiAttrWrap::SaiAttrWrap(
         SWSS_LOG_THROW("failed to find metadata for %s", attrId.c_str());
     }
 
+    m_attr.id = m_meta->attrid;
+
     sai_deserialize_attr_value(attrValue.c_str(), *m_meta, m_attr, false);
 }
 
