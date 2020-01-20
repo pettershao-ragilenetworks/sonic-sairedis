@@ -4,6 +4,7 @@
 
 #include <inttypes.h>
 
+#include <cstddef>
 #include <vector>
 
 namespace saivs
