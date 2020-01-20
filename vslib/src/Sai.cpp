@@ -1,20 +1,18 @@
 #include "Sai.h"
-
-#include "swss/logger.h"
-
-#include "saivs.h"
-#include "sai_vs.h"
-#include "sai_vs_internal.h"
-
-#include "swss/notificationconsumer.h"
-#include "swss/select.h"
-
+#include "SaiInternal.h"
 #include "RealObjectIdManager.h"
 #include "VirtualSwitchSaiInterface.h"
 #include "SwitchStateBase.h"
 #include "LaneMapFileParser.h"
 #include "HostInterfaceInfo.h"
 #include "SwitchConfigContainer.h"
+
+#include "swss/logger.h"
+
+#include "swss/notificationconsumer.h"
+#include "swss/select.h"
+
+#include "saivs.h"
 
 #include <unistd.h>
 #include <inttypes.h>
@@ -190,7 +188,7 @@ sai_status_t Sai::uninitialize(void)
     // at this point packets may still arrive on hostif but event queue thread
     // ended so they will not be processed
 
-    // TODO at this point we can have MUTEX();
+    // NOTE: at this point we can have MUTEX();
 
     // clear state after ending all threads
 
@@ -217,8 +215,6 @@ sai_status_t Sai::create(
     SWSS_LOG_ENTER();
     VS_CHECK_API_INITIALIZED();
 
-    // TODO switch is special case
-
     return m_meta->create(
             objectType,
             objectId,
@@ -234,8 +230,6 @@ sai_status_t Sai::remove(
     MUTEX();
     SWSS_LOG_ENTER();
     VS_CHECK_API_INITIALIZED();
-
-    // TODO switch is special case
 
     return m_meta->remove(objectType, objectId);
 }

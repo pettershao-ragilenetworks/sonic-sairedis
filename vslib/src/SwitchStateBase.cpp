@@ -3,8 +3,6 @@
 #include "swss/logger.h"
 #include "meta/sai_serialize.h"
 
-#include "sai_vs.h" // TODO to be removed
-
 #include <algorithm>
 
 #define MAX_OBJLIST_LEN 128
@@ -716,7 +714,7 @@ sai_status_t SwitchStateBase::create_ports()
         CHECK_STATUS(set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
 
         attr.id = SAI_PORT_ATTR_SPEED;
-        attr.value.u32 = 40 * 1000;     /* TODO from config */
+        attr.value.u32 = 40 * 1000;     // TODO from config
 
         CHECK_STATUS(set(SAI_OBJECT_TYPE_PORT, port_id, &attr));
 
@@ -753,10 +751,7 @@ sai_status_t SwitchStateBase::set_port_list()
 
     SWSS_LOG_INFO("set port list");
 
-    /*
-     * TODO this is static, when we start to "create/remove" ports we need to
-     * update this list since it can change depends on profile.ini
-     */
+    // NOTE: this is static, but will be refreshed on read only get
 
     sai_attribute_t attr;
 
@@ -833,7 +828,7 @@ sai_status_t SwitchStateBase::create_ingress_priority_groups_per_port(
 {
     SWSS_LOG_ENTER();
 
-    const uint32_t port_pgs_count = 8; // TODO must be per switch (mlnx and brcm is 8)
+    const uint32_t port_pgs_count = 8; // NOTE: must be per switch (mlnx and brcm is 8)
 
     std::vector<sai_object_id_t> pgs;
 
@@ -843,7 +838,7 @@ sai_status_t SwitchStateBase::create_ingress_priority_groups_per_port(
 
         sai_attribute_t attr[3];
 
-        // TODO on brcm this attribute is not added
+        // NOTE: on brcm this attribute is not added
 
         attr[0].id = SAI_INGRESS_PRIORITY_GROUP_ATTR_BUFFER_PROFILE;
         attr[0].value.oid = SAI_NULL_OBJECT_ID;
@@ -879,7 +874,7 @@ sai_status_t SwitchStateBase::create_ingress_priority_groups()
 {
     SWSS_LOG_ENTER();
 
-    // TODO priority groups size may change when we will modify pg or ports
+    // XXX priority groups size may change when we will modify pg or ports
 
     SWSS_LOG_INFO("create ingress priority groups");
 
@@ -1030,8 +1025,6 @@ sai_status_t SwitchStateBase::create_qos_queues_per_port(
 {
     SWSS_LOG_ENTER();
 
-    // TODO this method can be abstract, FIXME
-
     SWSS_LOG_ERROR("implement in child class");
 
     return SAI_STATUS_NOT_IMPLEMENTED;
@@ -1040,8 +1033,6 @@ sai_status_t SwitchStateBase::create_qos_queues_per_port(
 sai_status_t SwitchStateBase::create_qos_queues()
 {
     SWSS_LOG_ENTER();
-
-    // TODO this method can be abstract, FIXME
 
     SWSS_LOG_ERROR("implement in child class");
 
@@ -1054,8 +1045,6 @@ sai_status_t SwitchStateBase::create_scheduler_group_tree(
 {
     SWSS_LOG_ENTER();
 
-    // TODO this method can be abstract, FIXME
-
     SWSS_LOG_ERROR("implement in child class");
 
     return SAI_STATUS_NOT_IMPLEMENTED;
@@ -1065,8 +1054,6 @@ sai_status_t SwitchStateBase::create_scheduler_groups_per_port(
         _In_ sai_object_id_t port_id)
 {
     SWSS_LOG_ENTER();
-
-    // TODO this method can be abstract, FIXME
 
     SWSS_LOG_ERROR("implement in child class");
 
@@ -1079,7 +1066,7 @@ sai_status_t SwitchStateBase::create_scheduler_groups()
 
     SWSS_LOG_INFO("create scheduler groups");
 
-    // TODO scheduler groups size may change when we will modify sg or ports
+    // XXX scheduler groups size may change when we will modify sg or ports
 
     for (auto &port_id : m_port_list)
     {
@@ -1092,8 +1079,6 @@ sai_status_t SwitchStateBase::create_scheduler_groups()
 sai_status_t SwitchStateBase::set_maximum_number_of_childs_per_scheduler_group()
 {
     SWSS_LOG_ENTER();
-
-    // TODO this method can be abstract, FIXME
 
     SWSS_LOG_ERROR("implement in child class");
 
@@ -1167,7 +1152,7 @@ sai_status_t SwitchStateBase::create_port_dependencies(
     CHECK_STATUS(create_qos_queues_per_port(port_id));
     CHECK_STATUS(create_scheduler_groups_per_port(port_id));
 
-    // TODO should bridge ports should also be created when new port is created?
+    // XXX should bridge ports should also be created when new port is created?
     // this needs to be checked on real ASIC and updated here
 
     return SAI_STATUS_SUCCESS;
@@ -1278,8 +1263,6 @@ sai_status_t SwitchStateBase::refresh_bridge_port_list(
 {
     SWSS_LOG_ENTER();
 
-    // TODO this method can be abstract, FIXME
-
     SWSS_LOG_ERROR("implement in child class");
 
     return SAI_STATUS_NOT_IMPLEMENTED;
@@ -1374,12 +1357,10 @@ sai_status_t SwitchStateBase::refresh_port_list(
     }
 
     /*
-     * TODO:
-     *
-     * Currently we don't know what's happen on brcm SAI implementation when
-     * port is removed and then added, will new port could get the same vendor
-     * OID or always different, and what is order of those new oids on the
-     * PORT_LIST attribute.
+     * XXX Currently we don't know what's happen on brcm SAI implementation
+     * when port is removed and then added, will new port could get the same
+     * vendor OID or always different, and what is order of those new oids on
+     * the PORT_LIST attribute.
      *
      * This needs to be investigated, and to reflect exact behaviour here.
      * Currently we just sort all the port oids.
@@ -1405,7 +1386,7 @@ sai_status_t SwitchStateBase::refresh_port_list(
     return SAI_STATUS_SUCCESS;
 }
 
-// TODO extra work may be needed on GET api if N on list will be > then actual
+// XXX extra work may be needed on GET api if N on list will be > then actual
 
 /*
  * We can use local variable here for initialization (init should be in class
@@ -1991,7 +1972,7 @@ bool SwitchStateBase::check_object_default_state(
         }
     }
 
-    // TODO later there can be issue when we for example add extra queues to
+    // XXX later there can be issue when we for example add extra queues to
     // the port those new queues should be removed by user first before
     // removing port, and currently we don't have a way to differentiate those
 

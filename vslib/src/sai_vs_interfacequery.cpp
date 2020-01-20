@@ -3,7 +3,7 @@
 
 using namespace saivs;
 
-std::shared_ptr<Sai> g_sai = std::make_shared<Sai>();
+std::shared_ptr<Sai> vs_sai = std::make_shared<Sai>();
 
 sai_status_t sai_api_initialize(
         _In_ uint64_t flags,
@@ -11,14 +11,14 @@ sai_status_t sai_api_initialize(
 {
     SWSS_LOG_ENTER();
 
-    return g_sai->initialize(flags, service_method_table);
+    return vs_sai->initialize(flags, service_method_table);
 }
 
 sai_status_t sai_api_uninitialize(void)
 {
     SWSS_LOG_ENTER();
 
-    return g_sai->uninitialize();
+    return vs_sai->uninitialize();
 }
 
 sai_status_t sai_log_set(
@@ -30,10 +30,55 @@ sai_status_t sai_log_set(
     return SAI_STATUS_NOT_IMPLEMENTED;
 }
 
-#define API_CASE(API,api)                                                       \
-    case SAI_API_ ## API: {                                                     \
-        *(const sai_ ## api ## _api_t**)api_method_table = &vs_ ## api ## _api; \
-        return SAI_STATUS_SUCCESS; }
+#define API(api) .api ## _api = const_cast<sai_ ## api ## _api_t*>(&vs_ ## api ## _api)
+
+static sai_apis_t vs_apis = {
+    API(switch),
+    API(port),
+    API(fdb),
+    API(vlan),
+    API(virtual_router),
+    API(route),
+    API(next_hop),
+    API(next_hop_group),
+    API(router_interface),
+    API(neighbor),
+    API(acl),
+    API(hostif),
+    API(mirror),
+    API(samplepacket),
+    API(stp),
+    API(lag),
+    API(policer),
+    API(wred),
+    API(qos_map),
+    API(queue),
+    API(scheduler),
+    API(scheduler_group),
+    API(buffer),
+    API(hash),
+    API(udf),
+    API(tunnel),
+    API(l2mc),
+    API(ipmc),
+    API(rpf_group),
+    API(l2mc_group),
+    API(ipmc_group),
+    API(mcast_fdb),
+    API(bridge),
+    API(tam),
+    API(segmentroute),
+    API(mpls),
+    API(dtel),
+    API(bfd),
+    API(isolation_group),
+    API(nat),
+    API(counter),
+    API(debug_counter),
+    API(bmtor),
+};
+
+static_assert((sizeof(sai_apis_t)/sizeof(void*)) == (SAI_API_EXTENSIONS_MAX - 1));
 
 sai_status_t sai_api_query(
         _In_ sai_api_t sai_api_id,
@@ -47,56 +92,15 @@ sai_status_t sai_api_query(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    switch (sai_api_id)
+    if (sai_metadata_get_enum_value_name(&sai_metadata_enum_sai_api_t, sai_api_id))
     {
-        API_CASE(ACL,acl);
-        API_CASE(BFD,bfd);
-        API_CASE(BMTOR,bmtor);
-        API_CASE(BRIDGE,bridge);
-        API_CASE(BUFFER,buffer);
-        API_CASE(COUNTER,counter);
-        API_CASE(DEBUG_COUNTER,debug_counter);
-        API_CASE(DTEL,dtel);
-        API_CASE(FDB,fdb);
-        API_CASE(HASH,hash);
-        API_CASE(HOSTIF,hostif);
-        API_CASE(IPMC_GROUP,ipmc_group);
-        API_CASE(IPMC,ipmc);
-        API_CASE(ISOLATION_GROUP,isolation_group);
-        API_CASE(L2MC_GROUP,l2mc_group);
-        API_CASE(L2MC,l2mc);
-        API_CASE(LAG,lag);
-        API_CASE(MCAST_FDB,mcast_fdb);
-        API_CASE(MIRROR,mirror);
-        API_CASE(MPLS,mpls);
-        API_CASE(NAT,nat);
-        API_CASE(NEIGHBOR,neighbor);
-        API_CASE(NEXT_HOP_GROUP,next_hop_group);
-        API_CASE(NEXT_HOP,next_hop);
-        API_CASE(POLICER,policer);
-        API_CASE(PORT,port);
-        API_CASE(QOS_MAP,qos_map);
-        API_CASE(QUEUE,queue);
-        API_CASE(ROUTER_INTERFACE,router_interface);
-        API_CASE(ROUTE,route);
-        API_CASE(RPF_GROUP,rpf_group);
-        API_CASE(SAMPLEPACKET,samplepacket);
-        API_CASE(SCHEDULER_GROUP,scheduler_group);
-        API_CASE(SCHEDULER,scheduler);
-        API_CASE(SEGMENTROUTE,segmentroute);
-        API_CASE(STP,stp);
-        API_CASE(SWITCH,switch);
-        API_CASE(TAM,tam);
-        API_CASE(TUNNEL,tunnel);
-        API_CASE(UDF,udf);
-        API_CASE(VIRTUAL_ROUTER,virtual_router);
-        API_CASE(VLAN,vlan);
-        API_CASE(WRED,wred);
-
-        default:
-            SWSS_LOG_ERROR("Invalid API type %d", sai_api_id);
-            return SAI_STATUS_INVALID_PARAMETER;
+        *api_method_table = ((void**)&vs_apis)[sai_api_id - 1];
+        return SAI_STATUS_SUCCESS;
     }
+
+    SWSS_LOG_ERROR("Invalid API type %d", sai_api_id);
+
+    return SAI_STATUS_INVALID_PARAMETER;
 }
 
 sai_status_t sai_query_attribute_enum_values_capability(
@@ -107,7 +111,7 @@ sai_status_t sai_query_attribute_enum_values_capability(
 {
     SWSS_LOG_ENTER();
 
-    return g_sai->queryAattributeEnumValuesCapability(
+    return vs_sai->queryAattributeEnumValuesCapability(
             switch_id,
             object_type,
             attr_id,
@@ -123,7 +127,7 @@ sai_status_t sai_object_type_get_availability(
 {
     SWSS_LOG_ENTER();
 
-    return g_sai->objectTypeGetAvailability(
+    return vs_sai->objectTypeGetAvailability(
             switch_id,
             object_type,
             attr_count,
@@ -136,7 +140,7 @@ sai_object_type_t sai_object_type_query(
 {
     SWSS_LOG_ENTER();
 
-    return g_sai->objectTypeQuery(objectId);
+    return vs_sai->objectTypeQuery(objectId);
 }
 
 sai_object_id_t sai_switch_id_query(
@@ -144,5 +148,5 @@ sai_object_id_t sai_switch_id_query(
 {
     SWSS_LOG_ENTER();
 
-    return g_sai->switchIdQuery(objectId);
+    return vs_sai->switchIdQuery(objectId);
 }

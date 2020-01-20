@@ -7,7 +7,6 @@
 
 #include <inttypes.h>
 
-#include "sai_vs.h"
 #include "meta/sai_serialize.h"
 
 #include "SwitchStateBase.h"
@@ -516,8 +515,6 @@ std::shared_ptr<SwitchStateBase> VirtualSwitchSaiInterface::init_switch(
             return nullptr;
     }
 
-    // TODO remove switch state map
-
     auto ss = m_switchStateMap.at(switch_id);
 
     ss->setMeta(meta);
@@ -528,7 +525,7 @@ std::shared_ptr<SwitchStateBase> VirtualSwitchSaiInterface::init_switch(
 
         SWSS_LOG_NOTICE("initialized switch %s in WARM boot mode", sai_serialize_object_id(switch_id).c_str());
 
-        // TODO lane map may be different after warm boot if ports were added/removed
+        // XXX lane map may be different after warm boot if ports were added/removed
     }
     else
     {
@@ -598,7 +595,7 @@ sai_status_t VirtualSwitchSaiInterface::create(
 
         if (warmBootState != nullptr)
         {
-            update_real_object_ids(ss);
+            update_real_object_ids(ss); // TODO needs to be done at read whole warm boot and update there
 
             update_local_metadata(switchId);
 
@@ -746,9 +743,7 @@ sai_status_t VirtualSwitchSaiInterface::objectTypeGetAvailability(
 
     // TODO: We should generate this metadata for the virtual switch rather
     // than hard-coding it here.
-    //
-    // TODO what about attribute list?
-
+ 
     if (objectType == SAI_OBJECT_TYPE_DEBUG_COUNTER)
     {
         *count = 3;
@@ -901,7 +896,6 @@ sai_status_t VirtualSwitchSaiInterface::bulkRemove(
 {
     SWSS_LOG_ENTER();
 
-    // TODO implement
     return SAI_STATUS_NOT_IMPLEMENTED;
 }
 
@@ -1084,8 +1078,6 @@ sai_status_t VirtualSwitchSaiInterface::bulkCreate(
 {
     SWSS_LOG_ENTER();
 
-    // TODO support mode
-
     std::vector<std::string> serialized_object_ids;
 
     // on create vid is put in db by syncd
@@ -1116,6 +1108,8 @@ sai_status_t VirtualSwitchSaiInterface::bulkCreate(
 {
     SWSS_LOG_ENTER();
 
+    // support mode !
+
     return SAI_STATUS_NOT_IMPLEMENTED;
 }
 
@@ -1128,8 +1122,6 @@ sai_status_t VirtualSwitchSaiInterface::bulkCreate(
         _Out_ sai_status_t *object_statuses)
 {
     SWSS_LOG_ENTER();
-
-    // TODO support mode
 
     std::vector<std::string> serialized_object_ids;
 
@@ -1160,8 +1152,6 @@ sai_status_t VirtualSwitchSaiInterface::bulkCreate(
 {
     SWSS_LOG_ENTER();
 
-    // TODO support mode
-
     std::vector<std::string> serialized_object_ids;
 
     // on create vid is put in db by syncd
@@ -1190,8 +1180,6 @@ sai_status_t VirtualSwitchSaiInterface::bulkCreate(
         _Out_ sai_status_t *object_statuses)
 {
     SWSS_LOG_ENTER();
-
-    // TODO support mode
 
     std::vector<std::string> serialized_object_ids;
 

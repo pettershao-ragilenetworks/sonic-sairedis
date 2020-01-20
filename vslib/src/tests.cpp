@@ -15,7 +15,6 @@ extern "C" {
 #include <sai.h>
 }
 
-#include "sai_vs.h"
 #include "saivs.h"
 
 const char* profile_get_value(

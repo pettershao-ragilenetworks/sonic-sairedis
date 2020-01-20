@@ -4,8 +4,6 @@
 #include "swss/logger.h"
 #include "meta/sai_serialize.h"
 
-#include "sai_vs.h" // TODO to be removed
-
 using namespace saivs;
 
 bool VirtualSwitchSaiInterface::doesFdbEntryNotMatchFlushAttr(
@@ -104,7 +102,6 @@ sai_status_t VirtualSwitchSaiInterface::flushFdbEntries(
     std::map<std::string, SwitchState::AttrHash> static_fdbs;
     std::map<std::string, SwitchState::AttrHash> dynamic_fdbs;
 
-    // TODO cast right switch or different data pass
     auto ss = m_switchStateMap.at(switch_id);
 
     for (auto it = fdbs.begin(); it != fdbs.end();)
@@ -337,7 +334,7 @@ sai_status_t VirtualSwitchSaiInterface::flushFdbEntries(
         SWSS_LOG_NOTICE("1");
     }
 
-    // TODO: we can add config entry to send notifications 1 by 1 as option to consolidated
+    // NOTE: we can add config entry to send notifications 1 by 1 as option to consolidated
 
     return SAI_STATUS_SUCCESS;
 }

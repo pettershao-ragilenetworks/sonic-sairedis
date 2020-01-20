@@ -22,9 +22,6 @@
 #include <linux/if_packet.h>
 #include <linux/if_ether.h>
 
-#include "sai_vs.h" // TODO to be removed
-#include "sai_vs_internal.h" // TODO to be removed
-
 using namespace saivs;
 
 HostInterfaceInfo::HostInterfaceInfo(

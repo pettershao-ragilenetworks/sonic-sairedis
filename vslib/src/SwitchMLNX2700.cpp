@@ -3,8 +3,6 @@
 #include "swss/logger.h"
 #include "meta/sai_serialize.h"
 
-#include "sai_vs.h" // TODO to be removed
-
 using namespace saivs;
 
 SwitchMLNX2700::SwitchMLNX2700(
@@ -254,7 +252,6 @@ sai_status_t SwitchMLNX2700::create_scheduler_groups_per_port(
 
     CHECK_STATUS(create_scheduler_group_tree(sgs, port_id));
 
-    // TODO
     // SAI_SCHEDULER_GROUP_ATTR_CHILD_COUNT // sched_groups + count
     // scheduler group are organized in tree and on the bottom there are queues
     // order matters in returning api
@@ -282,9 +279,7 @@ sai_status_t SwitchMLNX2700::refresh_bridge_port_list(
 {
     SWSS_LOG_ENTER();
 
-    /*
-     * TODO possible issues with vxlan and lag.
-     */
+    // XXX possible issues with vxlan and lag.
 
     auto &all_bridge_ports = m_objectHash.at(SAI_OBJECT_TYPE_BRIDGE_PORT);
 

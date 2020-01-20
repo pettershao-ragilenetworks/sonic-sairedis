@@ -91,6 +91,8 @@ namespace saivs
                     _In_ int nlmsg_type,
                     _In_ struct nl_object *obj);
 
+            std::shared_ptr<saimeta::Meta> getMeta();
+
         public: // TODO make private
 
             ObjectHash m_objectHash;

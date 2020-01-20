@@ -13,8 +13,6 @@
 #include <netlink/route/addr.h>
 #include <linux/if.h>
 
-#include "sai_vs.h" // TODO to be removed
-
 using namespace saivs;
 
 #define VS_COUNTERS_COUNT_MSB (0x80000000)
@@ -28,7 +26,6 @@ SwitchState::SwitchState(
 {
     SWSS_LOG_ENTER();
 
-    // TODO we would not like to use real manager static method here
     if (RealObjectIdManager::objectTypeQuery(switch_id) != SAI_OBJECT_TYPE_SWITCH)
     {
         SWSS_LOG_THROW("object %s is not SWITCH, its %s",
@@ -275,3 +272,16 @@ sai_status_t SwitchState::getStatsExt(
     return SAI_STATUS_SUCCESS;
 }
 
+std::shared_ptr<saimeta::Meta> SwitchState::getMeta()
+{
+    SWSS_LOG_ENTER();
+
+    auto meta = m_meta.lock();
+
+    if (!meta)
+    {
+        SWSS_LOG_WARN("meta pointer expired");
+    }
+
+    return meta;
+}

@@ -5,7 +5,6 @@
 #include "meta/sai_serialize.h"
 #include "meta/saiattributelist.h"
 
-#include "sai_vs.h"
 #include <inttypes.h>
 
 using namespace saivs;
@@ -16,7 +15,7 @@ sai_status_t VirtualSwitchSaiInterface::preSetPort(
 {
     SWSS_LOG_ENTER();
 
-    // TODO should be used only when tap interface is enabled
+    // NOTE: should be used only when tap interface is enabled ?
 
     // Special handling for the sampling attribute modification
     if (attr->id == SAI_PORT_ATTR_INGRESS_SAMPLEPACKET_ENABLE)

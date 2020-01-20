@@ -4,9 +4,6 @@
 #include "swss/logger.h"
 #include "meta/sai_serialize.h"
 
-#include "sai_vs.h" // TODO to be removed
-#include "sai_vs_internal.h" // TODO to be removed
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -28,8 +25,8 @@
 
 using namespace saivs;
 
-// TODO set must also be supported when we change operational status up/down
-// and probably also generate notification then
+// XXX set must also be supported when we change operational status up/down and
+// probably also generate notification then
 
 #define ETH_FRAME_BUFFER_SIZE (0x4000)
 
@@ -427,8 +424,6 @@ bool SwitchStateBase::hostif_create_tap_veth_forwarding(
         return false;
     }
 
-    // TODO we should listen only to those interfaces indexes on link message
-
     SWSS_LOG_NOTICE("interface index = %d, %s\n", sock_address.sll_ifindex, vethname.c_str());
 
     if (ifup(vethname.c_str(), port_id))
@@ -565,9 +560,6 @@ sai_status_t SwitchStateBase::vs_create_hostif_tap_interface(
 
     SWSS_LOG_INFO("created TAP device for %s, fd: %d", name.c_str(), tapfd);
 
-    // TODO currently tapfd is ignored, it should be closed on hostif_remove
-    // and we should use it to read/write packets from that interface
-
     sai_attribute_t attr;
 
     memset(&attr, 0, sizeof(attr));
@@ -611,11 +603,6 @@ sai_status_t SwitchStateBase::vs_create_hostif_tap_interface(
 
     setIfNameToPortId(vname, obj_id);
     setPortIdToTapName(obj_id, name);
-
-    // TODO what about FDB entries notifications, they also should
-    // be generated if new mac address will show up on the interface/arp table
-
-    // TODO IP address should be assigned when router interface is created
 
     SWSS_LOG_INFO("created tap interface %s", name.c_str());
 
@@ -880,10 +867,13 @@ void SwitchStateBase::syncOnLinkMsg(
             sai_serialize_object_id(data.port_id).c_str(),
             sai_serialize_port_oper_status(data.port_state).c_str());
 
-    // TODO we should also call Meta for this notification
+    auto meta = getMeta();
 
+    if (meta)
+    {
+        meta->meta_sai_on_port_state_change(1, &data);
+    }
+
+    // TODO generate event
     callback(1, &data);
 }
-
-
-

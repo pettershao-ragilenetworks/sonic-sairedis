@@ -55,4 +55,4 @@ PRIVATE extern const sai_virtual_router_api_t   vs_virtual_router_api;
 PRIVATE extern const sai_vlan_api_t             vs_vlan_api;
 PRIVATE extern const sai_wred_api_t             vs_wred_api;
 
-PRIVATE extern std::shared_ptr<saivs::Sai>      g_sai;
+PRIVATE extern std::shared_ptr<saivs::Sai>      vs_sai;

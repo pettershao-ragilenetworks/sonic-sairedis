@@ -1,7 +1,5 @@
 #include "Sai.h"
-
-#include "sai_vs.h" // TODO to be removed
-#include "sai_vs_internal.h" // TODO to be removed
+#include "SaiInternal.h"
 
 #include "swss/logger.h"
 

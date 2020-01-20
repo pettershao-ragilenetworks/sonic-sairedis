@@ -4,7 +4,6 @@
 #include "swss/select.h"
 
 #include "meta/sai_serialize.h"
-#include "sai_vs.h" // TODO to be removed
 
 #include <linux/if_ether.h>
 #include <arpa/inet.h>
@@ -82,8 +81,6 @@ void SwitchStateBase::processFdbInfo(
     data.attr_count = 2;
     data.attr = attrs;
 
-    // TODO revisit m_meta here
-
     auto meta = m_meta.lock();
 
     if (meta)
@@ -151,7 +148,7 @@ void SwitchStateBase::findBridgeVlanForPortVlan(
      * If not found, then do not generate fdb event. It means the packet is not
      * received on the bridge port.
      *
-     * XXX: this is not whats happening here, we are just looking for any
+     * XXX this is not whats happening here, we are just looking for any
      * bridge id (as in our case this is shortcut, we will remove all bridge ports
      * when we will use router interface based port/lag and no bridge
      * will be found.
@@ -420,8 +417,6 @@ bool SwitchStateBase::isLagOrPortRifBased(
     return false;
 }
 
-// TODO we would need hostif info here
-// and maybe interface index, then we can find host info from index
 void SwitchStateBase::process_packet_for_fdb_event(
         _In_ sai_object_id_t portId,
         _In_ const std::string& name,
@@ -429,6 +424,9 @@ void SwitchStateBase::process_packet_for_fdb_event(
         _In_ size_t size)
 {
     SWSS_LOG_ENTER();
+
+    // we would need hostif info here and maybe interface index, then we can
+    // find host info from index
 
     uint32_t frametime = (uint32_t)time(NULL);
 

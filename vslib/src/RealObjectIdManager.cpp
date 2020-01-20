@@ -124,8 +124,6 @@ sai_object_id_t RealObjectIdManager::saiSwitchIdQuery(
 
     uint32_t switchIndex = (uint32_t)SAI_VS_GET_SWITCH_INDEX(objectId);
 
-    // TODO for static - use SAI_VS_GET_GLOBAL_CONTEXT
-
     return constructObjectId(SAI_OBJECT_TYPE_SWITCH, switchIndex, switchIndex, m_globalContext);
 }
 

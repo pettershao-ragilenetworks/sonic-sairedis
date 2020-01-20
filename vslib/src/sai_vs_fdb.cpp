@@ -10,7 +10,7 @@ static sai_status_t vs_flush_fdb_entries(
 {
     SWSS_LOG_ENTER();
 
-    return g_sai->flushFdbEntries(
+    return vs_sai->flushFdbEntries(
             switch_id,
             attr_count,
             attr_list);

@@ -3,8 +3,6 @@
 #include "swss/logger.h"
 #include "meta/sai_serialize.h"
 
-#include "sai_vs.h" // TODO to be removed
-
 using namespace saivs;
 
 SwitchBCM56850::SwitchBCM56850(
@@ -84,7 +82,7 @@ sai_status_t SwitchBCM56850::create_qos_queues()
 {
     SWSS_LOG_ENTER();
 
-    // TODO queues size may change when we will modify queue or ports
+    // XXX queues size may change when we will modify queue or ports
 
     SWSS_LOG_INFO("create qos queues");
 
@@ -324,7 +322,6 @@ sai_status_t SwitchBCM56850::create_scheduler_groups_per_port(
 
     CHECK_STATUS(create_scheduler_group_tree(sgs, port_id));
 
-    // TODO
     // SAI_SCHEDULER_GROUP_ATTR_CHILD_COUNT // sched_groups + count
     // scheduler group are organized in tree and on the bottom there are queues
     // order matters in returning api
@@ -352,9 +349,7 @@ sai_status_t SwitchBCM56850::refresh_bridge_port_list(
 {
     SWSS_LOG_ENTER();
 
-    /*
-     * TODO possible issues with vxlan and lag.
-     */
+    // XXX possible issues with vxlan and lag.
 
     auto &all_bridge_ports = m_objectHash.at(SAI_OBJECT_TYPE_BRIDGE_PORT);
 

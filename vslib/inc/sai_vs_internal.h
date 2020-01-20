@@ -1,6 +1,4 @@
 
-#define MUTEX() std::lock_guard<std::recursive_mutex> _lock(m_apimutex)
-
 // QUAD OID
 
 #define VS_CREATE(OT,ot)                                \
@@ -11,7 +9,7 @@
             _In_ const sai_attribute_t *attr_list)      \
 {                                                       \
     SWSS_LOG_ENTER();                                   \
-    return g_sai->create(                               \
+    return vs_sai->create(                              \
             (sai_object_type_t)SAI_OBJECT_TYPE_ ## OT,  \
             object_id,                                  \
             switch_id,                                  \
@@ -24,7 +22,7 @@
             _In_ sai_object_id_t object_id)             \
 {                                                       \
     SWSS_LOG_ENTER();                                   \
-    return g_sai->remove(                               \
+    return vs_sai->remove(                              \
             (sai_object_type_t)SAI_OBJECT_TYPE_ ## OT,  \
             object_id);                                 \
 }
@@ -35,7 +33,7 @@
             _In_ const sai_attribute_t *attr)           \
 {                                                       \
     SWSS_LOG_ENTER();                                   \
-    return g_sai->set(                                  \
+    return vs_sai->set(                                 \
             (sai_object_type_t)SAI_OBJECT_TYPE_ ## OT,  \
             object_id,                                  \
             attr);                                      \
@@ -48,7 +46,7 @@
             _Inout_ sai_attribute_t *attr_list)         \
 {                                                       \
     SWSS_LOG_ENTER();                                   \
-    return g_sai->get(                                  \
+    return vs_sai->get(                                 \
             (sai_object_type_t)SAI_OBJECT_TYPE_ ## OT,  \
             object_id,                                  \
             attr_count,                                 \
@@ -72,7 +70,7 @@
             _In_ const sai_attribute_t *attr_list)      \
 {                                                       \
     SWSS_LOG_ENTER();                                   \
-    return g_sai->create(                               \
+    return vs_sai->create(                              \
             entry,                                      \
             attr_count,                                 \
             attr_list);                                 \
@@ -83,7 +81,7 @@
             _In_ const sai_ ## ot ## _t *entry)         \
 {                                                       \
     SWSS_LOG_ENTER();                                   \
-    return g_sai->remove(                               \
+    return vs_sai->remove(                              \
             entry);                                     \
 }
 
@@ -93,7 +91,7 @@
             _In_ const sai_attribute_t *attr)           \
 {                                                       \
     SWSS_LOG_ENTER();                                   \
-    return g_sai->set(                                  \
+    return vs_sai->set(                                 \
             entry,                                      \
             attr);                                      \
 }
@@ -105,7 +103,7 @@
             _Inout_ sai_attribute_t *attr_list)         \
 {                                                       \
     SWSS_LOG_ENTER();                                   \
-    return g_sai->get(                                  \
+    return vs_sai->get(                                 \
             entry,                                      \
             attr_count,                                 \
             attr_list);                                 \
@@ -137,7 +135,7 @@
             _Out_ uint64_t *counters)                   \
 {                                                       \
     SWSS_LOG_ENTER();                                   \
-    return g_sai->getStats(                             \
+    return vs_sai->getStats(                            \
             (sai_object_type_t)SAI_OBJECT_TYPE_ ## OT,  \
             object_id,                                  \
             number_of_counters,                         \
@@ -154,7 +152,7 @@
             _Out_ uint64_t *counters)                   \
 {                                                       \
     SWSS_LOG_ENTER();                                   \
-    return g_sai->getStatsExt(                          \
+    return vs_sai->getStatsExt(                         \
             (sai_object_type_t)SAI_OBJECT_TYPE_ ## OT,  \
             object_id,                                  \
             number_of_counters,                         \
@@ -170,7 +168,7 @@
             _In_ const sai_stat_id_t *counter_ids)      \
 {                                                       \
     SWSS_LOG_ENTER();                                   \
-    return g_sai->clearStats(                           \
+    return vs_sai->clearStats(                          \
             (sai_object_type_t)SAI_OBJECT_TYPE_ ## OT,  \
             object_id,                                  \
             number_of_counters,                         \
@@ -204,7 +202,7 @@
             _Out_ sai_status_t *object_statuses)    \
 {                                                   \
     SWSS_LOG_ENTER();                               \
-    return g_sai->bulkCreate(                       \
+    return vs_sai->bulkCreate(                      \
             SAI_OBJECT_TYPE_ ## OT,                 \
             switch_id,                              \
             object_count,                           \
@@ -223,7 +221,7 @@
             _Out_ sai_status_t *object_statuses)    \
 {                                                   \
     SWSS_LOG_ENTER();                               \
-    return g_sai->bulkRemove(                       \
+    return vs_sai->bulkRemove(                      \
             SAI_OBJECT_TYPE_ ## OT,                 \
             object_count,                           \
             object_id,                              \
@@ -240,7 +238,7 @@
             _Out_ sai_status_t *object_statuses)    \
 {                                                   \
     SWSS_LOG_ENTER();                               \
-    return g_sai->bulkSet(                          \
+    return vs_sai->bulkSet(                         \
             SAI_OBJECT_TYPE_ ## OT,                 \
             object_count,                           \
             object_id,                              \
@@ -283,7 +281,7 @@
             _Out_ sai_status_t *object_statuses)    \
 {                                                   \
     SWSS_LOG_ENTER();                               \
-    return g_sai->bulkCreate(                       \
+    return vs_sai->bulkCreate(                      \
             object_count,                           \
             entry,                                  \
             attr_count,                             \
@@ -300,7 +298,7 @@
             _Out_ sai_status_t *object_statuses)    \
 {                                                   \
     SWSS_LOG_ENTER();                               \
-    return g_sai->bulkRemove(                       \
+    return vs_sai->bulkRemove(                      \
             object_count,                           \
             entry,                                  \
             mode,                                   \
@@ -316,7 +314,7 @@
             _Out_ sai_status_t *object_statuses)    \
 {                                                   \
     SWSS_LOG_ENTER();                               \
-    return g_sai->bulkSet(                          \
+    return vs_sai->bulkSet(                         \
             object_count,                           \
             entry,                                  \
             attr_list,                              \

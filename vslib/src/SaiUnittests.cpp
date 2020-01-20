@@ -1,10 +1,8 @@
 #include "Sai.h"
+#include "SaiInternal.h"
 
 #include "saivs.h"
 #include "meta/sai_serialize.h"
-
-#include "sai_vs.h" // TODO to be removed
-#include "sai_vs_internal.h" // TODO to be removed
 
 #include "swss/logger.h"
 #include "swss/select.h"
@@ -348,5 +346,3 @@ void Sai::unittestChannelThreadProc()
 
     SWSS_LOG_NOTICE("exit VS unittest channel thread");
 }
-
-
