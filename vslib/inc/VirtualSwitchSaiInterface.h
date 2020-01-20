@@ -3,6 +3,7 @@
 #include "SwitchStateBase.h"
 #include "WarmBootState.h"
 #include "SwitchConfigContainer.h"
+#include "RealObjectIdManager.h"
 
 #include "lib/inc/SaiInterface.h"
 
@@ -300,10 +301,10 @@ namespace saivs
 
         private:
 
-            void vs_update_local_metadata(
+            void update_local_metadata(
                     _In_ sai_object_id_t switch_id);
 
-            std::shared_ptr<SwitchStateBase> vs_read_switch_database_for_warm_restart(
+            std::shared_ptr<SwitchStateBase> read_switch_database_for_warm_restart(
                     _In_ sai_object_id_t switch_id);
 
             std::shared_ptr<WarmBootState> extractWarmBootState(
@@ -313,6 +314,14 @@ namespace saivs
                     _In_ uint32_t attr_count,
                     _In_ const sai_attribute_t *attr_list) const;
 
+            void update_real_object_ids(
+                    _In_ const std::shared_ptr<SwitchState> warmBootState);
+
+            std::shared_ptr<SwitchStateBase> init_switch(
+                    _In_ sai_object_id_t switch_id,
+                    _In_ std::shared_ptr<SwitchConfig> config,
+                    _In_ std::shared_ptr<WarmBootState> warmBootState,
+                    _In_ std::weak_ptr<saimeta::Meta> meta);
         private:
 
             static bool doesFdbEntryNotMatchFlushAttr(
@@ -344,5 +353,8 @@ namespace saivs
             std::map<sai_object_id_t, WarmBootState> m_warmBootState;
 
             std::shared_ptr<SwitchConfigContainer> m_switchConfigContainer;
+
+            std::shared_ptr<RealObjectIdManager> m_realObjectIdManager;
+
     };
 }

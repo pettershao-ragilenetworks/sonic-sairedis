@@ -27,7 +27,7 @@ sai_status_t VirtualSwitchSaiInterface::preSetPort(
         // Get the interface name from the port id
         std::string if_name;
 
-        sai_object_id_t vs_switch_id = g_realObjectIdManager->saiSwitchIdQuery(port_id);
+        sai_object_id_t vs_switch_id = switchIdQuery(port_id);
 
         if (vs_switch_id == SAI_NULL_OBJECT_ID)
         {

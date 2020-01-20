@@ -6,6 +6,7 @@
 #include "HostInterfaceInfo.h"
 #include "WarmBootState.h"
 #include "SwitchConfig.h"
+#include "RealObjectIdManager.h"
 
 #include <set>
 #include <unordered_set>
@@ -21,10 +22,12 @@ namespace saivs
 
             SwitchStateBase(
                     _In_ sai_object_id_t switch_id,
+                    _In_ std::shared_ptr<RealObjectIdManager> manager,
                     _In_ std::shared_ptr<SwitchConfig> config);
 
             SwitchStateBase(
                     _In_ sai_object_id_t switch_id,
+                    _In_ std::shared_ptr<RealObjectIdManager> manager,
                     _In_ std::shared_ptr<SwitchConfig> config,
                     std::shared_ptr<WarmBootState> warmBootState);
 
@@ -185,6 +188,14 @@ namespace saivs
                     _In_ sai_object_id_t switch_id,
                     _In_ uint32_t attr_count,
                     _In_ const sai_attribute_t *attr_list);
+
+        private:
+
+            sai_object_type_t objectTypeQuery(
+                    _In_ sai_object_id_t objectId);
+
+            sai_object_id_t switchIdQuery(
+                    _In_ sai_object_id_t objectId);
 
         public:
 
@@ -367,6 +378,8 @@ namespace saivs
             std::set<FdbInfo> m_fdb_info_set;
 
             std::map<std::string, std::shared_ptr<HostInterfaceInfo>> m_hostif_info_map;
+
+            std::shared_ptr<RealObjectIdManager> m_realObjectIdManager;
     };
 }
 

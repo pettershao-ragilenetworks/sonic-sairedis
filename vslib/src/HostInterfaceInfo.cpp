@@ -98,7 +98,8 @@ void HostInterfaceInfo::process_packet_for_fdb_event(
 
     // TODO remove cast
 
-    sai_object_id_t switch_id = g_realObjectIdManager->saiSwitchIdQuery(m_portId);
+    // TODO we would like not use manager static method here
+    sai_object_id_t switch_id = RealObjectIdManager::switchIdQuery(m_portId);
 
     auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map.at(switch_id));
 

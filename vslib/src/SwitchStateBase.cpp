@@ -14,8 +14,10 @@ using namespace saivs;
 
 SwitchStateBase::SwitchStateBase(
         _In_ sai_object_id_t switch_id,
+        _In_ std::shared_ptr<RealObjectIdManager> manager,
         _In_ std::shared_ptr<SwitchConfig> config):
-    SwitchState(switch_id, config)
+    SwitchState(switch_id, config),
+    m_realObjectIdManager(manager)
 {
     SWSS_LOG_ENTER();
 
@@ -24,9 +26,11 @@ SwitchStateBase::SwitchStateBase(
 
 SwitchStateBase::SwitchStateBase(
         _In_ sai_object_id_t switch_id,
+        _In_ std::shared_ptr<RealObjectIdManager> manager,
         _In_ std::shared_ptr<SwitchConfig> config,
         _In_ std::shared_ptr<WarmBootState> warmBootState):
-    SwitchState(switch_id, config)
+    SwitchState(switch_id, config),
+    m_realObjectIdManager(manager)
 {
     SWSS_LOG_ENTER();
 
@@ -67,7 +71,7 @@ sai_status_t SwitchStateBase::create(
         SWSS_LOG_THROW("this method can't be used to create switch");
     }
 
-    *object_id = g_realObjectIdManager->allocateNewObjectId(object_type, switch_id);
+    *object_id = m_realObjectIdManager->allocateNewObjectId(object_type, switch_id);
 
     auto sid = sai_serialize_object_id(*object_id);
 
@@ -284,9 +288,7 @@ sai_status_t SwitchStateBase::removePort(
         // meta_sai_remove_oid automatically removed related oids internally
         // so we just need to execute remove for virtual switch db
 
-        auto status = remove(
-                g_realObjectIdManager->saiObjectTypeQuery(oid),
-                oid);
+        auto status = remove(objectTypeQuery(oid), oid);
 
         if (status != SAI_STATUS_SUCCESS)
         {
@@ -294,7 +296,7 @@ sai_status_t SwitchStateBase::removePort(
             // port related objects: queues, ipgs, sg
 
             SWSS_LOG_THROW("FATAL: failed to removed port related oid: %s: %s, bug!",
-                    sai_serialize_object_type(g_realObjectIdManager->saiObjectTypeQuery(oid)).c_str(),
+                    sai_serialize_object_type(objectTypeQuery(oid)).c_str(),
                     sai_serialize_object_id(oid).c_str());
         }
     }
@@ -1652,7 +1654,7 @@ sai_status_t SwitchStateBase::check_port_dependencies(
 
     // check if port exists's
 
-    sai_object_id_t switch_id = g_realObjectIdManager->saiSwitchIdQuery(port_id);
+    sai_object_id_t switch_id = switchIdQuery(port_id);
 
     if (switch_id == SAI_NULL_OBJECT_ID)
     {
@@ -1662,7 +1664,7 @@ sai_status_t SwitchStateBase::check_port_dependencies(
         return SAI_STATUS_FAILURE;
     }
 
-    sai_object_type_t ot = g_realObjectIdManager->saiObjectTypeQuery(port_id);
+    sai_object_type_t ot = objectTypeQuery(port_id);
 
     if (ot != SAI_OBJECT_TYPE_PORT)
     {
@@ -1764,7 +1766,7 @@ bool SwitchStateBase::get_object_list(
 
     objlist.clear();
 
-    sai_object_type_t object_type = g_realObjectIdManager->saiObjectTypeQuery(object_id);
+    sai_object_type_t object_type = objectTypeQuery(object_id);
 
     auto* meta = sai_metadata_get_attr_metadata(object_type, attr_id);
 
@@ -1849,7 +1851,7 @@ bool SwitchStateBase::check_object_default_state(
 {
     SWSS_LOG_ENTER();
 
-    sai_object_type_t object_type = g_realObjectIdManager->saiObjectTypeQuery(object_id);
+    sai_object_type_t object_type = objectTypeQuery(object_id);
 
     if (object_type == SAI_OBJECT_TYPE_NULL)
     {
@@ -2067,5 +2069,21 @@ std::string SwitchStateBase::dump_switch_database_for_warm_restart() const
             sai_serialize_object_id(m_switch_id).c_str());
 
     return ss.str();
+}
+
+sai_object_type_t SwitchStateBase::objectTypeQuery(
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    return RealObjectIdManager::objectTypeQuery(objectId);
+}
+
+sai_object_id_t SwitchStateBase::switchIdQuery(
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    return RealObjectIdManager::switchIdQuery(objectId);
 }
 

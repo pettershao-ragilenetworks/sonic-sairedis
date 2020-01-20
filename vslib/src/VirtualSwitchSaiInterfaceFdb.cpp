@@ -153,7 +153,7 @@ sai_status_t VirtualSwitchSaiInterface::flushFdbEntries(
 
             fi.setFdbEntry(fdb_entry);
 
-            if (g_realObjectIdManager->saiObjectTypeQuery(fdb_entry.bv_id) == SAI_OBJECT_TYPE_VLAN)
+            if (objectTypeQuery(fdb_entry.bv_id) == SAI_OBJECT_TYPE_VLAN)
             {
                 sai_attribute_t attr;
 

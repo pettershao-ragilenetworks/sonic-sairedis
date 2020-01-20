@@ -2,6 +2,7 @@
 #include "SwitchState.h"
 #include "RealObjectIdManager.h"
 #include "SwitchStateBase.h"
+#include "RealObjectIdManager.h"
 
 #include "swss/logger.h"
 
@@ -14,8 +15,6 @@
 #include "sai_vs.h" // TODO to be removed
 
 using namespace saivs;
-
-extern std::shared_ptr<RealObjectIdManager>       g_realObjectIdManager;
 
 // TODO MUTEX must be used when adding and removing interface index by system
 
@@ -32,11 +31,12 @@ SwitchState::SwitchState(
 {
     SWSS_LOG_ENTER();
 
-    if (g_realObjectIdManager->saiObjectTypeQuery(switch_id) != SAI_OBJECT_TYPE_SWITCH)
+    // TODO we would not like to use real manager static method here
+    if (RealObjectIdManager::objectTypeQuery(switch_id) != SAI_OBJECT_TYPE_SWITCH)
     {
         SWSS_LOG_THROW("object %s is not SWITCH, its %s",
                 sai_serialize_object_id(switch_id).c_str(),
-                sai_serialize_object_type(g_realObjectIdManager->saiObjectTypeQuery(switch_id)).c_str());
+                sai_serialize_object_type(RealObjectIdManager::objectTypeQuery(switch_id)).c_str());
     }
 
     for (int i = SAI_OBJECT_TYPE_NULL; i < (int)SAI_OBJECT_TYPE_EXTENSIONS_MAX; ++i)

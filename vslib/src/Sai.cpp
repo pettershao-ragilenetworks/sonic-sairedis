@@ -24,8 +24,6 @@
 
 using namespace saivs;
 
-std::shared_ptr<RealObjectIdManager>            g_realObjectIdManager;
-
 Sai::Sai()
 {
     SWSS_LOG_ENTER();
@@ -129,8 +127,6 @@ sai_status_t Sai::initialize(
 
     // most important
 
-    g_realObjectIdManager = std::make_shared<RealObjectIdManager>(0);
-
     g_switch_state_map.clear();
 
     m_vsSai = std::make_shared<VirtualSwitchSaiInterface>(scc);
@@ -184,10 +180,6 @@ sai_status_t Sai::uninitialize(void)
     m_meta = nullptr;
 
     g_switch_state_map.clear();
-
-    // TODO since we create new manager, we need to create new meta db with
-    // updated functions for query object type and switch id
-    g_realObjectIdManager = nullptr;
 
     Globals::apiInitialized = false;
 

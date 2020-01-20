@@ -26,6 +26,8 @@ VirtualSwitchSaiInterface::VirtualSwitchSaiInterface(
 {
     SWSS_LOG_ENTER();
 
+    m_realObjectIdManager = std::make_shared<RealObjectIdManager>(0);
+
     m_switchConfigContainer = scc;
 }
 
@@ -62,7 +64,7 @@ void VirtualSwitchSaiInterface::setMeta(
 
 SwitchState::SwitchStateMap g_switch_state_map;
 
-static void vs_update_real_object_ids(
+void VirtualSwitchSaiInterface::update_real_object_ids(
         _In_ const std::shared_ptr<SwitchState> warmBootState)
 {
     SWSS_LOG_ENTER();
@@ -98,7 +100,7 @@ static void vs_update_real_object_ids(
 
             // TODO this should actually go to oid indexer, and be passed to
             // real object manager
-            g_realObjectIdManager->updateWarmBootObjectIndex(oid);
+            m_realObjectIdManager->updateWarmBootObjectIndex(oid);
         }
     }
 }
@@ -166,7 +168,7 @@ bool VirtualSwitchSaiInterface::validate_switch_warm_boot_atributes(
     return true;
 }
 
-void VirtualSwitchSaiInterface::vs_update_local_metadata(
+void VirtualSwitchSaiInterface::update_local_metadata(
         _In_ sai_object_id_t switch_id)
 {
     SWSS_LOG_ENTER();
@@ -329,7 +331,7 @@ sai_status_t VirtualSwitchSaiInterface::create(
     }
 
     // create new real object ID
-    *objectId = g_realObjectIdManager->allocateNewObjectId(objectType, switchId);
+    *objectId = m_realObjectIdManager->allocateNewObjectId(objectType, switchId);
 
     if (objectType == SAI_OBJECT_TYPE_SWITCH)
     {
@@ -468,9 +470,7 @@ DECLARE_SET_ENTRY(NEIGHBOR_ENTRY,neighbor_entry);
 DECLARE_SET_ENTRY(ROUTE_ENTRY,route_entry);
 DECLARE_SET_ENTRY(NAT_ENTRY,nat_entry);
 
-// TODO must be revisited
-template <class T>
-static std::shared_ptr<SwitchStateBase> init_switch(
+std::shared_ptr<SwitchStateBase> VirtualSwitchSaiInterface::init_switch(
         _In_ sai_object_id_t switch_id,
         _In_ std::shared_ptr<SwitchConfig> config,
         _In_ std::shared_ptr<WarmBootState> warmBootState,
@@ -485,45 +485,57 @@ static std::shared_ptr<SwitchStateBase> init_switch(
         SWSS_LOG_THROW("init switch with NULL switch id is not allowed");
     }
 
-    // TODO remove switch state map
-
-    if (warmBootState != nullptr)
-    {
-        g_switch_state_map[switch_id] = std::make_shared<T>(switch_id, config, warmBootState);
-
-        // TODO cast right switch or different data pass
-        auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
-
-        ss->setMeta(meta);
-
-        ss->warm_boot_initialize_objects();
-
-        SWSS_LOG_NOTICE("initialized switch %s in WARM boot mode", sai_serialize_object_id(switch_id).c_str());
-
-        // TODO lane map may be different after warm boot if ports were added/removed
-
-        return ss;
-    }
-
     if (g_switch_state_map.find(switch_id) != g_switch_state_map.end())
     {
         SWSS_LOG_THROW("switch already exists %s", sai_serialize_object_id(switch_id).c_str());
     }
 
-    g_switch_state_map[switch_id] = std::make_shared<T>(switch_id, config);
+    switch (config->m_switchType)
+    {
+        case SAI_VS_SWITCH_TYPE_BCM56850:
 
+            g_switch_state_map[switch_id] = std::make_shared<SwitchBCM56850>(switch_id, m_realObjectIdManager, config, warmBootState);
+            break;
+
+        case SAI_VS_SWITCH_TYPE_MLNX2700:
+
+            g_switch_state_map[switch_id] = std::make_shared<SwitchMLNX2700>(switch_id, m_realObjectIdManager, config, warmBootState);
+
+            break;
+
+        default:
+
+            SWSS_LOG_WARN("unknown switch type: %d", config->m_switchType);
+
+            return nullptr;
+    }
+
+    // TODO remove switch state map
+
+    // TODO cast right switch or different data pass
     auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
 
     ss->setMeta(meta);
 
-    sai_status_t status = ss->initialize_default_objects();
-
-    if (status != SAI_STATUS_SUCCESS)
+    if (warmBootState != nullptr)
     {
-        SWSS_LOG_THROW("unable to init switch %s", sai_serialize_status(status).c_str());
-    }
+        ss->warm_boot_initialize_objects(); // TODO move to constructor
 
-    SWSS_LOG_NOTICE("initialized switch %s", sai_serialize_object_id(switch_id).c_str());
+        SWSS_LOG_NOTICE("initialized switch %s in WARM boot mode", sai_serialize_object_id(switch_id).c_str());
+
+        // TODO lane map may be different after warm boot if ports were added/removed
+    }
+    else
+    {
+        sai_status_t status = ss->initialize_default_objects(); // TODO move to constructor
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_THROW("unable to init switch %s", sai_serialize_status(status).c_str());
+        }
+
+        SWSS_LOG_NOTICE("initialized switch %s", sai_serialize_object_id(switch_id).c_str());
+    }
 
     return ss;
 }
@@ -574,32 +586,18 @@ sai_status_t VirtualSwitchSaiInterface::create(
             }
         }
 
-        std::shared_ptr<SwitchStateBase> ss;
+        auto ss = init_switch(switch_id, config, warmBootState, m_meta);
 
-        switch (config->m_switchType)
+        if (!ss)
         {
-            case SAI_VS_SWITCH_TYPE_BCM56850:
-
-                ss = init_switch<SwitchBCM56850>(switch_id, config, warmBootState, m_meta);
-                break;
-
-            case SAI_VS_SWITCH_TYPE_MLNX2700:
-
-                ss = init_switch<SwitchMLNX2700>(switch_id, config, warmBootState, m_meta);
-                break;
-
-            default:
-
-                SWSS_LOG_WARN("unknown switch type: %d", config->m_switchType);
-
-                return SAI_STATUS_FAILURE;
+            return SAI_STATUS_FAILURE;
         }
 
         if (warmBootState != nullptr)
         {
-            vs_update_real_object_ids(ss);
+            update_real_object_ids(ss);
 
-            vs_update_local_metadata(switch_id);
+            update_local_metadata(switch_id);
 
             if (config->m_useTapDevice)
             {
@@ -653,7 +651,7 @@ sai_status_t VirtualSwitchSaiInterface::remove(
     SWSS_LOG_ENTER();
 
     // std::string str_object_id = sai_serialize_object_id(object_id);
-    // sai_object_id_t switch_id = g_realObjectIdManager->saiSwitchIdQuery(object_id);
+    // sai_object_id_t switch_id = m_realObjectIdManager->saiSwitchIdQuery(object_id);
 
     sai_object_id_t switch_id;
 
@@ -713,7 +711,7 @@ sai_status_t VirtualSwitchSaiInterface::remove(
 
         SWSS_LOG_NOTICE("removed switch: %s", sai_serialize_object_id(object_id).c_str());
 
-        g_realObjectIdManager->releaseObjectId(object_id);
+        m_realObjectIdManager->releaseObjectId(object_id);
 
         removeSwitch(object_id);
     }
@@ -731,7 +729,7 @@ sai_status_t VirtualSwitchSaiInterface::set(
     // TODO we will need switch id when multiple switches will be supported or
     // each switch will have it's own interface, then not needed
 
-    sai_object_id_t switch_id = SAI_NULL_OBJECT_ID; // g_realObjectIdManager->saiSwitchIdQuery(objectId)
+    sai_object_id_t switch_id = SAI_NULL_OBJECT_ID; // ,_realObjectIdManager->saiSwitchIdQuery(objectId)
 
     if (g_switch_state_map.size() == 0)
     {
@@ -1287,7 +1285,7 @@ sai_object_type_t VirtualSwitchSaiInterface::objectTypeQuery(
 {
     SWSS_LOG_ENTER();
 
-    return g_realObjectIdManager->saiObjectTypeQuery(objectId);
+    return m_realObjectIdManager->saiObjectTypeQuery(objectId);
 }
 
 sai_object_id_t VirtualSwitchSaiInterface::switchIdQuery(
@@ -1295,7 +1293,7 @@ sai_object_id_t VirtualSwitchSaiInterface::switchIdQuery(
 {
     SWSS_LOG_ENTER();
 
-    return g_realObjectIdManager->saiSwitchIdQuery(objectId);
+    return m_realObjectIdManager->saiSwitchIdQuery(objectId);
 }
 
 bool VirtualSwitchSaiInterface::writeWarmBootFile(
@@ -1381,7 +1379,7 @@ bool VirtualSwitchSaiInterface::readWarmBootFile(
 
             FdbInfo fi = FdbInfo::deserialize(strObjectId);
 
-            auto switchId = RealObjectIdManager::switchIdQuery(fi.m_portId);
+            auto switchId = switchIdQuery(fi.m_portId);
 
             if (switchId == SAI_NULL_OBJECT_ID)
             {
@@ -1406,7 +1404,7 @@ bool VirtualSwitchSaiInterface::readWarmBootFile(
 
         // query each object for switch id
 
-        auto switchId = RealObjectIdManager::switchIdQuery(metaKey.objectkey.key.object_id);
+        auto switchId = switchIdQuery(metaKey.objectkey.key.object_id);
 
         if (switchId == SAI_NULL_OBJECT_ID)
         {
