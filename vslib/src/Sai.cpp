@@ -24,6 +24,11 @@
 
 using namespace saivs;
 
+#define VS_CHECK_API_INITIALIZED()                                          \
+    if (!m_apiInitialized) {                                                \
+        SWSS_LOG_ERROR("%s: api not initialized", __PRETTY_FUNCTION__);     \
+        return SAI_STATUS_FAILURE; }
+
 Sai::Sai()
 {
     SWSS_LOG_ENTER();
