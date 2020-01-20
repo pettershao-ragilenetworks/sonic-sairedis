@@ -341,6 +341,7 @@ sai_status_t VirtualSwitchSaiInterface::create(
     std::string str_object_id = sai_serialize_object_id(*objectId);
 
     return create(
+            switchId,
             objectType,
             str_object_id,
             attr_count,
@@ -354,6 +355,7 @@ sai_status_t VirtualSwitchSaiInterface::remove(
     SWSS_LOG_ENTER();
 
     return remove(
+            switchIdQuery(objectId),
             objectType,
             sai_serialize_object_id(objectId));
 }
@@ -387,6 +389,7 @@ sai_status_t VirtualSwitchSaiInterface::set(
     CHECK_STATUS(status);
 
     return set(
+            switchIdQuery(objectId),
             objectType,
             sai_serialize_object_id(objectId),
             attr);
@@ -401,6 +404,7 @@ sai_status_t VirtualSwitchSaiInterface::get(
     SWSS_LOG_ENTER();
 
     return get(
+            switchIdQuery(objectId),
             objectType,
             sai_serialize_object_id(objectId),
             attr_count,
@@ -409,12 +413,13 @@ sai_status_t VirtualSwitchSaiInterface::get(
 
 #define DECLARE_REMOVE_ENTRY(OT,ot)                             \
 sai_status_t VirtualSwitchSaiInterface::remove(                 \
-        _In_ const sai_ ## ot ## _t* ot)                        \
+        _In_ const sai_ ## ot ## _t* entry)                     \
 {                                                               \
     SWSS_LOG_ENTER();                                           \
     return remove(                                              \
+            entry->switch_id,                                   \
             SAI_OBJECT_TYPE_ ## OT,                             \
-            sai_serialize_ ## ot(*ot));                         \
+            sai_serialize_ ## ot(*entry));                      \
 }
 
 DECLARE_REMOVE_ENTRY(FDB_ENTRY,fdb_entry);
@@ -428,14 +433,15 @@ DECLARE_REMOVE_ENTRY(NAT_ENTRY,nat_entry);
 
 #define DECLARE_CREATE_ENTRY(OT,ot)                             \
 sai_status_t VirtualSwitchSaiInterface::create(                 \
-        _In_ const sai_ ## ot ## _t* ot,                        \
+        _In_ const sai_ ## ot ## _t* entry,                     \
         _In_ uint32_t attr_count,                               \
         _In_ const sai_attribute_t *attr_list)                  \
 {                                                               \
     SWSS_LOG_ENTER();                                           \
     return create(                                              \
+            entry->switch_id,                                   \
             SAI_OBJECT_TYPE_ ## OT,                             \
-            sai_serialize_ ## ot(*ot),                          \
+            sai_serialize_ ## ot(*entry),                       \
             attr_count,                                         \
             attr_list);                                         \
 }
@@ -451,13 +457,14 @@ DECLARE_CREATE_ENTRY(NAT_ENTRY,nat_entry);
 
 #define DECLARE_SET_ENTRY(OT,ot)                                \
 sai_status_t VirtualSwitchSaiInterface::set(                    \
-        _In_ const sai_ ## ot ## _t* ot,                        \
+        _In_ const sai_ ## ot ## _t* entry,                     \
         _In_ const sai_attribute_t *attr)                       \
 {                                                               \
     SWSS_LOG_ENTER();                                           \
     return set(                                                 \
+            entry->switch_id,                                   \
             SAI_OBJECT_TYPE_ ## OT,                             \
-            sai_serialize_ ## ot(*ot),                          \
+            sai_serialize_ ## ot(*entry),                       \
             attr);                                              \
 }
 
@@ -512,7 +519,7 @@ std::shared_ptr<SwitchStateBase> VirtualSwitchSaiInterface::init_switch(
 
     // TODO remove switch state map
 
-    auto ss = g_switch_state_map[switch_id];
+    auto ss = g_switch_state_map.at(switch_id);
 
     ss->setMeta(meta);
 
@@ -540,6 +547,7 @@ std::shared_ptr<SwitchStateBase> VirtualSwitchSaiInterface::init_switch(
 }
 
 sai_status_t VirtualSwitchSaiInterface::create(
+        _In_ sai_object_id_t switchId,
         _In_ sai_object_type_t object_type,
         _In_ const std::string& serializedObjectId,
         _In_ uint32_t attr_count,
@@ -549,10 +557,7 @@ sai_status_t VirtualSwitchSaiInterface::create(
 
     if (object_type == SAI_OBJECT_TYPE_SWITCH)
     {
-        sai_object_id_t switch_id;
-        sai_deserialize_object_id(serializedObjectId, switch_id);
-
-        auto switchIndex = RealObjectIdManager::getSwitchIndex(switch_id);
+        auto switchIndex = RealObjectIdManager::getSwitchIndex(switchId);
 
         auto config = m_switchConfigContainer->getConfig(switchIndex);
 
@@ -576,16 +581,16 @@ sai_status_t VirtualSwitchSaiInterface::create(
                 return SAI_STATUS_FAILURE;
             }
 
-            warmBootState = extractWarmBootState(switch_id);
+            warmBootState = extractWarmBootState(switchId);
 
             if (warmBootState == nullptr)
             {
                 SWSS_LOG_WARN("warm boot was requested on switch %s, but warm boot state is NULL, will perform COLD boot",
-                        sai_serialize_object_id(switch_id).c_str());
+                        sai_serialize_object_id(switchId).c_str());
             }
         }
 
-        auto ss = init_switch(switch_id, config, warmBootState, m_meta);
+        auto ss = init_switch(switchId, config, warmBootState, m_meta);
 
         if (!ss)
         {
@@ -596,7 +601,7 @@ sai_status_t VirtualSwitchSaiInterface::create(
         {
             update_real_object_ids(ss);
 
-            update_local_metadata(switch_id);
+            update_local_metadata(switchId);
 
             if (config->m_useTapDevice)
             {
@@ -605,26 +610,9 @@ sai_status_t VirtualSwitchSaiInterface::create(
         }
     }
 
-    sai_object_id_t switch_id;
+    auto ss = g_switch_state_map.at(switchId);
 
-    if (g_switch_state_map.size() == 0)
-    {
-        SWSS_LOG_ERROR("no switch!, was removed but some function still call");
-        return SAI_STATUS_FAILURE;
-    }
-
-    if (g_switch_state_map.size() == 1)
-    {
-        switch_id = g_switch_state_map.begin()->first;
-    }
-    else
-    {
-        SWSS_LOG_THROW("multiple switches not supported, FIXME");
-    }
-
-    auto ss = g_switch_state_map[switch_id];
-
-    return ss->create(object_type, serializedObjectId, switch_id, attr_count, attr_list);
+    return ss->create(object_type, serializedObjectId, switchId, attr_count, attr_list);
 }
 
 void VirtualSwitchSaiInterface::removeSwitch(
@@ -643,32 +631,13 @@ void VirtualSwitchSaiInterface::removeSwitch(
 }
 
 sai_status_t VirtualSwitchSaiInterface::remove(
+        _In_ sai_object_id_t switchId,
         _In_ sai_object_type_t objectType,
         _In_ const std::string& serializedObjectId)
 {
     SWSS_LOG_ENTER();
 
-    // std::string str_object_id = sai_serialize_object_id(object_id);
-    // sai_object_id_t switch_id = m_realObjectIdManager->saiSwitchIdQuery(object_id);
-
-    sai_object_id_t switch_id;
-
-    if (g_switch_state_map.size() == 0)
-    {
-        SWSS_LOG_ERROR("no switch!, was removed but some function still call");
-        return SAI_STATUS_FAILURE;
-    }
-
-    if (g_switch_state_map.size() == 1)
-    {
-        switch_id = g_switch_state_map.begin()->first;
-    }
-    else
-    {
-        SWSS_LOG_THROW("multiple switches not supported, FIXME");
-    }
-
-    auto ss = g_switch_state_map[switch_id];
+    auto ss = g_switch_state_map.at(switchId);
 
     // Perform db dump if warm restart was requested.
 
@@ -684,12 +653,12 @@ sai_status_t VirtualSwitchSaiInterface::remove(
         if (get(objectType, object_id, 1, &attr) == SAI_STATUS_SUCCESS)
         {
             SWSS_LOG_NOTICE("switch %s SAI_SWITCH_ATTR_RESTART_WARM = %s",
-                    sai_serialize_object_id(switch_id).c_str(),
+                    sai_serialize_object_id(switchId).c_str(),
                     attr.value.booldata ? "true" : "false");
 
             if (attr.value.booldata)
             {
-                m_warmBootData[switch_id] = ss->dump_switch_database_for_warm_restart();
+                m_warmBootData[switchId] = ss->dump_switch_database_for_warm_restart();
             }
         }
         else
@@ -717,39 +686,20 @@ sai_status_t VirtualSwitchSaiInterface::remove(
 }
 
 sai_status_t VirtualSwitchSaiInterface::set(
+        _In_ sai_object_id_t switchId,
         _In_ sai_object_type_t objectType,
         _In_ const std::string &serializedObjectId,
         _In_ const sai_attribute_t *attr)
 {
     SWSS_LOG_ENTER();
 
-    // TODO we will need switch id when multiple switches will be supported or
-    // each switch will have it's own interface, then not needed
-
-    sai_object_id_t switch_id = SAI_NULL_OBJECT_ID; // ,_realObjectIdManager->saiSwitchIdQuery(objectId)
-
-    if (g_switch_state_map.size() == 0)
-    {
-        SWSS_LOG_ERROR("no switch!, was removed but some function still call");
-        return SAI_STATUS_FAILURE;
-    }
-
-    if (g_switch_state_map.size() == 1)
-    {
-        switch_id = g_switch_state_map.begin()->first;
-    }
-    else
-    {
-        SWSS_LOG_THROW("multiple switches not supported, FIXME");
-    }
-
-    // TODO remove cast
-    auto ss = g_switch_state_map[switch_id];
+    auto ss = g_switch_state_map.at(switchId);
 
     return ss->set(objectType, serializedObjectId, attr);
 }
 
 sai_status_t VirtualSwitchSaiInterface::get(
+        _In_ sai_object_id_t switchId,
         _In_ sai_object_type_t objectType,
         _In_ const std::string& serializedObjectId,
         _In_ uint32_t attr_count,
@@ -757,45 +707,22 @@ sai_status_t VirtualSwitchSaiInterface::get(
 {
     SWSS_LOG_ENTER();
 
-    sai_object_id_t switch_id = SAI_NULL_OBJECT_ID;
-
-    if (g_switch_state_map.size() == 0)
-    {
-        SWSS_LOG_ERROR("no switch!, was removed but some function still call");
-        return SAI_STATUS_FAILURE;
-    }
-
-    if (g_switch_state_map.size() == 1)
-    {
-        switch_id = g_switch_state_map.begin()->first;
-    }
-    else
-    {
-        SWSS_LOG_THROW("multiple switches not supported, FIXME");
-    }
-
-    if (g_switch_state_map.find(switch_id) == g_switch_state_map.end())
-    {
-        SWSS_LOG_ERROR("failed to find switch %s in switch state map", sai_serialize_object_id(switch_id).c_str());
-
-        return SAI_STATUS_FAILURE;
-    }
-
-    auto ss = g_switch_state_map[switch_id];
+    auto ss = g_switch_state_map.at(switchId);
 
     return ss->get(objectType, serializedObjectId, attr_count, attr_list);
 }
 
 #define DECLARE_GET_ENTRY(OT,ot)                                \
 sai_status_t VirtualSwitchSaiInterface::get(                    \
-        _In_ const sai_ ## ot ## _t* ot,                        \
+        _In_ const sai_ ## ot ## _t* entry,                     \
         _In_ uint32_t attr_count,                               \
         _Inout_ sai_attribute_t *attr_list)                     \
 {                                                               \
     SWSS_LOG_ENTER();                                           \
     return get(                                                 \
+            entry->switch_id,                                   \
             SAI_OBJECT_TYPE_ ## OT,                             \
-            sai_serialize_ ## ot(*ot),                          \
+            sai_serialize_ ## ot(*entry),                       \
             attr_count,                                         \
             attr_list);                                         \
 }
@@ -930,7 +857,7 @@ sai_status_t VirtualSwitchSaiInterface::getStatsExt(
         return SAI_STATUS_FAILURE;
     }
 
-    auto ss = g_switch_state_map[switch_id];
+    auto ss = g_switch_state_map.at(switch_id);
 
     return ss->getStatsExt(
             object_type,
@@ -967,6 +894,7 @@ sai_status_t VirtualSwitchSaiInterface::clearStats(
 }
 
 sai_status_t VirtualSwitchSaiInterface::bulkRemove(
+        _In_ sai_object_id_t switchId,
         _In_ sai_object_type_t object_type,
         _In_ const std::vector<std::string> &serialized_object_ids,
         _In_ sai_bulk_op_error_mode_t mode,
@@ -994,7 +922,9 @@ sai_status_t VirtualSwitchSaiInterface::bulkRemove(
         serializedObjectIds.emplace_back(sai_serialize_object_id(object_id[idx]));
     }
 
-    return bulkRemove(object_type, serializedObjectIds, mode, object_statuses);
+    auto switchId = switchIdQuery(*object_id);
+
+    return bulkRemove(switchId, object_type, serializedObjectIds, mode, object_statuses);
 }
 
 sai_status_t VirtualSwitchSaiInterface::bulkRemove(
@@ -1012,7 +942,7 @@ sai_status_t VirtualSwitchSaiInterface::bulkRemove(
         serializedObjectIds.emplace_back(sai_serialize_route_entry(route_entry[idx]));
     }
 
-    return bulkRemove(SAI_OBJECT_TYPE_ROUTE_ENTRY, serializedObjectIds, mode, object_statuses);
+    return bulkRemove(route_entry->switch_id, SAI_OBJECT_TYPE_ROUTE_ENTRY, serializedObjectIds, mode, object_statuses);
 }
 
 sai_status_t VirtualSwitchSaiInterface::bulkRemove(
@@ -1030,7 +960,7 @@ sai_status_t VirtualSwitchSaiInterface::bulkRemove(
         serializedObjectIds.emplace_back(sai_serialize_nat_entry(nat_entry[idx]));
     }
 
-    return bulkRemove(SAI_OBJECT_TYPE_NAT_ENTRY, serializedObjectIds, mode, object_statuses);
+    return bulkRemove(nat_entry->switch_id, SAI_OBJECT_TYPE_NAT_ENTRY, serializedObjectIds, mode, object_statuses);
 }
 
 sai_status_t VirtualSwitchSaiInterface::bulkRemove(
@@ -1048,7 +978,7 @@ sai_status_t VirtualSwitchSaiInterface::bulkRemove(
         serializedObjectIds.emplace_back(sai_serialize_fdb_entry(fdb_entry[idx]));
     }
 
-    return bulkRemove(SAI_OBJECT_TYPE_FDB_ENTRY, serializedObjectIds, mode, object_statuses);
+    return bulkRemove(fdb_entry->switch_id, SAI_OBJECT_TYPE_FDB_ENTRY, serializedObjectIds, mode, object_statuses);
 }
 
 sai_status_t VirtualSwitchSaiInterface::bulkSet(
@@ -1068,7 +998,9 @@ sai_status_t VirtualSwitchSaiInterface::bulkSet(
         serializedObjectIds.emplace_back(sai_serialize_object_id(object_id[idx]));
     }
 
-    return bulkSet(object_type, serializedObjectIds, attr_list, mode, object_statuses);
+    auto switchId = switchIdQuery(*object_id);
+
+    return bulkSet(switchId, object_type, serializedObjectIds, attr_list, mode, object_statuses);
 }
 
 sai_status_t VirtualSwitchSaiInterface::bulkSet(
@@ -1087,7 +1019,7 @@ sai_status_t VirtualSwitchSaiInterface::bulkSet(
         serializedObjectIds.emplace_back(sai_serialize_route_entry(route_entry[idx]));
     }
 
-    return bulkSet(SAI_OBJECT_TYPE_ROUTE_ENTRY, serializedObjectIds, attr_list, mode, object_statuses);
+    return bulkSet(route_entry->switch_id, SAI_OBJECT_TYPE_ROUTE_ENTRY, serializedObjectIds, attr_list, mode, object_statuses);
 }
 
 sai_status_t VirtualSwitchSaiInterface::bulkSet(
@@ -1106,7 +1038,7 @@ sai_status_t VirtualSwitchSaiInterface::bulkSet(
         serializedObjectIds.emplace_back(sai_serialize_nat_entry(nat_entry[idx]));
     }
 
-    return bulkSet(SAI_OBJECT_TYPE_NAT_ENTRY, serializedObjectIds, attr_list, mode, object_statuses);
+    return bulkSet(nat_entry->switch_id, SAI_OBJECT_TYPE_NAT_ENTRY, serializedObjectIds, attr_list, mode, object_statuses);
 }
 
 sai_status_t VirtualSwitchSaiInterface::bulkSet(
@@ -1125,10 +1057,11 @@ sai_status_t VirtualSwitchSaiInterface::bulkSet(
         serializedObjectIds.emplace_back(sai_serialize_fdb_entry(fdb_entry[idx]));
     }
 
-    return bulkSet(SAI_OBJECT_TYPE_FDB_ENTRY, serializedObjectIds, attr_list, mode, object_statuses);
+    return bulkSet(fdb_entry->switch_id, SAI_OBJECT_TYPE_FDB_ENTRY, serializedObjectIds, attr_list, mode, object_statuses);
 }
 
 sai_status_t VirtualSwitchSaiInterface::bulkSet(
+        _In_ sai_object_id_t switchId,
         _In_ sai_object_type_t object_type,
         _In_ const std::vector<std::string> &serialized_object_ids,
         _In_ const sai_attribute_t *attr_list,
@@ -1164,6 +1097,7 @@ sai_status_t VirtualSwitchSaiInterface::bulkCreate(
     }
 
     return bulkCreate(
+            switch_id,
             object_type,
             serialized_object_ids,
             attr_count,
@@ -1173,6 +1107,7 @@ sai_status_t VirtualSwitchSaiInterface::bulkCreate(
 }
 
 sai_status_t VirtualSwitchSaiInterface::bulkCreate(
+        _In_ sai_object_id_t switchId,
         _In_ sai_object_type_t object_type,
         _In_ const std::vector<std::string> &serialized_object_ids,
         _In_ const uint32_t *attr_count,
@@ -1207,6 +1142,7 @@ sai_status_t VirtualSwitchSaiInterface::bulkCreate(
     }
 
     return bulkCreate(
+            route_entry->switch_id,
             SAI_OBJECT_TYPE_ROUTE_ENTRY,
             serialized_object_ids,
             attr_count,
@@ -1237,6 +1173,7 @@ sai_status_t VirtualSwitchSaiInterface::bulkCreate(
     }
 
     return bulkCreate(
+            fdb_entry->switch_id,
             SAI_OBJECT_TYPE_FDB_ENTRY,
             serialized_object_ids,
             attr_count,
@@ -1267,6 +1204,7 @@ sai_status_t VirtualSwitchSaiInterface::bulkCreate(
     }
 
     return bulkCreate(
+            nat_entry->switch_id,
             SAI_OBJECT_TYPE_NAT_ENTRY,
             serialized_object_ids,
             attr_count,

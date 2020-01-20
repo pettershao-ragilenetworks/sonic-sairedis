@@ -105,7 +105,7 @@ sai_status_t VirtualSwitchSaiInterface::flushFdbEntries(
     std::map<std::string, SwitchState::AttrHash> dynamic_fdbs;
 
     // TODO cast right switch or different data pass
-    auto ss = g_switch_state_map[switch_id];
+    auto ss = g_switch_state_map.at(switch_id);
 
     for (auto it = fdbs.begin(); it != fdbs.end();)
     {
