@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_internal.h"
 
 VS_BULK_CREATE(LAG_MEMBER,lag_members);
 VS_BULK_REMOVE(LAG_MEMBER,lag_members);

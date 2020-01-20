@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_internal.h"
 
 VS_BULK_CREATE(NEXT_HOP_GROUP_MEMBER,next_hop_group_members);
 VS_BULK_REMOVE(NEXT_HOP_GROUP_MEMBER,next_hop_group_members);

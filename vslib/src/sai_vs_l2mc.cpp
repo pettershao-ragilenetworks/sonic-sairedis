@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_internal.h"
 
 VS_GENERIC_QUAD_ENTRY(L2MC_ENTRY,l2mc_entry);
 

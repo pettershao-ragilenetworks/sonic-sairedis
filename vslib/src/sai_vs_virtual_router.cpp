@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_internal.h"
 
 VS_GENERIC_QUAD(VIRTUAL_ROUTER,virtual_router);
 

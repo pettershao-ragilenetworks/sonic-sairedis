@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_internal.h"
 
 VS_GENERIC_QUAD(ROUTER_INTERFACE,router_interface);
 VS_GENERIC_STATS(ROUTER_INTERFACE,router_interface);

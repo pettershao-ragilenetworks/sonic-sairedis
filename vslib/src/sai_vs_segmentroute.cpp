@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_internal.h"
 
 VS_BULK_CREATE(SEGMENTROUTE_SIDLIST,segmentroute_sidlists);
 VS_BULK_REMOVE(SEGMENTROUTE_SIDLIST,segmentroute_sidlists);

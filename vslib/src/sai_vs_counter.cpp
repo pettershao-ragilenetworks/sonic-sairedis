@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_internal.h"
 
 VS_GENERIC_QUAD(COUNTER,counter);
 VS_GENERIC_STATS(COUNTER,counter);

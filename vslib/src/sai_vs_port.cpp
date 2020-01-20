@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_internal.h"
 
 sai_status_t vs_clear_port_all_stats(
         _In_ sai_object_id_t port_id)

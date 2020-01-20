@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_internal.h"
 
 VS_GENERIC_QUAD(BUFFER_POOL,buffer_pool);
 VS_GENERIC_QUAD(INGRESS_PRIORITY_GROUP,ingress_priority_group);

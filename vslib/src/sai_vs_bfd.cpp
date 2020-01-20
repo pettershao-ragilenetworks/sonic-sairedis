@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_internal.h"
 
 VS_GENERIC_QUAD(BFD_SESSION,bfd_session);
 VS_GENERIC_STATS(BFD_SESSION,bfd_session);

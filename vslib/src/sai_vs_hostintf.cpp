@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_internal.h"
 
 static sai_status_t vs_recv_hostif_packet(
         _In_ sai_object_id_t hif_id,

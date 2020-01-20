@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_internal.h"
 
 VS_GENERIC_QUAD(DTEL,dtel);
 VS_GENERIC_QUAD(DTEL_QUEUE_REPORT,dtel_queue_report);

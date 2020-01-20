@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_internal.h"
 
 VS_GENERIC_QUAD(UDF,udf)
 VS_GENERIC_QUAD(UDF_MATCH,udf_match)

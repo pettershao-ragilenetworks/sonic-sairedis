@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_internal.h"
 
 VS_GENERIC_QUAD(ISOLATION_GROUP,isolation_group);
 VS_GENERIC_QUAD(ISOLATION_GROUP_MEMBER,isolation_group_member);

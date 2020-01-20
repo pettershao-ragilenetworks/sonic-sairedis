@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_internal.h"
 
 VS_BULK_QUAD_ENTRY(NAT_ENTRY,nat_entry);
 

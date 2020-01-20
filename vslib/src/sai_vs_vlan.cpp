@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_internal.h"
 
 VS_BULK_CREATE(VLAN_MEMBER,vlan_members);
 VS_BULK_REMOVE(VLAN_MEMBER,vlan_members);

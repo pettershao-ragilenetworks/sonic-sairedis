@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_internal.h"
 
 static sai_status_t vs_remove_all_neighbor_entries(
         _In_ sai_object_id_t switch_id)

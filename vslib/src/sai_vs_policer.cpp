@@ -1,5 +1,4 @@
 #include "sai_vs.h"
-#include "sai_vs_internal.h"
 
 VS_GENERIC_QUAD(POLICER,policer);
 VS_GENERIC_STATS(POLICER,policer);
