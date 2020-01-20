@@ -22,11 +22,14 @@ void Sai::stopEventQueueThread()
 
     SWSS_LOG_NOTICE("begin");
 
-    m_eventQueueThreadRun = false;
+    if (m_eventQueueThreadRun)
+    {
+        m_eventQueueThreadRun = false;
 
-    m_eventQueue->enqueue(std::make_shared<Event>(EventType::EVENT_TYPE_END_THREAD, nullptr));
+        m_eventQueue->enqueue(std::make_shared<Event>(EventType::EVENT_TYPE_END_THREAD, nullptr));
 
-    m_eventQueueThread->join();
+        m_eventQueueThread->join();
+    }
 
     SWSS_LOG_NOTICE("end");
 }

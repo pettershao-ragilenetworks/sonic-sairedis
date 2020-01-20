@@ -31,16 +31,19 @@ void Sai::stopUnittestThread()
 {
     SWSS_LOG_ENTER();
 
-    m_unittestChannelRun = false;
+    SWSS_LOG_NOTICE("begin");
 
-    // notify thread that it should end
-    m_unittestChannelThreadEvent->notify();
+    if (m_unittestChannelRun)
+    {
+        m_unittestChannelRun = false;
 
-    SWSS_LOG_NOTICE("ending unittest thread ...");
+        // notify thread that it should end
+        m_unittestChannelThreadEvent->notify();
 
-    m_unittestChannelThread->join();
+        m_unittestChannelThread->join();
+    }
 
-    SWSS_LOG_NOTICE("unittest thread ended");
+    SWSS_LOG_NOTICE("end");
 }
 
 void Sai::channelOpEnableUnittest(

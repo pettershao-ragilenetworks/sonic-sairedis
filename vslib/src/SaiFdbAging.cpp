@@ -35,11 +35,14 @@ void Sai::stopFdbAgingThread()
 
     SWSS_LOG_NOTICE("begin");
 
-    m_fdbAgingThreadEvent->notify();
+    if (m_fdbAgingThreadRun)
+    {
+        m_fdbAgingThreadRun = false;
 
-    m_fdbAgingThreadRun = false;
+        m_fdbAgingThreadEvent->notify();
 
-    m_fdbAgingThread->join();
+        m_fdbAgingThread->join();
+    }
 
     SWSS_LOG_NOTICE("end");
 }
