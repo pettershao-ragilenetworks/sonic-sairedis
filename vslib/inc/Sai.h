@@ -384,9 +384,9 @@ namespace saivs
 
         private:
 
-            //bool m_apiInitialized;
+            bool m_apiInitialized;
 
-            //std::recursive_mutex m_mutex;
+            std::recursive_mutex m_apimutex;
 
             std::shared_ptr<saimeta::Meta> m_meta;
 

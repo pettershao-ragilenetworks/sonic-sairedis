@@ -32,7 +32,6 @@ libsaivs_la_SOURCES = \
 					  LaneMapFileParser.cpp \
 					  VirtualSwitchSaiInterfacePort.cpp \
 					  VirtualSwitchSaiInterfaceFdb.cpp \
-					  Globals.cpp \
 					  Switch.cpp \
 					  FdbInfo.cpp \
 					  SwitchContainer.cpp \

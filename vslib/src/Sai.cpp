@@ -29,13 +29,19 @@ Sai::Sai()
     SWSS_LOG_ENTER();
 
     m_unittestChannelRun = false;
+
+    m_fdbAgingThreadRun = false;
+
+    m_eventQueueThreadRun = false;
+
+    m_apiInitialized = false;
 }
 
 Sai::~Sai()
 {
     SWSS_LOG_ENTER();
 
-    if (Globals::apiInitialized)
+    if (m_apiInitialized)
     {
         uninitialize();
     }
@@ -51,7 +57,7 @@ sai_status_t Sai::initialize(
 
     SWSS_LOG_ENTER();
 
-    if (Globals::apiInitialized)
+    if (m_apiInitialized)
     {
         SWSS_LOG_ERROR("%s: api already initialized", __PRETTY_FUNCTION__);
 
@@ -154,7 +160,7 @@ sai_status_t Sai::initialize(
 
     startFdbAgingThread();
 
-    Globals::apiInitialized = true;
+    m_apiInitialized = true;
 
     return SAI_STATUS_SUCCESS;
 }
@@ -188,7 +194,7 @@ sai_status_t Sai::uninitialize(void)
     m_vsSai = nullptr;
     m_meta = nullptr;
 
-    Globals::apiInitialized = false;
+    m_apiInitialized = false;
 
     return SAI_STATUS_SUCCESS;
 }
@@ -702,7 +708,7 @@ sai_object_type_t Sai::objectTypeQuery(
 {
     SWSS_LOG_ENTER();
 
-    if (!Globals::apiInitialized)
+    if (!m_apiInitialized)
     {
         SWSS_LOG_ERROR("%s: SAI API not initialized", __PRETTY_FUNCTION__);
 
@@ -719,7 +725,7 @@ sai_object_id_t Sai::switchIdQuery(
 {
     SWSS_LOG_ENTER();
 
-    if (!Globals::apiInitialized)
+    if (!m_apiInitialized)
     {
         SWSS_LOG_ERROR("%s: SAI API not initialized", __PRETTY_FUNCTION__);
 

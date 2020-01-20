@@ -5,7 +5,6 @@ extern "C" {
 #include "saiextensions.h"
 }
 
-#include "Globals.h"
 #include "Sai.h"
 
 #include <memory>

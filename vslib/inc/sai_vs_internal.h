@@ -1,8 +1,8 @@
 
-#define MUTEX() std::lock_guard<std::recursive_mutex> _lock(saivs::Globals::apimutex)
+#define MUTEX() std::lock_guard<std::recursive_mutex> _lock(m_apimutex)
 
 #define VS_CHECK_API_INITIALIZED()                                          \
-    if (!saivs::Globals::apiInitialized) {                                  \
+    if (!m_apiInitialized) {                                                \
         SWSS_LOG_ERROR("%s: api not initialized", __PRETTY_FUNCTION__);     \
         return SAI_STATUS_FAILURE; }
 
