@@ -33,8 +33,6 @@ namespace saivs
              */
             typedef std::map<sai_object_type_t, std::map<std::string, AttrHash>> ObjectHash;
 
-            typedef std::map<sai_object_id_t, std::shared_ptr<SwitchState>> SwitchStateMap;
-
         public:
 
             SwitchState(

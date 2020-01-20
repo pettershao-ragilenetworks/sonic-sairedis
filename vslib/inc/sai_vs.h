@@ -5,22 +5,11 @@ extern "C" {
 #include "saiextensions.h"
 }
 
-#include "meta/sai_serialize.h"
-#include "meta/Meta.h"
-
-#include "SwitchConfig.h"
 #include "Globals.h"
-#include "RealObjectIdManager.h"
-#include "VirtualSwitchSaiInterface.h"
-#include "FdbInfo.h"
-#include "SwitchState.h"
-#include "LaneMapContainer.h"
+#include "SwitchStateBase.h"
 #include "Sai.h"
 
-#include "swss/logger.h"
-#include "swss/tokenize.h"
-
-#include <mutex>
+#include <memory>
 
 #define SAI_VS_VETH_PREFIX   "v"
 
@@ -30,7 +19,7 @@ extern "C" {
 
 #define DEFAULT_VLAN_NUMBER 1
 
-extern saivs::SwitchState::SwitchStateMap g_switch_state_map;
+extern saivs::SwitchStateBase::SwitchStateMap g_switch_state_map;
 
 #define PRIVATE __attribute__((visibility("hidden")))
 

@@ -5,6 +5,8 @@
 #include "swss/logger.h"
 #include "swss/select.h"
 
+#include "meta/sai_serialize.h"
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -101,7 +103,7 @@ void HostInterfaceInfo::process_packet_for_fdb_event(
     // TODO we would like not use manager static method here
     sai_object_id_t switch_id = RealObjectIdManager::switchIdQuery(m_portId);
 
-    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map.at(switch_id));
+    auto ss = g_switch_state_map.at(switch_id);
 
     ss->process_packet_for_fdb_event(m_portId, m_name, buffer, size);
 }

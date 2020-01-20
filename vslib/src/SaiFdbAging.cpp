@@ -52,7 +52,7 @@ void Sai::processFdbEntriesForAging()
     for (auto& it: g_switch_state_map)
     {
         // TODO remove cast
-        std::dynamic_pointer_cast<SwitchStateBase>(it.second)->processFdbEntriesForAging();
+        it.second->processFdbEntriesForAging();
     }
 }
 

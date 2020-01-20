@@ -21,6 +21,8 @@
 
 using namespace saivs;
 
+SwitchStateBase::SwitchStateMap g_switch_state_map;
+
 VirtualSwitchSaiInterface::VirtualSwitchSaiInterface(
         _In_ const std::shared_ptr<SwitchConfigContainer> scc)
 {
@@ -61,8 +63,6 @@ void VirtualSwitchSaiInterface::setMeta(
 
     m_meta = meta;
 }
-
-SwitchState::SwitchStateMap g_switch_state_map;
 
 void VirtualSwitchSaiInterface::update_real_object_ids(
         _In_ const std::shared_ptr<SwitchState> warmBootState)
@@ -512,8 +512,7 @@ std::shared_ptr<SwitchStateBase> VirtualSwitchSaiInterface::init_switch(
 
     // TODO remove switch state map
 
-    // TODO cast right switch or different data pass
-    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
+    auto ss = g_switch_state_map[switch_id];
 
     ss->setMeta(meta);
 
@@ -623,8 +622,7 @@ sai_status_t VirtualSwitchSaiInterface::create(
         SWSS_LOG_THROW("multiple switches not supported, FIXME");
     }
 
-    // TODO remove cast
-    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
+    auto ss = g_switch_state_map[switch_id];
 
     return ss->create(object_type, serializedObjectId, switch_id, attr_count, attr_list);
 }
@@ -670,8 +668,7 @@ sai_status_t VirtualSwitchSaiInterface::remove(
         SWSS_LOG_THROW("multiple switches not supported, FIXME");
     }
 
-    // TODO remove cast
-    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
+    auto ss = g_switch_state_map[switch_id];
 
     // Perform db dump if warm restart was requested.
 
@@ -747,7 +744,7 @@ sai_status_t VirtualSwitchSaiInterface::set(
     }
 
     // TODO remove cast
-    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
+    auto ss = g_switch_state_map[switch_id];
 
     return ss->set(objectType, serializedObjectId, attr);
 }
@@ -784,8 +781,7 @@ sai_status_t VirtualSwitchSaiInterface::get(
         return SAI_STATUS_FAILURE;
     }
 
-    // TODO remove cast
-    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
+    auto ss = g_switch_state_map[switch_id];
 
     return ss->get(objectType, serializedObjectId, attr_count, attr_list);
 }
@@ -934,8 +930,7 @@ sai_status_t VirtualSwitchSaiInterface::getStatsExt(
         return SAI_STATUS_FAILURE;
     }
 
-    // TODO remove cast
-    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
+    auto ss = g_switch_state_map[switch_id];
 
     return ss->getStatsExt(
             object_type,

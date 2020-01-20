@@ -2,6 +2,7 @@
 #include "SwitchStateBase.h"
 
 #include "swss/logger.h"
+#include "meta/sai_serialize.h"
 
 #include "sai_vs.h" // TODO to be removed
 
@@ -104,7 +105,7 @@ sai_status_t VirtualSwitchSaiInterface::flushFdbEntries(
     std::map<std::string, SwitchState::AttrHash> dynamic_fdbs;
 
     // TODO cast right switch or different data pass
-    auto ss = std::dynamic_pointer_cast<SwitchStateBase>(g_switch_state_map[switch_id]);
+    auto ss = g_switch_state_map[switch_id];
 
     for (auto it = fdbs.begin(); it != fdbs.end();)
     {

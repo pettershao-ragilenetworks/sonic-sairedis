@@ -179,7 +179,7 @@ sai_status_t Sai::uninitialize(void)
     m_vsSai = nullptr;
     m_meta = nullptr;
 
-    g_switch_state_map.clear();
+    g_switch_state_map.clear(); // this will stop hostif threads
 
     Globals::apiInitialized = false;
 
