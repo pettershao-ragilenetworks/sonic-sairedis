@@ -349,6 +349,9 @@ namespace saivs
             void syncProcessEventPacket(
                     _In_ std::shared_ptr<EventPayloadPacket> payload);
 
+            void syncProcessEventNetLinkMsg(
+                    _In_ std::shared_ptr<EventPayloadNetLinkMsg> payload);
+
         private: // unittests
 
             bool m_unittestChannelRun;

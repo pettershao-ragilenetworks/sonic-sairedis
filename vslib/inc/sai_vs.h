@@ -10,10 +10,6 @@ extern "C" {
 
 #include <memory>
 
-#define SAI_VS_VETH_PREFIX   "v"
-
-#define DEFAULT_VLAN_NUMBER 1
-
 #define PRIVATE __attribute__((visibility("hidden")))
 
 PRIVATE extern const sai_acl_api_t              vs_acl_api;

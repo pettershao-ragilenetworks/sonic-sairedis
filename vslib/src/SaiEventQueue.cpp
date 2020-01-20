@@ -58,13 +58,16 @@ void Sai::processQueueEvent(
 
     switch (type)
     {
-        case EventType::EVENT_TYPE_END_THREAD:
+        case EVENT_TYPE_END_THREAD:
 
             SWSS_LOG_NOTICE("received EVENT_TYPE_END_THREAD, will process all messages and end");
             break;
 
-        case EventType::EVENT_TYPE_PACKET:
+        case EVENT_TYPE_PACKET:
             return syncProcessEventPacket(std::dynamic_pointer_cast<EventPayloadPacket>(event->getPayload()));
+
+        case EVENT_TYPE_NET_LINK_MSG:
+            return syncProcessEventNetLinkMsg(std::dynamic_pointer_cast<EventPayloadNetLinkMsg>(event->getPayload()));
 
         default:
 
@@ -81,5 +84,15 @@ void Sai::syncProcessEventPacket(
     SWSS_LOG_ENTER();
 
     m_vsSai->syncProcessEventPacket(payload);
+}
+
+void Sai::syncProcessEventNetLinkMsg(
+        _In_ std::shared_ptr<EventPayloadNetLinkMsg> payload)
+{
+    MUTEX();
+
+    SWSS_LOG_ENTER();
+
+    m_vsSai->syncProcessEventNetLinkMsg(payload);
 }
 

@@ -101,7 +101,7 @@ namespace saivs
 
             sai_object_id_t m_switch_id;
 
-        protected: // tap device related objects
+        private : // tap device related objects
 
             std::map<sai_object_id_t, std::string> m_port_id_to_tapname;
 
@@ -110,6 +110,8 @@ namespace saivs
             uint64_t m_linkCallbackIndex;
 
             std::mutex m_mutex;
+
+        protected:
 
             std::weak_ptr<saimeta::Meta> m_meta;
 

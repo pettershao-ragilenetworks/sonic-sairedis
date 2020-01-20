@@ -12,7 +12,7 @@ namespace saivs
     {
         EVENT_TYPE_END_THREAD,
 
-        EVENT_TYPE_NET_LINK_MESSAGE,
+        EVENT_TYPE_NET_LINK_MSG,
 
         EVENT_TYPE_PACKET,
 

@@ -179,6 +179,8 @@ sai_status_t Sai::uninitialize(void)
     // at this point packets may still arrive on hostif but event queue thread
     // ended so they will not be processed
 
+    // TODO at this point we can have MUTEX();
+
     // clear state after ending all threads
 
     m_vsSai->writeWarmBootFile(m_warm_boot_write_file);

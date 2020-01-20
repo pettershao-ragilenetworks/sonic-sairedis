@@ -54,8 +54,6 @@ namespace saivs
 
             sai_object_id_t m_portId;
 
-            sai_object_id_t m_hostif_vid;
-
             bool m_run_thread;
 
             std::shared_ptr<EventQueue> m_eventQueue;

@@ -9,6 +9,7 @@ endif
 lib_LTLIBRARIES = libsaivs.la
 
 libsaivs_la_SOURCES = \
+					  EventPayloadNetLinkMsg.cpp \
 					  SaiEventQueue.cpp \
 					  Event.cpp \
 					  EventQueue.cpp \

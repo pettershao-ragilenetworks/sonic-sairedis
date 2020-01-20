@@ -20,6 +20,9 @@
 #include <arpa/inet.h>
 #include <linux/if_packet.h>
 #include <linux/if_ether.h>
+#include <netlink/route/link.h>
+#include <netlink/route/addr.h>
+#include <linux/if.h>
 
 #include <algorithm>
 
@@ -31,6 +34,8 @@ using namespace saivs;
 #define ETH_FRAME_BUFFER_SIZE (0x4000)
 
 #define MAX_INTERFACE_NAME_LEN IFNAMSIZ
+
+#define SAI_VS_VETH_PREFIX   "v"
 
 int SwitchStateBase::vs_create_tap_device(
         _In_ const char *dev,
@@ -110,8 +115,6 @@ void SwitchStateBase::update_port_oper_status(
         _In_ sai_object_id_t port_id,
         _In_ sai_port_oper_status_t port_oper_status)
 {
-    MUTEX(); // since called from async thread (TODO use queue manager)
-
     SWSS_LOG_ENTER();
 
     sai_attribute_t attr;
@@ -178,6 +181,7 @@ void SwitchStateBase::send_port_up_notification(
 
     // NOTE this callback should be executed from separate non blocking thread
 
+    // TODO create event !
     if (callback)
         callback(1, &data);
 }
@@ -454,9 +458,14 @@ bool SwitchStateBase::hostif_create_tap_veth_forwarding(
         return false;
     }
 
-    // TODO pass correct if index
     m_hostif_info_map[tapname] =
-        std::make_shared<HostInterfaceInfo>(0, packet_socket, tapfd, tapname, port_id, m_switchConfig->m_eventQueue);
+        std::make_shared<HostInterfaceInfo>(
+                sock_address.sll_ifindex,
+                packet_socket,
+                tapfd,
+                tapname,
+                port_id,
+                m_switchConfig->m_eventQueue);
 
     SWSS_LOG_NOTICE("setup forward rule for %s succeeded", tapname.c_str());
 
@@ -741,4 +750,140 @@ sai_status_t SwitchStateBase::removeHostif(
 
     return SAI_STATUS_SUCCESS;
 }
+
+bool SwitchStateBase::hasIfIndex(
+        _In_ int ifindex) const
+{
+    SWSS_LOG_ENTER();
+
+    for (auto& kvp: m_hostif_info_map)
+    {
+        if (kvp.second->m_ifindex == ifindex)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void SwitchStateBase::syncOnLinkMsg(
+        _In_ std::shared_ptr<EventPayloadNetLinkMsg> payload)
+{
+    SWSS_LOG_ENTER();
+
+    // XXX if during switch shutdown lane map changed (port added/removed)
+    // then loaded lane map will point to wrong mapping
+
+    auto ifindex = payload->getIfIndex();
+    auto ifflags = payload->getIfFlags();
+    auto ifname = payload->getIfName();
+
+    auto msgtype = payload->getNlmsgType();
+
+    if (msgtype != RTM_NEWLINK)
+    {
+        // ignore delete message
+        return;
+    }
+
+    if (!hasIfIndex(ifindex))
+    {
+        // since we will receive messages from all indexes and all switches
+        // then we only need to check messages addressed for us and since
+        // ifindex is unique across system, then we will use that
+
+        return;
+    }
+
+    auto map = m_switchConfig->m_laneMap;
+
+    if (!map)
+    {
+        SWSS_LOG_ERROR("lane map for switch %s don't exists",
+                sai_serialize_object_id(m_switch_id).c_str());
+        return;
+    }
+
+    if (strncmp(ifname.c_str(), SAI_VS_VETH_PREFIX, sizeof(SAI_VS_VETH_PREFIX) - 1) != 0 &&
+            !map->hasInterface(ifname))
+    {
+        SWSS_LOG_ERROR("skipping newlink for %s, name not found in map", ifname.c_str());
+        return;
+    }
+
+    SWSS_LOG_NOTICE("newlink: ifindex: %d, ifflags: 0x%x, ifname: %s",
+            ifindex,
+            ifflags,
+            ifname.c_str());
+
+    auto portId = getPortIdFromIfName(ifname);
+
+    if (portId == SAI_NULL_OBJECT_ID)
+    {
+        SWSS_LOG_ERROR("failed to find port id for interface %s", ifname.c_str());
+        return;
+    }
+
+    auto objectType = objectTypeQuery(portId); // can be port, bridge port, lag
+
+    if (objectType != SAI_OBJECT_TYPE_PORT)
+    {
+        SWSS_LOG_ERROR("object type %s not supported",
+                sai_serialize_object_type(objectType).c_str());
+
+        return;
+    }
+
+    sai_port_oper_status_notification_t data;
+
+    data.port_id = portId;
+    data.port_state = (ifflags & IFF_LOWER_UP) ? SAI_PORT_OPER_STATUS_UP : SAI_PORT_OPER_STATUS_DOWN;
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_PORT_ATTR_OPER_STATUS;
+
+    if (get(objectType, portId, 1, &attr) != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_ERROR("failed to get port attribute SAI_PORT_ATTR_OPER_STATUS");
+    }
+    else
+    {
+        if ((sai_port_oper_status_t)attr.value.s32 == data.port_state)
+        {
+            SWSS_LOG_INFO("port oper status didn't changed, will not send notification");
+            return;
+        }
+    }
+
+    update_port_oper_status(portId, data.port_state);
+
+    attr.id = SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY;
+
+    if (get(SAI_OBJECT_TYPE_SWITCH, m_switch_id, 1, &attr) != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_ERROR("failed to get SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY for switch %s",
+                sai_serialize_object_id(m_switch_id).c_str());
+        return;
+    }
+
+    sai_port_state_change_notification_fn callback =
+        (sai_port_state_change_notification_fn)attr.value.ptr;
+
+    if (callback == NULL)
+    {
+        return;
+    }
+
+    SWSS_LOG_DEBUG("executing callback SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY for port %s: %s",
+            sai_serialize_object_id(data.port_id).c_str(),
+            sai_serialize_port_oper_status(data.port_state).c_str());
+
+    // TODO we should also call Meta for this notification
+
+    callback(1, &data);
+}
+
+
 

@@ -7,6 +7,7 @@
 #include "SwitchStateBase.h"
 #include "EventQueue.h"
 #include "EventPayloadPacket.h"
+#include "EventPayloadNetLinkMsg.h"
 
 #include "lib/inc/SaiInterface.h"
 
@@ -362,6 +363,9 @@ namespace saivs
 
             void syncProcessEventPacket(
                     _In_ std::shared_ptr<EventPayloadPacket> payload);
+
+            void syncProcessEventNetLinkMsg(
+                    _In_ std::shared_ptr<EventPayloadNetLinkMsg> payload);
 
         private:
 

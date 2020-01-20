@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "SwitchState.h"
@@ -7,11 +6,14 @@
 #include "WarmBootState.h"
 #include "SwitchConfig.h"
 #include "RealObjectIdManager.h"
+#include "EventPayloadNetLinkMsg.h"
 
 #include <set>
 #include <unordered_set>
 
 #define SAI_VS_FDB_INFO "SAI_VS_FDB_INFO"
+
+#define DEFAULT_VLAN_NUMBER 1
 
 #define CHECK_STATUS(status) {                                  \
     sai_status_t _status = (status);                            \
@@ -356,6 +358,9 @@ namespace saivs
             void send_port_up_notification(
                     _In_ sai_object_id_t port_id);
 
+            bool hasIfIndex(
+                    _In_ int ifIndex) const;
+
         public: // TODO move inside warm boot load state
 
             sai_status_t vs_recreate_hostif_tap_interfaces();
@@ -365,6 +370,9 @@ namespace saivs
                     _In_ sai_port_oper_status_t port_oper_status);
 
             std::string dump_switch_database_for_warm_restart() const;
+
+            void syncOnLinkMsg(
+                    _In_ std::shared_ptr<EventPayloadNetLinkMsg> payload);
 
         protected:
 

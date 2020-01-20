@@ -1415,6 +1415,10 @@ void VirtualSwitchSaiInterface::debugSetStats(
     it->second->debugSetStats(oid, stats);
 }
 
+// those are asynchronous events that are executed under api mutex, we should
+// take care and double check if objects received still exists, and we should
+// use meta to check that
+
 void VirtualSwitchSaiInterface::syncProcessEventPacket(
         _In_ std::shared_ptr<EventPayloadPacket> payload)
 {
@@ -1445,4 +1449,24 @@ void VirtualSwitchSaiInterface::syncProcessEventPacket(
             payload->getIfName(),
             buffer.getData(),
             buffer.getSize());
+}
+
+void VirtualSwitchSaiInterface::syncProcessEventNetLinkMsg(
+        _In_ std::shared_ptr<EventPayloadNetLinkMsg> payload)
+{
+    SWSS_LOG_ENTER();
+
+    auto switchId = payload->getSwitchId();
+
+    auto it = m_switchStateMap.find(switchId);
+
+    if (it == m_switchStateMap.end())
+    {
+        SWSS_LOG_NOTICE("switch %s don't exists in switch state map",
+                sai_serialize_object_id(switchId).c_str());
+
+        return;
+    }
+
+    it->second->syncOnLinkMsg(payload);
 }
