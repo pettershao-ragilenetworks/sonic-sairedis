@@ -4,6 +4,8 @@ extern "C" {
 #include "sai.h"
 }
 
+#include "EventQueue.h"
+
 #include "swss/selectableevent.h"
 
 #include <memory>
@@ -25,13 +27,14 @@ namespace saivs
                     _In_ int socket,
                     _In_ int tapfd,
                     _In_ const std::string& tapname,
-                    _In_ sai_object_id_t portId);
+                    _In_ sai_object_id_t portId,
+                    _In_ std::shared_ptr<EventQueue> eventQueue);
 
             virtual ~HostInterfaceInfo();
 
         public:
 
-            void process_packet_for_fdb_event(
+            void async_process_packet_for_fdb_event(
                     _In_ const uint8_t *buffer,
                     _In_ size_t size) const;
 
@@ -54,6 +57,8 @@ namespace saivs
             sai_object_id_t m_hostif_vid;
 
             bool m_run_thread;
+
+            std::shared_ptr<EventQueue> m_eventQueue;
 
         private:
 

@@ -6,20 +6,13 @@ extern "C" {
 }
 
 #include "Globals.h"
-#include "SwitchStateBase.h"
 #include "Sai.h"
 
 #include <memory>
 
 #define SAI_VS_VETH_PREFIX   "v"
 
-#define CHECK_STATUS(status) {                                  \
-    sai_status_t _status = (status);                            \
-    if (_status != SAI_STATUS_SUCCESS) { return _status; } }
-
 #define DEFAULT_VLAN_NUMBER 1
-
-extern saivs::SwitchStateBase::SwitchStateMap g_switch_state_map;
 
 #define PRIVATE __attribute__((visibility("hidden")))
 

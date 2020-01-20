@@ -2088,3 +2088,16 @@ sai_object_id_t SwitchStateBase::switchIdQuery(
     return RealObjectIdManager::switchIdQuery(objectId);
 }
 
+void SwitchStateBase::debugSetStats(
+        _In_ sai_object_id_t oid,
+        _In_ const std::map<sai_stat_id_t, uint64_t>& stats)
+{
+    SWSS_LOG_ENTER();
+
+    auto key = sai_serialize_object_id(oid);
+
+    for (auto& kvp: stats)
+    {
+        m_countersMap[key][kvp.first] = kvp.second;
+    }
+}

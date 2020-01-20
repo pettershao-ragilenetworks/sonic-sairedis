@@ -174,9 +174,7 @@ void Sai::channelOpSetStats(
 {
     SWSS_LOG_ENTER();
 
-    // NOTE: we need to find stats for specific object, later SAI already have
-    // this feature and this search could be optimized here:
-    // https://github.com/opencomputeproject/SAI/commit/acc83933ff21c68e8ef10c9826de45807fdc0438
+    // NOTE: add support for non object id stats
 
     sai_object_id_t oid;
 
@@ -198,32 +196,6 @@ void Sai::channelOpSetStats(
         return;
     }
 
-    /*
-     * Check if object for statistics was created and exists on switch.
-     */
-
-    auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash.at(ot);
-
-    auto it = objectHash.find(key.c_str());
-
-    if (it == objectHash.end())
-    {
-        SWSS_LOG_ERROR("object not found: %s", key.c_str());
-        return;
-    }
-
-    /*
-     * Check if object for statistics have statistic map created, if not
-     * create empty map.
-     */
-
-    auto &countersMap = g_switch_state_map.at(switch_id)->m_countersMap;
-
-    auto mapit = countersMap.find(key);
-
-    if (mapit == countersMap.end())
-        countersMap[key] = std::map<int,uint64_t>();
-
     auto statenum = sai_metadata_get_object_type_info(ot)->statenum;
 
     if (statenum == NULL)
@@ -233,17 +205,26 @@ void Sai::channelOpSetStats(
         return;
     }
 
+    /*
+     * Check if object for statistics have statistic map created, if not
+     * create empty map.
+     */
+
+    std::map<sai_stat_id_t, uint64_t> stats;
+
     for (auto v: values)
     {
         // value format: stat_enum_name:uint64
 
         auto name = fvField(v);
+        auto val  = fvValue(v);
 
         uint64_t value;
 
-        if (sscanf(fvValue(v).c_str(), "%" PRIu64, &value) != 1)
+        if (sscanf(val.c_str(), "%" PRIu64, &value) != 1)
         {
-            SWSS_LOG_ERROR("failed to deserialize %s as couner value uint64_t", fvValue(v).c_str());
+            SWSS_LOG_ERROR("failed to deserialize %s as couner value uint64_t", val.c_str());
+            continue;
         }
 
         // linear search
@@ -265,10 +246,12 @@ void Sai::channelOpSetStats(
             continue;
         }
 
-        SWSS_LOG_DEBUG("writting %s = %lu on %s", name.c_str(), value, key.c_str());
+        SWSS_LOG_INFO("writting %s = %lu on %s", name.c_str(), value, key.c_str());
 
-        countersMap.at(key)[enumvalue] = value;
+        stats[enumvalue] = value;
     }
+
+    m_vsSai->debugSetStats(oid, stats);
 }
 
 void Sai::handleUnittestChannelOp(
@@ -279,13 +262,6 @@ void Sai::handleUnittestChannelOp(
     MUTEX();
 
     SWSS_LOG_ENTER();
-
-    if (!Globals::apiInitialized)
-    {
-        SWSS_LOG_ERROR("%s: SAI API not initialized", __PRETTY_FUNCTION__);
-
-        return;
-    }
 
     /*
      * Since we will access and modify DB we need to be under mutex.

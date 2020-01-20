@@ -10,8 +10,11 @@ namespace saivs
 {
     typedef enum _EventType
     {
+        EVENT_TYPE_END_THREAD,
+
         EVENT_TYPE_NET_LINK_MESSAGE,
 
+        EVENT_TYPE_PACKET,
 
     } EventType;
 
@@ -27,7 +30,7 @@ namespace saivs
 
         public:
 
-            EventType getEventType() const;
+            EventType getType() const;
 
             std::shared_ptr<EventPayload> getPayload() const;
 

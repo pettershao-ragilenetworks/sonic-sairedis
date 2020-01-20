@@ -15,7 +15,7 @@ Event::Event(
     // empty
 }
 
-EventType Event::getEventType() const
+EventType Event::getType() const
 {
     SWSS_LOG_ENTER();
 

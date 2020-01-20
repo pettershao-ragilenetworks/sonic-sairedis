@@ -4,6 +4,9 @@
 #include "WarmBootState.h"
 #include "SwitchConfigContainer.h"
 #include "RealObjectIdManager.h"
+#include "SwitchStateBase.h"
+#include "EventQueue.h"
+#include "EventPayloadPacket.h"
 
 #include "lib/inc/SaiInterface.h"
 
@@ -351,6 +354,15 @@ namespace saivs
             bool readWarmBootFile(
                     _In_ const char* warmBootFile);
 
+            void ageFdbs();
+
+            void debugSetStats(
+                    _In_ sai_object_id_t oid,
+                    _In_ const std::map<sai_stat_id_t, uint64_t>& stats);
+
+            void syncProcessEventPacket(
+                    _In_ std::shared_ptr<EventPayloadPacket> payload);
+
         private:
 
             std::weak_ptr<saimeta::Meta> m_meta;
@@ -363,5 +375,6 @@ namespace saivs
 
             std::shared_ptr<RealObjectIdManager> m_realObjectIdManager;
 
+            SwitchStateBase::SwitchStateMap m_switchStateMap;
     };
 }

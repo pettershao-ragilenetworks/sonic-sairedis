@@ -21,8 +21,6 @@
 
 using namespace saivs;
 
-SwitchStateBase::SwitchStateMap g_switch_state_map;
-
 VirtualSwitchSaiInterface::VirtualSwitchSaiInterface(
         _In_ const std::shared_ptr<SwitchConfigContainer> scc)
 {
@@ -187,7 +185,7 @@ void VirtualSwitchSaiInterface::update_local_metadata(
      * called, we could check the actual state.
      */
 
-    const auto &objectHash = g_switch_state_map.at(switch_id)->m_objectHash;//.at(object_type);
+    const auto &objectHash = m_switchStateMap.at(switch_id)->m_objectHash;//.at(object_type);
 
     // first create switch
     // first we need to create all "oid" objects to have reference base
@@ -386,7 +384,8 @@ sai_status_t VirtualSwitchSaiInterface::set(
 
     auto status = preSet(objectType, objectId, attr);
 
-    CHECK_STATUS(status);
+    if (status != SAI_STATUS_SUCCESS)
+        return status;
 
     return set(
             switchIdQuery(objectId),
@@ -492,7 +491,7 @@ std::shared_ptr<SwitchStateBase> VirtualSwitchSaiInterface::init_switch(
         SWSS_LOG_THROW("init switch with NULL switch id is not allowed");
     }
 
-    if (g_switch_state_map.find(switch_id) != g_switch_state_map.end())
+    if (m_switchStateMap.find(switch_id) != m_switchStateMap.end())
     {
         SWSS_LOG_THROW("switch already exists %s", sai_serialize_object_id(switch_id).c_str());
     }
@@ -501,12 +500,12 @@ std::shared_ptr<SwitchStateBase> VirtualSwitchSaiInterface::init_switch(
     {
         case SAI_VS_SWITCH_TYPE_BCM56850:
 
-            g_switch_state_map[switch_id] = std::make_shared<SwitchBCM56850>(switch_id, m_realObjectIdManager, config, warmBootState);
+            m_switchStateMap[switch_id] = std::make_shared<SwitchBCM56850>(switch_id, m_realObjectIdManager, config, warmBootState);
             break;
 
         case SAI_VS_SWITCH_TYPE_MLNX2700:
 
-            g_switch_state_map[switch_id] = std::make_shared<SwitchMLNX2700>(switch_id, m_realObjectIdManager, config, warmBootState);
+            m_switchStateMap[switch_id] = std::make_shared<SwitchMLNX2700>(switch_id, m_realObjectIdManager, config, warmBootState);
 
             break;
 
@@ -519,7 +518,7 @@ std::shared_ptr<SwitchStateBase> VirtualSwitchSaiInterface::init_switch(
 
     // TODO remove switch state map
 
-    auto ss = g_switch_state_map.at(switch_id);
+    auto ss = m_switchStateMap.at(switch_id);
 
     ss->setMeta(meta);
 
@@ -610,7 +609,7 @@ sai_status_t VirtualSwitchSaiInterface::create(
         }
     }
 
-    auto ss = g_switch_state_map.at(switchId);
+    auto ss = m_switchStateMap.at(switchId);
 
     return ss->create(object_type, serializedObjectId, switchId, attr_count, attr_list);
 }
@@ -620,14 +619,14 @@ void VirtualSwitchSaiInterface::removeSwitch(
 {
     SWSS_LOG_ENTER();
 
-    if (g_switch_state_map.find(switch_id) == g_switch_state_map.end())
+    if (m_switchStateMap.find(switch_id) == m_switchStateMap.end())
     {
         SWSS_LOG_THROW("switch doesn't exist 0x%lx", switch_id);
     }
 
     SWSS_LOG_NOTICE("remove switch 0x%lx", switch_id);
 
-    g_switch_state_map.erase(switch_id);
+    m_switchStateMap.erase(switch_id);
 }
 
 sai_status_t VirtualSwitchSaiInterface::remove(
@@ -637,7 +636,7 @@ sai_status_t VirtualSwitchSaiInterface::remove(
 {
     SWSS_LOG_ENTER();
 
-    auto ss = g_switch_state_map.at(switchId);
+    auto ss = m_switchStateMap.at(switchId);
 
     // Perform db dump if warm restart was requested.
 
@@ -693,7 +692,7 @@ sai_status_t VirtualSwitchSaiInterface::set(
 {
     SWSS_LOG_ENTER();
 
-    auto ss = g_switch_state_map.at(switchId);
+    auto ss = m_switchStateMap.at(switchId);
 
     return ss->set(objectType, serializedObjectId, attr);
 }
@@ -707,7 +706,7 @@ sai_status_t VirtualSwitchSaiInterface::get(
 {
     SWSS_LOG_ENTER();
 
-    auto ss = g_switch_state_map.at(switchId);
+    auto ss = m_switchStateMap.at(switchId);
 
     return ss->get(objectType, serializedObjectId, attr_count, attr_list);
 }
@@ -835,29 +834,29 @@ sai_status_t VirtualSwitchSaiInterface::getStatsExt(
 
     sai_object_id_t switch_id = SAI_NULL_OBJECT_ID;
 
-    if (g_switch_state_map.size() == 0)
+    if (m_switchStateMap.size() == 0)
     {
         SWSS_LOG_ERROR("no switch!, was removed but some function still call");
         return SAI_STATUS_FAILURE;
     }
 
-    if (g_switch_state_map.size() == 1)
+    if (m_switchStateMap.size() == 1)
     {
-        switch_id = g_switch_state_map.begin()->first;
+        switch_id = m_switchStateMap.begin()->first;
     }
     else
     {
         SWSS_LOG_THROW("multiple switches not supported, FIXME");
     }
 
-    if (g_switch_state_map.find(switch_id) == g_switch_state_map.end())
+    if (m_switchStateMap.find(switch_id) == m_switchStateMap.end())
     {
         SWSS_LOG_ERROR("failed to find switch %s in switch state map", sai_serialize_object_id(switch_id).c_str());
 
         return SAI_STATUS_FAILURE;
     }
 
-    auto ss = g_switch_state_map.at(switch_id);
+    auto ss = m_switchStateMap.at(switch_id);
 
     return ss->getStatsExt(
             object_type,
@@ -1392,4 +1391,58 @@ bool VirtualSwitchSaiInterface::readWarmBootFile(
     }
 
     return true;
+}
+
+void VirtualSwitchSaiInterface::debugSetStats(
+        _In_ sai_object_id_t oid,
+        _In_ const std::map<sai_stat_id_t, uint64_t>& stats)
+{
+    SWSS_LOG_ENTER();
+
+    auto switchId = switchIdQuery(oid);
+
+    auto it = m_switchStateMap.find(switchId);
+
+    if (it == m_switchStateMap.end())
+    {
+        SWSS_LOG_ERROR("oid %s and it switch %s don't exists in switch state map",
+                sai_serialize_object_id(oid).c_str(),
+                sai_serialize_object_id(switchId).c_str());
+
+        return;
+    }
+
+    it->second->debugSetStats(oid, stats);
+}
+
+void VirtualSwitchSaiInterface::syncProcessEventPacket(
+        _In_ std::shared_ptr<EventPayloadPacket> payload)
+{
+    SWSS_LOG_ENTER();
+
+    // this method is executed under mutex, but from other thread so actual
+    // switch may not exists
+
+    auto port = payload->getPort();
+
+    auto switchId = switchIdQuery(port);
+
+    auto it = m_switchStateMap.find(switchId);
+
+    if (it == m_switchStateMap.end())
+    {
+        SWSS_LOG_WARN("oid %s and it switch %s don't exists in switch state map",
+                sai_serialize_object_id(port).c_str(),
+                sai_serialize_object_id(switchId).c_str());
+
+        return;
+    }
+
+    auto& buffer = payload->getBuffer();
+
+    it->second->process_packet_for_fdb_event(
+            port,
+            payload->getIfName(),
+            buffer.getData(),
+            buffer.getSize());
 }

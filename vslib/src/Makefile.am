@@ -9,6 +9,13 @@ endif
 lib_LTLIBRARIES = libsaivs.la
 
 libsaivs_la_SOURCES = \
+					  SaiEventQueue.cpp \
+					  Event.cpp \
+					  EventQueue.cpp \
+					  Signal.cpp \
+					  Buffer.cpp \
+					  EventPayloadPacket.cpp \
+					  VirtualSwitchSaiInterface.cpp \
 					  SaiFdbAging.cpp \
 					  SwitchConfigContainer.cpp \
 					  SwitchConfig.cpp \
@@ -29,7 +36,6 @@ libsaivs_la_SOURCES = \
 					  FdbInfo.cpp \
 					  SwitchContainer.cpp \
 					  RealObjectIdManager.cpp \
-					  VirtualSwitchSaiInterface.cpp \
 					  SaiAttrWrap.cpp \
 					  SelectableFd.cpp \
 					  SwitchState.cpp \

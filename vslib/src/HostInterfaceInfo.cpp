@@ -1,6 +1,7 @@
 #include "HostInterfaceInfo.h"
 #include "SwitchStateBase.h"
 #include "SelectableFd.h"
+#include "EventPayloadPacket.h"
 
 #include "swss/logger.h"
 #include "swss/select.h"
@@ -31,11 +32,13 @@ HostInterfaceInfo::HostInterfaceInfo(
         _In_ int socket,
         _In_ int tapfd,
         _In_ const std::string& tapname,
-        _In_ sai_object_id_t portId):
+        _In_ sai_object_id_t portId,
+        _In_ std::shared_ptr<EventQueue> eventQueue):
     m_ifindex(ifindex),
     m_packet_socket(socket),
     m_name(tapname),
     m_portId(portId),
+    m_eventQueue(eventQueue),
     m_tapfd(tapfd)
 {
     SWSS_LOG_ENTER();
@@ -77,35 +80,17 @@ HostInterfaceInfo::~HostInterfaceInfo()
     SWSS_LOG_NOTICE("joined threads for hostif: %s", m_name.c_str());
 }
 
-void HostInterfaceInfo::process_packet_for_fdb_event(
-        _In_ const uint8_t *buffer,
+void HostInterfaceInfo::async_process_packet_for_fdb_event(
+        _In_ const uint8_t *data,
         _In_ size_t size) const
 {
     SWSS_LOG_ENTER();
 
-    MUTEX();
-    //VS_CHECK_API_INITIALIZED();
+    auto buffer = Buffer(data, size);
 
-    if (!Globals::apiInitialized)
-    {
-        SWSS_LOG_ERROR("%s: api not initialized", __PRETTY_FUNCTION__);
-        return;
-    }
+    auto payload = std::make_shared<EventPayloadPacket>(m_portId, m_ifindex, m_name, buffer); 
 
-    // TODO this function could be still called when switch is removed
-    // during syncd shutdown
-    // no it can't now, since this thread is joined when switch destructor is called
-
-    // TODO send event to execute this in synchronized thread
-
-    // TODO remove cast
-
-    // TODO we would like not use manager static method here
-    sai_object_id_t switch_id = RealObjectIdManager::switchIdQuery(m_portId);
-
-    auto ss = g_switch_state_map.at(switch_id);
-
-    ss->process_packet_for_fdb_event(m_portId, m_name, buffer, size);
+    m_eventQueue->enqueue(std::make_shared<Event>(EventType::EVENT_TYPE_PACKET, payload));
 }
 
 #define ETH_FRAME_BUFFER_SIZE (0x4000)
@@ -210,7 +195,7 @@ void HostInterfaceInfo::veth2tap_fun()
             }
         }
 
-        process_packet_for_fdb_event(buffer, size);
+        async_process_packet_for_fdb_event(buffer, size);
 
         if (write(m_tapfd, buffer, size) < 0)
         {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "LaneMap.h"
+#include "EventQueue.h"
 
 #include <string>
 #include <memory>
@@ -61,5 +62,7 @@ namespace saivs
             bool m_useTapDevice;
 
             std::shared_ptr<LaneMap> m_laneMap;
+
+            std::shared_ptr<EventQueue> m_eventQueue;
     };
 }

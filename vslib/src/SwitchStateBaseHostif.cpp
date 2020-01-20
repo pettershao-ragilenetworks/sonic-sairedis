@@ -456,7 +456,7 @@ bool SwitchStateBase::hostif_create_tap_veth_forwarding(
 
     // TODO pass correct if index
     m_hostif_info_map[tapname] =
-        std::make_shared<HostInterfaceInfo>(0, packet_socket, tapfd, tapname, port_id);
+        std::make_shared<HostInterfaceInfo>(0, packet_socket, tapfd, tapname, port_id, m_switchConfig->m_eventQueue);
 
     SWSS_LOG_NOTICE("setup forward rule for %s succeeded", tapname.c_str());
 

@@ -4,26 +4,34 @@
 
 using namespace saivs;
 
-#define MUTEX std::lock_guard<std::mutex> _lock(m_mutex);
+#define QUEUE_MUTEX std::lock_guard<std::mutex> _lock(m_mutex);
+
+EventQueue::EventQueue(
+        _In_ std::shared_ptr<Signal> signal):
+    m_signal(signal)
+{
+    SWSS_LOG_ENTER();
+
+    // empty
+}
 
 void EventQueue::enqueue(
         _In_ std::shared_ptr<Event> event)
 {
     SWSS_LOG_ENTER();
 
-    MUTEX;
+    QUEUE_MUTEX;
 
     m_queue.push_back(event);
 
-    // TODO signal !
-
+    m_signal->notifyAll();
 }
 
 std::shared_ptr<Event> EventQueue::dequeue()
 {
     SWSS_LOG_ENTER();
 
-    MUTEX;
+    QUEUE_MUTEX;
 
     if (m_queue.size())
     {
@@ -41,7 +49,7 @@ size_t EventQueue::size()
 {
     SWSS_LOG_ENTER();
 
-    MUTEX;
+    QUEUE_MUTEX;
 
     return m_queue.size();
 }

@@ -113,6 +113,10 @@ sai_status_t Sai::initialize(
 
     SWSS_LOG_NOTICE("hostif use TAP device: %s", (useTapDevice ? "true" : "false"));
 
+    m_signal = std::make_shared<Signal>();
+
+    m_eventQueue = std::make_shared<EventQueue>(m_signal);
+
     auto sc = std::make_shared<SwitchConfig>();
 
     sc->m_switchType = switchType;
@@ -120,14 +124,13 @@ sai_status_t Sai::initialize(
     sc->m_switchIndex = 0;
     sc->m_useTapDevice = useTapDevice;
     sc->m_laneMap = m_laneMapContainer->getLaneMap(sc->m_switchIndex);
+    sc->m_eventQueue = m_eventQueue;
 
     auto scc = std::make_shared<SwitchConfigContainer>();
 
     scc->insert(sc);
 
     // most important
-
-    g_switch_state_map.clear();
 
     m_vsSai = std::make_shared<VirtualSwitchSaiInterface>(scc);
 
@@ -144,6 +147,8 @@ sai_status_t Sai::initialize(
             sc->m_bootType = SAI_VS_BOOT_TYPE_COLD;
         }
     }
+
+    startEventQueueThread();
 
     startUnittestThread();
 
@@ -169,8 +174,10 @@ sai_status_t Sai::uninitialize(void)
 
     stopFdbAgingThread();
 
-    // at this point some api maybe under execution
-    // and hostif threads are still running
+    stopEventQueueThread();
+
+    // at this point packets may still arrive on hostif but event queue thread
+    // ended so they will not be processed
 
     // clear state after ending all threads
 
@@ -178,8 +185,6 @@ sai_status_t Sai::uninitialize(void)
 
     m_vsSai = nullptr;
     m_meta = nullptr;
-
-    g_switch_state_map.clear(); // this will stop hostif threads
 
     Globals::apiInitialized = false;
 

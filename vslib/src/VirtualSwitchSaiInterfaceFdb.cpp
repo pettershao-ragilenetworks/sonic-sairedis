@@ -90,22 +90,22 @@ sai_status_t VirtualSwitchSaiInterface::flushFdbEntries(
      * until notifications learned/aged will be sent.
      *
      * After learning fdb event, fdb entry will be put into 3 places:
-     * - local db g_switch_state_map
+     * - local db m_switchStateMap
      * - metadata db, and
      * - g_fdb_info_set (contains only learned entries)
      *
-     * This call should clear g_switch_state_map and g_fdb_info_set, and
+     * This call should clear m_switchStateMap and g_fdb_info_set, and
      * metadata db should be cleared by flush notification handler.
      */
 
     // TODO move some part to switch state
-    auto &fdbs = g_switch_state_map.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_FDB_ENTRY);
+    auto &fdbs = m_switchStateMap.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_FDB_ENTRY);
 
     std::map<std::string, SwitchState::AttrHash> static_fdbs;
     std::map<std::string, SwitchState::AttrHash> dynamic_fdbs;
 
     // TODO cast right switch or different data pass
-    auto ss = g_switch_state_map.at(switch_id);
+    auto ss = m_switchStateMap.at(switch_id);
 
     for (auto it = fdbs.begin(); it != fdbs.end();)
     {
@@ -342,3 +342,12 @@ sai_status_t VirtualSwitchSaiInterface::flushFdbEntries(
     return SAI_STATUS_SUCCESS;
 }
 
+void VirtualSwitchSaiInterface::ageFdbs()
+{
+    SWSS_LOG_ENTER();
+
+    for (auto& it: m_switchStateMap)
+    {
+        it.second->processFdbEntriesForAging();
+    }
+}

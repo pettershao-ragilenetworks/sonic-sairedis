@@ -95,9 +95,9 @@ namespace saivs
 
             ObjectHash m_objectHash;
 
-            std::map<std::string, std::map<int, uint64_t>> m_countersMap;
-
         protected:
+
+            std::map<std::string, std::map<int, uint64_t>> m_countersMap;
 
             sai_object_id_t m_switch_id;
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Event.h"
+#include "Signal.h"
 
 #include <mutex>
 #include <deque>
@@ -11,9 +12,10 @@ namespace saivs
     {
         public:
 
-            EventQueue();
+            EventQueue(
+                    _In_ std::shared_ptr<Signal> signal);
 
-            virtual ~EventQueue();
+            virtual ~EventQueue() = default;
 
         public:
 
@@ -25,6 +27,8 @@ namespace saivs
             size_t size();
 
         private:
+
+            std::shared_ptr<Signal> m_signal;
 
             std::mutex m_mutex;
 

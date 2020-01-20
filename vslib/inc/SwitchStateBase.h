@@ -13,6 +13,10 @@
 
 #define SAI_VS_FDB_INFO "SAI_VS_FDB_INFO"
 
+#define CHECK_STATUS(status) {                                  \
+    sai_status_t _status = (status);                            \
+    if (_status != SAI_STATUS_SUCCESS) { return _status; } }
+
 namespace saivs
 {
     class SwitchStateBase:
@@ -235,6 +239,10 @@ namespace saivs
                     _In_ const std::string& name,
                     _In_ const uint8_t *buffer,
                     _In_ size_t size);
+
+            void debugSetStats(
+                    _In_ sai_object_id_t oid,
+                    _In_ const std::map<sai_stat_id_t, uint64_t>& stats);
 
         protected: // custom port
 

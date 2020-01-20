@@ -1,0 +1,82 @@
+#include "Sai.h"
+
+#include "sai_vs.h" // TODO to be removed
+#include "sai_vs_internal.h" // TODO to be removed
+
+#include "swss/logger.h"
+
+using namespace saivs;
+
+void Sai::startEventQueueThread()
+{
+    SWSS_LOG_ENTER();
+
+    m_eventQueueThreadRun = true;
+
+    m_eventQueueThread = std::make_shared<std::thread>(&Sai::eventQueueThreadProc, this);
+}
+
+void Sai::stopEventQueueThread()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_NOTICE("begin");
+
+    m_eventQueueThreadRun = false;
+
+    m_eventQueue->enqueue(std::make_shared<Event>(EventType::EVENT_TYPE_END_THREAD, nullptr));
+
+    m_eventQueueThread->join();
+
+    SWSS_LOG_NOTICE("end");
+}
+
+void Sai::eventQueueThreadProc()
+{
+    SWSS_LOG_ENTER();
+
+    while (m_eventQueueThreadRun)
+    {
+        m_signal->wait();
+
+        while (auto event = m_eventQueue->dequeue())
+        {
+            processQueueEvent(event);
+        }
+    }
+}
+
+void Sai::processQueueEvent(
+        _In_ std::shared_ptr<Event> event)
+{
+    SWSS_LOG_ENTER();
+
+    auto type = event->getType();
+
+    switch (type)
+    {
+        case EventType::EVENT_TYPE_END_THREAD:
+
+            SWSS_LOG_NOTICE("received EVENT_TYPE_END_THREAD, will process all messages and end");
+            break;
+
+        case EventType::EVENT_TYPE_PACKET:
+            return syncProcessEventPacket(std::dynamic_pointer_cast<EventPayloadPacket>(event->getPayload()));
+
+        default:
+
+            SWSS_LOG_THROW("unhandled event type: %d", type);
+            break;
+    }
+}
+
+void Sai::syncProcessEventPacket(
+        _In_ std::shared_ptr<EventPayloadPacket> payload)
+{
+    MUTEX();
+
+    SWSS_LOG_ENTER();
+
+    m_vsSai->syncProcessEventPacket(payload);
+}
+

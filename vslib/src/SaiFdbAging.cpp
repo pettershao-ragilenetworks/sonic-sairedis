@@ -49,11 +49,10 @@ void Sai::processFdbEntriesForAging()
     MUTEX();
     SWSS_LOG_ENTER();
 
-    for (auto& it: g_switch_state_map)
-    {
-        // TODO remove cast
-        it.second->processFdbEntriesForAging();
-    }
+    // must be executed under mutex since
+    // this call comes from other thread
+
+    m_vsSai->ageFdbs();
 }
 
 void Sai::fdbAgingThreadProc()

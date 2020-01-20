@@ -36,9 +36,9 @@ sai_status_t VirtualSwitchSaiInterface::preSetPort(
             return SAI_STATUS_FAILURE;
         }
 
-        auto it = g_switch_state_map.find(vs_switch_id);
+        auto it = m_switchStateMap.find(vs_switch_id);
 
-        if (it == g_switch_state_map.end())
+        if (it == m_switchStateMap.end())
         {
             SWSS_LOG_ERROR("No switch state found for the switch id %s",
                     sai_serialize_object_id(vs_switch_id).c_str());

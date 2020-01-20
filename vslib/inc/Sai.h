@@ -1,10 +1,10 @@
 #pragma once
 
 #include "VirtualSwitchSaiInterface.h"
-
-#include "lib/inc/SaiInterface.h"
-#include "meta/Meta.h"
 #include "LaneMapContainer.h"
+#include "EventQueue.h"
+
+#include "meta/Meta.h"
 
 #include "swss/selectableevent.h"
 #include "swss/dbconnector.h"
@@ -335,6 +335,20 @@ namespace saivs
 
             void stopFdbAgingThread();
 
+        private: // event queue
+
+            void startEventQueueThread();
+
+            void stopEventQueueThread();
+
+            void eventQueueThreadProc();
+
+            void processQueueEvent(
+                    _In_ std::shared_ptr<Event> event);
+
+            void syncProcessEventPacket(
+                    _In_ std::shared_ptr<EventPayloadPacket> payload);
+
         private: // unittests
 
             bool m_unittestChannelRun;
@@ -354,6 +368,16 @@ namespace saivs
             std::shared_ptr<swss::SelectableEvent> m_fdbAgingThreadEvent;
 
             std::shared_ptr<std::thread> m_fdbAgingThread;
+
+        private: // event queue
+
+            bool m_eventQueueThreadRun;
+
+            std::shared_ptr<std::thread> m_eventQueueThread;
+
+            std::shared_ptr<EventQueue> m_eventQueue;
+
+            std::shared_ptr<Signal> m_signal;
 
         private:
 
