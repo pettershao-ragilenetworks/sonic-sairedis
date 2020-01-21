@@ -16,6 +16,8 @@ namespace saivs
 
         EVENT_TYPE_PACKET,
 
+        EVENT_TYPE_NOTIFICATION,
+
     } EventType;
 
     class Event

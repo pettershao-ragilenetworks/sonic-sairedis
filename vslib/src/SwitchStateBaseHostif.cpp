@@ -1,8 +1,10 @@
 #include "SwitchStateBase.h"
 #include "HostInterfaceInfo.h"
+#include "EventPayloadNotification.h"
 
 #include "swss/logger.h"
 #include "meta/sai_serialize.h"
+#include "lib/inc/NotificationPortStateChange.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -129,58 +131,86 @@ void SwitchStateBase::update_port_oper_status(
     }
 }
 
-void SwitchStateBase::send_port_up_notification(
-        _In_ sai_object_id_t port_id)
+void SwitchStateBase::send_port_oper_status_notification(
+        _In_ sai_object_id_t portId,
+        _In_ sai_port_oper_status_t status,
+        _In_ bool force)
 {
     SWSS_LOG_ENTER();
 
-    sai_object_id_t switch_id = switchIdQuery(port_id);
+    sai_port_oper_status_notification_t data;
 
-    if (switch_id == SAI_NULL_OBJECT_ID)
+    data.port_id = portId;
+    data.port_state = status;
+
+    auto meta = getMeta();
+
+    if (meta)
     {
-        SWSS_LOG_ERROR("failed to get switch OID from port id %s",
-                sai_serialize_object_id(port_id).c_str());
+        meta->meta_sai_on_port_state_change(1, &data);
+    }
+
+    auto objectType = objectTypeQuery(portId); // can be port, bridge port, lag
+
+    if (objectType != SAI_OBJECT_TYPE_PORT)
+    {
+        SWSS_LOG_ERROR("object type %s not supported on portId %s",
+                sai_serialize_object_type(objectType).c_str(),
+                sai_serialize_object_id(portId).c_str());
         return;
     }
 
     sai_attribute_t attr;
 
+    attr.id = SAI_PORT_ATTR_OPER_STATUS;
+
+    if (get(objectType, portId, 1, &attr) != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_ERROR("failed to get port attribute SAI_PORT_ATTR_OPER_STATUS");
+    }
+    else
+    {
+        if ((!force) && ((sai_port_oper_status_t)attr.value.s32 == data.port_state))
+        {
+            SWSS_LOG_INFO("port oper status didn't changed, will not send notification");
+            return;
+        }
+    }
+
     attr.id = SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY;
 
-    if (get(SAI_OBJECT_TYPE_SWITCH, switch_id, 1, &attr) != SAI_STATUS_SUCCESS)
+    if (get(SAI_OBJECT_TYPE_SWITCH, m_switch_id, 1, &attr) != SAI_STATUS_SUCCESS)
     {
         SWSS_LOG_ERROR("failed to get SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY for switch %s",
-                sai_serialize_object_id(switch_id).c_str());
+                sai_serialize_object_id(m_switch_id).c_str());
         return;
     }
 
-    sai_port_state_change_notification_fn callback =
-        (sai_port_state_change_notification_fn)attr.value.ptr;
-
-    if (callback == NULL)
+    if (attr.value.ptr == NULL)
     {
         SWSS_LOG_INFO("SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY callback is NULL");
         return;
     }
 
-    sai_port_oper_status_notification_t data;
+    sai_switch_notifications_t sn = { };
 
-    data.port_id = port_id;
-    data.port_state = SAI_PORT_OPER_STATUS_UP;
+    sn.on_port_state_change = (sai_port_state_change_notification_fn)attr.value.ptr;
 
     attr.id = SAI_PORT_ATTR_OPER_STATUS;
 
-    update_port_oper_status(port_id, data.port_state);
+    update_port_oper_status(portId, data.port_state);
 
-    SWSS_LOG_NOTICE("explicitly send SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY for port %s: %s (port was UP)",
+    SWSS_LOG_NOTICE("send event SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY for port %s: %s",
             sai_serialize_object_id(data.port_id).c_str(),
             sai_serialize_port_oper_status(data.port_state).c_str());
 
-    // NOTE this callback should be executed from separate non blocking thread
+    auto str = sai_serialize_port_oper_status_ntf(1, &data);
 
-    // TODO create event !
-    if (callback)
-        callback(1, &data);
+    auto ntf = std::make_shared<sairedis::NotificationPortStateChange>(str);
+
+    auto payload = std::make_shared<EventPayloadNotification>(ntf, sn);
+
+    m_switchConfig->m_eventQueue->enqueue(std::make_shared<Event>(EVENT_TYPE_NOTIFICATION, payload));
 }
 
 int SwitchStateBase::ifup(
@@ -225,7 +255,7 @@ int SwitchStateBase::ifup(
         // notification before hostif create function will actually return,
         // this can happen when syncd will be operating in synchronous mode
 
-        send_port_up_notification(port_id);
+        send_port_oper_status_notification(port_id, SAI_PORT_OPER_STATUS_UP, true);
 
         return 0;
     }
@@ -804,76 +834,9 @@ void SwitchStateBase::syncOnLinkMsg(
             ifflags,
             ifname.c_str());
 
+    auto state = (ifflags & IFF_LOWER_UP) ? SAI_PORT_OPER_STATUS_UP : SAI_PORT_OPER_STATUS_DOWN;
+
     auto portId = getPortIdFromIfName(ifname);
 
-    if (portId == SAI_NULL_OBJECT_ID)
-    {
-        SWSS_LOG_ERROR("failed to find port id for interface %s", ifname.c_str());
-        return;
-    }
-
-    auto objectType = objectTypeQuery(portId); // can be port, bridge port, lag
-
-    if (objectType != SAI_OBJECT_TYPE_PORT)
-    {
-        SWSS_LOG_ERROR("object type %s not supported",
-                sai_serialize_object_type(objectType).c_str());
-
-        return;
-    }
-
-    sai_port_oper_status_notification_t data;
-
-    data.port_id = portId;
-    data.port_state = (ifflags & IFF_LOWER_UP) ? SAI_PORT_OPER_STATUS_UP : SAI_PORT_OPER_STATUS_DOWN;
-
-    sai_attribute_t attr;
-
-    attr.id = SAI_PORT_ATTR_OPER_STATUS;
-
-    if (get(objectType, portId, 1, &attr) != SAI_STATUS_SUCCESS)
-    {
-        SWSS_LOG_ERROR("failed to get port attribute SAI_PORT_ATTR_OPER_STATUS");
-    }
-    else
-    {
-        if ((sai_port_oper_status_t)attr.value.s32 == data.port_state)
-        {
-            SWSS_LOG_INFO("port oper status didn't changed, will not send notification");
-            return;
-        }
-    }
-
-    update_port_oper_status(portId, data.port_state);
-
-    attr.id = SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY;
-
-    if (get(SAI_OBJECT_TYPE_SWITCH, m_switch_id, 1, &attr) != SAI_STATUS_SUCCESS)
-    {
-        SWSS_LOG_ERROR("failed to get SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY for switch %s",
-                sai_serialize_object_id(m_switch_id).c_str());
-        return;
-    }
-
-    sai_port_state_change_notification_fn callback =
-        (sai_port_state_change_notification_fn)attr.value.ptr;
-
-    if (callback == NULL)
-    {
-        return;
-    }
-
-    SWSS_LOG_DEBUG("executing callback SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY for port %s: %s",
-            sai_serialize_object_id(data.port_id).c_str(),
-            sai_serialize_port_oper_status(data.port_state).c_str());
-
-    auto meta = getMeta();
-
-    if (meta)
-    {
-        meta->meta_sai_on_port_state_change(1, &data);
-    }
-
-    // TODO generate event
-    callback(1, &data);
+    send_port_oper_status_notification(portId, state, false);
 }

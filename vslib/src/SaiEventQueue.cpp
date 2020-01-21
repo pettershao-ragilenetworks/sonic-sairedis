@@ -67,6 +67,9 @@ void Sai::processQueueEvent(
         case EVENT_TYPE_NET_LINK_MSG:
             return syncProcessEventNetLinkMsg(std::dynamic_pointer_cast<EventPayloadNetLinkMsg>(event->getPayload()));
 
+        case EVENT_TYPE_NOTIFICATION:
+            return asyncProcessEventNotification(std::dynamic_pointer_cast<EventPayloadNotification>(event->getPayload()));
+
         default:
 
             SWSS_LOG_THROW("unhandled event type: %d", type);
@@ -94,3 +97,14 @@ void Sai::syncProcessEventNetLinkMsg(
     m_vsSai->syncProcessEventNetLinkMsg(payload);
 }
 
+void Sai::asyncProcessEventNotification(
+        _In_ std::shared_ptr<EventPayloadNotification> payload)
+{
+    SWSS_LOG_ENTER();
+
+    auto switchNotifications = payload->getSwitchNotifications();
+
+    auto ntf = payload->getNotification();
+
+    ntf->executeCallback(switchNotifications);
+}

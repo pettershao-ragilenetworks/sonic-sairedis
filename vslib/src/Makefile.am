@@ -9,6 +9,9 @@ endif
 lib_LTLIBRARIES = libsaivs.la
 
 libsaivs_la_SOURCES = \
+					  ../../lib/src/Notification.cpp \
+					  ../../lib/src/NotificationPortStateChange.cpp \
+					  EventPayloadNotification.cpp \
 					  EventPayloadNetLinkMsg.cpp \
 					  SaiEventQueue.cpp \
 					  Event.cpp \

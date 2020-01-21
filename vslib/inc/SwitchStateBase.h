@@ -355,8 +355,10 @@ namespace saivs
                     _In_ const std::string& tapname,
                     _In_ sai_object_id_t port_id);
 
-            void send_port_up_notification(
-                    _In_ sai_object_id_t port_id);
+            void send_port_oper_status_notification(
+                    _In_ sai_object_id_t port_id,
+                    _In_ sai_port_oper_status_t status,
+                    _In_ bool force);
 
             bool hasIfIndex(
                     _In_ int ifIndex) const;

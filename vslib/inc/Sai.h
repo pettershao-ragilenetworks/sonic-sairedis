@@ -3,6 +3,7 @@
 #include "VirtualSwitchSaiInterface.h"
 #include "LaneMapContainer.h"
 #include "EventQueue.h"
+#include "EventPayloadNotification.h"
 
 #include "meta/Meta.h"
 
@@ -351,6 +352,9 @@ namespace saivs
 
             void syncProcessEventNetLinkMsg(
                     _In_ std::shared_ptr<EventPayloadNetLinkMsg> payload);
+
+            void asyncProcessEventNotification(
+                    _In_ std::shared_ptr<EventPayloadNotification> payload);
 
         private: // unittests
 

@@ -81,16 +81,11 @@ void SwitchStateBase::processFdbInfo(
     data.attr_count = 2;
     data.attr = attrs;
 
-    auto meta = m_meta.lock();
+    auto meta = getMeta();
 
     if (meta)
     {
-        // update metadata DB
         meta->meta_sai_on_fdb_event(1, &data);
-    }
-    else
-    {
-        SWSS_LOG_WARN("meta pointer expired");
     }
 
     // update local DB
