@@ -347,6 +347,18 @@ sai_status_t VirtualSwitchSaiInterface::create(
 
             return SAI_STATUS_FAILURE;
         }
+
+        if (m_switchStateMap.find(switchId) != m_switchStateMap.end())
+        {
+            if (m_warmBootData.find(switchId) == m_warmBootData.end())
+            {
+                SWSS_LOG_ERROR("switch %s with hwinfo '%s' already exists",
+                        sai_serialize_object_id(switchId).c_str(),
+                        hwinfo.c_str());
+
+                return SAI_STATUS_FAILURE;
+            }
+        }
     }
     else
     {
