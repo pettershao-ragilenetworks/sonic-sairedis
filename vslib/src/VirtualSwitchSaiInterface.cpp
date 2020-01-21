@@ -61,47 +61,6 @@ void VirtualSwitchSaiInterface::setMeta(
     m_meta = meta;
 }
 
-void VirtualSwitchSaiInterface::update_real_object_ids(
-        _In_ const std::shared_ptr<SwitchState> warmBootState)
-{
-    SWSS_LOG_ENTER();
-
-    /*
-     * Since we loaded state from warm boot, we need to update real object id's
-     * in case a new object will be created. We need this so new objects will
-     * not have the same ID as existing ones.
-     */
-
-    for (const auto& oh: warmBootState->m_objectHash)
-    {
-        sai_object_type_t ot = oh.first;
-
-        if (ot == SAI_OBJECT_TYPE_NULL)
-            continue;
-
-        auto oi = sai_metadata_get_object_type_info(ot);
-
-        if (oi == NULL)
-        {
-            SWSS_LOG_THROW("failed to find object type info for object type: %d", ot);
-        }
-
-        if (oi->isnonobjectid)
-            continue;
-
-        for (const auto& o: oh.second)
-        {
-            sai_object_id_t oid;
-
-            sai_deserialize_object_id(o.first, oid);
-
-            // TODO this should actually go to oid indexer, and be passed to
-            // real object manager
-            m_realObjectIdManager->updateWarmBootObjectIndex(oid);
-        }
-    }
-}
-
 std::shared_ptr<WarmBootState> VirtualSwitchSaiInterface::extractWarmBootState(
         _In_ sai_object_id_t switchId)
 {
@@ -595,8 +554,6 @@ sai_status_t VirtualSwitchSaiInterface::create(
 
         if (warmBootState != nullptr)
         {
-            update_real_object_ids(ss); // TODO needs to be done at read whole warm boot and update there
-
             update_local_metadata(switchId);
 
             if (config->m_useTapDevice)
@@ -1321,6 +1278,16 @@ bool VirtualSwitchSaiInterface::readWarmBootFile(
 
         sai_object_meta_key_t metaKey;
         sai_deserialize_object_meta_key(strObjectType + ":" + strObjectId, metaKey);
+
+        /*
+         * Since all objects we are creating, then during warm boot we need to
+         * get the biggest object index, so after warm boot we can start
+         * generating new objects with index value not colliding with objects
+         * loaded from warm boot scenario. We only need to consider OID
+         * objects.
+         */
+
+        m_realObjectIdManager->updateWarmBootObjectIndex(metaKey.objectkey.key.object_id);
 
         // query each object for switch id
 

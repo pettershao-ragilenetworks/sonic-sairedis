@@ -356,21 +356,16 @@ uint32_t RealObjectIdManager::getSwitchIndex(
     return SAI_VS_GET_SWITCH_INDEX(switchId);
 }
 
-// TODO this must be considered per all switches if we are doing warm boot on VS
-// since it may happen that we warm boot 1 switch, then 1 notification will arrive
-// and produce colliding object id that is used in 2nd switch warm boot !!
-
 void RealObjectIdManager::updateWarmBootObjectIndex(
         _In_ sai_object_id_t oid)
 {
     SWSS_LOG_ENTER();
 
-    sai_object_type_t objectType = (sai_object_type_t)(SAI_VS_GET_OBJECT_TYPE(oid));
+    sai_object_type_t objectType = objectTypeQuery(oid);
 
-    if (objectType >= SAI_OBJECT_TYPE_EXTENSIONS_MAX)
+    if (objectType == SAI_OBJECT_TYPE_NULL)
     {
-        SWSS_LOG_THROW("invalid object type %d on warm boot object: %s",
-                objectType,
+        SWSS_LOG_THROW("invalid object type on warm boot object: %s",
                 sai_serialize_object_id(oid).c_str());
     }
 
@@ -382,7 +377,7 @@ void RealObjectIdManager::updateWarmBootObjectIndex(
 
         m_indexer[objectType] = index + 1; // +1 since this will be next object number
 
-        SWSS_LOG_INFO("update %s:%s real id to from %lu to %lu",
+        SWSS_LOG_DEBUG("update %s:%s real id to from %lu to %lu",
                 sai_serialize_object_type(objectType).c_str(),
                 sai_serialize_object_id(oid).c_str(),
                 prev,

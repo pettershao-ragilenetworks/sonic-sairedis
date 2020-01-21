@@ -325,9 +325,6 @@ namespace saivs
                     _In_ uint32_t attr_count,
                     _In_ const sai_attribute_t *attr_list) const;
 
-            void update_real_object_ids(
-                    _In_ const std::shared_ptr<SwitchState> warmBootState);
-
             std::shared_ptr<SwitchStateBase> init_switch(
                     _In_ sai_object_id_t switch_id,
                     _In_ std::shared_ptr<SwitchConfig> config,
