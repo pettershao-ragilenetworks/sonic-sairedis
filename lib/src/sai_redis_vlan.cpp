@@ -1,5 +1,4 @@
 #include "sai_redis.h"
-#include "sai_redis_internal.h"
 
 REDIS_BULK_CREATE(VLAN_MEMBER,vlan_members);
 REDIS_BULK_REMOVE(VLAN_MEMBER,vlan_members);

@@ -7,9 +7,7 @@ static sai_status_t redis_recv_hostif_packet(
         _Inout_ uint32_t *attr_count,
         _Out_ sai_attribute_t *attr_list)
 {
-    MUTEX();
     SWSS_LOG_ENTER();
-    REDIS_CHECK_API_INITIALIZED();
 
     return SAI_STATUS_NOT_IMPLEMENTED;
 }
@@ -21,9 +19,7 @@ static sai_status_t redis_send_hostif_packet(
         _In_ uint32_t attr_count,
         _In_ const sai_attribute_t *attr_list)
 {
-    MUTEX();
     SWSS_LOG_ENTER();
-    REDIS_CHECK_API_INITIALIZED();
 
     return SAI_STATUS_NOT_IMPLEMENTED;
 }

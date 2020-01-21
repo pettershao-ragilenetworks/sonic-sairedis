@@ -1,5 +1,4 @@
 #include "sai_redis.h"
-#include "sai_redis_internal.h"
 
 REDIS_GENERIC_QUAD(RPF_GROUP,rpf_group);
 REDIS_GENERIC_QUAD(RPF_GROUP_MEMBER,rpf_group_member);

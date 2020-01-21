@@ -1,5 +1,4 @@
 #include "sai_redis.h"
-#include "sai_redis_internal.h"
 
 REDIS_BULK_CREATE(STP_PORT,stp_ports);
 REDIS_BULK_REMOVE(STP_PORT,stp_ports);

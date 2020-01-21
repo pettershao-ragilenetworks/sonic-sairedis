@@ -3,9 +3,7 @@
 static sai_status_t redis_clear_port_all_stats(
         _In_ sai_object_id_t port_id)
 {
-    MUTEX();
     SWSS_LOG_ENTER();
-    REDIS_CHECK_API_INITIALIZED();
 
     return SAI_STATUS_NOT_IMPLEMENTED;
 }

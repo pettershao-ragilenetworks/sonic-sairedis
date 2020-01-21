@@ -1,17 +1,13 @@
 #include "sai_redis.h"
-#include "meta/sai_serialize.h"
-#include "meta/saiattributelist.h"
 
 static sai_status_t redis_flush_fdb_entries(
         _In_ sai_object_id_t switch_id,
         _In_ uint32_t attr_count,
         _In_ const sai_attribute_t *attr_list)
 {
-    MUTEX();
     SWSS_LOG_ENTER();
-    REDIS_CHECK_API_INITIALIZED();
 
-    return g_meta->flushFdbEntries(
+    return redis_sai->flushFdbEntries(
             switch_id,
             attr_count,
             attr_list);
@@ -34,7 +30,13 @@ sai_status_t sai_bulk_create_fdb_entry(
 {
     SWSS_LOG_ENTER();
 
-    return redis_bulk_create_fdb_entry(object_count, fdb_entry, attr_count, attr_list, mode, object_statuses);
+    return redis_bulk_create_fdb_entry(
+            object_count,
+            fdb_entry,
+            attr_count,
+            attr_list,
+            mode,
+            object_statuses);
 }
 
 sai_status_t sai_bulk_remove_fdb_entry(
@@ -45,7 +47,11 @@ sai_status_t sai_bulk_remove_fdb_entry(
 {
     SWSS_LOG_ENTER();
 
-    return redis_bulk_remove_fdb_entry(object_count, fdb_entry, mode, object_statuses);
+    return redis_bulk_remove_fdb_entry(
+            object_count,
+            fdb_entry,
+            mode,
+            object_statuses);
 }
 
 const sai_fdb_api_t redis_fdb_api = {

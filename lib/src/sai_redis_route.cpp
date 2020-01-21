@@ -1,10 +1,6 @@
 #include "sai_redis.h"
-#include "sairedis.h"
-#include "meta/sai_serialize.h"
-#include "meta/saiattributelist.h"
 
 REDIS_GENERIC_QUAD_ENTRY(ROUTE_ENTRY,route_entry);
-
 REDIS_BULK_QUAD_ENTRY(ROUTE_ENTRY,route_entry);
 
 const sai_route_api_t redis_route_api = {

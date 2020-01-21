@@ -1,5 +1,4 @@
 #include "sai_redis.h"
-#include "sai_redis_internal.h"
 
 REDIS_GENERIC_QUAD(BFD_SESSION,bfd_session);
 REDIS_GENERIC_STATS(BFD_SESSION,bfd_session);

@@ -1,5 +1,4 @@
 #include "sai_redis.h"
-#include "sai_redis_internal.h"
 
 REDIS_BULK_CREATE(SEGMENTROUTE_SIDLIST,segmentroute_sidlists);
 REDIS_BULK_REMOVE(SEGMENTROUTE_SIDLIST,segmentroute_sidlists);
