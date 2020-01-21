@@ -54,6 +54,8 @@ bool VirtualSwitchSaiInterface::doesFdbEntryNotMatchFlushAttr(
 
             case SAI_FDB_FLUSH_ATTR_ENTRY_TYPE:
 
+                // TODO static/dynamic/all
+
                 // remove from list all entries not matching type
                 if (fdb_attrs.at("SAI_FDB_ENTRY_ATTR_TYPE")->getAttr()->value.s32 != attr.value.s32)
                 {
@@ -96,13 +98,13 @@ sai_status_t VirtualSwitchSaiInterface::flushFdbEntries(
      * metadata db should be cleared by flush notification handler.
      */
 
+    auto ss = m_switchStateMap.at(switch_id);
+
     // TODO move some part to switch state
-    auto &fdbs = m_switchStateMap.at(switch_id)->m_objectHash.at(SAI_OBJECT_TYPE_FDB_ENTRY);
+    auto &fdbs = ss->m_objectHash.at(SAI_OBJECT_TYPE_FDB_ENTRY);
 
     std::map<std::string, SwitchState::AttrHash> static_fdbs;
     std::map<std::string, SwitchState::AttrHash> dynamic_fdbs;
-
-    auto ss = m_switchStateMap.at(switch_id);
 
     for (auto it = fdbs.begin(); it != fdbs.end();)
     {
@@ -230,29 +232,12 @@ sai_status_t VirtualSwitchSaiInterface::flushFdbEntries(
      * irrelevant.
      */
 
-    sai_attribute_t attr;
-
-    attr.id = SAI_SWITCH_ATTR_FDB_EVENT_NOTIFY;
-
-    sai_status_t status = get(SAI_OBJECT_TYPE_SWITCH, switch_id, 1, &attr);
-
-    if (status != SAI_STATUS_SUCCESS)
-    {
-        SWSS_LOG_ERROR("unable to get SAI_SWITCH_ATTR_FDB_EVENT_NOTIFY attribute for %s",
-                sai_serialize_object_id(switch_id).c_str());
-
-        attr.value.ptr = NULL;
-    }
-
     SWSS_LOG_NOTICE("generating fdb flush notifications");
-
-    sai_fdb_event_notification_fn ntf = (sai_fdb_event_notification_fn)attr.value.ptr;
 
     sai_fdb_event_notification_data_t data;
     sai_attribute_t attrs[2];
 
     memset(&data, 0, sizeof(data));
-
     memset(attrs, 0, sizeof(attrs));
 
     data.event_type             = SAI_FDB_EVENT_FLUSHED;
@@ -277,61 +262,24 @@ sai_status_t VirtualSwitchSaiInterface::flushFdbEntries(
         data.fdb_entry.bv_id = vlanid->value.oid;
     }
 
-    if (static_fdbs.size() > 0)
+    if (static_fdbs.size())
     {
         SWSS_LOG_NOTICE("flushing %zu static entries", static_fdbs.size());
 
         attrs[0].id        = SAI_FDB_ENTRY_ATTR_TYPE;
         attrs[0].value.s32 = SAI_FDB_ENTRY_TYPE_STATIC;
 
-        // TODO since this is explicit call this could be moved to metadata itself
-
-        auto meta = m_meta.lock();
-
-        if (meta)
-        {
-            // update metadata DB
-            meta->meta_sai_on_fdb_event(1, &data);
-        }
-        else
-        {
-            SWSS_LOG_WARN("meta pointer expired");
-        }
-
-        // TODO schedule event
-        if (ntf != NULL)
-        {
-            ntf(1, &data);
-        }
+        ss->send_fdb_event_notification(data);
     }
 
-    if (dynamic_fdbs.size() > 0)
+    if (dynamic_fdbs.size())
     {
         SWSS_LOG_NOTICE("flushing %zu dynamic entries", dynamic_fdbs.size());
 
         attrs[0].id        = SAI_FDB_ENTRY_ATTR_TYPE;
         attrs[0].value.s32 = SAI_FDB_ENTRY_TYPE_DYNAMIC;
 
-        auto meta = m_meta.lock();
-
-        // TODO since this is explicit call this could be moved to metadata itself when calling
-        if (meta)
-        {
-            // update metadata DB
-            meta->meta_sai_on_fdb_event(1, &data);
-        }
-        else
-        {
-            SWSS_LOG_WARN("meta pointer expired");
-        }
-
-        // TODO schedule event
-        if (ntf != NULL)
-        {
-            ntf(1, &data);
-        }
-
-        SWSS_LOG_NOTICE("1");
+        ss->send_fdb_event_notification(data);
     }
 
     // NOTE: we can add config entry to send notifications 1 by 1 as option to consolidated

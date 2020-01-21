@@ -1,9 +1,11 @@
 #include "SwitchStateBase.h"
+#include "EventPayloadNotification.h"
 
 #include "swss/logger.h"
 #include "swss/select.h"
 
 #include "meta/sai_serialize.h"
+#include "lib/inc/NotificationFdbEvent.h"
 
 #include <linux/if_ether.h>
 #include <arpa/inet.h>
@@ -81,40 +83,10 @@ void SwitchStateBase::processFdbInfo(
     data.attr_count = 2;
     data.attr = attrs;
 
-    auto meta = getMeta();
-
-    if (meta)
-    {
-        meta->meta_sai_on_fdb_event(1, &data);
-    }
-
     // update local DB
-    updateLocalDB(data, fdb_event);
+    updateLocalDB(data, fdb_event); // TODO we could move to send_fdb_event_notification and support flush
 
-    sai_attribute_t attr;
-
-    attr.id = SAI_SWITCH_ATTR_FDB_EVENT_NOTIFY;
-
-    sai_status_t status = get(SAI_OBJECT_TYPE_SWITCH, data.fdb_entry.switch_id, 1, &attr);
-
-    if (status != SAI_STATUS_SUCCESS)
-    {
-        SWSS_LOG_ERROR("failed to get fdb event notify from switch %s",
-                sai_serialize_object_id(data.fdb_entry.switch_id).c_str());
-        return;
-    }
-
-    std::string s = sai_serialize_fdb_event_ntf(1, &data);
-
-    SWSS_LOG_DEBUG("calling user fdb event callback: %s", s.c_str());
-
-    // TODO send event to execute notification in different thread
-    sai_fdb_event_notification_fn ntf = (sai_fdb_event_notification_fn)attr.value.ptr;
-
-    if (ntf != NULL)
-    {
-        ntf(1, &data);
-    }
+    send_fdb_event_notification(data);
 }
 
 void SwitchStateBase::findBridgeVlanForPortVlan(
@@ -582,4 +554,47 @@ void SwitchStateBase::process_packet_for_fdb_event(
     m_fdb_info_set.insert(fi);
 
     processFdbInfo(fi, SAI_FDB_EVENT_LEARNED);
+}
+
+void SwitchStateBase::send_fdb_event_notification(
+        _In_ const sai_fdb_event_notification_data_t& data)
+{
+    SWSS_LOG_ENTER();
+
+    auto meta = getMeta();
+
+    if (meta)
+    {
+        meta->meta_sai_on_fdb_event(1, &data);
+    }
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_SWITCH_ATTR_FDB_EVENT_NOTIFY;
+
+    sai_status_t status = get(SAI_OBJECT_TYPE_SWITCH, m_switch_id, 1, &attr);
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_ERROR("unable to get SAI_SWITCH_ATTR_FDB_EVENT_NOTIFY attribute for %s",
+                sai_serialize_object_id(m_switch_id).c_str());
+
+        return;
+    }
+
+    auto str = sai_serialize_fdb_event_ntf(1, &data);
+
+    sai_switch_notifications_t sn = { };
+
+    sn.on_fdb_event = (sai_fdb_event_notification_fn)attr.value.ptr;
+
+    attr.id = SAI_PORT_ATTR_OPER_STATUS;
+
+    SWSS_LOG_INFO("send event SAI_SWITCH_ATTR_FDB_EVENT_NOTIFY %s", str.c_str());
+
+    auto ntf = std::make_shared<sairedis::NotificationFdbEvent>(str);
+
+    auto payload = std::make_shared<EventPayloadNotification>(ntf, sn);
+
+    m_switchConfig->m_eventQueue->enqueue(std::make_shared<Event>(EVENT_TYPE_NOTIFICATION, payload));
 }

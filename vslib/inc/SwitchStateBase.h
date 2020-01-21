@@ -376,6 +376,9 @@ namespace saivs
             void syncOnLinkMsg(
                     _In_ std::shared_ptr<EventPayloadNetLinkMsg> payload);
 
+            void send_fdb_event_notification(
+                    _In_ const sai_fdb_event_notification_data_t& data);
+
         protected:
 
             constexpr static const int maxDebugCounters = 32;
