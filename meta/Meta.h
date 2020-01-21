@@ -255,7 +255,7 @@ namespace saimeta
 
             void meta_sai_on_fdb_event(
                     _In_ uint32_t count,
-                    _In_ sai_fdb_event_notification_data_t *data);
+                    _In_ const sai_fdb_event_notification_data_t *data);
 
             void meta_sai_on_switch_state_change(
                     _In_ sai_object_id_t switch_id,
