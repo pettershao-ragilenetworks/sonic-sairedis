@@ -100,6 +100,38 @@ namespace sairedis
                     _In_ uint64_t objectIndex,
                     _In_ uint32_t globalContext);
 
+        public:
+
+            /**
+             * @brief Switch id query.
+             *
+             * Return switch object id for given object if. If object type is
+             * switch, it will return input value.
+             *
+             * Return SAI_NULL_OBJECT_ID if given object id has invalid object type.
+             */
+            static sai_object_id_t switchIdQuery(
+                    _In_ sai_object_id_t objectId);
+
+            /**
+             * @brief Object type query.
+             *
+             * Returns object type for input object id. If object id is invalid
+             * then returns SAI_OBJECT_TYPE_NULL.
+             */
+            static sai_object_type_t objectTypeQuery(
+                    _In_ sai_object_id_t objectId);
+
+            /**
+             * @brief Get switch index.
+             *
+             * Index range is <0..255>.
+             *
+             * Returns switch index for given oid. If oid is invalid, returns 0.
+             */
+            static uint32_t getSwitchIndex(
+                    _In_ sai_object_id_t obejctId);
+
         private:
 
             /**

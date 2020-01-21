@@ -293,3 +293,66 @@ sai_object_id_t VirtualObjectIdManager::constructObjectId(
             objectIndex);
 }
 
+sai_object_id_t VirtualObjectIdManager::switchIdQuery(
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    if (objectId == SAI_NULL_OBJECT_ID)
+    {
+        return SAI_NULL_OBJECT_ID;
+    }
+
+    sai_object_type_t objectType = objectTypeQuery(objectId);
+
+    if (objectType == SAI_OBJECT_TYPE_NULL)
+    {
+        SWSS_LOG_ERROR("invalid object type of oid %s",
+                sai_serialize_object_id(objectId).c_str());
+
+        return SAI_NULL_OBJECT_ID;
+    }
+
+    if (objectType == SAI_OBJECT_TYPE_SWITCH)
+    {
+        return objectId;
+    }
+
+    uint32_t switchIndex = (uint32_t)SAI_REDIS_GET_SWITCH_INDEX(objectId);
+    uint32_t globalContext = (uint32_t)SAI_REDIS_GET_GLOBAL_CONTEXT(objectId);
+
+    return constructObjectId(SAI_OBJECT_TYPE_SWITCH, switchIndex, switchIndex, globalContext);
+}
+
+sai_object_type_t VirtualObjectIdManager::objectTypeQuery(
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    if (objectId == SAI_NULL_OBJECT_ID)
+    {
+        return SAI_OBJECT_TYPE_NULL;
+    }
+
+    sai_object_type_t objectType = (sai_object_type_t)(SAI_REDIS_GET_OBJECT_TYPE(objectId));
+
+    if (!sai_metadata_is_object_type_valid(objectType))
+    {
+        SWSS_LOG_ERROR("invalid object id 0x%s",
+                sai_serialize_object_id(objectId).c_str());
+
+        return SAI_OBJECT_TYPE_NULL;
+    }
+
+    return objectType;
+}
+
+uint32_t VirtualObjectIdManager::getSwitchIndex(
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    auto switchId = switchIdQuery(objectId);
+
+    return SAI_REDIS_GET_SWITCH_INDEX(switchId);
+}
