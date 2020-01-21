@@ -81,8 +81,10 @@ static_assert(SAI_VS_GET_OBJECT_INDEX(SAI_VS_TEST_OID) == 0x89abcdef, "test obje
 using namespace saivs;
 
 RealObjectIdManager::RealObjectIdManager(
-        _In_ uint32_t globalContext):
-    m_globalContext(globalContext)
+        _In_ uint32_t globalContext,
+        _In_ std::shared_ptr<SwitchConfigContainer> container):
+    m_globalContext(globalContext),
+    m_container(container)
 {
     SWSS_LOG_ENTER();
 
@@ -220,21 +222,7 @@ sai_object_id_t RealObjectIdManager::allocateNewObjectId(
 
     if (objectType == SAI_OBJECT_TYPE_SWITCH)
     {
-        if (switchId)
-        {
-            SWSS_LOG_WARN("switchId should be NULL when allocating new switch, but value is %s",
-                    sai_serialize_object_id(switchId).c_str());
-        }
-
-        uint32_t switchIndex = allocateNewSwitchIndex();
-
-        // in case of object type switch, object index is same as switch index
-        sai_object_id_t objectId = constructObjectId(SAI_OBJECT_TYPE_SWITCH, switchIndex, switchIndex, m_globalContext);
-
-        SWSS_LOG_NOTICE("created SWITCH VID %s",
-                sai_serialize_object_id(objectId).c_str());
-
-        return objectId;
+        SWSS_LOG_THROW("this function can't be used to allocate switch id");
     }
 
     sai_object_type_t switchObjectType = saiObjectTypeQuery(switchId);
@@ -260,8 +248,40 @@ sai_object_id_t RealObjectIdManager::allocateNewObjectId(
 
     sai_object_id_t objectId = constructObjectId(objectType, switchIndex, objectIndex, m_globalContext);
 
-    SWSS_LOG_DEBUG("created VID %s",
+    SWSS_LOG_DEBUG("created RID %s",
             sai_serialize_object_id(objectId).c_str());
+
+    return objectId;
+}
+
+sai_object_id_t RealObjectIdManager::allocateNewSwitchObjectId(
+        _In_ const std::string& hardwareInfo)
+{
+    SWSS_LOG_ENTER();
+
+    auto config = m_container->getConfig(hardwareInfo);
+
+    if (config == nullptr)
+    {
+        SWSS_LOG_ERROR("no switch config for hardware info: '%s'", hardwareInfo.c_str());
+
+        return SAI_NULL_OBJECT_ID;
+    }
+
+    uint32_t switchIndex = config->m_switchIndex;
+
+    if (switchIndex > SAI_VS_SWITCH_INDEX_MAX)
+    {
+        SWSS_LOG_THROW("switch index %u > %llu (max)", switchIndex, SAI_VS_SWITCH_INDEX_MAX);
+    }
+
+    m_switchIndexes.insert(switchIndex);
+
+    sai_object_id_t objectId = constructObjectId(SAI_OBJECT_TYPE_SWITCH, switchIndex, switchIndex, m_globalContext);
+
+    SWSS_LOG_NOTICE("created SWITCH RID %s for hwinfo: '%s'",
+            sai_serialize_object_id(objectId).c_str(),
+            hardwareInfo.c_str());
 
     return objectId;
 }
@@ -367,6 +387,13 @@ void RealObjectIdManager::updateWarmBootObjectIndex(
     {
         SWSS_LOG_THROW("invalid object type on warm boot object: %s",
                 sai_serialize_object_id(oid).c_str());
+    }
+
+    if (objectType == SAI_OBJECT_TYPE_SWITCH)
+    {
+        uint32_t switchIndex = (uint32_t)SAI_VS_GET_SWITCH_INDEX(oid);
+
+        m_switchIndexes.insert(switchIndex);
     }
 
     uint64_t index = SAI_VS_GET_OBJECT_INDEX(oid);

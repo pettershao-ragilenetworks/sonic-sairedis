@@ -4,6 +4,8 @@ extern "C" {
 #include <sai.h>
 }
 
+#include "SwitchConfigContainer.h"
+
 #include <set>
 #include <map>
 
@@ -14,7 +16,8 @@ namespace saivs
         public:
 
             RealObjectIdManager(
-                    _In_ uint32_t globalContext);
+                    _In_ uint32_t globalContext,
+                    _In_ std::shared_ptr<SwitchConfigContainer> container);
 
             virtual ~RealObjectIdManager() = default;
 
@@ -52,7 +55,7 @@ namespace saivs
             /**
              * @brief Allocate new object id on a given switch.
              *
-             * If object type is switch, then switch id param is ignored.
+             * Method can't be used to allocate switch object id.
              *
              * Throws when object type is switch and there are no more
              * available switch indexes.
@@ -60,6 +63,13 @@ namespace saivs
             sai_object_id_t allocateNewObjectId(
                     _In_ sai_object_type_t objectType,
                     _In_ sai_object_id_t switchId);
+
+            /**
+             * @brief Allocate new switch object id.
+             */
+            sai_object_id_t allocateNewSwitchObjectId(
+                    _In_ const std::string& hardwareInfo);
+
             /**
              * @brief Release allocated object id.
              *
@@ -156,5 +166,7 @@ namespace saivs
             std::set<uint32_t> m_switchIndexes;
 
             std::map<sai_object_type_t, uint64_t> m_indexer;
+
+            std::shared_ptr<SwitchConfigContainer> m_container;
     };
 }

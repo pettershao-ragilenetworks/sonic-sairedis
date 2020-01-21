@@ -18,6 +18,8 @@
  */
 #define VS_MAX_COUNTERS 128
 
+#define MAX_HARDWARE_INFO_LENGTH 0x1000
+
 using namespace saivs;
 
 VirtualSwitchSaiInterface::VirtualSwitchSaiInterface(
@@ -25,7 +27,7 @@ VirtualSwitchSaiInterface::VirtualSwitchSaiInterface(
 {
     SWSS_LOG_ENTER();
 
-    m_realObjectIdManager = std::make_shared<RealObjectIdManager>(0);
+    m_realObjectIdManager = std::make_shared<RealObjectIdManager>(0, scc);
 
     m_switchConfigContainer = scc;
 }
@@ -272,6 +274,48 @@ void VirtualSwitchSaiInterface::update_local_metadata(
     mmeta->meta_warm_boot_notify();
 }
 
+std::string VirtualSwitchSaiInterface::getHardwareInfo(
+        _In_ uint32_t attrCount,
+        _In_ const sai_attribute_t *attrList) const
+{
+    SWSS_LOG_ENTER();
+
+     auto *attr = sai_metadata_get_attr_by_id(
+             SAI_SWITCH_ATTR_SWITCH_HARDWARE_INFO,
+             attrCount,
+             attrList);
+
+     if (attr == NULL)
+         return "";
+
+     auto& s8list = attr->value.s8list;
+
+     if (s8list.count == 0)
+         return "";
+
+     if (s8list.list == NULL)
+     {
+         SWSS_LOG_WARN("SAI_SWITCH_ATTR_SWITCH_HARDWARE_INFO s8list.list is NULL! but count is %u", s8list.count);
+         return "";
+     }
+
+     uint32_t count = s8list.count;
+
+     if (count > SAI_MAX_HARDWARE_ID_LEN)
+     {
+         SWSS_LOG_WARN("SAI_SWITCH_ATTR_SWITCH_HARDWARE_INFO s8list.count (%u) > SAI_MAX_HARDWARE_ID_LEN (%d), LIMITING !!",
+                 count,
+                 SAI_MAX_HARDWARE_ID_LEN);
+
+         count = SAI_MAX_HARDWARE_ID_LEN;
+     }
+
+     // check actual length, since buffer may contain nulls
+     auto actualLength = strnlen((const char*)s8list.list, count);
+
+     return std::string((const char*)s8list.list, actualLength);
+}
+
 sai_status_t VirtualSwitchSaiInterface::create(
         _In_ sai_object_type_t objectType,
         _Out_ sai_object_id_t* objectId,
@@ -286,12 +330,28 @@ sai_status_t VirtualSwitchSaiInterface::create(
         SWSS_LOG_THROW("objectId pointer is NULL");
     }
 
-    // create new real object ID
-    *objectId = m_realObjectIdManager->allocateNewObjectId(objectType, switchId);
-
     if (objectType == SAI_OBJECT_TYPE_SWITCH)
     {
-        switchId = *objectId;
+        // for given hardware info we always return same switch id,
+        // this is required since we could be performing warm boot here
+
+        auto hwinfo = getHardwareInfo(attr_count, attr_list);
+
+        switchId = m_realObjectIdManager->allocateNewSwitchObjectId(hwinfo);
+
+        *objectId = switchId;
+
+        if (switchId == SAI_NULL_OBJECT_ID)
+        {
+            SWSS_LOG_ERROR("switch ID allocation failed");
+
+            return SAI_STATUS_FAILURE;
+        }
+    }
+    else
+    {
+        // create new real object ID
+        *objectId = m_realObjectIdManager->allocateNewObjectId(objectType, switchId);
     }
 
     std::string str_object_id = sai_serialize_object_id(*objectId);
@@ -700,7 +760,7 @@ sai_status_t VirtualSwitchSaiInterface::objectTypeGetAvailability(
 
     // TODO: We should generate this metadata for the virtual switch rather
     // than hard-coding it here.
- 
+
     if (objectType == SAI_OBJECT_TYPE_DEBUG_COUNTER)
     {
         *count = 3;

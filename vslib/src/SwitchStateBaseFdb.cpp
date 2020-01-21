@@ -547,7 +547,7 @@ void SwitchStateBase::process_packet_for_fdb_event(
         return;
     }
 
-    SWSS_LOG_INFO("inserting to fdb_info set: %s, vid: %d",
+    SWSS_LOG_INFO("inserting to fdb_info set: %s, vlan id: %d",
             sai_serialize_fdb_entry(fi.getFdbEntry()).c_str(),
             fi.getVlanId());
 
