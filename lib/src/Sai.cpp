@@ -1,11 +1,10 @@
 #include "Sai.h"
 #include "SaiInternal.h"
+#include "SwitchConfigContainer.h"
 
 #include "meta/Meta.h"
 #include "meta/sai_serialize.h"
 
-// TODO - add switch config and switch config container
-// TODO - allocate switch new function in virtual id manager
 // TODO - simplify recorder
 
 using namespace sairedis;
@@ -66,11 +65,21 @@ sai_status_t Sai::initialize(
 
     memcpy(&m_service_method_table, service_method_table, sizeof(m_service_method_table));
 
+    auto sc = std::make_shared<SwitchConfig>();
+
+    sc->m_switchIndex = 0;
+    sc->m_hardwareInfo = "";
+
+    auto scc = std::make_shared<SwitchConfigContainer>();
+
+    scc->insert(sc);
+
     m_recorder = std::make_shared<Recorder>();
 
     // will create notification thread
     m_redisSai = std::make_shared<RedisRemoteSaiInterface>(
             0, // global context (later syncd config with db and switches config)
+            scc,
             std::bind(&Sai::handle_notification, this, std::placeholders::_1),
             m_recorder);
 

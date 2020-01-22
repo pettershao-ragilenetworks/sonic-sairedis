@@ -1,10 +1,11 @@
 #pragma once
 
-#include "OidIndexGenerator.h"
-
 extern "C" {
-#include <sai.h>
+#include "sai.h"
 }
+
+#include "OidIndexGenerator.h"
+#include "SwitchConfigContainer.h"
 
 #include <set>
 #include <memory>
@@ -18,6 +19,7 @@ namespace sairedis
 
             VirtualObjectIdManager(
                     _In_ uint32_t globalContext,
+                    _In_ std::shared_ptr<SwitchConfigContainer> scc,
                     _In_ std::shared_ptr<OidIndexGenerator> oidIndexGenerator);
 
             virtual ~VirtualObjectIdManager() = default;
@@ -64,6 +66,13 @@ namespace sairedis
             sai_object_id_t allocateNewObjectId(
                     _In_ sai_object_type_t objectType,
                     _In_ sai_object_id_t switchId);
+
+            /**
+             * @brief Allocate new switch object id.
+             */
+            sai_object_id_t allocateNewSwitchObjectId(
+                    _In_ const std::string& hardwareInfo);
+
             /**
              * @brief release allocated object id.
              *
@@ -141,6 +150,8 @@ namespace sairedis
              * (system wide) syncd instance.
              */
             uint32_t m_globalContext;
+
+            std::shared_ptr<SwitchConfigContainer> m_container;
 
             /**
              * @brief Oid index generator.

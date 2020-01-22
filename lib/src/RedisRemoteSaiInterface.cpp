@@ -26,9 +26,11 @@ std::vector<swss::FieldValueTuple> serialize_counter_id_list(
 
 RedisRemoteSaiInterface::RedisRemoteSaiInterface(
         _In_ uint32_t globalContext,
+        _In_ std::shared_ptr<SwitchConfigContainer> scc,
         _In_ std::function<sai_switch_notifications_t(std::shared_ptr<Notification>)> notificationCallback,
         _In_ std::shared_ptr<Recorder> recorder):
     m_globalContext(globalContext),
+    m_switchConfigContainer(scc),
     m_recorder(recorder),
     m_notificationCallback(notificationCallback)
 {
@@ -104,6 +106,49 @@ sai_status_t RedisRemoteSaiInterface::uninitialize(void)
     return SAI_STATUS_SUCCESS;
 }
 
+std::string RedisRemoteSaiInterface::getHardwareInfo(
+        _In_ uint32_t attrCount,
+        _In_ const sai_attribute_t *attrList) const
+{
+    SWSS_LOG_ENTER();
+
+     auto *attr = sai_metadata_get_attr_by_id(
+             SAI_SWITCH_ATTR_SWITCH_HARDWARE_INFO,
+             attrCount,
+             attrList);
+
+     if (attr == NULL)
+         return "";
+
+     auto& s8list = attr->value.s8list;
+
+     if (s8list.count == 0)
+         return "";
+
+     if (s8list.list == NULL)
+     {
+         SWSS_LOG_WARN("SAI_SWITCH_ATTR_SWITCH_HARDWARE_INFO s8list.list is NULL! but count is %u", s8list.count);
+         return "";
+     }
+
+     uint32_t count = s8list.count;
+
+     if (count > SAI_MAX_HARDWARE_ID_LEN)
+     {
+         SWSS_LOG_WARN("SAI_SWITCH_ATTR_SWITCH_HARDWARE_INFO s8list.count (%u) > SAI_MAX_HARDWARE_ID_LEN (%d), LIMITING !!",
+                 count,
+                 SAI_MAX_HARDWARE_ID_LEN);
+
+         count = SAI_MAX_HARDWARE_ID_LEN;
+     }
+
+     // check actual length, since buffer may contain nulls
+     auto actualLength = strnlen((const char*)s8list.list, count);
+
+     return std::string((const char*)s8list.list, actualLength);
+}
+
+
 sai_status_t RedisRemoteSaiInterface::create(
         _In_ sai_object_type_t objectType,
         _Out_ sai_object_id_t* objectId,
@@ -115,14 +160,28 @@ sai_status_t RedisRemoteSaiInterface::create(
 
     *objectId = SAI_NULL_OBJECT_ID;
 
-    // TODO allocating new object ID should be inside implementation but here
-    // we need it also for recording, if we move recording inside
-    // implementation then we don't need wrapper
+    if (objectType == SAI_OBJECT_TYPE_SWITCH)
+    {
+        // for given hardware info we always return same switch id,
+        // this is required since we could be performing warm boot here
 
-    // TODO switch must be special, we need config
+        auto hwinfo = getHardwareInfo(attr_count, attr_list);
 
-    // on create vid is put in db by syncd
-    *objectId = m_virtualObjectIdManager->allocateNewObjectId(objectType, switchId);
+        switchId = m_virtualObjectIdManager->allocateNewSwitchObjectId(hwinfo);
+
+        *objectId = switchId;
+
+        if (switchId == SAI_NULL_OBJECT_ID)
+        {
+            SWSS_LOG_ERROR("switch ID allocation failed");
+
+            return SAI_STATUS_FAILURE;
+        }
+    }
+    else
+    {
+        *objectId = m_virtualObjectIdManager->allocateNewObjectId(objectType, switchId);
+    }
 
     if (*objectId == SAI_NULL_OBJECT_ID)
     {
@@ -1595,8 +1654,11 @@ void RedisRemoteSaiInterface::clear_local_state()
     // will clear switch container
     m_switchContainer = std::make_shared<SwitchContainer>();
 
-    // TODO update global context when supporting multiple syncd instances
-    m_virtualObjectIdManager = std::make_shared<VirtualObjectIdManager>(m_globalContext, m_redisVidIndexGenerator);
+    m_virtualObjectIdManager = 
+        std::make_shared<VirtualObjectIdManager>(
+                m_globalContext, 
+                m_switchConfigContainer,
+                m_redisVidIndexGenerator);
 
     auto meta = m_meta.lock();
 

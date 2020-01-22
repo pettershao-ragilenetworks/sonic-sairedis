@@ -8,6 +8,7 @@
 #include "RedisVidIndexGenerator.h"
 #include "SkipRecordAttrContainer.h"
 #include "RedisChannel.h"
+#include "SwitchConfigContainer.h"
 
 #include "swss/producertable.h"
 #include "swss/consumertable.h"
@@ -71,6 +72,7 @@ namespace sairedis
 
             RedisRemoteSaiInterface(
                     _In_ uint32_t globalContext,
+                    _In_ std::shared_ptr<SwitchConfigContainer> scc,
                     _In_ std::function<sai_switch_notifications_t(std::shared_ptr<Notification>)> notificationCallback,
                     _In_ std::shared_ptr<Recorder> recorder);
 
@@ -411,9 +413,15 @@ namespace sairedis
             sai_switch_notifications_t processNotification(
                     _In_ std::shared_ptr<Notification> notification);
 
+            std::string getHardwareInfo(
+                    _In_ uint32_t attrCount,
+                    _In_ const sai_attribute_t *attrList) const;
+
         private:
 
             uint32_t m_globalContext;
+
+            std::shared_ptr<SwitchConfigContainer> m_switchConfigContainer;
 
             bool m_asicInitViewMode;
 

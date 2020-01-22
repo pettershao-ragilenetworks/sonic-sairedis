@@ -78,8 +78,10 @@ using namespace sairedis;
 
 VirtualObjectIdManager::VirtualObjectIdManager(
         _In_ uint32_t globalContext,
+        _In_ std::shared_ptr<SwitchConfigContainer> scc,
         _In_ std::shared_ptr<OidIndexGenerator> oidIndexGenerator):
     m_globalContext(globalContext),
+    m_container(scc),
     m_oidIndexGenerator(oidIndexGenerator)
 {
     SWSS_LOG_ENTER();
@@ -222,21 +224,7 @@ sai_object_id_t VirtualObjectIdManager::allocateNewObjectId(
 
     if (objectType == SAI_OBJECT_TYPE_SWITCH)
     {
-        if (switchId)
-        {
-            SWSS_LOG_WARN("switchId should be NULL when allocating new switch, but value is %s",
-                    sai_serialize_object_id(switchId).c_str());
-        }
-
-        uint32_t switchIndex = allocateNewSwitchIndex();
-
-        // in case of object type switch, object index is same as switch index
-        sai_object_id_t objectId = constructObjectId(SAI_OBJECT_TYPE_SWITCH, switchIndex, switchIndex, m_globalContext);
-
-        SWSS_LOG_NOTICE("created SWITCH VID %s", 
-                sai_serialize_object_id(objectId).c_str());
-
-        return objectId;
+        SWSS_LOG_THROW("this function can't be used to allocate switch id");
     }
 
     sai_object_type_t switchObjectType = saiObjectTypeQuery(switchId);
@@ -266,6 +254,39 @@ sai_object_id_t VirtualObjectIdManager::allocateNewObjectId(
 
     return objectId;
 }
+
+sai_object_id_t VirtualObjectIdManager::allocateNewSwitchObjectId(
+        _In_ const std::string& hardwareInfo)
+{
+    SWSS_LOG_ENTER();
+
+    auto config = m_container->getConfig(hardwareInfo);
+
+    if (config == nullptr)
+    {
+        SWSS_LOG_ERROR("no switch config for hardware info: '%s'", hardwareInfo.c_str());
+
+        return SAI_NULL_OBJECT_ID;
+    }
+
+    uint32_t switchIndex = config->m_switchIndex;
+
+    if (switchIndex > SAI_REDIS_SWITCH_INDEX_MAX)
+    {
+        SWSS_LOG_THROW("switch index %u > %llu (max)", switchIndex, SAI_REDIS_SWITCH_INDEX_MAX);
+    }
+
+    m_switchIndexes.insert(switchIndex);
+
+    sai_object_id_t objectId = constructObjectId(SAI_OBJECT_TYPE_SWITCH, switchIndex, switchIndex, m_globalContext);
+
+    SWSS_LOG_NOTICE("created SWITCH RID %s for hwinfo: '%s'",
+            sai_serialize_object_id(objectId).c_str(),
+            hardwareInfo.c_str());
+
+    return objectId;
+}
+
 
 void VirtualObjectIdManager::releaseObjectId(
         _In_ sai_object_id_t objectId)

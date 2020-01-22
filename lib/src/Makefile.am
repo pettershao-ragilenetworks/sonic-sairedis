@@ -9,6 +9,8 @@ endif
 lib_LTLIBRARIES = libsairedis.la
 
 libsairedis_la_SOURCES = \
+						 SwitchConfig.cpp \
+						 SwitchConfigContainer.cpp \
 						 RedisChannel.cpp \
 						 Sai.cpp \
 						 Switch.cpp \
