@@ -11,11 +11,37 @@
 #define ASIC_STATE_TABLE    "ASIC_STATE"
 #define TEMP_PREFIX         "TEMP_"
 
-// Messages for processing queries from libsairedis to syncd
-#define STRING_ATTR_ENUM_VALUES_CAPABILITY_QUERY        "attr_enum_values_capability_query"
-#define STRING_ATTR_ENUM_VALUES_CAPABILITY_RESPONSE     "attr_enum_values_capability_response"
-#define STRING_OBJECT_TYPE_GET_AVAILABILITY_QUERY       "object_type_get_availability_query"
-#define STRING_OBJECT_TYPE_GET_AVAILABILITY_RESPONSE    "object_type_get_availability_response"
+/*
+ * Asic state table commands. Those names are special and they will be used
+ * inside swsscommon library LUA scripts to perform operations on redis
+ * database.
+ */
+
+#define REDIS_ASIC_STATE_COMMAND_CREATE "create"
+#define REDIS_ASIC_STATE_COMMAND_REMOVE "remove"
+#define REDIS_ASIC_STATE_COMMAND_SET    "set"
+#define REDIS_ASIC_STATE_COMMAND_GET    "get"
+
+#define REDIS_ASIC_STATE_COMMAND_BULK_CREATE "bulkcreate"
+#define REDIS_ASIC_STATE_COMMAND_BULK_REMOVE "bulkremove"
+#define REDIS_ASIC_STATE_COMMAND_BULK_SET    "bulkset"
+#define REDIS_ASIC_STATE_COMMAND_BULK_GET    "bulkget"
+
+#define REDIS_ASIC_STATE_COMMAND_NOTIFY      "notify"
+
+#define REDIS_ASIC_STATE_COMMAND_GET_STATS          "get_stats"
+#define REDIS_ASIC_STATE_COMMAND_CLEAR_STATS        "clear_stats"
+
+#define REDIS_ASIC_STATE_COMMAND_GETRESPONSE        "getresponse"
+
+#define REDIS_ASIC_STATE_COMMAND_FLUSH              "flush"
+#define REDIS_ASIC_STATE_COMMAND_FLUSHRESPONSE      "flushresponse"
+
+#define REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_QUERY      "attr_enum_values_capability_query"
+#define REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_RESPONSE   "attr_enum_values_capability_response"
+
+#define REDIS_ASIC_STATE_COMMAND_OBJECT_TYPE_GET_AVAILABILITY_QUERY     "object_type_get_availability_query"
+#define REDIS_ASIC_STATE_COMMAND_OBJECT_TYPE_GET_AVAILABILITY_RESPONSE  "object_type_get_availability_response"
 
 // TODO move this to SAI meta repository for auto generate
 

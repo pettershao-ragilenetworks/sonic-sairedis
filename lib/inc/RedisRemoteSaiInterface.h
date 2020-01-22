@@ -17,38 +17,6 @@
 #include <memory>
 #include <functional>
 
-/*
- * Asic state table commands. Those names are special and they will be used
- * inside swsscommon library LUA scripts to perform operations on redis
- * database.
- */
-
-#define REDIS_ASIC_STATE_COMMAND_CREATE "create"
-#define REDIS_ASIC_STATE_COMMAND_REMOVE "remove"
-#define REDIS_ASIC_STATE_COMMAND_SET    "set"
-#define REDIS_ASIC_STATE_COMMAND_GET    "get"
-
-#define REDIS_ASIC_STATE_COMMAND_BULK_CREATE "bulkcreate"
-#define REDIS_ASIC_STATE_COMMAND_BULK_REMOVE "bulkremove"
-#define REDIS_ASIC_STATE_COMMAND_BULK_SET    "bulkset"
-#define REDIS_ASIC_STATE_COMMAND_BULK_GET    "bulkget"
-
-#define REDIS_ASIC_STATE_COMMAND_NOTIFY      "notify"
-
-#define REDIS_ASIC_STATE_COMMAND_GET_STATS          "get_stats"
-#define REDIS_ASIC_STATE_COMMAND_CLEAR_STATS        "clear_stats"
-
-#define REDIS_ASIC_STATE_COMMAND_GETRESPONSE        "getresponse"
-
-#define REDIS_ASIC_STATE_COMMAND_FLUSH              "flush"
-#define REDIS_ASIC_STATE_COMMAND_FLUSHRESPONSE      "flushresponse"
-
-#define REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_QUERY      "attr_enum_values_capability_query"
-#define REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_RESPONSE   "attr_enum_values_capability_response"
-
-#define REDIS_ASIC_STATE_COMMAND_OBJECT_TYPE_GET_AVAILABILITY_QUERY     "object_type_get_availability_query"
-#define REDIS_ASIC_STATE_COMMAND_OBJECT_TYPE_GET_AVAILABILITY_RESPONSE  "object_type_get_availability_response"
-
 #define SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_REMOVE_ENTRY(ot)   \
     virtual sai_status_t remove(                                    \
             _In_ const sai_ ## ot ## _t* ot) override;
