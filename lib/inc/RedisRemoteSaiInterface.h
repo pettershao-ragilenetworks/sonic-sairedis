@@ -2,6 +2,7 @@
 
 #include "RemoteSaiInterface.h"
 #include "Notification.h"
+#include "Recorder.h"
 
 #include "swss/producertable.h"
 #include "swss/consumertable.h"
@@ -103,7 +104,8 @@ namespace sairedis
             RedisRemoteSaiInterface(
                     _In_ std::shared_ptr<swss::ProducerTable> asicState,
                     _In_ std::shared_ptr<swss::ConsumerTable> getConsumer,
-                    _In_ std::function<void(std::shared_ptr<Notification>)> notificationCallback);
+                    _In_ std::function<void(std::shared_ptr<Notification>)> notificationCallback,
+                    _In_ std::shared_ptr<Recorder> recorder);
 
             virtual ~RedisRemoteSaiInterface();
 
@@ -439,6 +441,8 @@ namespace sairedis
              * Channel used to receive responses from syncd.
              */
             std::shared_ptr<swss::ConsumerTable> m_getConsumer;
+
+            std::shared_ptr<Recorder> m_recorder;
 
         private: // notification
 

@@ -6,9 +6,10 @@ extern "C" {
 
 #include "swss/table.h"
 
-#include "sairedis.h"
+#include "sairedis.h" // for notify enum
 
 #include <string>
+#include <fstream>
 #include <vector>
 
 #define SAI_REDIS_RECORDER_DECLARE_RECORD_REMOVE(ot)    \

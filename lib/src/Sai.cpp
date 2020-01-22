@@ -75,7 +75,6 @@ std::shared_ptr<swss::RedisPipeline>        g_redisPipeline;
 std::shared_ptr<SwitchContainer>            g_switchContainer;
 std::shared_ptr<VirtualObjectIdManager>     g_virtualObjectIdManager;
 std::shared_ptr<RedisVidIndexGenerator>     g_redisVidIndexGenerator;
-std::shared_ptr<Recorder>                   g_recorder;
 
 #define REDIS_CHECK_API_INITIALIZED()                                       \
     if (!m_apiInitialized) {                                                \
@@ -106,7 +105,6 @@ sai_status_t Sai::initialize(
         _In_ const sai_service_method_table_t *service_method_table)
 {
     MUTEX();
-
     SWSS_LOG_ENTER();
 
     if (m_apiInitialized)
@@ -140,7 +138,7 @@ sai_status_t Sai::initialize(
     g_redisGetConsumer          = std::make_shared<swss::ConsumerTable>(g_db.get(), "GETRESPONSE");
     g_redisVidIndexGenerator    = std::make_shared<RedisVidIndexGenerator>(g_db, REDIS_KEY_VIDCOUNTER);
 
-    g_recorder = std::make_shared<Recorder>();
+    m_recorder = std::make_shared<Recorder>();
 
     clear_local_state();
 
@@ -152,7 +150,8 @@ sai_status_t Sai::initialize(
     m_redisSai = std::make_shared<RedisRemoteSaiInterface>(
             g_asicState,
             g_redisGetConsumer,
-            std::bind(&Sai::handle_notification, this, std::placeholders::_1));
+            std::bind(&Sai::handle_notification, this, std::placeholders::_1),
+            m_recorder);
 
     m_meta = std::make_shared<Meta>(m_redisSai);
 
@@ -174,7 +173,7 @@ sai_status_t Sai::uninitialize(void)
     m_redisSai= nullptr;
     m_meta = nullptr;
 
-    g_recorder = nullptr;
+    m_recorder = nullptr;
 
     // clear everything after stopping notification thread
     clear_local_state();
@@ -249,7 +248,7 @@ sai_status_t Sai::set(
          * actual set operation was called.
          */
 
-        auto rec = g_recorder; // make local to keep reference
+        auto rec = m_recorder; // make local to keep reference
 
         if (rec)
         {
@@ -273,13 +272,13 @@ sai_status_t Sai::set(
         switch (attr->id)
         {
             case SAI_REDIS_SWITCH_ATTR_PERFORM_LOG_ROTATE:
-                if (g_recorder)
-                    g_recorder->requestLogRotate();
+                if (m_recorder)
+                    m_recorder->requestLogRotate();
                 return SAI_STATUS_SUCCESS;
 
             case SAI_REDIS_SWITCH_ATTR_RECORD:
-                if (g_recorder)
-                    g_recorder->enableRecording(attr->value.booldata);
+                if (m_recorder)
+                    m_recorder->enableRecording(attr->value.booldata);
                 return SAI_STATUS_SUCCESS;
 
             case SAI_REDIS_SWITCH_ATTR_NOTIFY_SYNCD:
@@ -321,7 +320,7 @@ sai_status_t Sai::set(
                 return SAI_STATUS_SUCCESS;
 
             case SAI_REDIS_SWITCH_ATTR_RECORDING_OUTPUT_DIR:
-                if (g_recorder && g_recorder->setRecordingOutputDirectory(*attr))
+                if (m_recorder && m_recorder->setRecordingOutputDirectory(*attr))
                     return SAI_STATUS_SUCCESS;
                 return SAI_STATUS_FAILURE;
 

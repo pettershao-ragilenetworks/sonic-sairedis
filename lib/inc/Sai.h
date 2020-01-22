@@ -2,6 +2,7 @@
 
 #include "RedisRemoteSaiInterface.h"
 #include "Notification.h"
+#include "Recorder.h"
 
 #include "meta/Meta.h"
 
@@ -311,5 +312,7 @@ namespace sairedis
             std::shared_ptr<RedisRemoteSaiInterface> m_redisSai;
 
             sai_service_method_table_t m_service_method_table;
+
+            std::shared_ptr<Recorder> m_recorder;
     };
 }

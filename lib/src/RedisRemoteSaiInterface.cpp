@@ -22,7 +22,6 @@ static auto g_skipRecordAttrContainer = std::make_shared<SkipRecordAttrContainer
 extern std::string getSelectResultAsString(int result);
 
 extern bool                                         g_syncMode;  // TODO make member
-extern std::shared_ptr<Recorder>                    g_recorder;
 extern std::shared_ptr<VirtualObjectIdManager>      g_virtualObjectIdManager;
 extern std::shared_ptr<SwitchContainer>             g_switchContainer;
 
@@ -37,9 +36,11 @@ std::vector<swss::FieldValueTuple> serialize_counter_id_list(
 RedisRemoteSaiInterface::RedisRemoteSaiInterface(
         _In_ std::shared_ptr<swss::ProducerTable> asicState,
         _In_ std::shared_ptr<swss::ConsumerTable> getConsumer,
-        _In_ std::function<void(std::shared_ptr<Notification>)> notificationCallback):
+        _In_ std::function<void(std::shared_ptr<Notification>)> notificationCallback,
+        _In_ std::shared_ptr<Recorder> recorder):
     m_asicState(asicState),
     m_getConsumer(getConsumer),
+    m_recorder(recorder),
     m_notificationCallback(notificationCallback)
 {
     SWSS_LOG_ENTER();
@@ -310,13 +311,13 @@ sai_status_t RedisRemoteSaiInterface::create(
 
     SWSS_LOG_DEBUG("generic create key: %s, fields: %" PRIu64, key.c_str(), entry.size());
 
-    g_recorder->recordGenericCreate(key, entry);
+    m_recorder->recordGenericCreate(key, entry);
 
     m_asicState->set(key, entry, REDIS_ASIC_STATE_COMMAND_CREATE);
 
     auto status = waitForResponse(SAI_COMMON_API_CREATE);
 
-    g_recorder->recordGenericCreateResponse(status);
+    m_recorder->recordGenericCreateResponse(status);
 
     return status;
 }
@@ -333,13 +334,13 @@ sai_status_t RedisRemoteSaiInterface::remove(
 
     SWSS_LOG_DEBUG("generic remove key: %s", key.c_str());
 
-    g_recorder->recordGenericRemove(key);
+    m_recorder->recordGenericRemove(key);
 
     m_asicState->del(key, REDIS_ASIC_STATE_COMMAND_REMOVE);
 
     auto status = waitForResponse(SAI_COMMON_API_REMOVE);
 
-    g_recorder->recordGenericRemoveResponse(status);
+    m_recorder->recordGenericRemoveResponse(status);
 
     return status;
 }
@@ -363,13 +364,13 @@ sai_status_t RedisRemoteSaiInterface::set(
 
     SWSS_LOG_DEBUG("generic set key: %s, fields: %lu", key.c_str(), entry.size());
 
-    g_recorder->recordGenericSet(key, entry);
+    m_recorder->recordGenericSet(key, entry);
 
     m_asicState->set(key, entry, REDIS_ASIC_STATE_COMMAND_SET);
 
     auto status = waitForResponse(SAI_COMMON_API_SET);
 
-    g_recorder->recordGenericSetResponse(status);
+    m_recorder->recordGenericSetResponse(status);
 
     return status;
 }
@@ -546,7 +547,7 @@ sai_status_t RedisRemoteSaiInterface::get(
 
     if (!skipRecord)
     {
-        g_recorder->recordGenericGet(key, entry);
+        m_recorder->recordGenericGet(key, entry);
     }
 
     // get is special, it will not put data
@@ -557,7 +558,7 @@ sai_status_t RedisRemoteSaiInterface::get(
 
     if (!skipRecord)
     {
-        g_recorder->recordGenericGetResponse(status, objectType, attr_count, attr_list);
+        m_recorder->recordGenericGetResponse(status, objectType, attr_count, attr_list);
     }
 
     return status;
@@ -657,14 +658,14 @@ sai_status_t RedisRemoteSaiInterface::flushFdbEntries(
 
     SWSS_LOG_NOTICE("flush key: %s, fields: %lu", key.c_str(), entry.size());
 
-    g_recorder->recordFlushFdbEntries(switchId, attrCount, attrList);
-   // g_recorder->recordFlushFdbEntries(key, entry)
+    m_recorder->recordFlushFdbEntries(switchId, attrCount, attrList);
+   // m_recorder->recordFlushFdbEntries(key, entry)
 
     m_asicState->set(key, entry, REDIS_ASIC_STATE_COMMAND_FLUSH);
 
     auto status = waitForFlushFdbEntriesResponse();
 
-    g_recorder->recordFlushFdbEntriesResponse(status);
+    m_recorder->recordFlushFdbEntriesResponse(status);
 
     return status;
 }
@@ -698,7 +699,7 @@ sai_status_t RedisRemoteSaiInterface::objectTypeGetAvailability(
     // Syncd will pop this argument off before trying to deserialize the attribute list
     query_arguments.push_back(swss::FieldValueTuple("OBJECT_TYPE", object_type_str));
 
-    g_recorder->recordObjectTypeGetAvailability(switchId, objectType, attrCount, attrList);
+    m_recorder->recordObjectTypeGetAvailability(switchId, objectType, attrCount, attrList);
     // recordObjectTypeGetAvailability(switch_id_str, query_arguments);
 
     // This query will not put any data into the ASIC view, just into the
@@ -707,7 +708,7 @@ sai_status_t RedisRemoteSaiInterface::objectTypeGetAvailability(
 
     auto status = waitForObjectTypeGetAvailabilityResponse(count);
 
-    g_recorder->recordObjectTypeGetAvailabilityResponse(status, count);
+    m_recorder->recordObjectTypeGetAvailabilityResponse(status, count);
 
     return status;
 }
@@ -825,13 +826,13 @@ sai_status_t RedisRemoteSaiInterface::queryAattributeEnumValuesCapability(
     // This query will not put any data into the ASIC view, just into the
     // message queue
 
-    g_recorder->recordQueryAattributeEnumValuesCapability(switchId, objectType, attrId, enumValuesCapability);
+    m_recorder->recordQueryAattributeEnumValuesCapability(switchId, objectType, attrId, enumValuesCapability);
 
     m_asicState->set(switch_id_str, query_arguments, REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_QUERY);
 
     auto status = waitForQueryAattributeEnumValuesCapabilityResponse(enumValuesCapability);
 
-    g_recorder->recordQueryAattributeEnumValuesCapabilityResponse(status, objectType, attrId, enumValuesCapability);
+    m_recorder->recordQueryAattributeEnumValuesCapabilityResponse(status, objectType, attrId, enumValuesCapability);
 
     return status;
 }
@@ -1069,13 +1070,13 @@ sai_status_t RedisRemoteSaiInterface::clearStats(
 
     // clear_stats will not put data into asic view, only to message queue
 
-    g_recorder->recordGenericClearStats(object_type, object_id, number_of_counters, counter_ids);
+    m_recorder->recordGenericClearStats(object_type, object_id, number_of_counters, counter_ids);
 
     m_asicState->set(key, values, REDIS_ASIC_STATE_COMMAND_CLEAR_STATS);
 
     auto status = waitForClearStatsResponse();
 
-    g_recorder->recordGenericClearStatsResponse(status);
+    m_recorder->recordGenericClearStatsResponse(status);
 
     return status;
 }
@@ -1671,13 +1672,13 @@ sai_status_t RedisRemoteSaiInterface::notifySyncd(
     // and then on syncd side read all the asic state queue
     // and apply changes before switching to init/apply mode
 
-    g_recorder->recordNotifySyncd(switchId, redisNotifySyncd);
+    m_recorder->recordNotifySyncd(switchId, redisNotifySyncd);
 
     m_asicState->set(key, entry, REDIS_ASIC_STATE_COMMAND_NOTIFY);
 
     auto status = waitForNotifySyncdResponse();
 
-    g_recorder->recordNotifySyncdResponse(status);
+    m_recorder->recordNotifySyncdResponse(status);
 
     return status;
 }
@@ -1807,7 +1808,7 @@ void RedisRemoteSaiInterface::handleNotification(
 
     // TODO record should also be under api mutex, all other apis are
 
-    g_recorder->recordNotification(name, serializedNotification, values);
+    m_recorder->recordNotification(name, serializedNotification, values);
 
     auto notification = NotificationFactory::deserialize(name, serializedNotification);
 
