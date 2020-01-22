@@ -4,6 +4,10 @@
 #include "meta/Meta.h"
 #include "meta/sai_serialize.h"
 
+// TODO - add switch config and switch config container
+// TODO - allocate switch new function in virtual id manager
+// TODO - simplify recorder
+
 using namespace sairedis;
 
 #define REDIS_CHECK_API_INITIALIZED()                                       \
@@ -566,8 +570,6 @@ sai_switch_notifications_t Sai::handle_notification(
 
     return m_redisSai->syncProcessNotification(notification);
 }
-
-////////////
 
 std::string joinFieldValues(
         _In_ const std::vector<swss::FieldValueTuple> &values)

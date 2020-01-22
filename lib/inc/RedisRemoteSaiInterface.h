@@ -7,6 +7,7 @@
 #include "Recorder.h"
 #include "RedisVidIndexGenerator.h"
 #include "SkipRecordAttrContainer.h"
+#include "RedisChannel.h"
 
 #include "swss/producertable.h"
 #include "swss/consumertable.h"
@@ -47,11 +48,6 @@
 
 #define REDIS_ASIC_STATE_COMMAND_OBJECT_TYPE_GET_AVAILABILITY_QUERY     "object_type_get_availability_query"
 #define REDIS_ASIC_STATE_COMMAND_OBJECT_TYPE_GET_AVAILABILITY_RESPONSE  "object_type_get_availability_response"
-
-/**
- * @brief Get response timeout in milliseconds.
- */
-#define REDIS_ASIC_STATE_COMMAND_GETRESPONSE_TIMEOUT_MS (60*1000)
 
 #define SAIREDIS_REDISREMOTESAIINTERFACE_DECLARE_REMOVE_ENTRY(ot)   \
     virtual sai_status_t remove(                                    \
@@ -422,11 +418,6 @@ namespace sairedis
 
             sai_status_t waitForNotifySyncdResponse();
 
-        private: // helpers
-
-            // TODO to be removed when swss-common pointer will be advanced
-            static std::string getSelectResultAsString(int result);
-
         private: // notification
 
             void notificationThreadFunction();
@@ -454,26 +445,6 @@ namespace sairedis
 
         private:
 
-            /**
-             * @brief Asic state channel.
-             *
-             * Used to sent commands like create/remove/set/get to syncd.
-             */
-            std::shared_ptr<swss::ProducerTable>  m_asicState;
-
-            /**
-             * @brief Get consumer.
-             *
-             * Channel used to receive responses from syncd.
-             */
-            std::shared_ptr<swss::ConsumerTable> m_getConsumer;
-
-            std::shared_ptr<swss::DBConnector> m_db;
-
-            std::shared_ptr<swss::RedisPipeline> m_redisPipeline;
-
-        private:
-
             uint32_t m_globalContext;
 
             bool m_asicInitViewMode;
@@ -496,33 +467,8 @@ namespace sairedis
 
             std::shared_ptr<SkipRecordAttrContainer> m_skipRecordAttrContainer;
 
-        private: // notification
+            std::shared_ptr<RedisChannel> m_redisChannel;
 
             std::function<sai_switch_notifications_t(std::shared_ptr<Notification>)> m_notificationCallback;
-
-            /**
-             * @brief Indicates whether notification thread should be running.
-             */
-            volatile bool m_runNotificationThread;
-
-            /**
-             * @brief Database connector used for notifications.
-             */
-            std::shared_ptr<swss::DBConnector> m_dbNtf;
-
-            /**
-             * @brief Notification consumer.
-             */
-            std::shared_ptr<swss::NotificationConsumer> m_notificationConsumer;
-
-            /**
-             * @brief Event used to nice end notifications thread.
-             */
-            swss::SelectableEvent m_notificationThreadShouldEndEvent;
-
-            /**
-             * @brief Notification thread
-             */
-            std::shared_ptr<std::thread> m_notificationThread;
     };
 }
