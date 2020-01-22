@@ -9,14 +9,7 @@ endif
 lib_LTLIBRARIES = libsairedis.la
 
 libsairedis_la_SOURCES = \
-						 sai_redis_interfacequery.cpp \
-						 sai_redis_switch.cpp \
-						 sai_redis_generic_create.cpp \
-						 sai_redis_generic_remove.cpp \
-						 sai_redis_generic_stats.cpp \
-						 sai_redis_notifications.cpp \
-						 sai_redis_record.cpp \
-						 Globals.cpp \
+						 Sai.cpp \
 						 Switch.cpp \
 						 SwitchContainer.cpp \
 						 VirtualObjectIdManager.cpp \
@@ -44,6 +37,7 @@ libsairedis_la_SOURCES = \
 						 sai_redis_fdb.cpp \
 						 sai_redis_hash.cpp \
 						 sai_redis_hostintf.cpp \
+						 sai_redis_interfacequery.cpp \
 						 sai_redis_ipmc.cpp \
 						 sai_redis_ipmc_group.cpp \
 						 sai_redis_isolation_group.cpp \
@@ -69,6 +63,7 @@ libsairedis_la_SOURCES = \
 						 sai_redis_schedulergroup.cpp \
 						 sai_redis_segmentroute.cpp \
 						 sai_redis_stp.cpp \
+						 sai_redis_switch.cpp \
 						 sai_redis_tam.cpp \
 						 sai_redis_tunnel.cpp \
 						 sai_redis_udf.cpp \

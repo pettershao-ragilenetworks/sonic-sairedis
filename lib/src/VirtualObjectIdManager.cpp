@@ -354,5 +354,5 @@ uint32_t VirtualObjectIdManager::getSwitchIndex(
 
     auto switchId = switchIdQuery(objectId);
 
-    return SAI_REDIS_GET_SWITCH_INDEX(switchId);
+    return (uint32_t)SAI_REDIS_GET_SWITCH_INDEX(switchId);
 }

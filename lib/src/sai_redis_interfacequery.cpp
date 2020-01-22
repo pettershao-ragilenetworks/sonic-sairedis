@@ -1,10 +1,12 @@
 #include "sai_redis.h"
 
+using namespace sairedis;
+
 std::shared_ptr<Sai> redis_sai = std::make_shared<Sai>();
 
 sai_status_t sai_api_initialize(
         _In_ uint64_t flags,
-        _In_ const sai_service_method_table_t* services)
+        _In_ const sai_service_method_table_t* service_method_table)
 {
     SWSS_LOG_ENTER();
 
@@ -29,7 +31,7 @@ sai_status_t sai_log_set(
 
 #define API(api) .api ## _api = const_cast<sai_ ## api ## _api_t*>(&redis_ ## api ## _api)
 
-static sai_apis_t vs_apis = {
+static sai_apis_t redis_apis = {
     API(switch),
     API(port),
     API(fdb),
@@ -109,7 +111,7 @@ sai_status_t sai_query_attribute_enum_values_capability(
 {
     SWSS_LOG_ENTER();
 
-    return m_meta->queryAattributeEnumValuesCapability(
+    return redis_sai->queryAattributeEnumValuesCapability(
             switch_id,
             object_type,
             attr_id,
@@ -125,7 +127,7 @@ sai_status_t sai_object_type_get_availability(
 {
     SWSS_LOG_ENTER();
 
-    return m_meta->objectTypeGetAvailability(
+    return redis_sai->objectTypeGetAvailability(
             switch_id,
             object_type,
             attr_count,
@@ -138,14 +140,7 @@ sai_object_type_t sai_object_type_query(
 {
     SWSS_LOG_ENTER();
 
-    if (!m_apiInitialized)
-    {
-        SWSS_LOG_ERROR("%s: api not initialized", __PRETTY_FUNCTION__);
-
-        return SAI_OBJECT_TYPE_NULL;
-    }
-
-    return VirtualObjectIdManager::objectTypeQuery(objectId);
+    return redis_sai->objectTypeQuery(objectId);
 }
 
 sai_object_id_t sai_switch_id_query(
@@ -153,12 +148,5 @@ sai_object_id_t sai_switch_id_query(
 {
     SWSS_LOG_ENTER();
 
-    if (!m_apiInitialized)
-    {
-        SWSS_LOG_ERROR("%s: api not initialized", __PRETTY_FUNCTION__);
-
-        return SAI_NULL_OBJECT_ID;
-    }
-
-    return VirtualObjectIdManager::switchIdQuery(objectId);
+    return redis_sai->switchIdQuery(objectId);
 }

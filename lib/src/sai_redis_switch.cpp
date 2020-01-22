@@ -1,7 +1,7 @@
 #include "sai_redis.h"
 
-VS_GENERIC_QUAD(SWITCH,switch);
-VS_GENERIC_STATS(SWITCH,switch);
+REDIS_GENERIC_QUAD(SWITCH,switch);
+REDIS_GENERIC_STATS(SWITCH,switch);
 
 static sai_status_t redis_create_switch_uniq(
         _Out_ sai_object_id_t *switch_id,
@@ -24,5 +24,5 @@ const sai_switch_api_t redis_switch_api = {
     redis_set_switch_attribute,
     redis_get_switch_attribute,
 
-    VS_GENERIC_STATS_API(switch)
+    REDIS_GENERIC_STATS_API(switch)
 };

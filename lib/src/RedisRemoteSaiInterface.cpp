@@ -383,6 +383,9 @@ sai_status_t RedisRemoteSaiInterface::waitForGetResponse(
                 continue;
             }
 
+            // TODO;
+            // TODO record response must happen here, before transfer_attributes which can fail !
+
             sai_status_t status;
             sai_deserialize_status(opkey, status);
 

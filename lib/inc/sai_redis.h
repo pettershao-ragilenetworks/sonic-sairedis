@@ -410,7 +410,7 @@ PRIVATE extern std::shared_ptr<sairedis::Sai>   redis_sai;
     redis_bulk_set_ ## ot,          \
     redis_bulk_get_ ## ot,
 
-// DECALRE EVERY ENTRY
+// DECLARE EVERY ENTRY
 
 #define REDIS_DECLARE_EVERY_ENTRY(_X)       \
     _X(FDB_ENTRY,fdb_entry);                \
