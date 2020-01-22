@@ -1261,6 +1261,8 @@ void post_port_remove(
      * - discovered existing objects in saiswitch class
      * - local vid2rid map
      * - redis RIDTOVID map
+     *
+     * also remove LANES mapping
      */
 
     for (auto rid: relatedRids)
@@ -2996,7 +2998,7 @@ sai_status_t processAttrEnumValuesCapabilityQuery(
     if (values.size() != 3)
     {
         SWSS_LOG_ERROR("Invalid input: expected 3 arguments, received %zu", values.size());
-        getResponse->set(sai_serialize_status(SAI_STATUS_INVALID_PARAMETER), {}, STRING_ATTR_ENUM_VALUES_CAPABILITY_RESPONSE);
+        getResponse->set(sai_serialize_status(SAI_STATUS_INVALID_PARAMETER), {}, REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_RESPONSE);
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
@@ -3041,7 +3043,7 @@ sai_status_t processAttrEnumValuesCapabilityQuery(
         SWSS_LOG_DEBUG("Sending response: capabilities = '%s', count = %d", serialized_enum_capabilities.c_str(), enum_values_capability.count);
     }
 
-    getResponse->set(sai_serialize_status(status), response_payload, STRING_ATTR_ENUM_VALUES_CAPABILITY_RESPONSE);
+    getResponse->set(sai_serialize_status(status), response_payload, REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_RESPONSE);
     return status;
 }
 
@@ -3092,7 +3094,7 @@ sai_status_t processObjectTypeGetAvailabilityQuery(
         SWSS_LOG_DEBUG("Sending response: count = %lu", count);
     }
 
-    getResponse->set(sai_serialize_status(status), response_payload, STRING_OBJECT_TYPE_GET_AVAILABILITY_RESPONSE);
+    getResponse->set(sai_serialize_status(status), response_payload, REDIS_ASIC_STATE_COMMAND_OBJECT_TYPE_GET_AVAILABILITY_RESPONSE);
     return status;
 }
 
@@ -3188,11 +3190,11 @@ sai_status_t processEvent(
         {
             return processFdbFlush(kco);
         }
-        else if (op == STRING_ATTR_ENUM_VALUES_CAPABILITY_QUERY)
+        else if (op == REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_QUERY)
         {
             return processAttrEnumValuesCapabilityQuery(kco);
         }
-        else if (op == STRING_OBJECT_TYPE_GET_AVAILABILITY_QUERY)
+        else if (op == REDIS_ASIC_STATE_COMMAND_OBJECT_TYPE_GET_AVAILABILITY_QUERY)
         {
             return processObjectTypeGetAvailabilityQuery(kco);
         }
