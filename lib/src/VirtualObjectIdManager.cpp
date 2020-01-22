@@ -280,7 +280,7 @@ sai_object_id_t VirtualObjectIdManager::allocateNewSwitchObjectId(
 
     sai_object_id_t objectId = constructObjectId(SAI_OBJECT_TYPE_SWITCH, switchIndex, switchIndex, m_globalContext);
 
-    SWSS_LOG_NOTICE("created SWITCH RID %s for hwinfo: '%s'",
+    SWSS_LOG_NOTICE("created SWITCH VID %s for hwinfo: '%s'",
             sai_serialize_object_id(objectId).c_str(),
             hardwareInfo.c_str());
 
