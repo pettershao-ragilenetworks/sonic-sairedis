@@ -98,7 +98,9 @@ tests_SOURCES = \
 				DummySaiInterface.cpp \
 				MetaTestSaiInterface.cpp \
 				NumberOidIndexGenerator.cpp \
-				../lib/src/VirtualObjectIdManager.cpp
+				../lib/src/VirtualObjectIdManager.cpp \
+				../lib/src/SwitchConfig.cpp \
+				../lib/src/SwitchConfigContainer.cpp
 
 tests_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON)
 tests_LDADD = -lhiredis -lswsscommon -lpthread libsaimetadata.la libsaimeta.la
