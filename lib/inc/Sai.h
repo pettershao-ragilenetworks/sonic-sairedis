@@ -1,6 +1,11 @@
 #pragma once
 
+#include "WrapperRemoteSaiInterface.h"
+#include "Notification.h"
+
 #include "meta/Meta.h"
+
+#include "swss/logger.h"
 
 #include <string>
 #include <vector>
@@ -283,13 +288,27 @@ namespace sairedis
 
         private:
 
+            sai_switch_notifications_t processNotification(
+                    _In_ std::shared_ptr<Notification> notification);
+
+            void handle_notification(
+                    _In_ std::shared_ptr<Notification> notification);
+
+            sai_status_t sai_redis_notify_syncd(
+                    _In_ sai_object_id_t switchId,
+                    _In_ const sai_attribute_t *attr);
+
+            void clear_local_state();
+
+        private:
+
             bool m_apiInitialized;
 
             std::recursive_mutex m_apimutex;
 
             std::shared_ptr<saimeta::Meta> m_meta;
 
-            std::shared_ptr<VirtualSwitchSaiInterface> m_vsSai;
+            std::shared_ptr<WrapperRemoteSaiInterface> m_redisSai;
 
             sai_service_method_table_t m_service_method_table;
     };
