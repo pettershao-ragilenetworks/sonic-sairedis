@@ -34,6 +34,8 @@ RedisRemoteSaiInterface::RedisRemoteSaiInterface(
 {
     SWSS_LOG_ENTER();
 
+    m_initialized = false;
+
     initialize(0, nullptr);
 }
 
