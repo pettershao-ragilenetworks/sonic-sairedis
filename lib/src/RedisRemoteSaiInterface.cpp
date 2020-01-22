@@ -16,14 +16,8 @@
 
 using namespace sairedis;
 
-static auto g_skipRecordAttrContainer = std::make_shared<SkipRecordAttrContainer>();
-
 // TODO to be moved to members
 extern std::string getSelectResultAsString(int result);
-
-extern bool                                         g_syncMode;  // TODO make member
-extern std::shared_ptr<VirtualObjectIdManager>      g_virtualObjectIdManager;
-extern std::shared_ptr<SwitchContainer>             g_switchContainer;
 
 std::string joinFieldValues(
         _In_ const std::vector<swss::FieldValueTuple> &values);
@@ -34,16 +28,54 @@ std::vector<swss::FieldValueTuple> serialize_counter_id_list(
         _In_ const sai_stat_id_t *counter_id_list);
 
 RedisRemoteSaiInterface::RedisRemoteSaiInterface(
-        _In_ std::shared_ptr<swss::ProducerTable> asicState,
-        _In_ std::shared_ptr<swss::ConsumerTable> getConsumer,
-        _In_ std::function<void(std::shared_ptr<Notification>)> notificationCallback,
+        _In_ uint32_t globalContext,
+        _In_ std::function<sai_switch_notifications_t(std::shared_ptr<Notification>)> notificationCallback,
         _In_ std::shared_ptr<Recorder> recorder):
-    m_asicState(asicState),
-    m_getConsumer(getConsumer),
+    m_globalContext(globalContext),
     m_recorder(recorder),
     m_notificationCallback(notificationCallback)
 {
     SWSS_LOG_ENTER();
+
+    initialize(0, nullptr);
+}
+
+RedisRemoteSaiInterface::~RedisRemoteSaiInterface()
+{
+    SWSS_LOG_ENTER();
+
+    if (m_initialized)
+    {
+        uninitialize();
+    }
+}
+
+sai_status_t RedisRemoteSaiInterface::initialize(
+        _In_ uint64_t flags,
+        _In_ const sai_service_method_table_t *service_method_table)
+{
+    SWSS_LOG_ENTER();
+
+    if (m_initialized)
+    {
+        SWSS_LOG_ERROR("already initialized");
+
+        return SAI_STATUS_FAILURE;
+    }
+
+    m_skipRecordAttrContainer = std::make_shared<SkipRecordAttrContainer>();
+
+    m_asicInitViewMode = false; // default mode is apply mode
+    m_useTempView = false;
+    m_syncMode = false;
+
+    m_db                        = std::make_shared<swss::DBConnector>(ASIC_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+    m_redisPipeline             = std::make_shared<swss::RedisPipeline>(m_db.get()); //enable default pipeline 128
+    m_asicState                 = std::make_shared<swss::ProducerTable>(m_redisPipeline.get(), ASIC_STATE_TABLE, true);
+    m_getConsumer               = std::make_shared<swss::ConsumerTable>(m_db.get(), "GETRESPONSE");
+    m_redisVidIndexGenerator    = std::make_shared<RedisVidIndexGenerator>(m_db, REDIS_KEY_VIDCOUNTER);
+
+    clear_local_state();
 
     // TODO ASIC DB and connector socket must be obtained from config database json
 
@@ -57,25 +89,9 @@ RedisRemoteSaiInterface::RedisRemoteSaiInterface(
     SWSS_LOG_NOTICE("creating notification thread");
 
     m_notificationThread = std::make_shared<std::thread>(&RedisRemoteSaiInterface::notificationThreadFunction, this);
-}
 
-RedisRemoteSaiInterface::~RedisRemoteSaiInterface()
-{
-    SWSS_LOG_ENTER();
 
-    m_runNotificationThread = false;
-
-    // notify thread that it should end
-    m_notificationThreadShouldEndEvent.notify();
-
-    m_notificationThread->join();
-}
-
-sai_status_t RedisRemoteSaiInterface::initialize(
-        _In_ uint64_t flags,
-        _In_ const sai_service_method_table_t *service_method_table)
-{
-    SWSS_LOG_ENTER();
+    m_initialized = true;
 
     return SAI_STATUS_SUCCESS;
 }
@@ -83,6 +99,24 @@ sai_status_t RedisRemoteSaiInterface::initialize(
 sai_status_t RedisRemoteSaiInterface::uninitialize(void)
 {
     SWSS_LOG_ENTER();
+
+    if (!m_initialized)
+    {
+        SWSS_LOG_ERROR("not initialized");
+
+        return SAI_STATUS_FAILURE;
+    }
+
+    m_runNotificationThread = false;
+
+    // notify thread that it should end
+    m_notificationThreadShouldEndEvent.notify();
+
+    m_notificationThread->join();
+
+    clear_local_state();
+
+    m_initialized = false;
 
     return SAI_STATUS_SUCCESS;
 }
@@ -105,7 +139,7 @@ sai_status_t RedisRemoteSaiInterface::create(
     // TODO switch must be special, we need config
 
     // on create vid is put in db by syncd
-    *objectId = g_virtualObjectIdManager->allocateNewObjectId(objectType, switchId);
+    *objectId = m_virtualObjectIdManager->allocateNewObjectId(objectType, switchId);
 
     if (*objectId == SAI_NULL_OBJECT_ID)
     {
@@ -136,12 +170,12 @@ sai_status_t RedisRemoteSaiInterface::create(
 
         auto sw = std::make_shared<Switch>(*objectId, attr_count, attr_list);
 
-        g_switchContainer->insert(sw);
+        m_switchContainer->insert(sw);
     }
     else if (status != SAI_STATUS_SUCCESS)
     {
         // if create failed, then release allocated object
-        g_virtualObjectIdManager->releaseObjectId(*objectId);
+        m_virtualObjectIdManager->releaseObjectId(*objectId);
     }
 
     return status;
@@ -161,13 +195,118 @@ sai_status_t RedisRemoteSaiInterface::remove(
     {
         SWSS_LOG_NOTICE("removing switch id %s", sai_serialize_object_id(objectId).c_str());
 
-        g_virtualObjectIdManager->releaseObjectId(objectId);
+        m_virtualObjectIdManager->releaseObjectId(objectId);
 
         // remove switch from container
-        g_switchContainer->removeSwitch(objectId);
+        m_switchContainer->removeSwitch(objectId);
     }
 
     return status;
+}
+
+sai_status_t RedisRemoteSaiInterface::setRedisExtensionAttribute(
+        _In_ sai_object_type_t objectType,
+        _In_ sai_object_id_t objectId,
+        _In_ const sai_attribute_t *attr)
+{
+    SWSS_LOG_ENTER();
+
+    if (attr == nullptr)
+    {
+        SWSS_LOG_ERROR("attr pointer is null");
+
+        return SAI_STATUS_FAILURE;
+    }
+
+    /*
+     * NOTE: that this will work without
+     * switch being created.
+     */
+
+    switch (attr->id)
+    {
+        case SAI_REDIS_SWITCH_ATTR_PERFORM_LOG_ROTATE:
+
+            if (m_recorder)
+            {
+                m_recorder->requestLogRotate();
+            }
+
+            return SAI_STATUS_SUCCESS;
+
+        case SAI_REDIS_SWITCH_ATTR_RECORD:
+
+            if (m_recorder)
+            {
+                m_recorder->enableRecording(attr->value.booldata);
+            }
+
+            return SAI_STATUS_SUCCESS;
+
+        case SAI_REDIS_SWITCH_ATTR_NOTIFY_SYNCD:
+
+            return sai_redis_notify_syncd(objectId, attr);
+
+        case SAI_REDIS_SWITCH_ATTR_USE_TEMP_VIEW:
+
+            m_useTempView = attr->value.booldata;
+
+            return SAI_STATUS_SUCCESS;
+
+        case SAI_REDIS_SWITCH_ATTR_RECORD_STATS:
+
+            m_recorder->recordStats(attr->value.booldata);
+
+            return SAI_STATUS_SUCCESS;
+
+        case SAI_REDIS_SWITCH_ATTR_SYNC_MODE:
+
+            m_syncMode = attr->value.booldata;
+
+            if (m_syncMode)
+            {
+                SWSS_LOG_NOTICE("disabling buffered pipeline in sync mode");
+
+                m_asicState->setBuffered(false);
+            }
+
+            return SAI_STATUS_SUCCESS;
+
+        case SAI_REDIS_SWITCH_ATTR_USE_PIPELINE:
+
+            if (m_syncMode)
+            {
+                SWSS_LOG_WARN("use pipeline is not supported in sync mode");
+
+                return SAI_STATUS_NOT_SUPPORTED;
+            }
+
+            m_asicState->setBuffered(attr->value.booldata);
+
+            return SAI_STATUS_SUCCESS;
+
+        case SAI_REDIS_SWITCH_ATTR_FLUSH:
+
+            m_asicState->flush();
+
+            return SAI_STATUS_SUCCESS;
+
+        case SAI_REDIS_SWITCH_ATTR_RECORDING_OUTPUT_DIR:
+
+            if (m_recorder)
+            {
+                m_recorder->setRecordingOutputDirectory(*attr);
+            }
+
+            return SAI_STATUS_SUCCESS;
+
+        default:
+            break;
+    }
+
+    SWSS_LOG_ERROR("unknown redis extension attribute: %d", attr->id);
+
+    return SAI_STATUS_FAILURE;
 }
 
 sai_status_t RedisRemoteSaiInterface::set(
@@ -177,6 +316,11 @@ sai_status_t RedisRemoteSaiInterface::set(
 {
     SWSS_LOG_ENTER();
 
+    if (RedisRemoteSaiInterface::isRedisAttribute(objectType, attr))
+    {
+        return setRedisExtensionAttribute(objectType, objectId, attr);
+    }
+
     auto status = set(
             objectType,
             sai_serialize_object_id(objectId),
@@ -184,7 +328,7 @@ sai_status_t RedisRemoteSaiInterface::set(
 
     if (objectType == SAI_OBJECT_TYPE_SWITCH && status == SAI_STATUS_SUCCESS)
     {
-        auto sw = g_switchContainer->getSwitch(objectId);
+        auto sw = m_switchContainer->getSwitch(objectId);
 
         if (!sw)
         {
@@ -380,7 +524,7 @@ sai_status_t RedisRemoteSaiInterface::waitForResponse(
 {
     SWSS_LOG_ENTER();
 
-    if (!g_syncMode)
+    if (!m_syncMode)
     {
         /*
          * By default sync mode is disabled and all create/set/remove are
@@ -543,7 +687,7 @@ sai_status_t RedisRemoteSaiInterface::get(
 
     SWSS_LOG_DEBUG("generic get key: %s, fields: %lu", key.c_str(), entry.size());
 
-    bool skipRecord = g_skipRecordAttrContainer->canSkipRecording(objectType, attr_count, attr_list);
+    bool skipRecord = m_skipRecordAttrContainer->canSkipRecording(objectType, attr_count, attr_list);
 
     if (!skipRecord)
     {
@@ -1179,7 +1323,7 @@ sai_status_t RedisRemoteSaiInterface::waitForBulkResponse(
 {
     SWSS_LOG_ENTER();
 
-    if (!g_syncMode)
+    if (!m_syncMode)
     {
         /*
          * By default sync mode is disabled and all bulk create/set/remove are
@@ -1459,7 +1603,7 @@ sai_status_t RedisRemoteSaiInterface::bulkCreate(
 
     for (uint32_t idx = 0; idx < object_count; idx++)
     {
-        object_id[idx] = g_virtualObjectIdManager->allocateNewObjectId(object_type, switch_id);
+        object_id[idx] = m_virtualObjectIdManager->allocateNewObjectId(object_type, switch_id);
 
         if (object_id[idx] == SAI_NULL_OBJECT_ID)
         {
@@ -1731,11 +1875,12 @@ sai_status_t RedisRemoteSaiInterface::waitForNotifySyncdResponse()
 }
 
 bool RedisRemoteSaiInterface::isRedisAttribute(
+        _In_ sai_object_id_t objectType,
         _In_ const sai_attribute_t* attr)
 {
     SWSS_LOG_ENTER();
 
-    if (attr == nullptr || (attr->id < SAI_SWITCH_ATTR_CUSTOM_RANGE_START))
+    if ((objectType != SAI_OBJECT_TYPE_SWITCH) || (attr == nullptr) || (attr->id < SAI_SWITCH_ATTR_CUSTOM_RANGE_START))
     {
         return false;
     }
@@ -1812,9 +1957,13 @@ void RedisRemoteSaiInterface::handleNotification(
 
     auto notification = NotificationFactory::deserialize(name, serializedNotification);
 
-    if (notification && m_notificationCallback)
+    if (notification)
     {
-        m_notificationCallback(notification);
+        auto sn = m_notificationCallback(notification); // will be synchronized to api mutex
+
+        // execute callback from notification thread
+
+        notification->executeCallback(sn);
     }
 }
 
@@ -1823,7 +1972,7 @@ sai_object_type_t RedisRemoteSaiInterface::objectTypeQuery(
 {
     SWSS_LOG_ENTER();
 
-    return g_virtualObjectIdManager->saiObjectTypeQuery(objectId);
+    return m_virtualObjectIdManager->saiObjectTypeQuery(objectId);
 }
 
 sai_object_id_t RedisRemoteSaiInterface::switchIdQuery(
@@ -1831,5 +1980,134 @@ sai_object_id_t RedisRemoteSaiInterface::switchIdQuery(
 {
     SWSS_LOG_ENTER();
 
-    return g_virtualObjectIdManager->saiSwitchIdQuery(objectId);
+    return m_virtualObjectIdManager->saiSwitchIdQuery(objectId);
+}
+
+sai_status_t RedisRemoteSaiInterface::sai_redis_notify_syncd(
+        _In_ sai_object_id_t switchId,
+        _In_ const sai_attribute_t *attr)
+{
+    SWSS_LOG_ENTER();
+
+    auto redisNotifySyncd = (sai_redis_notify_syncd_t)attr->value.s32;
+
+    switch (redisNotifySyncd)
+    {
+        case SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW:
+        case SAI_REDIS_NOTIFY_SYNCD_APPLY_VIEW:
+        case SAI_REDIS_NOTIFY_SYNCD_INSPECT_ASIC:
+            break;
+
+        default:
+
+            SWSS_LOG_ERROR("invalid notify syncd attr value %s", sai_serialize(redisNotifySyncd).c_str());
+
+            return SAI_STATUS_FAILURE;
+    }
+
+    auto status = notifySyncd(switchId, redisNotifySyncd);
+
+    if (status == SAI_STATUS_SUCCESS)
+    {
+        switch (redisNotifySyncd)
+        {
+            case SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW:
+
+                SWSS_LOG_NOTICE("switched ASIC to INIT VIEW");
+
+                m_asicInitViewMode = true;
+
+                SWSS_LOG_NOTICE("clearing current local state since init view is called on initialized switch");
+
+                clear_local_state();
+
+                break;
+
+            case SAI_REDIS_NOTIFY_SYNCD_APPLY_VIEW:
+
+                SWSS_LOG_NOTICE("switched ASIC to APPLY VIEW");
+
+                m_asicInitViewMode = false;
+
+                break;
+
+            case SAI_REDIS_NOTIFY_SYNCD_INSPECT_ASIC:
+
+                SWSS_LOG_NOTICE("inspec ASIC SUCCEEDED");
+
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    return status;
+}
+
+void RedisRemoteSaiInterface::clear_local_state()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_NOTICE("clearing local state");
+
+    // Will need to be executed after init VIEW
+
+    // will clear switch container
+    m_switchContainer = std::make_shared<SwitchContainer>();
+
+    // TODO update global context when supporting multiple syncd instances
+    m_virtualObjectIdManager = std::make_shared<VirtualObjectIdManager>(m_globalContext, m_redisVidIndexGenerator);
+
+    auto meta = m_meta.lock();
+
+    if (meta)
+    {
+        meta->meta_init_db();
+    }
+}
+
+void RedisRemoteSaiInterface::setMeta(
+        _In_ std::weak_ptr<saimeta::Meta> meta)
+{
+    SWSS_LOG_ENTER();
+
+    m_meta = meta;
+}
+
+sai_switch_notifications_t RedisRemoteSaiInterface::syncProcessNotification(
+        _In_ std::shared_ptr<Notification> notification)
+{
+    SWSS_LOG_ENTER();
+
+    // NOTE: process metadata must be executed under sairedis API mutex since
+    // it will access meta database and notification comes from different
+    // thread, and this method is executed from notifications thread
+
+    auto meta = m_meta.lock();
+
+    if (!meta)
+    {
+        SWSS_LOG_WARN("meta pointer expired");
+
+        return { };
+    }
+
+    notification->processMetadata(meta);
+
+    auto objectId = notification->getAnyObjectId();
+
+    auto switchId = m_virtualObjectIdManager->saiSwitchIdQuery(objectId);
+
+    auto sw = m_switchContainer->getSwitch(switchId);
+
+    if (sw)
+    {
+        return sw->getSwitchNotifications(); // explicit copy
+    }
+
+    SWSS_LOG_WARN("switch %s not present in container, returning empty switch notifications",
+            sai_serialize_object_id(switchId).c_str());
+
+    return { };
 }

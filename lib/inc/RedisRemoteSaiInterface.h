@@ -1,8 +1,12 @@
 #pragma once
 
 #include "RemoteSaiInterface.h"
+#include "SwitchContainer.h"
+#include "VirtualObjectIdManager.h"
 #include "Notification.h"
 #include "Recorder.h"
+#include "RedisVidIndexGenerator.h"
+#include "SkipRecordAttrContainer.h"
 
 #include "swss/producertable.h"
 #include "swss/consumertable.h"
@@ -102,9 +106,8 @@ namespace sairedis
         public:
 
             RedisRemoteSaiInterface(
-                    _In_ std::shared_ptr<swss::ProducerTable> asicState,
-                    _In_ std::shared_ptr<swss::ConsumerTable> getConsumer,
-                    _In_ std::function<void(std::shared_ptr<Notification>)> notificationCallback,
+                    _In_ uint32_t globalContext,
+                    _In_ std::function<sai_switch_notifications_t(std::shared_ptr<Notification>)> notificationCallback,
                     _In_ std::shared_ptr<Recorder> recorder);
 
             virtual ~RedisRemoteSaiInterface();
@@ -295,11 +298,18 @@ namespace sairedis
              * This function should only be used on switch_api set function.
              */
             static bool isRedisAttribute(
+                    _In_ sai_object_id_t obejctType,
                     _In_ const sai_attribute_t* attr);
 
             sai_status_t setRedisAttribute(
                     _In_ sai_object_id_t switchId,
                     _In_ const sai_attribute_t* attr);
+
+            void setMeta(
+                    _In_ std::weak_ptr<saimeta::Meta> meta);
+
+            sai_switch_notifications_t syncProcessNotification(
+                    _In_ std::shared_ptr<Notification> notification);
 
         private: // QUAD API helpers
 
@@ -426,6 +436,22 @@ namespace sairedis
                     _In_ const std::string &serializedNotification,
                     _In_ const std::vector<swss::FieldValueTuple> &values);
 
+            sai_status_t setRedisExtensionAttribute(
+                    _In_ sai_object_type_t objectType,
+                    _In_ sai_object_id_t objectId,
+                    _In_ const sai_attribute_t *attr);
+
+        private:
+
+            sai_status_t sai_redis_notify_syncd(
+                    _In_ sai_object_id_t switchId,
+                    _In_ const sai_attribute_t *attr);
+
+            void clear_local_state();
+
+            sai_switch_notifications_t processNotification(
+                    _In_ std::shared_ptr<Notification> notification);
+
         private:
 
             /**
@@ -442,11 +468,37 @@ namespace sairedis
              */
             std::shared_ptr<swss::ConsumerTable> m_getConsumer;
 
+            std::shared_ptr<swss::DBConnector> m_db;
+
+            std::shared_ptr<swss::RedisPipeline> m_redisPipeline;
+
+        private:
+
+            uint32_t m_globalContext;
+
+            bool m_asicInitViewMode;
+
+            bool m_useTempView;
+
+            bool m_syncMode;
+
+            bool m_initialized;
+
             std::shared_ptr<Recorder> m_recorder;
+
+            std::shared_ptr<SwitchContainer> m_switchContainer;
+
+            std::shared_ptr<VirtualObjectIdManager> m_virtualObjectIdManager;
+
+            std::shared_ptr<RedisVidIndexGenerator> m_redisVidIndexGenerator;
+
+            std::weak_ptr<saimeta::Meta> m_meta;
+
+            std::shared_ptr<SkipRecordAttrContainer> m_skipRecordAttrContainer;
 
         private: // notification
 
-            std::function<void(std::shared_ptr<Notification>)> m_notificationCallback;
+            std::function<sai_switch_notifications_t(std::shared_ptr<Notification>)> m_notificationCallback;
 
             /**
              * @brief Indicates whether notification thread should be running.

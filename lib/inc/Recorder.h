@@ -352,6 +352,9 @@ namespace sairedis
 
             static std::string getTimestamp();
 
+            void recordStats(
+                _In_ bool enable);
+
         private: // recording helpers
 
             void recordCreate(
@@ -386,11 +389,14 @@ namespace sairedis
             void recordLine(
                     _In_ const std::string& line);
 
+
         private:
 
             bool m_performLogRotate;
 
             bool m_enabled;
+
+            bool m_recordStats;
 
             std::string m_recordingOutputDirectory;
 

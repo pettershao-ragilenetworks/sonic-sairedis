@@ -241,65 +241,10 @@ namespace sairedis
             virtual sai_object_id_t switchIdQuery(
                     _In_ sai_object_id_t objectId) override;
 
-        private: // QUAD API helpers
-
-            sai_status_t create(
-                    _In_ sai_object_type_t objectType,
-                    _In_ const std::string& serializedObjectId,
-                    _In_ uint32_t attr_count,
-                    _In_ const sai_attribute_t *attr_list);
-
-            sai_status_t remove(
-                    _In_ sai_object_type_t objectType,
-                    _In_ const std::string& serializedObjectId);
-
-            sai_status_t set(
-                    _In_ sai_object_type_t objectType,
-                    _In_ const std::string& serializedObjectId,
-                    _In_ const sai_attribute_t *attr);
-
-            sai_status_t get(
-                    _In_ sai_object_type_t objectType,
-                    _In_ const std::string& serializedObjectId,
-                    _In_ uint32_t attr_count,
-                    _Inout_ sai_attribute_t *attr_list);
-
-        private: // bulk QUAD API helpers
-
-            sai_status_t bulkCreate(
-                    _In_ sai_object_type_t object_type,
-                    _In_ const std::vector<std::string> &serialized_object_ids,
-                    _In_ const uint32_t *attr_count,
-                    _In_ const sai_attribute_t **attr_list,
-                    _In_ sai_bulk_op_error_mode_t mode,
-                    _Inout_ sai_status_t *object_statuses);
-
-            sai_status_t bulkRemove(
-                    _In_ sai_object_type_t object_type,
-                    _In_ const std::vector<std::string> &serialized_object_ids,
-                    _In_ sai_bulk_op_error_mode_t mode,
-                    _Out_ sai_status_t *object_statuses);
-
-            sai_status_t bulkSet(
-                    _In_ sai_object_type_t object_type,
-                    _In_ const std::vector<std::string> &serialized_object_ids,
-                    _In_ const sai_attribute_t *attr_list,
-                    _In_ sai_bulk_op_error_mode_t mode,
-                    _Out_ sai_status_t *object_statuses);
-
         private:
 
-            sai_switch_notifications_t processNotification(
+            sai_switch_notifications_t handle_notification(
                     _In_ std::shared_ptr<Notification> notification);
-
-            void handle_notification(
-                    _In_ std::shared_ptr<Notification> notification);
-
-            sai_status_t sai_redis_notify_syncd(
-                    _In_ sai_object_id_t switchId,
-                    _In_ const sai_attribute_t *attr);
-
-            void clear_local_state();
 
         private:
 
