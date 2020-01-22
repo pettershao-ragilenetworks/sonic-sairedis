@@ -3,7 +3,6 @@
 #include "VirtualObjectIdManager.h"
 #include "RedisVidIndexGenerator.h"
 #include "RedisRemoteSaiInterface.h"
-#include "WrapperRemoteSaiInterface.h"
 #include "NotificationFactory.h"
 #include "SwitchContainer.h"
 #include "VirtualObjectIdManager.h"
@@ -150,12 +149,10 @@ sai_status_t Sai::initialize(
     g_useTempView = false;
 
     // will create notification thread
-    auto impl = std::make_shared<RedisRemoteSaiInterface>(
+    m_redisSai = std::make_shared<RedisRemoteSaiInterface>(
             g_asicState,
             g_redisGetConsumer,
             std::bind(&Sai::handle_notification, this, std::placeholders::_1));
-
-    m_redisSai = std::make_shared<WrapperRemoteSaiInterface>(impl);
 
     m_meta = std::make_shared<Meta>(m_redisSai);
 
@@ -1089,6 +1086,4 @@ void Sai::clear_local_state()
     if (m_meta)
         m_meta->meta_init_db();
 }
-
-
 

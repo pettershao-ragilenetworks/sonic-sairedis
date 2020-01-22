@@ -3,6 +3,8 @@
 #include "NotificationFactory.h"
 #include "Recorder.h"
 #include "VirtualObjectIdManager.h"
+#include "SkipRecordAttrContainer.h"
+#include "SwitchContainer.h"
 
 #include "sairediscommon.h"
 #include "meta/sai_serialize.h"
@@ -14,10 +16,15 @@
 
 using namespace sairedis;
 
-extern bool g_syncMode;  // TODO make member
+static auto g_skipRecordAttrContainer = std::make_shared<SkipRecordAttrContainer>();
+
+// TODO to be moved to members
 extern std::string getSelectResultAsString(int result);
-extern std::shared_ptr<Recorder> g_recorder;
-extern std::shared_ptr<VirtualObjectIdManager> g_virtualObjectIdManager;
+
+extern bool                                         g_syncMode;  // TODO make member
+extern std::shared_ptr<Recorder>                    g_recorder;
+extern std::shared_ptr<VirtualObjectIdManager>      g_virtualObjectIdManager;
+extern std::shared_ptr<SwitchContainer>             g_switchContainer;
 
 std::string joinFieldValues(
         _In_ const std::vector<swss::FieldValueTuple> &values);
@@ -88,18 +95,55 @@ sai_status_t RedisRemoteSaiInterface::create(
 {
     SWSS_LOG_ENTER();
 
-    if (!objectId || *objectId == SAI_NULL_OBJECT_ID)
+    *objectId = SAI_NULL_OBJECT_ID;
+
+    // TODO allocating new object ID should be inside implementation but here
+    // we need it also for recording, if we move recording inside
+    // implementation then we don't need wrapper
+
+    // TODO switch must be special, we need config
+
+    // on create vid is put in db by syncd
+    *objectId = g_virtualObjectIdManager->allocateNewObjectId(objectType, switchId);
+
+    if (*objectId == SAI_NULL_OBJECT_ID)
     {
-        SWSS_LOG_THROW("forgot to allocate object id, FATAL");
+        SWSS_LOG_ERROR("failed to create %s, with switch id: %s",
+                sai_serialize_object_type(objectType).c_str(),
+                sai_serialize_object_id(switchId).c_str());
+
+        return SAI_STATUS_INSUFFICIENT_RESOURCES;
     }
 
     // NOTE: objectId was allocated by the caller
 
-    return create(
+    auto status = create(
             objectType,
             sai_serialize_object_id(*objectId),
             attr_count,
             attr_list);
+
+    if (objectType == SAI_OBJECT_TYPE_SWITCH && status == SAI_STATUS_SUCCESS)
+    {
+        /*
+         * When doing CREATE operation user may want to update notification
+         * pointers, since notifications can be defined per switch we need to
+         * update them.
+         *
+         * TODO: should be moved inside to redis_generic_create
+         */
+
+        auto sw = std::make_shared<Switch>(*objectId, attr_count, attr_list);
+
+        g_switchContainer->insert(sw);
+    }
+    else if (status != SAI_STATUS_SUCCESS)
+    {
+        // if create failed, then release allocated object
+        g_virtualObjectIdManager->releaseObjectId(*objectId);
+    }
+
+    return status;
 }
 
 sai_status_t RedisRemoteSaiInterface::remove(
@@ -108,9 +152,21 @@ sai_status_t RedisRemoteSaiInterface::remove(
 {
     SWSS_LOG_ENTER();
 
-    return remove(
+    auto status = remove(
             objectType,
             sai_serialize_object_id(objectId));
+
+    if (objectType == SAI_OBJECT_TYPE_SWITCH && status == SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_NOTICE("removing switch id %s", sai_serialize_object_id(objectId).c_str());
+
+        g_virtualObjectIdManager->releaseObjectId(objectId);
+
+        // remove switch from container
+        g_switchContainer->removeSwitch(objectId);
+    }
+
+    return status;
 }
 
 sai_status_t RedisRemoteSaiInterface::set(
@@ -120,10 +176,30 @@ sai_status_t RedisRemoteSaiInterface::set(
 {
     SWSS_LOG_ENTER();
 
-    return set(
+    auto status = set(
             objectType,
             sai_serialize_object_id(objectId),
             attr);
+
+    if (objectType == SAI_OBJECT_TYPE_SWITCH && status == SAI_STATUS_SUCCESS)
+    {
+        auto sw = g_switchContainer->getSwitch(objectId);
+
+        if (!sw)
+        {
+            SWSS_LOG_THROW("failed to find switch %s in container",
+                    sai_serialize_object_id(objectId).c_str());
+        }
+
+        /*
+         * When doing SET operation user may want to update notification
+         * pointers.
+         */
+
+        sw->updateNotifications(1, attr);
+    }
+
+    return status;
 }
 
 sai_status_t RedisRemoteSaiInterface::get(
@@ -213,13 +289,13 @@ sai_status_t RedisRemoteSaiInterface::create(
 {
     SWSS_LOG_ENTER();
 
-    std::vector<swss::FieldValueTuple> entry = SaiAttributeList::serialize_attr_list(
+    auto entry = SaiAttributeList::serialize_attr_list(
             object_type,
             attr_count,
             attr_list,
             false);
 
-    if (entry.size() == 0)
+    if (entry.empty())
     {
         // make sure that we put object into db
         // even if there are no attributes set
@@ -234,9 +310,15 @@ sai_status_t RedisRemoteSaiInterface::create(
 
     SWSS_LOG_DEBUG("generic create key: %s, fields: %" PRIu64, key.c_str(), entry.size());
 
+    g_recorder->recordGenericCreate(key, entry);
+
     m_asicState->set(key, entry, REDIS_ASIC_STATE_COMMAND_CREATE);
 
-    return waitForResponse(SAI_COMMON_API_CREATE);
+    auto status = waitForResponse(SAI_COMMON_API_CREATE);
+
+    g_recorder->recordGenericCreateResponse(status);
+
+    return status;
 }
 
 sai_status_t RedisRemoteSaiInterface::remove(
@@ -251,9 +333,15 @@ sai_status_t RedisRemoteSaiInterface::remove(
 
     SWSS_LOG_DEBUG("generic remove key: %s", key.c_str());
 
+    g_recorder->recordGenericRemove(key);
+
     m_asicState->del(key, REDIS_ASIC_STATE_COMMAND_REMOVE);
 
-    return waitForResponse(SAI_COMMON_API_REMOVE);
+    auto status = waitForResponse(SAI_COMMON_API_REMOVE);
+
+    g_recorder->recordGenericRemoveResponse(status);
+
+    return status;
 }
 
 sai_status_t RedisRemoteSaiInterface::set(
@@ -263,7 +351,7 @@ sai_status_t RedisRemoteSaiInterface::set(
 {
     SWSS_LOG_ENTER();
 
-    std::vector<swss::FieldValueTuple> entry = SaiAttributeList::serialize_attr_list(
+    auto entry = SaiAttributeList::serialize_attr_list(
             objectType,
             1,
             attr,
@@ -275,9 +363,15 @@ sai_status_t RedisRemoteSaiInterface::set(
 
     SWSS_LOG_DEBUG("generic set key: %s, fields: %lu", key.c_str(), entry.size());
 
+    g_recorder->recordGenericSet(key, entry);
+
     m_asicState->set(key, entry, REDIS_ASIC_STATE_COMMAND_SET);
 
-    return waitForResponse(SAI_COMMON_API_SET);
+    auto status = waitForResponse(SAI_COMMON_API_SET);
+
+    g_recorder->recordGenericSetResponse(status);
+
+    return status;
 }
 
 sai_status_t RedisRemoteSaiInterface::waitForResponse(
@@ -428,9 +522,15 @@ sai_status_t RedisRemoteSaiInterface::get(
 {
     SWSS_LOG_ENTER();
 
+    /*
+     * Since user may reuse buffers, then oid list buffers maybe not cleared
+     * and contain some garbage, let's clean them so we send all oids as null to
+     * syncd.
+     */
+
     Utils::clearOidValues(objectType, attr_count, attr_list);
 
-    std::vector<swss::FieldValueTuple> entry = SaiAttributeList::serialize_attr_list(
+    auto entry = SaiAttributeList::serialize_attr_list(
             objectType,
             attr_count,
             attr_list,
@@ -442,11 +542,25 @@ sai_status_t RedisRemoteSaiInterface::get(
 
     SWSS_LOG_DEBUG("generic get key: %s, fields: %lu", key.c_str(), entry.size());
 
+    bool skipRecord = g_skipRecordAttrContainer->canSkipRecording(objectType, attr_count, attr_list);
+
+    if (!skipRecord)
+    {
+        g_recorder->recordGenericGet(key, entry);
+    }
+
     // get is special, it will not put data
     // into asic view, only to message queue
     m_asicState->set(key, entry, REDIS_ASIC_STATE_COMMAND_GET);
 
-    return waitForGetResponse(objectType, attr_count, attr_list);
+    auto status = waitForGetResponse(objectType, attr_count, attr_list);
+
+    if (!skipRecord)
+    {
+        g_recorder->recordGenericGetResponse(status, objectType, attr_count, attr_list);
+    }
+
+    return status;
 }
 
 #define DECLARE_GET_ENTRY(OT,ot)                                \
@@ -530,7 +644,7 @@ sai_status_t RedisRemoteSaiInterface::flushFdbEntries(
 {
     SWSS_LOG_ENTER();
 
-    std::vector<swss::FieldValueTuple> entry = SaiAttributeList::serialize_attr_list(
+    auto entry = SaiAttributeList::serialize_attr_list(
             SAI_OBJECT_TYPE_FDB_FLUSH,
             attrCount,
             attrList,
@@ -543,9 +657,16 @@ sai_status_t RedisRemoteSaiInterface::flushFdbEntries(
 
     SWSS_LOG_NOTICE("flush key: %s, fields: %lu", key.c_str(), entry.size());
 
+    g_recorder->recordFlushFdbEntries(switchId, attrCount, attrList);
+   // g_recorder->recordFlushFdbEntries(key, entry)
+
     m_asicState->set(key, entry, REDIS_ASIC_STATE_COMMAND_FLUSH);
 
-    return waitForFlushFdbEntriesResponse();
+    auto status = waitForFlushFdbEntriesResponse();
+
+    g_recorder->recordFlushFdbEntriesResponse(status);
+
+    return status;
 }
 
 sai_status_t RedisRemoteSaiInterface::objectTypeGetAvailability(
@@ -560,7 +681,7 @@ sai_status_t RedisRemoteSaiInterface::objectTypeGetAvailability(
     const std::string switch_id_str = sai_serialize_object_id(switchId);
     const std::string object_type_str = sai_serialize_object_type(objectType);
 
-    std::vector<swss::FieldValueTuple> query_arguments =
+    auto query_arguments =
         SaiAttributeList::serialize_attr_list(
                 objectType,
                 attrCount,
@@ -577,11 +698,18 @@ sai_status_t RedisRemoteSaiInterface::objectTypeGetAvailability(
     // Syncd will pop this argument off before trying to deserialize the attribute list
     query_arguments.push_back(swss::FieldValueTuple("OBJECT_TYPE", object_type_str));
 
+    g_recorder->recordObjectTypeGetAvailability(switchId, objectType, attrCount, attrList);
+    // recordObjectTypeGetAvailability(switch_id_str, query_arguments);
+
     // This query will not put any data into the ASIC view, just into the
     // message queue
     m_asicState->set(switch_id_str, query_arguments, REDIS_ASIC_STATE_COMMAND_OBJECT_TYPE_GET_AVAILABILITY_QUERY);
 
-    return waitForObjectTypeGetAvailabilityResponse(count);
+    auto status = waitForObjectTypeGetAvailabilityResponse(count);
+
+    g_recorder->recordObjectTypeGetAvailabilityResponse(status, count);
+
+    return status;
 }
 
 sai_status_t RedisRemoteSaiInterface::waitForObjectTypeGetAvailabilityResponse(
@@ -651,26 +779,33 @@ sai_status_t RedisRemoteSaiInterface::waitForObjectTypeGetAvailabilityResponse(
 }
 
 sai_status_t RedisRemoteSaiInterface::queryAattributeEnumValuesCapability(
-        _In_ sai_object_id_t switch_id,
-        _In_ sai_object_type_t object_type,
-        _In_ sai_attr_id_t attr_id,
-        _Inout_ sai_s32_list_t *enum_values_capability)
+        _In_ sai_object_id_t switchId,
+        _In_ sai_object_type_t objectType,
+        _In_ sai_attr_id_t attrId,
+        _Inout_ sai_s32_list_t *enumValuesCapability)
 {
     SWSS_LOG_ENTER();
 
-    const std::string switch_id_str = sai_serialize_object_id(switch_id);
-    const std::string object_type_str = sai_serialize_object_type(object_type);
+    if (enumValuesCapability && enumValuesCapability->list)
+    {
+        // clear input list, since we use serialize to transfer values
+        for (uint32_t idx = 0; idx < enumValuesCapability->count; idx++)
+            enumValuesCapability->list[idx] = 0;
+    }
 
-    auto meta = sai_metadata_get_attr_metadata(object_type, attr_id);
+    const std::string switch_id_str = sai_serialize_object_id(switchId);
+    const std::string object_type_str = sai_serialize_object_type(objectType);
+
+    auto meta = sai_metadata_get_attr_metadata(objectType, attrId);
 
     if (meta == NULL)
     {
-        SWSS_LOG_ERROR("Failed to find attribute metadata: object type %s, attr id %d", object_type_str.c_str(), attr_id);
+        SWSS_LOG_ERROR("Failed to find attribute metadata: object type %s, attr id %d", object_type_str.c_str(), attrId);
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    const std::string attr_id_str = sai_serialize_attr_id(*meta);
-    const std::string list_size = std::to_string(enum_values_capability->count);
+    const std::string attr_id_str = meta->attridname;
+    const std::string list_size = std::to_string(enumValuesCapability->count);
 
     const std::vector<swss::FieldValueTuple> query_arguments =
     {
@@ -690,9 +825,15 @@ sai_status_t RedisRemoteSaiInterface::queryAattributeEnumValuesCapability(
     // This query will not put any data into the ASIC view, just into the
     // message queue
 
+    g_recorder->recordQueryAattributeEnumValuesCapability(switchId, objectType, attrId, enumValuesCapability);
+
     m_asicState->set(switch_id_str, query_arguments, REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_QUERY);
 
-    return waitForQueryAattributeEnumValuesCapabilityResponse(enum_values_capability);
+    auto status = waitForQueryAattributeEnumValuesCapabilityResponse(enumValuesCapability);
+
+    g_recorder->recordQueryAattributeEnumValuesCapabilityResponse(status, objectType, attrId, enumValuesCapability);
+
+    return status;
 }
 
 sai_status_t RedisRemoteSaiInterface::waitForQueryAattributeEnumValuesCapabilityResponse(
@@ -928,9 +1069,15 @@ sai_status_t RedisRemoteSaiInterface::clearStats(
 
     // clear_stats will not put data into asic view, only to message queue
 
+    g_recorder->recordGenericClearStats(object_type, object_id, number_of_counters, counter_ids);
+
     m_asicState->set(key, values, REDIS_ASIC_STATE_COMMAND_CLEAR_STATS);
 
-    return waitForClearStatsResponse();
+    auto status = waitForClearStatsResponse();
+
+    g_recorder->recordGenericClearStatsResponse(status);
+
+    return status;
 }
 
 sai_status_t RedisRemoteSaiInterface::waitForClearStatsResponse()
@@ -1309,6 +1456,20 @@ sai_status_t RedisRemoteSaiInterface::bulkCreate(
 
     // TODO support mode
 
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        object_id[idx] = g_virtualObjectIdManager->allocateNewObjectId(object_type, switch_id);
+
+        if (object_id[idx] == SAI_NULL_OBJECT_ID)
+        {
+            SWSS_LOG_ERROR("failed to create %s, with switch id: %s",
+                    sai_serialize_object_type(object_type).c_str(),
+                    sai_serialize_object_id(switch_id).c_str());
+
+            return SAI_STATUS_INSUFFICIENT_RESOURCES;
+        }
+    }
+
     std::vector<std::string> serialized_object_ids;
 
     // on create vid is put in db by syncd
@@ -1363,6 +1524,8 @@ sai_status_t RedisRemoteSaiInterface::bulkCreate(
     // field:       object_id
     // value:       object_attrs
     std::string key = str_object_type + ":" + std::to_string(entries.size());
+
+    // TODO record
 
     m_asicState->set(key, entries, REDIS_ASIC_STATE_COMMAND_BULK_CREATE);
 
@@ -1508,9 +1671,15 @@ sai_status_t RedisRemoteSaiInterface::notifySyncd(
     // and then on syncd side read all the asic state queue
     // and apply changes before switching to init/apply mode
 
+    g_recorder->recordNotifySyncd(switchId, redisNotifySyncd);
+
     m_asicState->set(key, entry, REDIS_ASIC_STATE_COMMAND_NOTIFY);
 
-    return waitForNotifySyncdResponse();
+    auto status = waitForNotifySyncdResponse();
+
+    g_recorder->recordNotifySyncdResponse(status);
+
+    return status;
 }
 
 sai_status_t RedisRemoteSaiInterface::waitForNotifySyncdResponse()

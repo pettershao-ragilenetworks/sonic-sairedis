@@ -24,7 +24,6 @@ libsairedis_la_SOURCES = \
 						 Recorder.cpp \
 						 RedisRemoteSaiInterface.cpp \
 						 Utils.cpp \
-						 WrapperRemoteSaiInterface.cpp \
 						 SkipRecordAttrContainer.cpp \
 						 sai_redis_acl.cpp \
 						 sai_redis_bfd.cpp \

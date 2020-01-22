@@ -1,6 +1,6 @@
 #pragma once
 
-#include "WrapperRemoteSaiInterface.h"
+#include "RedisRemoteSaiInterface.h"
 #include "Notification.h"
 
 #include "meta/Meta.h"
@@ -308,7 +308,7 @@ namespace sairedis
 
             std::shared_ptr<saimeta::Meta> m_meta;
 
-            std::shared_ptr<WrapperRemoteSaiInterface> m_redisSai;
+            std::shared_ptr<RedisRemoteSaiInterface> m_redisSai;
 
             sai_service_method_table_t m_service_method_table;
     };
