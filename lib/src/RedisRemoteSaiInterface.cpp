@@ -1581,6 +1581,15 @@ sai_object_id_t RedisRemoteSaiInterface::switchIdQuery(
     return m_virtualObjectIdManager->saiSwitchIdQuery(objectId);
 }
 
+sai_status_t RedisRemoteSaiInterface::logSet(
+        _In_ sai_api_t api,
+        _In_ sai_log_level_t log_level)
+{
+    SWSS_LOG_ENTER();
+
+    return SAI_STATUS_SUCCESS;
+}
+
 sai_status_t RedisRemoteSaiInterface::sai_redis_notify_syncd(
         _In_ sai_object_id_t switchId,
         _In_ const sai_attribute_t *attr)
