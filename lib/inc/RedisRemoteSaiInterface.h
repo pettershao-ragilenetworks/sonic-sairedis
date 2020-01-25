@@ -250,6 +250,10 @@ namespace sairedis
             virtual sai_object_id_t switchIdQuery(
                     _In_ sai_object_id_t objectId) override;
 
+            virtual sai_status_t logSet(
+                    _In_ sai_api_t api,
+                    _In_ sai_log_level_t log_level) override;
+
         public: // notify syncd
 
             virtual sai_status_t notifySyncd(
