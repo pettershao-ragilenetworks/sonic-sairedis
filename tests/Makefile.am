@@ -11,6 +11,7 @@ endif
 SAILIB=-L$(top_srcdir)/vslib/src/.libs -lsaivs
 
 vssyncd_SOURCES = \
+				../syncd/VendorSai.cpp \
 				../syncd/main.cpp \
 				../syncd/syncd.cpp \
 				../syncd/syncd_saiswitch.cpp \
@@ -28,4 +29,4 @@ vssyncd_SOURCES = \
 vssyncd_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON) $(SAIFLAGS)
 vssyncd_LDADD = -lhiredis -lswsscommon $(SAILIB) -lpthread -L$(top_srcdir)/meta/.libs -lsaimetadata -lsaimeta -ldl
 
-TESTS = aspellcheck.pl conflictnames.pl mlnx.pl brcm.pl swsslogentercheck.sh
+TESTS = aspellcheck.pl conflictnames.pl brcm.pl mlnx.pl swsslogentercheck.sh
