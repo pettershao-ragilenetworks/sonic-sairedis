@@ -410,3 +410,12 @@ sai_object_id_t DummySaiInterface::switchIdQuery(
 
     return SAI_NULL_OBJECT_ID;
 }
+
+sai_status_t DummySaiInterface::logSet(
+        _In_ sai_api_t api,
+        _In_ sai_log_level_t log_level)
+{
+    SWSS_LOG_ENTER();
+
+    return m_status;
+}

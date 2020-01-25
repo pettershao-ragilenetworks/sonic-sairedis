@@ -2746,6 +2746,17 @@ sai_object_id_t Meta::switchIdQuery(
     return m_implementation->switchIdQuery(objectId);
 }
 
+sai_status_t Meta::logSet(
+        _In_ sai_api_t api,
+        _In_ sai_log_level_t log_level)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO check api and loglevel
+
+    return m_implementation->logSet(api, log_level);
+}
+
 void Meta::clean_after_switch_remove(
         _In_ sai_object_id_t switchId)
 {
