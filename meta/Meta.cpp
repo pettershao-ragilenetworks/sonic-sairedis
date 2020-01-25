@@ -2752,7 +2752,7 @@ sai_status_t Meta::logSet(
 {
     SWSS_LOG_ENTER();
 
-    // TODO check api and loglevel
+    // TODO check api and log level
 
     return m_implementation->logSet(api, log_level);
 }
