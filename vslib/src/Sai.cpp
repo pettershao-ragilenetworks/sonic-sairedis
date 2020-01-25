@@ -736,3 +736,13 @@ sai_object_id_t Sai::switchIdQuery(
     return RealObjectIdManager::switchIdQuery(objectId);
 }
 
+sai_status_t Sai::logSet(
+        _In_ sai_api_t api,
+        _In_ sai_log_level_t log_level)
+{
+    MUTEX();
+    SWSS_LOG_ENTER();
+    VS_CHECK_API_INITIALIZED();
+
+    return m_meta->logSet(api, log_level);
+}

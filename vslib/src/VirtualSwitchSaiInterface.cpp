@@ -1245,6 +1245,15 @@ sai_object_id_t VirtualSwitchSaiInterface::switchIdQuery(
     return m_realObjectIdManager->saiSwitchIdQuery(objectId);
 }
 
+sai_status_t VirtualSwitchSaiInterface::logSet(
+        _In_ sai_api_t api,
+        _In_ sai_log_level_t log_level)
+{
+    SWSS_LOG_ENTER();
+
+    return SAI_STATUS_SUCCESS;
+}
+
 bool VirtualSwitchSaiInterface::writeWarmBootFile(
         _In_ const char* warmBootFile) const
 {
