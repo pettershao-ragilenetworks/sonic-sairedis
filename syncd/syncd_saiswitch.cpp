@@ -22,7 +22,7 @@ sai_uint32_t SaiSwitch::saiGetPortCount() const
 
     attr.id = SAI_SWITCH_ATTR_PORT_NUMBER;
 
-    sai_status_t status = sai_metadata_sai_switch_api->get_switch_attribute(m_switch_rid, 1, &attr);
+    sai_status_t status = g_vendorSai->get(SAI_OBJECT_TYPE_SWITCH, m_switch_rid, 1, &attr);
 
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -44,7 +44,7 @@ void SaiSwitch::saiGetMacAddress(
 
     attr.id = SAI_SWITCH_ATTR_SRC_MAC_ADDRESS;
 
-    sai_status_t status = sai_metadata_sai_switch_api->get_switch_attribute(m_switch_rid, 1, &attr);
+    sai_status_t status = g_vendorSai->get(SAI_OBJECT_TYPE_SWITCH, m_switch_rid, 1, &attr);
 
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -83,7 +83,7 @@ std::string SaiSwitch::saiGetHardwareInfo() const
     attr.value.s8list.count = MAX_HARDWARE_INFO_LENGTH;
     attr.value.s8list.list = (int8_t*)info;
 
-    sai_status_t status = sai_metadata_sai_switch_api->get_switch_attribute(m_switch_rid, 1, &attr);
+    sai_status_t status = g_vendorSai->get(SAI_OBJECT_TYPE_SWITCH, m_switch_rid, 1, &attr);
 
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -122,7 +122,7 @@ std::vector<sai_object_id_t> SaiSwitch::saiGetPortList() const
      * NOTE: We assume port list is always returned in the same order.
      */
 
-    sai_status_t status = sai_metadata_sai_switch_api->get_switch_attribute(m_switch_rid, 1, &attr);
+    sai_status_t status = g_vendorSai->get(SAI_OBJECT_TYPE_SWITCH, m_switch_rid, 1, &attr);
 
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -162,7 +162,7 @@ std::unordered_map<sai_uint32_t, sai_object_id_t> SaiSwitch::saiGetHardwareLaneM
         attr.value.u32list.count = maxLanesPerPort;
         attr.value.u32list.list = lanes;
 
-        sai_status_t status = sai_metadata_sai_port_api->get_port_attribute(port_rid, 1, &attr);
+        sai_status_t status = g_vendorSai->get(SAI_OBJECT_TYPE_PORT, port_rid, 1, &attr);
 
         if (status != SAI_STATUS_SUCCESS)
         {
@@ -370,11 +370,11 @@ void SaiSwitch::redisSetDummyAsicStateForRealObjectId(
 
     sai_object_id_t vid = translate_rid_to_vid(rid, m_switch_vid);
 
-    sai_object_type_t objectType = sai_object_type_query(rid);
+    sai_object_type_t objectType = g_vendorSai->objectTypeQuery(rid);
 
     if (objectType == SAI_OBJECT_TYPE_NULL)
     {
-        SWSS_LOG_THROW("sai_object_type_query returned NULL type for RID: %s",
+        SWSS_LOG_THROW("g_vendorSai->objectTypeQuery returned NULL type for RID: %s",
                 sai_serialize_object_id(rid).c_str());
     }
 
@@ -460,11 +460,11 @@ void SaiSwitch::removeExistingObject(
                 sai_serialize_object_id(rid).c_str());
     }
 
-    sai_object_type_t ot = sai_object_type_query(rid);
+    sai_object_type_t ot = g_vendorSai->objectTypeQuery(rid);
 
     if (ot == SAI_OBJECT_TYPE_NULL)
     {
-        SWSS_LOG_THROW("sai_object_type_query returned NULL on RID %s",
+        SWSS_LOG_THROW("g_vendorSai->objectTypeQuery returned NULL on RID %s",
                 sai_serialize_object_id(rid).c_str());
     }
 
@@ -528,7 +528,7 @@ sai_object_id_t SaiSwitch::helperGetSwitchAttrOid(
 
     attr.id = attr_id;
 
-    sai_status_t status = sai_metadata_sai_switch_api->get_switch_attribute(m_switch_rid, 1, &attr);
+    sai_status_t status = g_vendorSai->get(SAI_OBJECT_TYPE_SWITCH, m_switch_rid, 1, &attr);
 
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -681,7 +681,7 @@ bool SaiSwitch::isNonRemovableRid(
         return true;
     }
 
-    sai_object_type_t ot = sai_object_type_query(rid);
+    sai_object_type_t ot = g_vendorSai->objectTypeQuery(rid);
 
     /*
      * List of objects after init (mlnx 2700):
@@ -764,11 +764,11 @@ void SaiSwitch::saiDiscover(
         return;
     }
 
-    sai_object_type_t ot = sai_object_type_query(rid);
+    sai_object_type_t ot = g_vendorSai->objectTypeQuery(rid);
 
     if (ot == SAI_OBJECT_TYPE_NULL)
     {
-        SWSS_LOG_THROW("sai_object_type_query: rid %s returned NULL object type",
+        SWSS_LOG_THROW("g_vendorSai->objectTypeQuery: rid %s returned NULL object type",
                 sai_serialize_object_id(rid).c_str());
     }
 
@@ -879,11 +879,11 @@ void SaiSwitch::saiDiscover(
 
             if (attr.value.oid != SAI_NULL_OBJECT_ID)
             {
-                ot = sai_object_type_query(attr.value.oid);
+                ot = g_vendorSai->objectTypeQuery(attr.value.oid);
 
                 if (ot == SAI_OBJECT_TYPE_NULL)
                 {
-                    SWSS_LOG_THROW("when query %s (on %s RID %s) got value %s sai_object_type_query returned NULL object type",
+                    SWSS_LOG_THROW("when query %s (on %s RID %s) got value %s g_vendorSai->objectTypeQuery returned NULL object type",
                             md->attridname,
                             sai_serialize_object_type(md->objecttype).c_str(),
                             sai_serialize_object_id(rid).c_str(),
@@ -936,11 +936,11 @@ void SaiSwitch::saiDiscover(
             {
                 sai_object_id_t oid = attr.value.objlist.list[i];
 
-                ot = sai_object_type_query(oid);
+                ot = g_vendorSai->objectTypeQuery(oid);
 
                 if (ot == SAI_OBJECT_TYPE_NULL)
                 {
-                    SWSS_LOG_THROW("when query %s (on %s RID %s) got value %s sai_object_type_query returned NULL object type",
+                    SWSS_LOG_THROW("when query %s (on %s RID %s) got value %s g_vendorSai->objectTypeQuery returned NULL object type",
                             md->attridname,
                             sai_serialize_object_type(md->objecttype).c_str(),
                             sai_serialize_object_id(rid).c_str(),
@@ -987,7 +987,7 @@ void SaiSwitch::helperDiscover()
          * that.
          */
 
-        map[sai_object_type_query(rid)]++;
+        map[g_vendorSai->objectTypeQuery(rid)]++;
     }
 
     for (const auto &p: map)
@@ -1074,11 +1074,11 @@ void SaiSwitch::redisSaveColdBootDiscoveredVids() const
     {
         sai_object_id_t vid = translate_rid_to_vid(rid, m_switch_vid);
 
-        sai_object_type_t objectType = sai_object_type_query(rid);
+        sai_object_type_t objectType = g_vendorSai->objectTypeQuery(rid);
 
         if (objectType == SAI_OBJECT_TYPE_NULL)
         {
-            SWSS_LOG_THROW("sai_object_type_query returned NULL type for RID: %s",
+            SWSS_LOG_THROW("g_vendorSai->objectTypeQuery returned NULL type for RID: %s",
                     sai_serialize_object_id(rid).c_str());
         }
 
@@ -1307,7 +1307,7 @@ std::vector<uint32_t> SaiSwitch::saiGetPortLanes(
     attr.value.u32list.count = maxLanesPerPort;
     attr.value.u32list.list = lanes.data();
 
-    sai_status_t status = sai_metadata_sai_port_api->get_port_attribute(port_rid, 1, &attr);
+    sai_status_t status = g_vendorSai->get(SAI_OBJECT_TYPE_PORT, port_rid, 1, &attr);
 
     if (status != SAI_STATUS_SUCCESS)
     {

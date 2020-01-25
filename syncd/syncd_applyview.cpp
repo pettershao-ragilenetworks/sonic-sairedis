@@ -7227,7 +7227,7 @@ void populateExistingObjects(
         if (performColdCheck && coldBootDiscoveredVids.find(vid) == coldBootDiscoveredVids.end())
         {
             SWSS_LOG_INFO("object is not on default existing list: %s RID %s VID %s",
-                    sai_serialize_object_type(sai_object_type_query(rid)).c_str(),
+                    sai_serialize_object_type(g_vendorSai->objectTypeQuery(rid)).c_str(),
                     sai_serialize_object_id(rid).c_str(),
                     sai_serialize_object_id(vid).c_str());
 
@@ -7237,7 +7237,7 @@ void populateExistingObjects(
         temporaryView.createDummyExistingObject(rid, vid);
 
         SWSS_LOG_INFO("populate existing %s RID %s VID %s",
-                sai_serialize_object_type(sai_object_type_query(rid)).c_str(),
+                sai_serialize_object_type(g_vendorSai->objectTypeQuery(rid)).c_str(),
                 sai_serialize_object_id(rid).c_str(),
                 sai_serialize_object_id(vid).c_str());
 

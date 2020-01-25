@@ -271,7 +271,7 @@ void checkAllIds()
                 continue;
             }
 
-            if (ot == sai_object_type_query(rid) ||
+            if (ot == g_vendorSai->objectTypeQuery(rid) ||
                     ot == SAI_OBJECT_TYPE_NULL)
             {
                 g_sw->removeExistingObject(rid);
@@ -439,7 +439,7 @@ void processSwitches()
 
         {
             SWSS_LOG_TIMER("Cold boot: create switch");
-            status = sai_metadata_sai_switch_api->create_switch(&switch_rid, attr_count, attr_list);
+            status = g_vendorSai->create(SAI_OBJECT_TYPE_SWITCH, &switch_rid, 0, attr_count, attr_list);
         }
 
         gSwitchId = switch_rid;
@@ -493,7 +493,7 @@ void processSwitches()
         {
             sai_attribute_t *attr = &attrs_left[idx];
 
-            status = sai_metadata_sai_switch_api->set_switch_attribute(switch_rid, attr);
+            status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, switch_rid, attr);
 
             if (status != SAI_STATUS_SUCCESS)
             {
@@ -549,7 +549,7 @@ void trapGroupWorkaround(
         SWSS_LOG_THROW("missing QUEUE attribute on TRAP_GROUP creation even if it's not MANDATORY");
     }
 
-    sai_status_t status = sai_metadata_sai_hostif_api->create_hostif_trap_group(&rid, g_switch_rid, 1, queue_attr);
+    sai_status_t status = g_vendorSai->create(SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP, &rid, g_switch_rid, 1, queue_attr);
 
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -988,8 +988,7 @@ void processFdbs()
 
         processAttributesForOids(SAI_OBJECT_TYPE_FDB_ENTRY, attrCount, attrList);
 
-        sai_status_t status = sai_metadata_sai_fdb_api->
-            create_fdb_entry(&meta_key.objectkey.key.fdb_entry, attrCount, attrList);
+        sai_status_t status = g_vendorSai->create(&meta_key.objectkey.key.fdb_entry, attrCount, attrList);
 
         if (status != SAI_STATUS_SUCCESS)
         {
@@ -1027,8 +1026,7 @@ void processNeighbors()
 
         processAttributesForOids(SAI_OBJECT_TYPE_NEIGHBOR_ENTRY, attrCount, attrList);
 
-        sai_status_t status = sai_metadata_sai_neighbor_api->
-            create_neighbor_entry(&meta_key.objectkey.key.neighbor_entry, attrCount, attrList);
+        sai_status_t status = g_vendorSai->create(&meta_key.objectkey.key.neighbor_entry, attrCount, attrList);
 
         if (status != SAI_STATUS_SUCCESS)
         {
@@ -1081,8 +1079,7 @@ void processRoutes(bool defaultOnly)
 
         processAttributesForOids(SAI_OBJECT_TYPE_ROUTE_ENTRY, attrCount, attrList);
 
-        sai_status_t status = sai_metadata_sai_route_api->
-            create_route_entry(&meta_key.objectkey.key.route_entry, attrCount, attrList);
+        sai_status_t status = g_vendorSai->create(&meta_key.objectkey.key.route_entry, attrCount, attrList);
 
         if (status != SAI_STATUS_SUCCESS)
         {
@@ -1124,8 +1121,7 @@ void processNatEntries()
 
         processAttributesForOids(SAI_OBJECT_TYPE_NAT_ENTRY, attrCount, attrList);
 
-        sai_status_t status = sai_metadata_sai_nat_api->
-            create_nat_entry(&meta_key.objectkey.key.nat_entry, attrCount, attrList);
+        sai_status_t status = g_vendorSai->create(&meta_key.objectkey.key.nat_entry, attrCount, attrList);
 
         if (status != SAI_STATUS_SUCCESS)
         {
@@ -1376,7 +1372,7 @@ void performWarmRestart()
 
     {
         SWSS_LOG_TIMER("Warm boot: create switch");
-        status = sai_metadata_sai_switch_api->create_switch(&switch_rid, (uint32_t)NELMS(switch_attrs), &switch_attrs[0]);
+        status = g_vendorSai->create(SAI_OBJECT_TYPE_SWITCH, &switch_rid, 0, (uint32_t)NELMS(switch_attrs), &switch_attrs[0]);
     }
 
     if (status != SAI_STATUS_SUCCESS)

@@ -21,6 +21,10 @@
 #define DEF_SAI_WARM_BOOT_DATA_FILE "/var/warmboot/sai-warmboot.bin"
 #define MAX_OBJLIST_LEN 128
 
+using namespace syncd;
+
+std::shared_ptr<sairedis::SaiInterface> g_vendorSai = std::make_shared<VendorSai>();
+
 /**
  * @brief Global mutex for thread synchronization
  *
@@ -143,7 +147,7 @@ void sai_diag_shell(
         attr.id = SAI_SWITCH_ATTR_SWITCH_SHELL_ENABLE;
         attr.value.booldata = true;
 
-        status = sai_metadata_sai_switch_api->set_switch_attribute(switch_id, &attr);
+        status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
 
         if (status != SAI_STATUS_SUCCESS)
         {
@@ -373,11 +377,11 @@ sai_object_id_t translate_rid_to_vid(
 
     SWSS_LOG_DEBUG("spotted new RID 0x%" PRIx64, rid);
 
-    sai_object_type_t object_type = sai_object_type_query(rid);
+    sai_object_type_t object_type = g_vendorSai->objectTypeQuery(rid);
 
     if (object_type == SAI_OBJECT_TYPE_NULL)
     {
-        SWSS_LOG_THROW("sai_object_type_query returned NULL type for RID 0x%" PRIx64, rid);
+        SWSS_LOG_THROW("g_vendorSai->objectTypeQuery returned NULL type for RID 0x%" PRIx64, rid);
     }
 
     if (object_type == SAI_OBJECT_TYPE_SWITCH)
@@ -753,7 +757,7 @@ void snoop_get_oid(
     /*
      * We need use redis version of object type query here since we are
      * operating on VID value, and syncd is compiled against real SAI
-     * implementation which has different function sai_object_type_query.
+     * implementation which has different function g_vendorSai->objectTypeQuery.
      */
 
     sai_object_type_t object_type = redis_sai_object_type_query(vid);
@@ -1770,7 +1774,7 @@ void InspectAsic()
                 fdb_entry.switch_id = translate_vid_to_rid(fdb_entry.switch_id);
                 fdb_entry.bv_id = translate_vid_to_rid(fdb_entry.bv_id);
 
-                status = sai_metadata_sai_fdb_api->get_fdb_entry_attribute(&fdb_entry, attr_count, attr_list);
+                status = g_vendorSai->get(&fdb_entry, attr_count, attr_list);
                 break;
             }
 
@@ -1782,7 +1786,7 @@ void InspectAsic()
                 neighbor_entry.switch_id = translate_vid_to_rid(neighbor_entry.switch_id);
                 neighbor_entry.rif_id = translate_vid_to_rid(neighbor_entry.rif_id);
 
-                status = sai_metadata_sai_neighbor_api->get_neighbor_entry_attribute(&neighbor_entry, attr_count, attr_list);
+                status = g_vendorSai->get(&neighbor_entry, attr_count, attr_list);
                 break;
             }
 
@@ -1794,7 +1798,7 @@ void InspectAsic()
                 route_entry.switch_id = translate_vid_to_rid(route_entry.switch_id);
                 route_entry.vr_id = translate_vid_to_rid(route_entry.vr_id);
 
-                status = sai_metadata_sai_route_api->get_route_entry_attribute(&route_entry, attr_count, attr_list);
+                status = g_vendorSai->get(&route_entry, attr_count, attr_list);
                 break;
             }
 
@@ -1806,7 +1810,7 @@ void InspectAsic()
                 nat_entry.switch_id = translate_vid_to_rid(nat_entry.switch_id);
                 nat_entry.vr_id = translate_vid_to_rid(nat_entry.vr_id);
 
-                status = sai_metadata_sai_nat_api->get_nat_entry_attribute(&nat_entry, attr_count, attr_list);
+                status = g_vendorSai->get(&nat_entry, attr_count, attr_list);
                 break;
             }
 
@@ -1876,15 +1880,12 @@ sai_status_t onApplyViewInFastFastBoot()
 {
     SWSS_LOG_ENTER();
 
-    sai_switch_api_t* sai_switch_api = nullptr;
-    sai_api_query(SAI_API_SWITCH, (void**)&sai_switch_api);
-
     sai_attribute_t attr;
 
     attr.id = SAI_SWITCH_ATTR_FAST_API_ENABLE;
     attr.value.booldata = false;
 
-    sai_status_t status = sai_switch_api->set_switch_attribute(gSwitchId, &attr);
+    sai_status_t status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, gSwitchId, &attr);
 
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -2072,12 +2073,12 @@ std::vector<T> extractCounterIdsGeneric(
     return counterIdList;
 }
 
-template <typename T, typename F, typename G>
+template <typename T, typename G>
 sai_status_t getStatsGeneric(
+        _In_ sai_object_type_t object_type,
         _In_ sai_object_id_t object_id,
         _In_ const swss::KeyOpFieldsValuesTuple &kco,
         _Out_ std::vector<uint64_t>& counters,
-        _In_ F getStatsFn,
         _In_ G deserializeIdFn)
 {
     SWSS_LOG_ENTER();
@@ -2087,18 +2088,19 @@ sai_status_t getStatsGeneric(
             deserializeIdFn);
     counters.resize(counter_ids.size());
 
-    return getStatsFn(
+    return g_vendorSai->getStats(
+            object_type,
             object_id,
             (uint32_t)counter_ids.size(),
             (const sai_stat_id_t*)counter_ids.data(),
             counters.data());
 }
 
-template <typename T, typename F, typename G>
+template <typename T, typename G>
 sai_status_t clearStatsGeneric(
+        _In_ sai_object_type_t object_type,
         _In_ sai_object_id_t object_id,
         _In_ const swss::KeyOpFieldsValuesTuple &kco,
-        _In_ F clearStatsFn,
         _In_ G deserializeIdFn)
 {
     SWSS_LOG_ENTER();
@@ -2107,7 +2109,8 @@ sai_status_t clearStatsGeneric(
             kco,
             deserializeIdFn);
 
-    return clearStatsFn(
+    return g_vendorSai->clearStats(
+            object_type,
             object_id,
             static_cast<uint32_t>(counter_ids.size()),
             reinterpret_cast<const sai_stat_id_t *>(counter_ids.data()));
@@ -2136,26 +2139,26 @@ sai_status_t processGetStatsEvent(
     {
         case SAI_OBJECT_TYPE_PORT:
             status = getStatsGeneric<sai_port_stat_t>(
+                    SAI_OBJECT_TYPE_PORT,
                     rid,
                     kco,
                     result,
-                    sai_metadata_sai_port_api->get_port_stats,
                     sai_deserialize_port_stat);
             break;
         case SAI_OBJECT_TYPE_QUEUE:
             status = getStatsGeneric<sai_queue_stat_t>(
+                    SAI_OBJECT_TYPE_QUEUE,
                     rid,
                     kco,
                     result,
-                    sai_metadata_sai_queue_api->get_queue_stats,
                     sai_deserialize_queue_stat);
             break;
         case SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP:
             status = getStatsGeneric<sai_ingress_priority_group_stat_t>(
+                    SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP,
                     rid,
                     kco,
                     result,
-                    sai_metadata_sai_buffer_api->get_ingress_priority_group_stats,
                     sai_deserialize_ingress_priority_group_stat);
             break;
         default:
@@ -2211,9 +2214,9 @@ sai_status_t processClearStatsEvent(
     {
         case SAI_OBJECT_TYPE_BUFFER_POOL:
             status = clearStatsGeneric<sai_buffer_pool_stat_t>(
+                    SAI_OBJECT_TYPE_BUFFER_POOL,
                     rid,
                     kco,
-                    sai_metadata_sai_buffer_api->clear_buffer_pool_stats,
                     sai_deserialize_buffer_pool_stat);
             break;
         default:
@@ -2305,7 +2308,7 @@ void on_switch_create_in_init_view(
 
         {
             SWSS_LOG_TIMER("cold boot: create switch");
-            status = sai_metadata_sai_switch_api->create_switch(&switch_rid, attr_count, attr_list);
+            status = g_vendorSai->create(SAI_OBJECT_TYPE_SWITCH, &switch_rid, 0, attr_count, attr_list);
         }
 
         if (status != SAI_STATUS_SUCCESS)
@@ -2972,7 +2975,7 @@ sai_status_t processFdbFlush(
 
     translate_vid_to_rid_list(SAI_OBJECT_TYPE_FDB_FLUSH, attr_count, attr_list);
 
-    sai_status_t status = sai_metadata_sai_fdb_api->flush_fdb_entries(switch_rid, attr_count, attr_list);
+    sai_status_t status = g_vendorSai->flushFdbEntries(switch_rid, attr_count, attr_list);
 
     std::vector<swss::FieldValueTuple> en;
 
@@ -3015,7 +3018,7 @@ sai_status_t processAttrEnumValuesCapabilityQuery(
     enum_values_capability.count = list_size;
     enum_values_capability.list = enum_capabilities_list.data();
 
-    sai_status_t status = sai_query_attribute_enum_values_capability(switch_rid, object_type, attr_id, &enum_values_capability);
+    sai_status_t status = g_vendorSai->queryAattributeEnumValuesCapability(switch_rid, object_type, attr_id, &enum_values_capability);
 
     std::vector<swss::FieldValueTuple> response_payload;
 
@@ -3075,7 +3078,7 @@ sai_status_t processObjectTypeGetAvailabilityQuery(
     translate_vid_to_rid_list(object_type, attr_count, sai_attr_list);
 
     uint64_t count;
-    sai_status_t status = sai_object_type_get_availability(
+    sai_status_t status = g_vendorSai->objectTypeGetAvailability(
             switch_rid,
             object_type,
             attr_count,
@@ -3831,7 +3834,7 @@ void saiLoglevelNotify(std::string apiStr, std::string prioStr)
 
     sai_api_t api = (sai_api_t)get_enum_value_from_name(apiStr.c_str(), &sai_metadata_enum_sai_api_t);
 
-    sai_status_t status = sai_log_set(api, saiLoglevelMap.at(prioStr));
+    sai_status_t status = g_vendorSai->logSet(api, saiLoglevelMap.at(prioStr));
 
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -4089,21 +4092,13 @@ int syncd_main(int argc, char **argv)
         gProfileMap[SAI_KEY_BOOT_TYPE] = std::to_string(g_commandLineOptions->m_startType); // number value is needed
     }
 
-    sai_status_t status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
+    sai_status_t status = g_vendorSai->initialize(0, (sai_service_method_table_t*)&test_services);
 
     if (status != SAI_STATUS_SUCCESS)
     {
         SWSS_LOG_ERROR("fail to sai_api_initialize: %s", 
                 sai_serialize_status(status).c_str());
         return EXIT_FAILURE;
-    }
-
-    sai_apis_t apis;
-    int failed = sai_metadata_apis_query(sai_api_query, &apis);
-
-    if (failed > 0)
-    {
-        SWSS_LOG_NOTICE("sai_api_query failed for %d apis", failed);
     }
 
     /*
@@ -4122,9 +4117,6 @@ int syncd_main(int argc, char **argv)
     SWSS_LOG_NOTICE("syncd started");
 
     syncd_restart_type_t shutdownType = SYNCD_RESTART_TYPE_COLD;
-
-    sai_switch_api_t *sai_switch_api = NULL;
-    sai_api_query(SAI_API_SWITCH, (void**)&sai_switch_api);
 
     volatile bool runMainLoop = true;
 
@@ -4220,7 +4212,7 @@ int syncd_main(int argc, char **argv)
                 attr.id = SAI_SWITCH_ATTR_RESTART_WARM;
                 attr.value.booldata = true;
 
-                status = sai_switch_api->set_switch_attribute(gSwitchId, &attr);
+                status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, gSwitchId, &attr);
 
                 if (status != SAI_STATUS_SUCCESS)
                 {
@@ -4236,7 +4228,7 @@ int syncd_main(int argc, char **argv)
                 attr.id = SAI_SWITCH_ATTR_PRE_SHUTDOWN;
                 attr.value.booldata = true;
 
-                status = sai_switch_api->set_switch_attribute(gSwitchId, &attr);
+                status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, gSwitchId, &attr);
 
                 if (status == SAI_STATUS_SUCCESS)
                 {
@@ -4258,7 +4250,7 @@ int syncd_main(int argc, char **argv)
                     // Restore cold shutdown.
                     attr.id = SAI_SWITCH_ATTR_RESTART_WARM;
                     attr.value.booldata = false;
-                    status = sai_switch_api->set_switch_attribute(gSwitchId, &attr);
+                    status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, gSwitchId, &attr);
                 }
             }
             else if (sel == flexCounter.get())
@@ -4318,7 +4310,7 @@ int syncd_main(int argc, char **argv)
             attr.id = SAI_SWITCH_ATTR_RESTART_WARM;
             attr.value.booldata = true;
 
-            status = sai_switch_api->set_switch_attribute(gSwitchId, &attr);
+            status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, gSwitchId, &attr);
 
             if (status != SAI_STATUS_SUCCESS)
             {
@@ -4343,7 +4335,7 @@ int syncd_main(int argc, char **argv)
         attr.id = SAI_SWITCH_ATTR_UNINIT_DATA_PLANE_ON_REMOVAL;
         attr.value.booldata = false;
 
-        status = sai_switch_api->set_switch_attribute(gSwitchId, &attr);
+        status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, gSwitchId, &attr);
 
         if (status != SAI_STATUS_SUCCESS)
         {
@@ -4358,7 +4350,7 @@ int syncd_main(int argc, char **argv)
 
     {
         SWSS_LOG_TIMER("remove switch");
-        status = sai_switch_api->remove_switch(gSwitchId);
+        status = g_vendorSai->remove(SAI_OBJECT_TYPE_SWITCH, gSwitchId);
     }
 
     // Stop notification thread after removing switch
@@ -4380,7 +4372,7 @@ int syncd_main(int argc, char **argv)
 
     SWSS_LOG_NOTICE("calling api uninitialize");
 
-    status = sai_api_uninitialize();
+    status = g_vendorSai->uninitialize();
 
     if (status != SAI_STATUS_SUCCESS)
     {

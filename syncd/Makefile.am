@@ -15,6 +15,7 @@ SAILIB=-lsai
 endif
 
 syncd_SOURCES = \
+				VendorSai.cpp \
 				main.cpp \
 				syncd.cpp \
 				syncd_saiswitch.cpp \
@@ -46,6 +47,7 @@ syncd_request_shutdown_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON)
 syncd_request_shutdown_LDADD = -lhiredis -lswsscommon -lpthread
 
 tests_SOURCES = \
+				VendorSai.cpp \
 				tests.cpp \
 				syncd.cpp \
 				syncd_saiswitch.cpp \

@@ -41,6 +41,8 @@ extern "C" {
 
 #include "syncd_saiswitch.h"
 
+#include "VendorSai.h"
+
 #define UNREFERENCED_PARAMETER(X)
 
 #define DEFAULT_VLAN_NUMBER         1
@@ -56,6 +58,8 @@ extern "C" {
 #ifdef SAITHRIFT
 #define SWITCH_SAI_THRIFT_RPC_SERVER_PORT 9092
 #endif // SAITHRIFT
+
+extern std::shared_ptr<sairedis::SaiInterface> g_vendorSai;
 
 extern std::mutex g_mutex;
 
