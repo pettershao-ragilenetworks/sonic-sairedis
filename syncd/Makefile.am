@@ -14,10 +14,10 @@ else
 SAILIB=-lsai
 endif
 
-syncd_SOURCES = \
+noinst_LIBRARIES = libsyncd.a
+libsyncd_a_SOURCES = \
 				SaiAttr.cpp \
 				VendorSai.cpp \
-				main.cpp \
 				syncd.cpp \
 				syncd_saiswitch.cpp \
 				syncd_hard_reinit.cpp \
@@ -31,40 +31,31 @@ syncd_SOURCES = \
 				PortMap.cpp \
 				PortMapParser.cpp
 
+libsyncd_a_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON) $(SAIFLAGS)
+
+syncd_SOURCES = main.cpp
+
 syncd_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON) $(SAIFLAGS)
-syncd_LDADD = -lhiredis -lswsscommon $(SAILIB) -lpthread -L$(top_srcdir)/meta/.libs -lsaimetadata -lsaimeta -ldl
+syncd_LDADD = -lhiredis -lswsscommon $(SAILIB) -lpthread -L$(top_srcdir)/meta/.libs -lsaimetadata -lsaimeta -ldl libsyncd.a
 
 if SAITHRIFT
+libsyncd_a_CPPFLAGS += -DSAITHRIFT=yes
 syncd_CPPFLAGS += -DSAITHRIFT=yes
 syncd_LDADD += -lrpcserver -lthrift
 endif
 
 if sonic_asic_platform_mellanox
 syncd_CPPFLAGS += -DSAI_SUPPORT_UNINIT_DATA_PLANE_ON_REMOVAL
+libsyncd_a_CPPFLAGS += -DSAI_SUPPORT_UNINIT_DATA_PLANE_ON_REMOVAL
 endif
 
 syncd_request_shutdown_SOURCES = syncd_request_shutdown.cpp
 syncd_request_shutdown_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON)
 syncd_request_shutdown_LDADD = -lhiredis -lswsscommon -lpthread
 
-tests_SOURCES = \
-				SaiAttr.cpp \
-				VendorSai.cpp \
-				tests.cpp \
-				syncd.cpp \
-				syncd_saiswitch.cpp \
-				syncd_hard_reinit.cpp \
-				syncd_notifications.cpp \
-				syncd_applyview.cpp \
-				syncd_flex_counter.cpp \
-				TimerWatchdog.cpp \
-				NotificationQueue.cpp \
-				CommandLineOptions.cpp \
-				CommandLineOptionsParser.cpp \
-				PortMap.cpp \
-				PortMapParser.cpp
+tests_SOURCES = tests.cpp
 
 tests_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON)
-tests_LDADD = -lhiredis -lswsscommon -lpthread -L$(top_srcdir)/lib/src/.libs -lsairedis -L$(top_srcdir)/meta/.libs -lsaimetadata -lsaimeta
+tests_LDADD = -lhiredis -lswsscommon -lpthread -L$(top_srcdir)/lib/src/.libs -lsairedis -L$(top_srcdir)/meta/.libs -lsaimetadata -lsaimeta libsyncd.a
 
 TESTS = tests
