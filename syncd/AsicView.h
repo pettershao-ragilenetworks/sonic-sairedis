@@ -37,7 +37,7 @@ namespace syncd
 
             AsicView();
 
-            virtual ~AsicView() = default;
+            virtual ~AsicView();
 
         public:
 

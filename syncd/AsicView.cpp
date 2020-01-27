@@ -23,6 +23,13 @@ AsicView::AsicView():
     // empty
 }
 
+AsicView::~AsicView()
+{
+    SWSS_LOG_ENTER();
+
+    // empty
+}
+
 /**
  * @brief Populates ASIC view from REDIS table dump
  *
