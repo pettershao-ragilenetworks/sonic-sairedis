@@ -16,6 +16,7 @@ endif
 
 noinst_LIBRARIES = libsyncd.a
 libsyncd_a_SOURCES = \
+				SaiObj.cpp \
 				SaiAttr.cpp \
 				VendorSai.cpp \
 				syncd.cpp \

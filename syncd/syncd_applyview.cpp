@@ -6,6 +6,7 @@
 
 #include "CommandLineOptions.h"
 #include "SaiAttr.h"
+#include "SaiObj.h"
 
 #include <inttypes.h>
 #include <algorithm>
@@ -35,49 +36,6 @@ void dump_object_reference()
  */
 bool enableRefernceCountLogs = false;
 
-/**
- * @brief Represents SAI object status during comparison
- */
-typedef enum _sai_object_status_t
-{
-    /**
-     * @brief Object was not processed at all
-     *
-     * This enum must be declared first.
-     */
-    SAI_OBJECT_STATUS_NOT_PROCESSED = 0,
-
-    /**
-     * @brief Object was matched in previous view
-     *
-     * Previous VID was matched to temp VID since it's the same. Objects exists
-     * in both previous and next view and have the save VID/RID values.
-     *
-     * However attributes of that object could be different and may be not
-     * matched yet. This object still needs processing for attributes.
-     *
-     * Since only attributes can be updated then this object may not be removed
-     * at all, it must be possible to update only attribute values.
-     */
-    SAI_OBJECT_STATUS_MATCHED,
-
-    /**
-     * @brief Object was removed during child processing
-     *
-     * Only current view objects can be set to this status.
-     */
-    SAI_OBJECT_STATUS_REMOVED,
-
-    /**
-     * @brief Object is in final stage
-     *
-     * This means object was matched/set/created and proper actions were
-     * generated as diff data to be executed on ASIC.
-     */
-    SAI_OBJECT_STATUS_FINAL,
-
-} sai_object_status_t;
-
 struct AsicOperation
 {
     AsicOperation(int id, sai_object_id_t vID, bool remove,
@@ -93,170 +51,6 @@ struct AsicOperation
     bool isRemove;
 
     std::shared_ptr<swss::KeyOpFieldsValuesTuple> op;
-};
-
-/**
- * @brief Class represents SAI object
- */
-class SaiObj
-{
-    public:
-
-        /**
-         * @brief Constructor
-         */
-        SaiObj():
-            createdObject(false),
-            m_object_status(SAI_OBJECT_STATUS_NOT_PROCESSED)
-        {
-            SWSS_LOG_ENTER();
-
-            /* empty intentionally */
-        }
-
-        // TODO move to methods or constructor ?
-        std::string str_object_type;
-        std::string str_object_id;
-
-        sai_object_meta_key_t meta_key;
-
-        const sai_object_type_info_t *info;
-
-        /**
-         * @brief This will indicate whether object was created and it will
-         * indicate that currently there is no RID for it.
-         */
-        bool createdObject;
-
-        bool isOidObject() const
-        {
-            SWSS_LOG_ENTER();
-            // XXX return info->isobjectid;
-            return !info->isnonobjectid;
-        }
-
-        const std::unordered_map<sai_attr_id_t, std::shared_ptr<SaiAttr>>& getAllAttributes() const
-        {
-            SWSS_LOG_ENTER();
-
-            return m_attrs;
-        }
-
-        std::shared_ptr<const SaiAttr> getSaiAttr(
-                _In_ sai_attr_id_t id) const
-        {
-            SWSS_LOG_ENTER();
-
-            auto it = m_attrs.find(id);
-
-            if (it == m_attrs.end())
-            {
-                for (const auto &ita: m_attrs)
-                {
-                    const auto &a = ita.second;
-
-                    SWSS_LOG_ERROR("%s: %s", a->getStrAttrId().c_str(), a->getStrAttrValue().c_str());
-                }
-
-                SWSS_LOG_THROW("object %s has no attribute %d", str_object_id.c_str(), id);
-            }
-
-            return it->second;
-        }
-
-        std::shared_ptr<const SaiAttr> tryGetSaiAttr(
-                _In_ sai_attr_id_t id) const
-        {
-            SWSS_LOG_ENTER();
-
-            auto it = m_attrs.find(id);
-
-            if (it == m_attrs.end())
-                return nullptr;
-
-            return it->second;
-        }
-
-        /**
-         * @brief Sets object status
-         *
-         * @param[in] object_status New object status
-         */
-        void setObjectStatus(
-                _In_ sai_object_status_t object_status)
-        {
-            SWSS_LOG_ENTER();
-
-            m_object_status = object_status;
-        }
-
-        /**
-         * @brief Gets current object status
-         *
-         * @return Current object status
-         */
-        sai_object_status_t getObjectStatus() const
-        {
-            SWSS_LOG_ENTER();
-
-            return m_object_status;
-        }
-
-        /**
-         * @brief Gets object type
-         *
-         * @return Object type
-         */
-        sai_object_type_t getObjectType() const
-        {
-            SWSS_LOG_ENTER();
-
-            return meta_key.objecttype;
-        }
-
-        // TODO should be private, and we should have some friends from AsicView class
-        void setAttr(
-                _In_ const std::shared_ptr<SaiAttr> &attr)
-        {
-            SWSS_LOG_ENTER();
-
-            m_attrs[attr->getSaiAttr()->id] = attr;
-        }
-
-        bool hasAttr(
-                _In_ sai_attr_id_t id) const
-        {
-            SWSS_LOG_ENTER();
-
-            return m_attrs.find(id) != m_attrs.end();
-        }
-
-        sai_object_id_t getVid() const
-        {
-            SWSS_LOG_ENTER();
-
-            if (isOidObject())
-            {
-                return meta_key.objectkey.key.object_id;
-            }
-
-            SWSS_LOG_THROW("object %s it not object id type", str_object_id.c_str());
-        }
-
-        /*
-         * NOTE: We need dependency tree if we want to remove objects which
-         * have reference count not zero. Currently we just iterate on removed
-         * objects as many times as their reference will get down to zero.
-         */
-
-    private:
-
-        sai_object_status_t m_object_status;
-
-        std::unordered_map<sai_attr_id_t, std::shared_ptr<SaiAttr>> m_attrs;
-
-        SaiObj(const SaiObj&);
-        SaiObj& operator=(const SaiObj&);
 };
 
 typedef std::unordered_map<sai_object_id_t, sai_object_id_t> ObjectIdMap;
@@ -311,12 +105,12 @@ class AsicView
 
                 // TODO we could use sai deserialize object meta key
 
-                o->str_object_type  = key.first.substr(0, start);
-                o->str_object_id    = key.first.substr(start + 1);
+                o->m_str_object_type  = key.first.substr(0, start);
+                o->m_str_object_id    = key.first.substr(start + 1);
 
-                sai_deserialize_object_type(o->str_object_type, o->meta_key.objecttype);
+                sai_deserialize_object_type(o->m_str_object_type, o->m_meta_key.objecttype);
 
-                o->info = sai_metadata_get_object_type_info(o->meta_key.objecttype);
+                o->m_info = sai_metadata_get_object_type_info(o->m_meta_key.objecttype);
 
                 /*
                  * Since neighbor/route/fdb structs objects contains OIDs, we
@@ -324,50 +118,50 @@ class AsicView
                  * 1.0 this can be done in generic way for all non object ids.
                  */
 
-                switch (o->meta_key.objecttype)
+                switch (o->m_meta_key.objecttype)
                 {
                     case SAI_OBJECT_TYPE_FDB_ENTRY:
-                        sai_deserialize_fdb_entry(o->str_object_id, o->meta_key.objectkey.key.fdb_entry);
-                        soFdbs[o->str_object_id] = o;
+                        sai_deserialize_fdb_entry(o->m_str_object_id, o->m_meta_key.objectkey.key.fdb_entry);
+                        soFdbs[o->m_str_object_id] = o;
                         break;
 
                     case SAI_OBJECT_TYPE_NEIGHBOR_ENTRY:
-                        sai_deserialize_neighbor_entry(o->str_object_id, o->meta_key.objectkey.key.neighbor_entry);
-                        soNeighbors[o->str_object_id] = o;
+                        sai_deserialize_neighbor_entry(o->m_str_object_id, o->m_meta_key.objectkey.key.neighbor_entry);
+                        soNeighbors[o->m_str_object_id] = o;
                         break;
 
                     case SAI_OBJECT_TYPE_ROUTE_ENTRY:
-                        sai_deserialize_route_entry(o->str_object_id, o->meta_key.objectkey.key.route_entry);
-                        soRoutes[o->str_object_id] = o;
+                        sai_deserialize_route_entry(o->m_str_object_id, o->m_meta_key.objectkey.key.route_entry);
+                        soRoutes[o->m_str_object_id] = o;
 
-                        routesByPrefix[sai_serialize_ip_prefix(o->meta_key.objectkey.key.route_entry.destination)].push_back(o->str_object_id);
+                        routesByPrefix[sai_serialize_ip_prefix(o->m_meta_key.objectkey.key.route_entry.destination)].push_back(o->m_str_object_id);
 
                         break;
 
                     case SAI_OBJECT_TYPE_NAT_ENTRY:
-                        sai_deserialize_nat_entry(o->str_object_id, o->meta_key.objectkey.key.nat_entry);    
-                        soNatEntries[o->str_object_id] = o;
+                        sai_deserialize_nat_entry(o->m_str_object_id, o->m_meta_key.objectkey.key.nat_entry);
+                        soNatEntries[o->m_str_object_id] = o;
                         break;
 
                     default:
 
-                        if (o->info->isnonobjectid)
+                        if (o->m_info->isnonobjectid)
                         {
                             SWSS_LOG_THROW("object %s is non object id, not handled, FIXME", key.first.c_str());
                         }
 
-                        sai_deserialize_object_id(o->str_object_id, o->meta_key.objectkey.key.object_id);
+                        sai_deserialize_object_id(o->m_str_object_id, o->m_meta_key.objectkey.key.object_id);
 
-                        soOids[o->str_object_id] = o;
-                        oOids[o->meta_key.objectkey.key.object_id] = o;
+                        soOids[o->m_str_object_id] = o;
+                        oOids[o->m_meta_key.objectkey.key.object_id] = o;
 
                         break;
                 }
 
-                soAll[o->str_object_id] = o;
-                sotAll[o->meta_key.objecttype][o->str_object_id] = o;
+                soAll[o->m_str_object_id] = o;
+                sotAll[o->m_meta_key.objecttype][o->m_str_object_id] = o;
 
-                if (o->info->isnonobjectid)
+                if (o->m_info->isnonobjectid)
                 {
                     updateNonObjectIdVidReferenceCountByValue(o, 1);
                 }
@@ -382,7 +176,7 @@ class AsicView
                      * vidReference.
                      */
 
-                    m_vidReference[o->meta_key.objectkey.key.object_id] += 0;
+                    m_vidReference[o->m_meta_key.objectkey.key.object_id] += 0;
                 }
 
                 populateAttributes(o, key.second);
@@ -783,21 +577,21 @@ class AsicView
 
             std::shared_ptr<SaiObj> o = std::make_shared<SaiObj>();
 
-            o->str_object_type = sai_serialize_object_type(object_type);
-            o->str_object_id   = sai_serialize_object_id(vid);
+            o->m_str_object_type = sai_serialize_object_type(object_type);
+            o->m_str_object_id   = sai_serialize_object_id(vid);
 
-            o->meta_key.objecttype = object_type;
-            o->meta_key.objectkey.key.object_id = vid;
+            o->m_meta_key.objecttype = object_type;
+            o->m_meta_key.objectkey.key.object_id = vid;
 
-            o->info = sai_metadata_get_object_type_info(object_type);
+            o->m_info = sai_metadata_get_object_type_info(object_type);
 
-            soOids[o->str_object_id] = o;
+            soOids[o->m_str_object_id] = o;
             oOids[vid] = o;
 
             m_vidReference[vid] += 0;
 
-            soAll[o->str_object_id] = o;
-            sotAll[o->meta_key.objecttype][o->str_object_id] = o;
+            soAll[o->m_str_object_id] = o;
+            sotAll[o->m_meta_key.objecttype][o->m_str_object_id] = o;
 
             ridToVid[rid] = vid;
             vidToRid[vid] = rid;
@@ -830,7 +624,7 @@ class AsicView
         {
             SWSS_LOG_ENTER();
 
-            SWSS_LOG_INFO("%s: %s -> %s:%s", currentObj->str_object_type.c_str(), currentObj->str_object_id.c_str(),
+            SWSS_LOG_INFO("%s: %s -> %s:%s", currentObj->m_str_object_type.c_str(), currentObj->m_str_object_id.c_str(),
                     attr->getStrAttrId().c_str(), attr->getStrAttrValue().c_str());
 
             m_asicOperationId++;
@@ -882,7 +676,7 @@ class AsicView
                     attr->getSaiAttr(),
                     false);
 
-            std::string key = currentObj->str_object_type + ":" + currentObj->str_object_id;
+            std::string key = currentObj->m_str_object_type + ":" + currentObj->m_str_object_id;
 
             std::shared_ptr<swss::KeyOpFieldsValuesTuple> kco =
                 std::make_shared<swss::KeyOpFieldsValuesTuple>(key, "set", entry);
@@ -912,17 +706,17 @@ class AsicView
         {
             SWSS_LOG_ENTER();
 
-            SWSS_LOG_INFO("%s: %s", currentObj->str_object_type.c_str(), currentObj->str_object_id.c_str());
+            SWSS_LOG_INFO("%s: %s", currentObj->m_str_object_type.c_str(), currentObj->m_str_object_id.c_str());
 
             m_asicOperationId++;
 
             if (currentObj->isOidObject())
             {
-                soOids[currentObj->str_object_id] = currentObj;
-                oOids[currentObj->meta_key.objectkey.key.object_id] = currentObj;
+                soOids[currentObj->m_str_object_id] = currentObj;
+                oOids[currentObj->m_meta_key.objectkey.key.object_id] = currentObj;
 
-                soAll[currentObj->str_object_id] = currentObj;
-                sotAll[currentObj->meta_key.objecttype][currentObj->str_object_id] = currentObj;
+                soAll[currentObj->m_str_object_id] = currentObj;
+                sotAll[currentObj->m_meta_key.objecttype][currentObj->m_str_object_id] = currentObj;
 
                 /*
                  * Since we are creating object, we just need to mark that
@@ -930,7 +724,7 @@ class AsicView
                  * anywhere.
                  */
 
-                m_vidReference[currentObj->meta_key.objectkey.key.object_id] += 0;
+                m_vidReference[currentObj->m_meta_key.objectkey.key.object_id] += 0;
             }
             else
             {
@@ -945,22 +739,22 @@ class AsicView
                 switch (currentObj->getObjectType())
                 {
                     case SAI_OBJECT_TYPE_FDB_ENTRY:
-                        //sai_deserialize_fdb_entry(currentObj->str_object_id, currentObj->meta_key.objectkey.key.fdb_entry);
-                        soFdbs[currentObj->str_object_id] = currentObj;
+                        //sai_deserialize_fdb_entry(currentObj->m_str_object_id, currentObj->m_meta_key.objectkey.key.fdb_entry);
+                        soFdbs[currentObj->m_str_object_id] = currentObj;
                         break;
 
                     case SAI_OBJECT_TYPE_NEIGHBOR_ENTRY:
-                        //sai_deserialize_neighbor_entry(currentObj->str_object_id, currentObj->meta_key.objectkey.key.neighbor_entry);
-                        soNeighbors[currentObj->str_object_id] = currentObj;
+                        //sai_deserialize_neighbor_entry(currentObj->m_str_object_id, currentObj->m_meta_key.objectkey.key.neighbor_entry);
+                        soNeighbors[currentObj->m_str_object_id] = currentObj;
                         break;
 
                     case SAI_OBJECT_TYPE_ROUTE_ENTRY:
-                        //sai_deserialize_route_entry(currentObj->str_object_id, currentObj->meta_key.objectkey.key.route_entry);
-                        soRoutes[currentObj->str_object_id] = currentObj;
+                        //sai_deserialize_route_entry(currentObj->m_str_object_id, currentObj->m_meta_key.objectkey.key.route_entry);
+                        soRoutes[currentObj->m_str_object_id] = currentObj;
                         break;
 
                     case SAI_OBJECT_TYPE_NAT_ENTRY:
-                        soNatEntries[currentObj->str_object_id] = currentObj;
+                        soNatEntries[currentObj->m_str_object_id] = currentObj;
                         break;
 
                     default:
@@ -969,8 +763,8 @@ class AsicView
                                 sai_serialize_object_type(currentObj->getObjectType()).c_str());
                 }
 
-                soAll[currentObj->str_object_id] = currentObj;
-                sotAll[currentObj->meta_key.objecttype][currentObj->str_object_id] = currentObj;
+                soAll[currentObj->m_str_object_id] = currentObj;
+                sotAll[currentObj->m_meta_key.objecttype][currentObj->m_str_object_id] = currentObj;
 
                 updateNonObjectIdVidReferenceCountByValue(currentObj, 1);
             }
@@ -1004,7 +798,7 @@ class AsicView
                 entry.push_back(null);
             }
 
-            std::string key = currentObj->str_object_type + ":" + currentObj->str_object_id;
+            std::string key = currentObj->m_str_object_type + ":" + currentObj->m_str_object_id;
 
             std::shared_ptr<swss::KeyOpFieldsValuesTuple> kco =
                 std::make_shared<swss::KeyOpFieldsValuesTuple>(key, "create", entry);
@@ -1026,7 +820,7 @@ class AsicView
         {
             SWSS_LOG_ENTER();
 
-            SWSS_LOG_INFO("%s: %s", currentObj->str_object_type.c_str(), currentObj->str_object_id.c_str());
+            SWSS_LOG_INFO("%s: %s", currentObj->m_str_object_type.c_str(), currentObj->m_str_object_id.c_str());
 
             m_asicOperationId++;
 
@@ -1037,13 +831,13 @@ class AsicView
                  * that check here also as sanity check.
                  */
 
-                soOids.erase(currentObj->str_object_id);
-                oOids.erase(currentObj->meta_key.objectkey.key.object_id);
+                soOids.erase(currentObj->m_str_object_id);
+                oOids.erase(currentObj->m_meta_key.objectkey.key.object_id);
 
-                soAll.erase(currentObj->str_object_id);
-                sotAll.at(currentObj->meta_key.objecttype).erase(currentObj->str_object_id);
+                soAll.erase(currentObj->m_str_object_id);
+                sotAll.at(currentObj->m_meta_key.objecttype).erase(currentObj->m_str_object_id);
 
-                m_vidReference[currentObj->meta_key.objectkey.key.object_id] -= 1;
+                m_vidReference[currentObj->m_meta_key.objectkey.key.object_id] -= 1;
 
                 /*
                  * Clear object also from rid/vid maps.
@@ -1078,19 +872,19 @@ class AsicView
                 switch (currentObj->getObjectType())
                 {
                     case SAI_OBJECT_TYPE_FDB_ENTRY:
-                        soFdbs.erase(currentObj->str_object_id);
+                        soFdbs.erase(currentObj->m_str_object_id);
                         break;
 
                     case SAI_OBJECT_TYPE_NEIGHBOR_ENTRY:
-                        soNeighbors.erase(currentObj->str_object_id);
+                        soNeighbors.erase(currentObj->m_str_object_id);
                         break;
 
                     case SAI_OBJECT_TYPE_ROUTE_ENTRY:
-                        soRoutes.erase(currentObj->str_object_id);
+                        soRoutes.erase(currentObj->m_str_object_id);
                         break;
 
                     case SAI_OBJECT_TYPE_NAT_ENTRY:
-                        soNatEntries[currentObj->str_object_id] = currentObj;
+                        soNatEntries[currentObj->m_str_object_id] = currentObj;
                         break;
 
                     default:
@@ -1099,8 +893,8 @@ class AsicView
                                 sai_serialize_object_type(currentObj->getObjectType()).c_str());
                 }
 
-                soAll.erase(currentObj->str_object_id);
-                sotAll.at(currentObj->meta_key.objecttype).erase(currentObj->str_object_id);
+                soAll.erase(currentObj->m_str_object_id);
+                sotAll.at(currentObj->m_meta_key.objecttype).erase(currentObj->m_str_object_id);
 
                 updateNonObjectIdVidReferenceCountByValue(currentObj, -1);
             }
@@ -1113,7 +907,7 @@ class AsicView
 
             std::vector<swss::FieldValueTuple> entry;
 
-            std::string key = currentObj->str_object_type + ":" + currentObj->str_object_id;
+            std::string key = currentObj->m_str_object_type + ":" + currentObj->m_str_object_id;
 
             std::shared_ptr<swss::KeyOpFieldsValuesTuple> kco =
                 std::make_shared<swss::KeyOpFieldsValuesTuple>(key, "remove", entry);
@@ -1460,7 +1254,7 @@ class AsicView
                             // when reading asic view, ignore acl counter packets and bytes
                             // this will result to not compare them during comparison logic
 
-                            SWSS_LOG_INFO("ignoring %s for %s", meta->attridname, obj->str_object_id.c_str());
+                            SWSS_LOG_INFO("ignoring %s for %s", meta->attridname, obj->m_str_object_id.c_str());
 
                             continue;
 
@@ -1481,7 +1275,7 @@ class AsicView
                             // when reading asic view, ignore Nat entry hit-bit attribute
                             // this will result to not compare them during comparison logic
 
-                            SWSS_LOG_INFO("ignoring %s for %s", meta->attridname, obj->str_object_id.c_str());
+                            SWSS_LOG_INFO("ignoring %s for %s", meta->attridname, obj->m_str_object_id.c_str());
 
                             continue;
 
@@ -1522,13 +1316,13 @@ class AsicView
         {
             SWSS_LOG_ENTER();
 
-            for (size_t j = 0; j < currentObj->info->structmemberscount; ++j)
+            for (size_t j = 0; j < currentObj->m_info->structmemberscount; ++j)
             {
-                const sai_struct_member_info_t *m = currentObj->info->structmembers[j];
+                const sai_struct_member_info_t *m = currentObj->m_info->structmembers[j];
 
                 if (m->membervaluetype == SAI_ATTR_VALUE_TYPE_OBJECT_ID)
                 {
-                    sai_object_id_t vid = m->getoid(&currentObj->meta_key);
+                    sai_object_id_t vid = m->getoid(&currentObj->m_meta_key);
 
                     m_vidReference[vid] += value;
 
@@ -1602,8 +1396,8 @@ void checkObjectsStatus(
             const auto &o = *p.second;
 
             SWSS_LOG_ERROR("object was not processed: %s %s, status: %d (ref: %d)",
-                    o.str_object_type.c_str(),
-                    o.str_object_id.c_str(),
+                    o.m_str_object_type.c_str(),
+                    o.m_str_object_id.c_str(),
                     o.getObjectStatus(),
                     o.isOidObject() ? view.getVidReferenceCount(o.getVid()): -1);
 
@@ -1660,7 +1454,7 @@ void matchOids(
         currentIt->second->setObjectStatus(SAI_OBJECT_STATUS_MATCHED);
 
         SWSS_LOG_INFO("matched %s RID %s VID %s",
-                currentIt->second->str_object_type.c_str(),
+                currentIt->second->m_str_object_type.c_str(),
                 sai_serialize_object_id(rid).c_str(),
                 sai_serialize_object_id(vid).c_str());
     }
@@ -1718,12 +1512,12 @@ void checkInternalObjects(
         for (auto o: cot)
             if (o->getObjectStatus() != SAI_OBJECT_STATUS_MATCHED)
                 SWSS_LOG_ERROR("object status is not MATCHED on curr: %s:%s",
-                        sot.c_str(), o->str_object_id.c_str());
+                        sot.c_str(), o->m_str_object_id.c_str());
 
         for (auto o: tot)
             if (o->getObjectStatus() != SAI_OBJECT_STATUS_MATCHED)
                 SWSS_LOG_ERROR("object status is not MATCHED on temp: %s:%s",
-                        sot.c_str(), o->str_object_id.c_str());
+                        sot.c_str(), o->m_str_object_id.c_str());
     }
 }
 
@@ -1760,7 +1554,7 @@ void checkMatchedPorts(
          * ruled out.
          */
 
-        SWSS_LOG_THROW("port %s object status is not MATCHED (%d)", p->str_object_id.c_str(), p->getObjectStatus());
+        SWSS_LOG_THROW("port %s object status is not MATCHED (%d)", p->m_str_object_id.c_str(), p->getObjectStatus());
     }
 
     SWSS_LOG_NOTICE("all ports are matched");
@@ -2248,7 +2042,7 @@ int findAllChildsInDependencyTreeCount(
 
     int count = 0;
 
-    const auto &info = obj->info;
+    const auto &info = obj->m_info;
 
     if (info->revgraphmembers == NULL)
     {
@@ -2288,7 +2082,7 @@ int findAllChildsInDependencyTreeCount(
             continue;
         }
 
-        SWSS_LOG_DEBUG("looking for %s on %s", obj->str_object_type.c_str(), meta->attridname);
+        SWSS_LOG_DEBUG("looking for %s on %s", obj->m_str_object_type.c_str(), meta->attridname);
 
         auto usageObjects = findUsageCount(view, obj, meta->objecttype, meta->attrid);
 
@@ -2370,8 +2164,8 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForLag(
         if (lagMemberLagAttr->getSaiAttr()->value.oid == tmpLagVid)
         {
             SWSS_LOG_NOTICE("found temp LAG member %s which uses temp LAG %s",
-                    temporaryObj->str_object_id.c_str(),
-                    lagMember->str_object_id.c_str());
+                    temporaryObj->m_str_object_id.c_str(),
+                    lagMember->m_str_object_id.c_str());
 
             temporaryLagMemberPortVid = lagMember->getSaiAttr(SAI_LAG_MEMBER_ATTR_PORT_ID)->getSaiAttr()->value.oid;
 
@@ -2402,7 +2196,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForLag(
         if (lagMemberPortAttr->getSaiAttr()->value.oid == temporaryLagMemberPortVid)
         {
             SWSS_LOG_NOTICE("found current LAG member %s which uses PORT %s",
-                    lagMember->str_object_id.c_str(),
+                    lagMember->m_str_object_id.c_str(),
                     sai_serialize_object_id(temporaryLagMemberPortVid).c_str());
 
             /*
@@ -2417,7 +2211,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForLag(
                 if (c.obj->getVid() == currentLagVid)
                 {
                     SWSS_LOG_NOTICE("found best candidate for temp LAG %s which is current LAG %s using PORT %s",
-                            temporaryObj->str_object_id.c_str(),
+                            temporaryObj->m_str_object_id.c_str(),
                             sai_serialize_object_id(currentLagVid).c_str(),
                             sai_serialize_object_id(temporaryLagMemberPortVid).c_str());
 
@@ -2468,8 +2262,8 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForNextHopGroup(
         tmpRouteCandidate = tmpRoute;
 
         SWSS_LOG_NOTICE("Found route candidate for NHG: %s: %s",
-                temporaryObj->str_object_id.c_str(),
-                tmpRoute->str_object_id.c_str());
+                temporaryObj->m_str_object_id.c_str(),
+                tmpRoute->m_str_object_id.c_str());
 
         break;
     }
@@ -2477,7 +2271,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForNextHopGroup(
     if (tmpRouteCandidate == nullptr)
     {
         SWSS_LOG_NOTICE("failed to find route candidate for NHG: %s",
-                temporaryObj->str_object_id.c_str());
+                temporaryObj->m_str_object_id.c_str());
 
         return nullptr;
     }
@@ -2491,8 +2285,8 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForNextHopGroup(
 
     for (auto curRoute: curRouteEntries)
     {
-        std::string tmpPrefix = sai_serialize_ip_prefix(tmpRouteCandidate->meta_key.objectkey.key.route_entry.destination);
-        std::string curPrefix = sai_serialize_ip_prefix(curRoute->meta_key.objectkey.key.route_entry.destination);
+        std::string tmpPrefix = sai_serialize_ip_prefix(tmpRouteCandidate->m_meta_key.objectkey.key.route_entry.destination);
+        std::string curPrefix = sai_serialize_ip_prefix(curRoute->m_meta_key.objectkey.key.route_entry.destination);
 
         if (tmpPrefix != curPrefix)
             continue;
@@ -2513,7 +2307,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForNextHopGroup(
             if (curNextHopId != candidate.obj->getVid())
                 continue;
 
-            SWSS_LOG_NOTICE("Found NHG candidate %s", candidate.obj->str_object_id.c_str());
+            SWSS_LOG_NOTICE("Found NHG candidate %s", candidate.obj->m_str_object_id.c_str());
 
             return candidate.obj;
         }
@@ -2634,7 +2428,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForAclCounter(
                         if (c.obj->getVid() == curAclCounter->getVid())
                         {
                             SWSS_LOG_NOTICE("found best ACL counter match based on ACL entry field: %s, %s",
-                                    c.obj->str_object_id.c_str(),
+                                    c.obj->m_str_object_id.c_str(),
                                     meta->attridname);
                             return c.obj;
                         }
@@ -2647,7 +2441,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForAclCounter(
 
     if (objs.size())
     {
-        SWSS_LOG_NOTICE("found best ACL counter match based on ACL table: %s", objs.at(0)->str_object_id.c_str());
+        SWSS_LOG_NOTICE("found best ACL counter match based on ACL table: %s", objs.at(0)->m_str_object_id.c_str());
 
         return objs.at(0);
     }
@@ -2694,7 +2488,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForAclTableGroup(
                 continue;
 
             SWSS_LOG_DEBUG("found port candidate %s for ACL table group",
-                    port->str_object_id.c_str());
+                    port->m_str_object_id.c_str());
 
             auto curPort = currentView.oOids.at(port->getVid());
 
@@ -2710,8 +2504,8 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForAclTableGroup(
                 if (c.obj->getVid() == atgVid)
                 {
                     SWSS_LOG_INFO("found ALC table group candidate %s using port %s",
-                            c.obj->str_object_id.c_str(),
-                            port->str_object_id.c_str());
+                            c.obj->m_str_object_id.c_str(),
+                            port->m_str_object_id.c_str());
 
                     return c.obj;
                 }
@@ -2779,7 +2573,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForAclTableGroup(
 
                 sai_object_id_t curLagId = curLagMemberLagAttr->getSaiAttr()->value.oid;
 
-                SWSS_LOG_INFO("found current LAG member: %s", curLagMember->str_object_id.c_str());
+                SWSS_LOG_INFO("found current LAG member: %s", curLagMember->m_str_object_id.c_str());
 
                 auto curLag = currentView.oOids.at(curLagId);
 
@@ -2793,7 +2587,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForAclTableGroup(
                     if (c.obj->getVid() != inACL->getSaiAttr()->value.oid)
                         continue;
 
-                    SWSS_LOG_INFO("found best ACL table group match based on LAG ingress acl: %s", c.obj->str_object_id.c_str());
+                    SWSS_LOG_INFO("found best ACL table group match based on LAG ingress acl: %s", c.obj->m_str_object_id.c_str());
 
                     return c.obj;
                 }
@@ -2886,8 +2680,8 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForAclTable(
                     if (c.obj->getVid() == curAclTableId->getOid())
                     {
                         SWSS_LOG_INFO("found ACL table candidate %s using port %s",
-                                c.obj->str_object_id.c_str(),
-                                tmpPort->str_object_id.c_str());
+                                c.obj->m_str_object_id.c_str(),
+                                tmpPort->m_str_object_id.c_str());
 
                         return c.obj;
                     }
@@ -2934,8 +2728,8 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForAclTable(
                 if (c.obj->getVid() == curAclTableIdAttr->getOid())
                 {
                     SWSS_LOG_INFO("found ACL table candidate %s using pre match ACL TABLE GROUP %s",
-                            c.obj->str_object_id.c_str(),
-                            tmpAclTableGroup->str_object_id.c_str());
+                            c.obj->m_str_object_id.c_str(),
+                            tmpAclTableGroup->m_str_object_id.c_str());
 
                     return c.obj;
                 }
@@ -2966,7 +2760,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForRouterInterface(
 
     if (typeAttr->getSaiAttr()->value.s32 != SAI_ROUTER_INTERFACE_TYPE_LOOPBACK)
     {
-        SWSS_LOG_WARN("RIF %s is not LOOPBACK", temporaryObj->str_object_id.c_str());
+        SWSS_LOG_WARN("RIF %s is not LOOPBACK", temporaryObj->m_str_object_id.c_str());
 
         return nullptr;
     }
@@ -3021,7 +2815,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForRouterInterface(
                         if (c.obj->getVid() != curRif->getSaiAttr()->value.oid)
                             continue;
 
-                        SWSS_LOG_INFO("found best ROUTER_INTERFACE based on TUNNEL underlay interface %s", c.obj->str_object_id.c_str());
+                        SWSS_LOG_INFO("found best ROUTER_INTERFACE based on TUNNEL underlay interface %s", c.obj->m_str_object_id.c_str());
 
                         return c.obj;
                     }
@@ -3041,7 +2835,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForRouterInterface(
                         if (c.obj->getVid() != curRif->getSaiAttr()->value.oid)
                             continue;
 
-                        SWSS_LOG_INFO("found best ROUTER_INTERFACE based on TUNNEL overlay interface %s", c.obj->str_object_id.c_str());
+                        SWSS_LOG_INFO("found best ROUTER_INTERFACE based on TUNNEL overlay interface %s", c.obj->m_str_object_id.c_str());
 
                         return c.obj;
                     }
@@ -3108,7 +2902,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForRouterInterface(
                                 if (c.obj->getVid() != curRif->getSaiAttr()->value.oid)
                                     continue;
 
-                                SWSS_LOG_INFO("found best ROUTER_INTERFACE based on TUNNEL underlay interface %s", c.obj->str_object_id.c_str());
+                                SWSS_LOG_INFO("found best ROUTER_INTERFACE based on TUNNEL underlay interface %s", c.obj->m_str_object_id.c_str());
 
                                 return c.obj;
                             }
@@ -3128,7 +2922,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForRouterInterface(
                                 if (c.obj->getVid() != curRif->getSaiAttr()->value.oid)
                                     continue;
 
-                                SWSS_LOG_INFO("found best ROUTER_INTERFACE based on TUNNEL overlay interface %s", c.obj->str_object_id.c_str());
+                                SWSS_LOG_INFO("found best ROUTER_INTERFACE based on TUNNEL overlay interface %s", c.obj->m_str_object_id.c_str());
 
                                 return c.obj;
                             }
@@ -3247,7 +3041,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForPolicer(
                     if (c.obj->getVid() != curTrapGroupPolicerAttr->getOid())
                         continue;
 
-                    SWSS_LOG_INFO("found best POLICER based on hostif trap group %s", c.obj->str_object_id.c_str());
+                    SWSS_LOG_INFO("found best POLICER based on hostif trap group %s", c.obj->m_str_object_id.c_str());
 
                     return c.obj;
                 }
@@ -3318,7 +3112,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForHostifTrapGroup(
                 if (c.obj->getVid() != curTrapGroupAttr->getOid())
                     continue;
 
-                SWSS_LOG_INFO("found best HOSTIF TRAP GROUP based on hostif trap %s", c.obj->str_object_id.c_str());
+                SWSS_LOG_INFO("found best HOSTIF TRAP GROUP based on hostif trap %s", c.obj->m_str_object_id.c_str());
 
                 return c.obj;
             }
@@ -3400,7 +3194,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForBufferPool(
                 if (c.obj->getVid() != curPoolIdAttr->getOid())
                     continue;
 
-                SWSS_LOG_INFO("found best BUFFER POOL based on buffer profile and queue %s", c.obj->str_object_id.c_str());
+                SWSS_LOG_INFO("found best BUFFER POOL based on buffer profile and queue %s", c.obj->m_str_object_id.c_str());
 
                 return c.obj;
             }
@@ -3450,7 +3244,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForBufferPool(
                 if (c.obj->getVid() != curPoolIdAttr->getOid())
                     continue;
 
-                SWSS_LOG_INFO("found best BUFFER POOL based on buffer profile and ingress priority group %s", c.obj->str_object_id.c_str());
+                SWSS_LOG_INFO("found best BUFFER POOL based on buffer profile and ingress priority group %s", c.obj->m_str_object_id.c_str());
 
                 return c.obj;
             }
@@ -3511,7 +3305,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForBufferProfile(
             if (c.obj->getVid() != curBufferProfileIdAttr->getOid())
                 continue;
 
-            SWSS_LOG_INFO("found best BUFFER PROFILE based on queues %s", c.obj->str_object_id.c_str());
+            SWSS_LOG_INFO("found best BUFFER PROFILE based on queues %s", c.obj->m_str_object_id.c_str());
 
             return c.obj;
         }
@@ -3547,7 +3341,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForBufferProfile(
             if (c.obj->getVid() != curBufferProfileIdAttr->getOid())
                 continue;
 
-            SWSS_LOG_INFO("found best BUFFER PROFILE based on IPG %s", c.obj->str_object_id.c_str());
+            SWSS_LOG_INFO("found best BUFFER PROFILE based on IPG %s", c.obj->m_str_object_id.c_str());
 
             return c.obj;
         }
@@ -3624,7 +3418,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForTunnelMap(
                 if (c.obj->getVid() != curTunnelMap->getVid())
                     continue;
 
-                SWSS_LOG_INFO("found best TUNNEL MAP based on tunnel map entry vlan id value %s", c.obj->str_object_id.c_str());
+                SWSS_LOG_INFO("found best TUNNEL MAP based on tunnel map entry vlan id value %s", c.obj->m_str_object_id.c_str());
 
                 return c.obj;
             }
@@ -3681,7 +3475,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForWred(
             if (c.obj->getVid() != curWredProfileIdAttr->getOid())
                 continue;
 
-            SWSS_LOG_INFO("found best WRED based on queue %s", c.obj->str_object_id.c_str());
+            SWSS_LOG_INFO("found best WRED based on queue %s", c.obj->m_str_object_id.c_str());
 
             return c.obj;
         }
@@ -3820,7 +3614,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForGenericObjectUsingHeuristic(
 
     int tempCount = findAllChildsInDependencyTreeCount(temporaryView, temporaryObj);
 
-    SWSS_LOG_DEBUG("%s count usage: %d", temporaryObj->str_object_type.c_str(), tempCount);
+    SWSS_LOG_DEBUG("%s count usage: %d", temporaryObj->m_str_object_type.c_str(), tempCount);
 
     std::vector<int> counts;
 
@@ -3848,7 +3642,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForGenericObjectUsingHeuristic(
     }
 
     SWSS_LOG_WARN("heuristic failed for %s, selecting at random (count: %d, exact match: %d)",
-            temporaryObj->str_object_type.c_str(),
+            temporaryObj->m_str_object_type.c_str(),
             tempCount,
             exact);
 
@@ -3934,7 +3728,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForGenericObject(
     if (!temporaryObj->isOidObject())
     {
         SWSS_LOG_THROW("non object id %s is used in generic method, please implement special case, FIXME",
-                temporaryObj->str_object_type.c_str());
+                temporaryObj->m_str_object_type.c_str());
     }
 
     /*
@@ -3958,7 +3752,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForGenericObject(
      */
 
     SWSS_LOG_INFO("not processed objects for %s: %zu, attrs: %zu",
-            temporaryObj->str_object_type.c_str(),
+            temporaryObj->m_str_object_type.c_str(),
             notProcessedObjects.size(),
             attrs.size());
 
@@ -3990,16 +3784,16 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForGenericObject(
                 soci.equal_attributes++;
 
                 SWSS_LOG_INFO("ob equal %s %s, %s: %s",
-                        temporaryObj->str_object_id.c_str(),
-                        currentObj->str_object_id.c_str(),
+                        temporaryObj->m_str_object_id.c_str(),
+                        currentObj->m_str_object_id.c_str(),
                         attr.second->getStrAttrId().c_str(),
                         attr.second->getStrAttrValue().c_str());
             }
             else
             {
                 SWSS_LOG_INFO("ob not equal %s %s, %s: %s",
-                        temporaryObj->str_object_id.c_str(),
-                        currentObj->str_object_id.c_str(),
+                        temporaryObj->m_str_object_id.c_str(),
+                        currentObj->m_str_object_id.c_str(),
                         attr.second->getStrAttrId().c_str(),
                         attr.second->getStrAttrValue().c_str());
 
@@ -4032,7 +3826,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForGenericObject(
                     has_different_create_only_attr = true;
 
                     SWSS_LOG_INFO("obj has not equal create only attributes %s",
-                            temporaryObj->str_object_id.c_str());
+                            temporaryObj->m_str_object_id.c_str());
 
                     /*
                      * In this case there is no need to compare other
@@ -4059,14 +3853,14 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForGenericObject(
                             has_different_create_only_attr = true;
 
                             SWSS_LOG_INFO("obj has not equal create only attributes %s (default): %s",
-                                    temporaryObj->str_object_id.c_str(),
+                                    temporaryObj->m_str_object_id.c_str(),
                                     meta->attridname);
                             break;
                         }
                         else
                         {
                             SWSS_LOG_INFO("obj has equal create only value %s (default): %s",
-                                    temporaryObj->str_object_id.c_str(),
+                                    temporaryObj->m_str_object_id.c_str(),
                                     meta->attridname);
                         }
                     }
@@ -4109,14 +3903,14 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForGenericObject(
                         has_different_create_only_attr = true;
 
                         SWSS_LOG_INFO("obj has not equal create only attributes %s (default): %s",
-                                currentObj->str_object_id.c_str(),
+                                currentObj->m_str_object_id.c_str(),
                                 meta->attridname);
                         break;
                     }
                     else
                     {
                         SWSS_LOG_INFO("obj has equal create only value %s (default): %s",
-                                temporaryObj->str_object_id.c_str(),
+                                temporaryObj->m_str_object_id.c_str(),
                                 meta->attridname);
                     }
                 }
@@ -4138,7 +3932,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForGenericObject(
     }
 
     SWSS_LOG_INFO("number candidate objects for %s is %zu",
-            temporaryObj->str_object_id.c_str(),
+            temporaryObj->m_str_object_id.c_str(),
             candidateObjects.size());
 
     if (candidateObjects.size() == 0)
@@ -4238,7 +4032,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForGenericObject(
     SWSS_LOG_INFO("multiple candidates found (%zu of %zu) for %s, will use heuristic",
             candidateObjects.size(),
             previousCandidates,
-            temporaryObj->str_object_id.c_str());
+            temporaryObj->m_str_object_id.c_str());
 
     return findCurrentBestMatchForGenericObjectUsingHeuristic(
             currentView,
@@ -4352,7 +4146,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForNeighborEntry(
      * on this data should be read only.
      */
 
-    sai_object_meta_key_t mk = temporaryObj->meta_key;
+    sai_object_meta_key_t mk = temporaryObj->m_meta_key;
 
     if (!exchangeTemporaryVidToCurrentVid(currentView, temporaryView, mk))
     {
@@ -4435,7 +4229,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForRouteEntry(
      * on this data should be read only.
      */
 
-    sai_object_meta_key_t mk = temporaryObj->meta_key;
+    sai_object_meta_key_t mk = temporaryObj->m_meta_key;
 
     if (!exchangeTemporaryVidToCurrentVid(currentView, temporaryView, mk))
     {
@@ -4516,7 +4310,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForFdbEntry(
      * on this data should be read only.
      */
 
-    sai_object_meta_key_t mk = temporaryObj->meta_key;
+    sai_object_meta_key_t mk = temporaryObj->m_meta_key;
 
     if (!exchangeTemporaryVidToCurrentVid(currentView, temporaryView, mk))
     {
@@ -4611,7 +4405,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForSwitch(
      */
 
     SWSS_LOG_THROW("found switch object %s in current view, but it status is %d, FATAL",
-            currentSwitchObj->str_object_id.c_str(),
+            currentSwitchObj->m_str_object_id.c_str(),
             currentSwitchObj->getObjectStatus());
 }
 
@@ -4637,7 +4431,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatchForNatEntry(
      * on this data should be read only.
      */
 
-    sai_object_meta_key_t mk = temporaryObj->meta_key;
+    sai_object_meta_key_t mk = temporaryObj->m_meta_key;
 
     if (!exchangeTemporaryVidToCurrentVid(currentView, temporaryView, mk))
     {
@@ -4703,8 +4497,8 @@ std::shared_ptr<SaiObj> findCurrentBestMatch(
          */
 
         SWSS_LOG_INFO("found best match for %s %s since object status is MATCHED",
-                temporaryObj->str_object_type.c_str(),
-                temporaryObj->str_object_id.c_str());
+                temporaryObj->m_str_object_type.c_str(),
+                temporaryObj->m_str_object_id.c_str());
 
         return currentView.oOids.at(temporaryObj->getVid());
     }
@@ -4731,7 +4525,7 @@ std::shared_ptr<SaiObj> findCurrentBestMatch(
 
         case SAI_OBJECT_TYPE_NAT_ENTRY:
             return findCurrentBestMatchForNatEntry(currentView, temporaryView, temporaryObj);
- 
+
             /*
              * We can have special case for switch since we know there should
              * be only one switch.
@@ -4745,8 +4539,8 @@ std::shared_ptr<SaiObj> findCurrentBestMatch(
             if (!temporaryObj->isOidObject())
             {
                 SWSS_LOG_THROW("object %s:%s is non object id, not handled yet, FIXME",
-                        temporaryObj->str_object_type.c_str(),
-                        temporaryObj->str_object_id.c_str());
+                        temporaryObj->m_str_object_type.c_str(),
+                        temporaryObj->m_str_object_id.c_str());
             }
 
             /*
@@ -4783,7 +4577,7 @@ void procesObjectAttributesForViewTransition(
 {
     SWSS_LOG_ENTER();
 
-    SWSS_LOG_INFO("%s %s", temporaryObj->str_object_type.c_str(), temporaryObj->str_object_id.c_str());
+    SWSS_LOG_INFO("%s %s", temporaryObj->m_str_object_type.c_str(), temporaryObj->m_str_object_id.c_str());
 
     /*
      * First we need to make sure if all attributes of this temporary object
@@ -4835,19 +4629,19 @@ void procesObjectAttributesForViewTransition(
      * this can be automated since we have metadata for those structs.
      */
 
-    for (size_t j = 0; j < temporaryObj->info->structmemberscount; ++j)
+    for (size_t j = 0; j < temporaryObj->m_info->structmemberscount; ++j)
     {
-        const sai_struct_member_info_t *m = temporaryObj->info->structmembers[j];
+        const sai_struct_member_info_t *m = temporaryObj->m_info->structmembers[j];
 
         if (m->membervaluetype != SAI_ATTR_VALUE_TYPE_OBJECT_ID)
         {
             continue;
         }
 
-        sai_object_id_t vid = m->getoid(&temporaryObj->meta_key);
+        sai_object_id_t vid = m->getoid(&temporaryObj->m_meta_key);
 
         SWSS_LOG_INFO("- processing %s (%s) VID %s",
-                temporaryObj->str_object_type.c_str(),
+                temporaryObj->m_str_object_type.c_str(),
                 m->membername,
                 sai_serialize_object_id(vid).c_str());
 
@@ -4976,8 +4770,8 @@ void removeExistingObjectFromCurrentView(
              */
 
             SWSS_LOG_THROW("can't remove existing object %s:%s since reference count is %d, FIXME",
-                    currentObj->str_object_type.c_str(),
-                    currentObj->str_object_id.c_str(),
+                    currentObj->m_str_object_type.c_str(),
+                    currentObj->m_str_object_id.c_str(),
                     count);
         }
     }
@@ -5071,7 +4865,7 @@ sai_object_id_t translateTemporaryVidToCurrentVid(
 
         const auto &tempObj = tempIt->second;
 
-        if (tempObj->createdObject)
+        if (tempObj->m_createdObject)
         {
             SWSS_LOG_DEBUG("translated temp VID %s to current, since object was created",
                     sai_serialize_object_id(tvid).c_str());
@@ -5249,8 +5043,8 @@ void setAttributeOnCurrentObject(
     {
         SWSS_LOG_THROW("can't set attribute %s on current object %s:%s since it's not CREATE_AND_SET",
                 meta->attridname,
-                currentObj->str_object_type.c_str(),
-                currentObj->str_object_id.c_str());
+                currentObj->m_str_object_type.c_str(),
+                currentObj->m_str_object_id.c_str());
     }
 
     /*
@@ -5295,8 +5089,8 @@ void createNewObjectFromTemporaryObject(
     SWSS_LOG_ENTER();
 
     SWSS_LOG_INFO("creating object %s:%s",
-                    temporaryObj->str_object_type.c_str(),
-                    temporaryObj->str_object_id.c_str());
+                    temporaryObj->m_str_object_type.c_str(),
+                    temporaryObj->m_str_object_id.c_str());
 
     /*
      * This trap can be default trap group, so let's check if it's, then we
@@ -5347,10 +5141,10 @@ void createNewObjectFromTemporaryObject(
      * TODO Find out better way to do this, copy operator ?
      */
 
-    currentObj->str_object_type  = temporaryObj->str_object_type;
-    currentObj->str_object_id    = temporaryObj->str_object_id;      // temporary VID / non object id
-    currentObj->meta_key         = temporaryObj->meta_key;           // temporary VID / non object id
-    currentObj->info             = temporaryObj->info;
+    currentObj->m_str_object_type  = temporaryObj->m_str_object_type;
+    currentObj->m_str_object_id    = temporaryObj->m_str_object_id;      // temporary VID / non object id
+    currentObj->m_meta_key         = temporaryObj->m_meta_key;           // temporary VID / non object id
+    currentObj->m_info             = temporaryObj->m_info;
 
     if (!temporaryObj->isOidObject())
     {
@@ -5359,20 +5153,20 @@ void createNewObjectFromTemporaryObject(
          * in current view, so we need to do translation here.
          */
 
-        for (size_t j = 0; j < currentObj->info->structmemberscount; ++j)
+        for (size_t j = 0; j < currentObj->m_info->structmemberscount; ++j)
         {
-            const sai_struct_member_info_t *m = currentObj->info->structmembers[j];
+            const sai_struct_member_info_t *m = currentObj->m_info->structmembers[j];
 
             if (m->membervaluetype != SAI_ATTR_VALUE_TYPE_OBJECT_ID)
             {
                 continue;
             }
 
-            sai_object_id_t vid = m->getoid(&currentObj->meta_key);
+            sai_object_id_t vid = m->getoid(&currentObj->m_meta_key);
 
             vid = translateTemporaryVidToCurrentVid(currentView, temporaryView, vid);
 
-            m->setoid(&currentObj->meta_key, vid);
+            m->setoid(&currentObj->m_meta_key, vid);
 
             /*
              * Bind new vid reference is already done inside asicCreateObject.
@@ -5388,20 +5182,20 @@ void createNewObjectFromTemporaryObject(
         {
             case SAI_OBJECT_TYPE_ROUTE_ENTRY:
 
-                currentObj->str_object_id = sai_serialize_route_entry(currentObj->meta_key.objectkey.key.route_entry);
+                currentObj->m_str_object_id = sai_serialize_route_entry(currentObj->m_meta_key.objectkey.key.route_entry);
                 break;
 
             case SAI_OBJECT_TYPE_NEIGHBOR_ENTRY:
 
-                currentObj->str_object_id = sai_serialize_neighbor_entry(currentObj->meta_key.objectkey.key.neighbor_entry);
+                currentObj->m_str_object_id = sai_serialize_neighbor_entry(currentObj->m_meta_key.objectkey.key.neighbor_entry);
                 break;
 
             case SAI_OBJECT_TYPE_FDB_ENTRY:
-                currentObj->str_object_id = sai_serialize_fdb_entry(currentObj->meta_key.objectkey.key.fdb_entry);
+                currentObj->m_str_object_id = sai_serialize_fdb_entry(currentObj->m_meta_key.objectkey.key.fdb_entry);
                 break;
 
             case SAI_OBJECT_TYPE_NAT_ENTRY:
-                currentObj->str_object_id = sai_serialize_nat_entry(currentObj->meta_key.objectkey.key.nat_entry);
+                currentObj->m_str_object_id = sai_serialize_nat_entry(currentObj->m_meta_key.objectkey.key.nat_entry);
                 break;
 
             default:
@@ -5419,8 +5213,8 @@ void createNewObjectFromTemporaryObject(
      * views.
      */
 
-    currentObj->createdObject = true;
-    temporaryObj->createdObject = true;
+    currentObj->m_createdObject = true;
+    temporaryObj->m_createdObject = true;
 
     for (const auto &pair: temporaryObj->getAllAttributes())
     {
@@ -5538,11 +5332,11 @@ void UpdateObjectStatus(
 
             SWSS_LOG_INFO("remapped %s current %s to temp %s",
                     sai_serialize_object_type(temporaryObj->getObjectType()).c_str(),
-                    currentBestMatch->str_object_id.c_str(),
-                    temporaryObj->str_object_id.c_str());
+                    currentBestMatch->m_str_object_id.c_str(),
+                    temporaryObj->m_str_object_id.c_str());
 
-            temporaryView.nonObjectIdMap[objectType][temporaryObj->str_object_id] = currentBestMatch->str_object_id;
-            currentView.nonObjectIdMap[objectType][currentBestMatch->str_object_id] = temporaryObj->str_object_id;
+            temporaryView.nonObjectIdMap[objectType][temporaryObj->m_str_object_id] = currentBestMatch->m_str_object_id;
+            currentView.nonObjectIdMap[objectType][currentBestMatch->m_str_object_id] = temporaryObj->m_str_object_id;
         }
     }
     else
@@ -5882,7 +5676,7 @@ bool performObjectSetTransition(
                         meta->attridname,
                         currentAttr->getStrAttrValue().c_str(),
                         temporaryAttr->getStrAttrValue().c_str(),
-                        temporaryObj->str_object_id.c_str());
+                        temporaryObj->m_str_object_id.c_str());
             }
 
             SWSS_LOG_WARN("Attr %s CAN'T be updated from %s to %s since it's CREATE_ONLY",
@@ -6178,7 +5972,7 @@ bool performObjectSetTransition(
                 // *SAI_SCHEDULER_GROUP_ATTR_SCHEDULER_PROFILE_ID - is not any more mandatory on create, so default should be NULL
 
                 SWSS_LOG_ERROR("current attribute is mandatory on create, crate and set, and object MATCHED, FIXME %s %s:%s",
-                        currentBestMatch->str_object_id.c_str(),
+                        currentBestMatch->m_str_object_id.c_str(),
                         meta->attridname,
                         currentAttr->getStrAttrValue().c_str());
 
@@ -6356,7 +6150,7 @@ void processObjectForViewTransition(
         return;
     }
 
-    SWSS_LOG_INFO("processing: %s:%s", temporaryObj->str_object_type.c_str(), temporaryObj->str_object_id.c_str());
+    SWSS_LOG_INFO("processing: %s:%s", temporaryObj->m_str_object_type.c_str(), temporaryObj->m_str_object_id.c_str());
 
     procesObjectAttributesForViewTransition(currentView, temporaryView, temporaryObj);
 
@@ -6422,17 +6216,17 @@ void processObjectForViewTransition(
          */
 
         SWSS_LOG_INFO("failed to find best match %s %s in current view, will create new object",
-                temporaryObj->str_object_type.c_str(),
-                temporaryObj->str_object_id.c_str());
+                temporaryObj->m_str_object_type.c_str(),
+                temporaryObj->m_str_object_id.c_str());
 
         createNewObjectFromTemporaryObject(currentView, temporaryView, temporaryObj);
         return;
     }
 
     SWSS_LOG_INFO("found best match %s: current: %s temporary: %s",
-            currentBestMatch->str_object_type.c_str(),
-            currentBestMatch->str_object_id.c_str(),
-            temporaryObj->str_object_id.c_str());
+            currentBestMatch->m_str_object_type.c_str(),
+            currentBestMatch->m_str_object_id.c_str(),
+            temporaryObj->m_str_object_id.c_str());
 
     /*
      * We need to two passes, for not matched parameters since if first
@@ -6470,7 +6264,7 @@ void processObjectForViewTransition(
              */
 
             SWSS_LOG_THROW("performObjectSetTransition on MATCHED object (%s) FAILED! bug?",
-                    temporaryObj->str_object_id.c_str());
+                    temporaryObj->m_str_object_id.c_str());
         }
 
         /*
@@ -6699,7 +6493,7 @@ void applyViewTransition(
     {
         if (obj.second->getObjectType() == SAI_OBJECT_TYPE_ROUTE_ENTRY)
         {
-            bool isDefault = obj.second->str_object_id.find("/0") != std::string::npos;
+            bool isDefault = obj.second->m_str_object_id.find("/0") != std::string::npos;
 
             if (isDefault)
             {
@@ -6712,7 +6506,7 @@ void applyViewTransition(
     {
         if (obj.second->getObjectType() == SAI_OBJECT_TYPE_ROUTE_ENTRY)
         {
-            bool isDefault = obj.second->str_object_id.find("/0") != std::string::npos;
+            bool isDefault = obj.second->m_str_object_id.find("/0") != std::string::npos;
 
             if (!isDefault)
             {
@@ -7056,7 +6850,7 @@ void updateRedisDatabase(
 
         const auto &attr = obj->getAllAttributes();
 
-        std::string key = std::string(ASIC_STATE_TABLE) + ":" + obj->str_object_type + ":" + obj->str_object_id;
+        std::string key = std::string(ASIC_STATE_TABLE) + ":" + obj->m_str_object_type + ":" + obj->m_str_object_id;
 
         SWSS_LOG_DEBUG("setting key %s", key.c_str());
 
@@ -7154,7 +6948,7 @@ void checkAsicVsDatabaseConsistency(
 
             // get object meta key for get (object id or *entry)
 
-            sai_object_meta_key_t meta_key = obj->meta_key;
+            sai_object_meta_key_t meta_key = obj->m_meta_key;
 
             // translate all VID's to RIDs in non object is's
 
@@ -7185,13 +6979,13 @@ void checkAsicVsDatabaseConsistency(
 
                         SWSS_LOG_WARN("GET api for %s is not implemented on %s",
                                 meta->attridname,
-                                obj->str_object_id.c_str());
+                                obj->m_str_object_id.c_str());
                     continue;
                 }
 
                 SWSS_LOG_ERROR("failed to get %s on %s: %s",
                         meta->attridname,
-                        obj->str_object_id.c_str(),
+                        obj->m_str_object_id.c_str(),
                         sai_serialize_status(status).c_str());
 
                 hasErrors = true;
@@ -7239,7 +7033,7 @@ void checkAsicVsDatabaseConsistency(
                 {
                     SWSS_LOG_ERROR("failed to get %s on %s %s",
                             meta->attridname,
-                            obj->str_object_id.c_str(),
+                            obj->m_str_object_id.c_str(),
                             sai_serialize_status(status).c_str());
 
                     hasErrors = true;
@@ -7270,7 +7064,7 @@ void checkAsicVsDatabaseConsistency(
 
                 SWSS_LOG_ERROR("value missmatch: %s on %s: ASIC: %s DB: %s, inconsistent state!",
                         meta->attridname,
-                        obj->str_object_id.c_str(),
+                        obj->m_str_object_id.c_str(),
                         asicValue.c_str(),
                         dbValue.c_str());
 
@@ -7327,10 +7121,10 @@ void createPreMatchMapForObject(
 {
     SWSS_LOG_ENTER();
 
-    if (processed.find(tObj->str_object_id) != processed.end())
+    if (processed.find(tObj->m_str_object_id) != processed.end())
         return;
 
-    processed.insert(tObj->str_object_id);
+    processed.insert(tObj->m_str_object_id);
 
     if (cObj->getObjectType() != tObj->getObjectType())
         return;
@@ -7378,7 +7172,7 @@ void createPreMatchMapForObject(
                 continue;
 
             SWSS_LOG_INFO("inserting pre match entry for %s:%s: 0x%" PRIx64 " (tmp) -> 0x%" PRIx64 " (cur)",
-                    tObj->str_object_id.c_str(),
+                    tObj->m_str_object_id.c_str(),
                     cAttr->getAttrMetadata()->attridname,
                     tVid,
                     cVid);
