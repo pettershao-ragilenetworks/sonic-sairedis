@@ -1,4 +1,4 @@
-AM_CPPFLAGS = -I$(top_srcdir)/vslib/inc -I$(top_srcdir)/lib/inc -I$(top_srcdir)/SAI/inc -I$(top_srcdir)/SAI/meta -I$(top_srcdir)/SAI/experimental
+AM_CPPFLAGS = -I$(top_srcdir)/lib/inc -I$(top_srcdir)/vslib/inc -I$(top_srcdir)/SAI/inc -I$(top_srcdir)/SAI/meta -I$(top_srcdir)/SAI/experimental
 
 bin_PROGRAMS = syncd syncd_request_shutdown tests
 
@@ -16,6 +16,13 @@ endif
 
 noinst_LIBRARIES = libsyncd.a
 libsyncd_a_SOURCES = \
+				../lib/src/SwitchConfig.cpp \
+				../lib/src/SwitchConfigContainer.cpp \
+				../lib/src/VirtualObjectIdManager.cpp \
+				VidManager.cpp \
+				VidManager.cpp \
+				AsicOperation.cpp \
+				AsicView.cpp \
 				SaiObj.cpp \
 				SaiAttr.cpp \
 				VendorSai.cpp \
