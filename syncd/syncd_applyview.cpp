@@ -5,10 +5,13 @@
 #include "swss/dbconnector.h"
 
 #include "CommandLineOptions.h"
+#include "SaiAttr.h"
 
 #include <inttypes.h>
 #include <algorithm>
 #include <list>
+
+using namespace syncd;
 
 extern std::shared_ptr<CommandLineOptions> g_commandLineOptions; // TODO move to syncd object
 // TODO part of sai meta (valid only when used with vslib)
@@ -90,250 +93,6 @@ struct AsicOperation
     bool isRemove;
 
     std::shared_ptr<swss::KeyOpFieldsValuesTuple> op;
-};
-
-/**
- * @brief Class represents single attribute
- *
- * Some attributes are lists, and have allocated memory, this class will help to
- * handle memory management and also will keep metadata for attribute.
- */
-class SaiAttr
-{
-    public:
-
-        /**
-         * @brief Constructor
-         *
-         * @param[in] str_attr_id Attribute is as string
-         * @param[in] str_attr_value Attribute value as string
-         */
-        SaiAttr(
-                _In_ const std::string &str_attr_id,
-                _In_ const std::string &str_attr_value):
-            m_str_attr_id(str_attr_id),
-            m_str_attr_value(str_attr_value),
-            m_meta(NULL)
-        {
-            SWSS_LOG_ENTER();
-
-            /*
-             * We perform deserialize here to have attribute value when we need
-             * it, this can include allocated lists, so on destructor we need
-             * to free this memory.
-             */
-
-            sai_deserialize_attr_id(str_attr_id, &m_meta);
-
-            m_attr.id = m_meta->attrid;
-
-            sai_deserialize_attr_value(str_attr_value, *m_meta, m_attr, false);
-        }
-
-        /**
-         * @brief Destructor
-         */
-        ~SaiAttr()
-        {
-            SWSS_LOG_ENTER();
-
-            sai_deserialize_free_attribute_value(m_meta->attrvaluetype, m_attr);
-        }
-
-        sai_attribute_t* getRWSaiAttr()
-        {
-            SWSS_LOG_ENTER();
-
-            return &m_attr;
-        }
-
-        const sai_attribute_t* getSaiAttr() const
-        {
-            SWSS_LOG_ENTER();
-            return &m_attr;
-        }
-
-        /**
-         * @brief Gets value.oid of attribute value.
-         *
-         * If attribute is not OID exception will be thrown.
-         *
-         * @return Oid field of attribute value.
-         */
-        sai_object_id_t getOid() const
-        {
-            SWSS_LOG_ENTER();
-
-            if (m_meta->attrvaluetype == SAI_ATTR_VALUE_TYPE_OBJECT_ID)
-            {
-                return m_attr.value.oid;
-            }
-
-            if (m_meta->attrvaluetype == SAI_ATTR_VALUE_TYPE_ACL_ACTION_DATA_OBJECT_ID &&
-                    m_attr.value.aclaction.enable)
-            {
-                return m_attr.value.aclaction.parameter.oid;
-            }
-
-            SWSS_LOG_THROW("attribute %s is not OID attribute", m_meta->attridname);
-        }
-
-        /**
-         * @brief Tells whether attribute contains OIDs
-         *
-         * @return True if attribute contains OIDs, false otherwise
-         */
-        bool isObjectIdAttr() const
-        {
-            SWSS_LOG_ENTER();
-            return m_meta->isoidattribute;
-        }
-
-        const std::string& getStrAttrId() const
-        {
-            SWSS_LOG_ENTER();
-            return m_str_attr_id;
-        }
-
-        const std::string& getStrAttrValue() const
-        {
-            SWSS_LOG_ENTER();
-            return m_str_attr_value;
-        }
-
-        const sai_attr_metadata_t* getAttrMetadata() const
-        {
-            SWSS_LOG_ENTER();
-            return m_meta;
-        }
-
-        void UpdateValue()
-        {
-            SWSS_LOG_ENTER();
-
-            m_str_attr_value = sai_serialize_attr_value(*m_meta, m_attr);
-        }
-
-        /**
-         * @brief Get OID list from attribute
-         *
-         * Based on serialization type attribute may be oid attribute, oid list
-         * attribute or non oid attribute. This method will extract all those oids from
-         * this attribute and return as vector.  This is handy when we need processing
-         * oids per attribute.
-         *
-         * @return Object list used in attribute
-         */
-        std::vector<sai_object_id_t> getOidListFromAttribute() const
-        {
-            SWSS_LOG_ENTER();
-
-            const sai_attribute_t &attr = m_attr;
-
-            uint32_t count = 0;
-
-            const sai_object_id_t *objectIdList = NULL;
-
-            /*
-             * For ACL fields and actions we need to use enable flag as
-             * indicator, since when attribute is disabled then parameter can
-             * be garbage.
-             */
-
-            switch (m_meta->attrvaluetype)
-            {
-                case SAI_ATTR_VALUE_TYPE_OBJECT_ID:
-
-                    count = 1;
-                    objectIdList = &attr.value.oid;
-
-                    break;
-
-                case SAI_ATTR_VALUE_TYPE_OBJECT_LIST:
-
-                    count = attr.value.objlist.count;
-                    objectIdList = attr.value.objlist.list;
-
-                    break;
-
-                case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_OBJECT_ID:
-
-                    if (attr.value.aclfield.enable)
-                    {
-                        count = 1;
-                        objectIdList = &attr.value.aclfield.data.oid;
-                    }
-
-                    break;
-
-                case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_OBJECT_LIST:
-
-                    if (attr.value.aclfield.enable)
-                    {
-                        count = attr.value.aclfield.data.objlist.count;
-                        objectIdList = attr.value.aclfield.data.objlist.list;
-                    }
-
-                    break;
-
-                case SAI_ATTR_VALUE_TYPE_ACL_ACTION_DATA_OBJECT_ID:
-
-                    if (attr.value.aclaction.enable)
-                    {
-                        count = 1;
-                        objectIdList = &attr.value.aclaction.parameter.oid;
-                    }
-
-                    break;
-
-                case SAI_ATTR_VALUE_TYPE_ACL_ACTION_DATA_OBJECT_LIST:
-
-                    if (attr.value.aclaction.enable)
-                    {
-                        count = attr.value.aclaction.parameter.objlist.count;
-                        objectIdList = attr.value.aclaction.parameter.objlist.list;
-                    }
-
-                    break;
-
-                default:
-
-                    if (m_meta->isoidattribute)
-                    {
-                        SWSS_LOG_THROW("attribute %s is oid attrubute but not handled", m_meta->attridname);
-                    }
-
-                    /*
-                     * Attribute not contain any object ids.
-                     */
-
-                    break;
-            }
-
-            std::vector<sai_object_id_t> result(objectIdList, objectIdList + count);
-
-            return result;
-        }
-
-    private:
-
-        /*
-         * Copy constructor and assignment operator are marked as private to
-         * prevent copy of this object, since attribute can contain pointers to
-         * list which can lead to double free when object copy.
-         *
-         * This can be solved by making proper implementations of those
-         * methods, currently this is not required.
-         */
-
-        SaiAttr(const SaiAttr&);
-        SaiAttr& operator=(const SaiAttr&);
-
-        const std::string m_str_attr_id;
-        std::string m_str_attr_value;
-
-        const sai_attr_metadata_t* m_meta;
-        sai_attribute_t m_attr;
 };
 
 /**
@@ -5454,7 +5213,7 @@ std::shared_ptr<SaiAttr> translateTemporaryVidsToCurrentVids(
      * exchanged, we need to update value string of that attribute.
      */
 
-    attr->UpdateValue();
+    attr->updateValue();
 
     return attr;
 }
