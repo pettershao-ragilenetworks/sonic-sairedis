@@ -1,10 +1,14 @@
 #include "syncd_flex_counter.h"
 #include "syncd.h"
 
+#include "VidManager.h"
+
 #include "swss/redisapi.h"
 #include "swss/tokenize.h"
 
 #include <inttypes.h>
+
+using namespace syncd;
 
 /* Global map with FlexCounter instances for different polling interval */
 static std::map<std::string, std::shared_ptr<FlexCounter>> g_flex_counters_map;
@@ -2062,3 +2066,44 @@ std::vector<sai_switch_stat_t> FlexCounter::saiCheckSupportedSwitchDebugCounters
 
     return supportedSwitchDebugCounters;
 }
+
+void FlexCounter::removeCounter(
+        _In_ sai_object_id_t vid,
+        _In_ const std::string& groupName)
+{
+    SWSS_LOG_ENTER();
+
+    auto objectType = VidManager::objectTypeQuery(vid);
+
+    if (objectType == SAI_OBJECT_TYPE_PORT)
+    {
+        FlexCounter::removePort(vid, groupName);
+        FlexCounter::removePortDebugCounters(vid, groupName);
+    }
+    else if (objectType == SAI_OBJECT_TYPE_QUEUE)
+    {
+        FlexCounter::removeQueue(vid, groupName);
+    }
+    else if (objectType == SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP)
+    {
+        FlexCounter::removePriorityGroup(vid, groupName);
+    }
+    else if (objectType == SAI_OBJECT_TYPE_ROUTER_INTERFACE)
+    {
+        FlexCounter::removeRif(vid, groupName);
+    }
+    else if (objectType == SAI_OBJECT_TYPE_BUFFER_POOL)
+    {
+        FlexCounter::removeBufferPool(vid, groupName);
+    }
+    else if (objectType == SAI_OBJECT_TYPE_SWITCH)
+    {
+        FlexCounter::removeSwitchDebugCounters(vid, groupName);
+    }
+    else
+    {
+        SWSS_LOG_ERROR("Object type for removal not supported, %s",
+                sai_serialize_object_type(objectType).c_str());
+    }
+}
+

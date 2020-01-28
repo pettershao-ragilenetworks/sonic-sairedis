@@ -3439,35 +3439,7 @@ void processFlexCounterEvent(
 
     if (op == DEL_COMMAND)
     {
-        if (objectType == SAI_OBJECT_TYPE_PORT)
-        {
-            FlexCounter::removePort(vid, groupName);
-            FlexCounter::removePortDebugCounters(vid, groupName);
-        }
-        else if (objectType == SAI_OBJECT_TYPE_QUEUE)
-        {
-            FlexCounter::removeQueue(vid, groupName);
-        }
-        else if (objectType == SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP)
-        {
-            FlexCounter::removePriorityGroup(vid, groupName);
-        }
-        else if (objectType == SAI_OBJECT_TYPE_ROUTER_INTERFACE)
-        {
-            FlexCounter::removeRif(vid, groupName);
-        }
-        else if (objectType == SAI_OBJECT_TYPE_BUFFER_POOL)
-        {
-            FlexCounter::removeBufferPool(vid, groupName);
-        }
-        else if (objectType == SAI_OBJECT_TYPE_SWITCH)
-        {
-            FlexCounter::removeSwitchDebugCounters(vid, groupName);
-        }
-        else
-        {
-            SWSS_LOG_ERROR("Object type for removal not supported, %s", objectTypeStr.c_str());
-        }
+        FlexCounter::removeCounter(vid, groupName);
     }
 
     const auto values = kfvFieldsValues(kco);

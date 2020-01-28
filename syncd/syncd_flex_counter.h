@@ -114,6 +114,10 @@ class FlexCounter
                 _In_ const std::string& groupName,
                 _In_ const std::vector<swss::FieldValueTuple>& values);
 
+        static void removeCounter(
+                _In_ sai_object_id_t vid,
+                _In_ const std::string& groupName);
+
         static void removeAllCounters();
 
         FlexCounter(
