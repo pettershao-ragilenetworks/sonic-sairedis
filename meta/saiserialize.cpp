@@ -670,6 +670,14 @@ std::string sai_serialize_object_type(
     return sai_serialize_enum(object_type, &sai_metadata_enum_sai_object_type_t);
 }
 
+std::string sai_serialize_log_level(
+        _In_ sai_log_level_t log_level)
+{
+    SWSS_LOG_ENTER();
+
+    return sai_serialize_enum(log_level, &sai_metadata_enum_sai_log_level_t);
+}
+
 std::string sai_serialize_attr_value_type(
         _In_ const sai_attr_value_type_t attr_value_type)
 {
@@ -2697,6 +2705,15 @@ void sai_deserialize_object_type(
     SWSS_LOG_ENTER();
 
     sai_deserialize_enum(s, &sai_metadata_enum_sai_object_type_t, (int32_t&)object_type);
+}
+
+void sai_deserialize_log_level(
+        _In_ const std::string& s,
+        _Out_ sai_log_level_t& log_level)
+{
+    SWSS_LOG_ENTER();
+
+    sai_deserialize_enum(s, &sai_metadata_enum_sai_log_level_t, (int32_t&)log_level);
 }
 
 void sai_deserialize_vlan_id(
