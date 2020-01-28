@@ -3442,70 +3442,52 @@ bool isVeryFirstRun()
     return firstRun;
 }
 
-int get_enum_value_from_name(
-        _In_ const char *name,
-        _In_ const sai_enum_metadata_t* metadata)
+static void saiLoglevelNotify(
+        _In_ std::string strApi,
+        _In_ std::string strLogLevel)
 {
     SWSS_LOG_ENTER();
 
-    for (uint32_t idx = 0; idx < metadata->valuescount; idx++)
+    try
     {
-        if (strcmp(name, metadata->valuesnames[idx]) == 0)
+        sai_log_level_t logLevel;
+        sai_deserialize_log_level(strLogLevel, logLevel);
+
+        sai_api_t api;
+        sai_deserialize_api(strApi, api);
+
+        sai_status_t status = g_vendorSai->logSet(api, logLevel);
+
+        if (status == SAI_STATUS_SUCCESS)
         {
-            return metadata->values[idx];
+            SWSS_LOG_NOTICE("Setting SAI loglevel %s on %s", strLogLevel.c_str(), strApi.c_str());
+        }
+        else
+        {
+            SWSS_LOG_INFO("set loglevel failed: %s", sai_serialize_status(status).c_str());
         }
     }
-
-    SWSS_LOG_ERROR("not found %s", name);
-    return 0;
-}
-
-void saiLoglevelNotify(std::string apiStr, std::string prioStr)
-{
-    SWSS_LOG_ENTER();
-
-    using namespace swss;
-
-    static const std::map<std::string, sai_log_level_t> saiLoglevelMap = {
-        { "SAI_LOG_LEVEL_CRITICAL", SAI_LOG_LEVEL_CRITICAL },
-        { "SAI_LOG_LEVEL_ERROR", SAI_LOG_LEVEL_ERROR },
-        { "SAI_LOG_LEVEL_WARN", SAI_LOG_LEVEL_WARN },
-        { "SAI_LOG_LEVEL_NOTICE", SAI_LOG_LEVEL_NOTICE },
-        { "SAI_LOG_LEVEL_INFO", SAI_LOG_LEVEL_INFO },
-        { "SAI_LOG_LEVEL_DEBUG", SAI_LOG_LEVEL_DEBUG },
-    };
-
-    if (saiLoglevelMap.find(prioStr) == saiLoglevelMap.end())
+    catch (const std::exception& e)
     {
-        SWSS_LOG_ERROR("Invalid SAI loglevel %s %s", apiStr.c_str(), prioStr.c_str());
-        return;
+        SWSS_LOG_ERROR("Failed to set loglevel to %s on %s: %s",
+                strLogLevel.c_str(),
+                strApi.c_str(),
+                e.what());
     }
-
-    sai_api_t api = (sai_api_t)get_enum_value_from_name(apiStr.c_str(), &sai_metadata_enum_sai_api_t);
-
-    sai_status_t status = g_vendorSai->logSet(api, saiLoglevelMap.at(prioStr));
-
-    if (status != SAI_STATUS_SUCCESS)
-    {
-        SWSS_LOG_INFO("Failed to set %s on %s: %s", prioStr.c_str(), apiStr.c_str(),
-                sai_serialize_status(status).c_str());
-        return;
-    }
-
-    SWSS_LOG_NOTICE("Setting SAI loglevel %s to %s", apiStr.c_str(), prioStr.c_str());
 }
 
 void set_sai_api_loglevel()
 {
     SWSS_LOG_ENTER();
 
-    /*
-     * We start from 1 since 0 is SAI_API_UNSPECIFIED.
-     */
+    // We start from 1 since 0 is SAI_API_UNSPECIFIED.
 
     for (uint32_t idx = 1; idx < sai_metadata_enum_sai_api_t.valuescount; ++idx)
     {
-        swss::Logger::linkToDb(sai_metadata_enum_sai_api_t.valuesnames[idx], saiLoglevelNotify, "SAI_LOG_LEVEL_NOTICE");
+        swss::Logger::linkToDb(
+                sai_metadata_enum_sai_api_t.valuesnames[idx],
+                saiLoglevelNotify,
+                sai_serialize_log_level(SAI_LOG_LEVEL_NOTICE));
     }
 }
 
@@ -3513,9 +3495,7 @@ void set_sai_api_log_min_prio(const std::string &prioStr)
 {
     SWSS_LOG_ENTER();
 
-    /*
-     * We start from 1 since 0 is SAI_API_UNSPECIFIED.
-     */
+    // We start from 1 since 0 is SAI_API_UNSPECIFIED.
 
     for (uint32_t idx = 1; idx < sai_metadata_enum_sai_api_t.valuescount; ++idx)
     {
