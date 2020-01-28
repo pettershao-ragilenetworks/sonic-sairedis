@@ -76,6 +76,9 @@ std::string sai_serialize_object_id(
 std::string sai_serialize_log_level(
         _In_ const sai_log_level_t log_level);
 
+std::string sai_serialize_api(
+        _In_ const sai_api_t api);
+
 std::string sai_serialize_attr_value_type(
         _In_ const sai_attr_value_type_t attr_value_type);
 
@@ -212,6 +215,10 @@ void sai_deserialize_object_id(
 void sai_deserialize_log_level(
         _In_ const std::string& s,
         _Out_ sai_log_level_t& log_level);
+
+void sai_deserialize_api(
+        _In_ const std::string& s,
+        _Out_ sai_api_t& api);
 
 void sai_deserialize_fdb_entry(
         _In_ const std::string& s,
