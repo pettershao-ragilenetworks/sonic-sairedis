@@ -8,6 +8,7 @@
 #include "SaiAttr.h"
 #include "SaiObj.h"
 #include "AsicView.h"
+#include "VidManager.h"
 
 #include <inttypes.h>
 #include <algorithm>
@@ -5430,7 +5431,7 @@ void populateExistingObjects(
 
         if (warmBootDiscoveredVids.find(vid) != warmBootDiscoveredVids.end())
         {
-            sai_object_type_t ot = redis_sai_object_type_query(vid);
+            sai_object_type_t ot = VidManager::objectTypeQuery(vid);
 
             switch (ot)
             {
@@ -6375,7 +6376,7 @@ sai_status_t asic_handle_generic(
                  * we could use shortcut here, but let's do this proper way.
                  */
 
-                sai_object_id_t switch_vid = redis_sai_switch_id_query(object_id);
+                sai_object_id_t switch_vid = VidManager::switchIdQuery(object_id);
 
                 sai_object_id_t switch_rid = asic_translate_vid_to_rid(current, temporary, switch_vid);
 

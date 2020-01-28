@@ -13,6 +13,10 @@
 #include "TimerWatchdog.h"
 #include "CommandLineOptionsParser.h"
 #include "PortMapParser.h"
+#include "VidManager.h"
+
+#include "VirtualObjectIdManager.h"
+#include "RedisVidIndexGenerator.h"
 
 #include <iostream>
 #include <map>
@@ -24,6 +28,8 @@
 using namespace syncd;
 
 std::shared_ptr<sairedis::SaiInterface> g_vendorSai = std::make_shared<VendorSai>();
+
+std::shared_ptr<sairedis::VirtualObjectIdManager> g_virtualObjectIdManager;
 
 /**
  * @brief Global mutex for thread synchronization
@@ -160,146 +166,6 @@ void sai_diag_shell(
     }
 }
 
-/*
- * Defined bit position on sairedis VID where object type and switch id is
- * located.
- */
-
-#define OT_POSITION     48
-#define SWID_POSITION   56
-
-/*
- * NOTE: those redis functions could go to librediscommon etc so syncd could
- * link against it, so we don't have to duplicate code.
- */
-
-sai_object_id_t redis_construct_object_id(
-        _In_ sai_object_type_t object_type,
-        _In_ int switch_index,
-        _In_ uint64_t real_id)
-{
-    SWSS_LOG_ENTER();
-
-    return (sai_object_id_t)(((uint64_t)switch_index << SWID_POSITION) | ((uint64_t)object_type << OT_POSITION) | real_id);
-}
-
-sai_object_type_t redis_sai_object_type_query(
-        _In_ sai_object_id_t object_id)
-{
-    SWSS_LOG_ENTER();
-
-    if (object_id == SAI_NULL_OBJECT_ID)
-    {
-        return SAI_OBJECT_TYPE_NULL;
-    }
-
-    sai_object_type_t ot = (sai_object_type_t)((object_id >> OT_POSITION) & 0xFF);
-
-    if (!sai_metadata_is_object_type_valid(ot))
-    {
-        SWSS_LOG_THROW("invalid object id 0x%" PRIx64, object_id);
-    }
-
-    return ot;
-}
-
-int redis_get_switch_id_index(
-        _In_ sai_object_id_t switch_id)
-{
-    SWSS_LOG_ENTER();
-
-    sai_object_type_t switch_object_type = redis_sai_object_type_query(switch_id);
-
-    if (switch_object_type == SAI_OBJECT_TYPE_SWITCH)
-    {
-        return (int)((switch_id >> SWID_POSITION) & 0xFF);
-    }
-
-    SWSS_LOG_THROW("object type of switch %s is %s, should be SWITCH",
-            sai_serialize_object_id(switch_id).c_str(),
-            sai_serialize_object_type(switch_object_type).c_str());
-}
-
-sai_object_id_t redis_sai_switch_id_query(
-        _In_ sai_object_id_t oid)
-{
-    SWSS_LOG_ENTER();
-
-    if (oid == SAI_NULL_OBJECT_ID)
-    {
-        return oid;
-    }
-
-    sai_object_type_t object_type = redis_sai_object_type_query(oid);
-
-    if (object_type == SAI_OBJECT_TYPE_NULL)
-    {
-        SWSS_LOG_THROW("invalid object type of oid 0x%" PRIx64, oid);
-    }
-
-    if (object_type == SAI_OBJECT_TYPE_SWITCH)
-    {
-        return oid;
-    }
-
-    /*
-     * Each VID contains switch index at constant position.
-     *
-     * We extract this index from VID and we create switch ID (VID) for
-     * specific object. We can do this for each object.
-     */
-
-    int sw_index = (int)((oid >> SWID_POSITION) & 0xFF);
-
-    sai_object_id_t switch_id = redis_construct_object_id(SAI_OBJECT_TYPE_SWITCH, sw_index, sw_index);
-
-    return switch_id;
-}
-
-sai_object_id_t redis_create_virtual_object_id(
-        _In_ sai_object_id_t switch_id,
-        _In_ sai_object_type_t object_type)
-{
-    SWSS_LOG_ENTER();
-
-    /*
-     * NOTE: switch ID is VID switch ID from sairedis.
-     */
-
-    /*
-     * Check if object type is in valid range.
-     */
-
-    if (!sai_metadata_is_object_type_valid(object_type))
-    {
-        SWSS_LOG_THROW("invalid object type: %s", sai_serialize_object_type(object_type).c_str());
-    }
-
-    /*
-     * Switch id is deterministic and it comes from sairedis so make check here
-     * that we will not use this for creating switch VIDs.
-     */
-
-    if (object_type == SAI_OBJECT_TYPE_SWITCH)
-    {
-        SWSS_LOG_THROW("this function should not be used to create VID for switch id");
-    }
-
-    uint64_t virtual_id = g_redisClient->incr(VIDCOUNTER);
-
-    int switch_index =  redis_get_switch_id_index(switch_id);
-
-    sai_object_id_t vid = redis_construct_object_id(object_type, switch_index, virtual_id);
-
-    auto info = sai_metadata_get_object_type_info(object_type);
-
-    SWSS_LOG_DEBUG("created virtual object id 0x%" PRIx64 " for object type %s",
-            vid,
-            info->objecttypename);
-
-    return vid;
-}
-
 std::unordered_map<sai_object_id_t, sai_object_id_t> local_rid_to_vid;
 std::unordered_map<sai_object_id_t, sai_object_id_t> local_vid_to_rid;
 
@@ -394,7 +260,7 @@ sai_object_id_t translate_rid_to_vid(
         SWSS_LOG_THROW("RID 0x%" PRIx64 " is switch object, but not in local or redis db, bug!", rid);
     }
 
-    vid = redis_create_virtual_object_id(switch_vid, object_type);
+    vid = g_virtualObjectIdManager->allocateNewObjectId(object_type, switch_vid);
 
     SWSS_LOG_DEBUG("translated RID 0x%" PRIx64 " to VID 0x%" PRIx64, rid, vid);
 
@@ -760,7 +626,7 @@ void snoop_get_oid(
      * implementation which has different function g_vendorSai->objectTypeQuery.
      */
 
-    sai_object_type_t object_type = redis_sai_object_type_query(vid);
+    sai_object_type_t object_type = VidManager::objectTypeQuery(vid);
 
     std::string str_vid = sai_serialize_object_id(vid);
 
@@ -1303,7 +1169,7 @@ void post_port_remove(
 
         // remove from ASIC DB
 
-        sai_object_type_t ot = redis_sai_object_type_query(vid);
+        sai_object_type_t ot = VidManager::objectTypeQuery(vid);
 
         std::string key = ASIC_STATE_TABLE + std::string(":") + sai_serialize_object_type(ot) + ":" + str_vid;
 
@@ -1381,7 +1247,7 @@ sai_status_t handle_generic(
                  * Object id is VID, we can use it to extract switch id.
                  */
 
-                sai_object_id_t switch_id = redis_sai_switch_id_query(object_id);
+                sai_object_id_t switch_id = VidManager::switchIdQuery(object_id);
 
                 if (switch_id == SAI_NULL_OBJECT_ID)
                 {
@@ -1463,7 +1329,7 @@ sai_status_t handle_generic(
 
                     if (object_type == SAI_OBJECT_TYPE_PORT)
                     {
-                        sai_object_id_t switch_vid = redis_sai_switch_id_query(object_id);
+                        sai_object_id_t switch_vid = VidManager::switchIdQuery(object_id);
 
                         post_port_create(switches.at(switch_vid), real_object_id, object_id);
                     }
@@ -1549,7 +1415,7 @@ sai_status_t handle_generic(
                          * can already deduce that.
                          */
 
-                        sai_object_id_t switch_vid = redis_sai_switch_id_query(object_id);
+                        sai_object_id_t switch_vid = VidManager::switchIdQuery(object_id);
 
                         if (switches.at(switch_vid)->isDiscoveredRid(rid))
                         {
@@ -2666,7 +2532,7 @@ sai_object_id_t extractSwitchVid(
 
             sai_deserialize_object_id(str_object_id, oid);
 
-            return redis_sai_switch_id_query(oid);
+            return VidManager::switchIdQuery(oid);
     }
 }
 
@@ -3816,6 +3682,15 @@ int syncd_main(int argc, char **argv)
     std::shared_ptr<swss::ConsumerTable> flexCounter = std::make_shared<swss::ConsumerTable>(dbFlexCounter.get(), FLEX_COUNTER_TABLE);
     std::shared_ptr<swss::ConsumerTable> flexCounterGroup = std::make_shared<swss::ConsumerTable>(dbFlexCounter.get(), FLEX_COUNTER_GROUP_TABLE);
 
+    auto switchConfigContainer = std::make_shared<sairedis::SwitchConfigContainer>();
+    auto redisVidIndexGenerator = std::make_shared<sairedis::RedisVidIndexGenerator>(dbAsic, REDIS_KEY_VIDCOUNTER);
+
+    g_virtualObjectIdManager =
+        std::make_shared<sairedis::VirtualObjectIdManager>(
+                0, // TODO global context, get from command line
+                switchConfigContainer,
+                redisVidIndexGenerator);
+
     /*
      * At the end we cant use producer consumer concept since if one process
      * will restart there may be something in the queue also "remove" from
@@ -3827,7 +3702,7 @@ int syncd_main(int argc, char **argv)
 
     std::string fdbFlushLuaScript = swss::loadLuaScript(fdbFlushLuaScriptName);
     fdbFlushSha = swss::loadRedisScript(dbAsic.get(), fdbFlushLuaScript);
-    
+
     g_veryFirstRun = isVeryFirstRun();
 
     /* ignore warm logic here if syncd starts in Mellanox fastfast boot mode */
@@ -3879,7 +3754,7 @@ int syncd_main(int argc, char **argv)
 
     if (status != SAI_STATUS_SUCCESS)
     {
-        SWSS_LOG_ERROR("fail to sai_api_initialize: %s", 
+        SWSS_LOG_ERROR("fail to sai_api_initialize: %s",
                 sai_serialize_status(status).c_str());
         return EXIT_FAILURE;
     }

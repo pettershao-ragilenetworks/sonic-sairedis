@@ -19,6 +19,7 @@ libsyncd_a_SOURCES = \
 				../lib/src/SwitchConfig.cpp \
 				../lib/src/SwitchConfigContainer.cpp \
 				../lib/src/VirtualObjectIdManager.cpp \
+				../lib/src/RedisVidIndexGenerator.cpp \
 				VidManager.cpp \
 				VidManager.cpp \
 				AsicOperation.cpp \

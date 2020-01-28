@@ -49,7 +49,6 @@ extern "C" {
 
 #define VIDTORID                    "VIDTORID"
 #define RIDTOVID                    "RIDTOVID"
-#define VIDCOUNTER                  "VIDCOUNTER"
 #define LANES                       "LANES"
 #define HIDDEN                      "HIDDEN"
 #define COLDVIDS                    "COLDVIDS"
@@ -91,16 +90,6 @@ extern std::shared_ptr<swss::NotificationProducer>  notifications;
 extern std::shared_ptr<swss::RedisClient>   g_redisClient;
 extern std::shared_ptr<swss::DBConnector>   dbAsic;
 extern std::string fdbFlushSha;
-
-sai_object_id_t redis_create_virtual_object_id(
-        _In_ sai_object_id_t switch_id,
-        _In_ sai_object_type_t object_type);
-
-sai_object_type_t redis_sai_object_type_query(
-        _In_ sai_object_id_t object_id);
-
-sai_object_id_t redis_sai_switch_id_query(
-        _In_ sai_object_id_t oid);
 
 sai_object_id_t translate_rid_to_vid(
         _In_ sai_object_id_t rid,

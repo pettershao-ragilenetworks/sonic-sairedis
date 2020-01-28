@@ -1,10 +1,14 @@
 #include "syncd.h"
 #include "sairediscommon.h"
 
+#include "VidManager.h"
+
 #include <string>
 #include <vector>
 #include <unordered_map>
 #include <tuple>
+
+using namespace syncd;
 
 /*
  * To support multiple switches here we need to refactor this to a class
@@ -66,7 +70,7 @@ sai_object_type_t getObjectTypeFromVid(
 {
     SWSS_LOG_ENTER();
 
-    sai_object_type_t objectType = redis_sai_object_type_query(object_vid);
+    sai_object_type_t objectType = VidManager::objectTypeQuery(object_vid);
 
     // TODO metadata is valid object type
     if (objectType >= SAI_OBJECT_TYPE_EXTENSIONS_MAX ||
