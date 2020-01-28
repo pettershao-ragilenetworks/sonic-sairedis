@@ -3420,8 +3420,9 @@ void processFlexCounterEvent(
     const auto groupName = key.substr(0, delimiter);
     const auto vidStr = key.substr(delimiter+1);
 
-    sai_object_id_t vid = SAI_NULL_OBJECT_ID;
+    sai_object_id_t vid;
     sai_deserialize_object_id(vidStr, vid);
+
     sai_object_id_t rid;
     {
         std::lock_guard<std::mutex> lock(g_mutex);
@@ -3434,151 +3435,16 @@ void processFlexCounterEvent(
         }
     }
 
-    sai_object_type_t objectType = redis_sai_object_type_query(vid); // VID and RID will have the same object type
-    std::string  objectTypeStr = sai_serialize_object_type(objectType);
+    const auto values = kfvFieldsValues(kco);
 
-    if (op == DEL_COMMAND)
+    if (op == SET_COMMAND)
+    {
+        FlexCounter::addCounter(vid, rid, groupName, values);
+    }
+    else if (op == DEL_COMMAND)
     {
         FlexCounter::removeCounter(vid, groupName);
     }
-
-    const auto values = kfvFieldsValues(kco);
-    std::vector<std::string> counterIds;
-    std::string statsMode;
-    for (const auto& valuePair : values)
-    {
-        const auto field = fvField(valuePair);
-        const auto value = fvValue(valuePair);
-
-        if (op == SET_COMMAND)
-        {
-            auto idStrings = swss::tokenize(value, ',');
-
-            if (objectType == SAI_OBJECT_TYPE_PORT && field == PORT_COUNTER_ID_LIST)
-            {
-                std::vector<sai_port_stat_t> portCounterIds;
-                for (const auto &str : idStrings)
-                {
-                    sai_port_stat_t stat;
-                    sai_deserialize_port_stat(str.c_str(), &stat);
-                    portCounterIds.push_back(stat);
-                }
-
-                FlexCounter::setPortCounterList(vid, rid, groupName, portCounterIds);
-            }
-            else if (objectType == SAI_OBJECT_TYPE_PORT && field == PORT_DEBUG_COUNTER_ID_LIST)
-            {
-                std::vector<sai_port_stat_t> portDebugCounterIds;
-                for (const auto &str : idStrings)
-                {
-                    sai_port_stat_t stat;
-                    sai_deserialize_port_stat(str.c_str(), &stat);
-                    portDebugCounterIds.push_back(stat);
-                }
-
-                FlexCounter::setPortDebugCounterList(vid, rid, groupName, portDebugCounterIds);
-            }
-            else if (objectType == SAI_OBJECT_TYPE_QUEUE && field == QUEUE_COUNTER_ID_LIST)
-            {
-                std::vector<sai_queue_stat_t> queueCounterIds;
-                for (const auto &str : idStrings)
-                {
-                    sai_queue_stat_t stat;
-                    sai_deserialize_queue_stat(str.c_str(), &stat);
-                    queueCounterIds.push_back(stat);
-                }
-
-                FlexCounter::setQueueCounterList(vid, rid, groupName, queueCounterIds);
-            }
-            else if (objectType == SAI_OBJECT_TYPE_QUEUE && field == QUEUE_ATTR_ID_LIST)
-            {
-                std::vector<sai_queue_attr_t> queueAttrIds;
-                for (const auto &str : idStrings)
-                {
-                    sai_queue_attr_t attr;
-                    sai_deserialize_queue_attr(str, attr);
-                    queueAttrIds.push_back(attr);
-                }
-
-                FlexCounter::setQueueAttrList(vid, rid, groupName, queueAttrIds);
-            }
-            else if (objectType == SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP && field == PG_COUNTER_ID_LIST)
-            {
-                std::vector<sai_ingress_priority_group_stat_t> pgCounterIds;
-                for (const auto &str : idStrings)
-                {
-                    sai_ingress_priority_group_stat_t stat;
-                    sai_deserialize_ingress_priority_group_stat(str.c_str(), &stat);
-                    pgCounterIds.push_back(stat);
-                }
-
-                FlexCounter::setPriorityGroupCounterList(vid, rid, groupName, pgCounterIds);
-            }
-            else if (objectType == SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP && field == PG_ATTR_ID_LIST)
-            {
-                std::vector<sai_ingress_priority_group_attr_t> pgAttrIds;
-                for (const auto &str : idStrings)
-                {
-                    sai_ingress_priority_group_attr_t attr;
-                    sai_deserialize_ingress_priority_group_attr(str, attr);
-                    pgAttrIds.push_back(attr);
-                }
-
-                FlexCounter::setPriorityGroupAttrList(vid, rid, groupName, pgAttrIds);
-            }
-            else if (objectType == SAI_OBJECT_TYPE_ROUTER_INTERFACE && field == RIF_COUNTER_ID_LIST)
-            {
-                std::vector<sai_router_interface_stat_t> rifCounterIds;
-                for (const auto &str : idStrings)
-                {
-                    sai_router_interface_stat_t stat;
-                    sai_deserialize_router_interface_stat(str.c_str(), &stat);
-                    rifCounterIds.push_back(stat);
-                }
-
-                FlexCounter::setRifCounterList(vid, rid, groupName, rifCounterIds);
-            }
-            else if (objectType == SAI_OBJECT_TYPE_SWITCH && field == SWITCH_DEBUG_COUNTER_ID_LIST)
-            {
-                std::vector<sai_switch_stat_t> switchCounterIds;
-                for (const auto &str : idStrings)
-                {
-                    sai_switch_stat_t stat;
-                    sai_deserialize_switch_stat(str.c_str(), &stat);
-                    switchCounterIds.push_back(stat);
-                }
-
-                FlexCounter::setSwitchDebugCounterList(vid, rid, groupName, switchCounterIds);
-            }
-            else if (objectType == SAI_OBJECT_TYPE_BUFFER_POOL && field == BUFFER_POOL_COUNTER_ID_LIST)
-            {
-                counterIds = idStrings;
-            }
-            else if (objectType == SAI_OBJECT_TYPE_BUFFER_POOL && field == STATS_MODE_FIELD)
-            {
-                statsMode = value;
-            }
-            else
-            {
-                SWSS_LOG_ERROR("Object type and field combination is not supported, object type %s, field %s", objectTypeStr.c_str(), field.c_str());
-            }
-        }
-    }
-
-    if (objectType == SAI_OBJECT_TYPE_BUFFER_POOL && counterIds.size())
-    {
-        std::vector<sai_buffer_pool_stat_t> bufferPoolCounterIds;
-        for (const auto &str : counterIds)
-        {
-            sai_buffer_pool_stat_t stat;
-            sai_deserialize_buffer_pool_stat(str.c_str(), &stat);
-            bufferPoolCounterIds.push_back(stat);
-        }
-
-        FlexCounter::setBufferPoolCounterList(vid, rid, groupName, bufferPoolCounterIds, statsMode);
-    }
-
-    return;
 }
 
 void handleProfileMap(const std::string& profileMapFile)
