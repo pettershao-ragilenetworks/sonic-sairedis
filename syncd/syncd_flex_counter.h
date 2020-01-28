@@ -106,8 +106,14 @@ class FlexCounter
         static void addBufferPoolCounterPlugin(
                 _In_ std::string sha,
                 _In_ std::string instanceId);
+
         static void removeCounterPlugin(
                 _In_ std::string instanceId);
+
+        static void addCounterPlugin(
+                _In_ const std::string& groupName,
+                _In_ const std::vector<swss::FieldValueTuple>& values);
+
         static void removeAllCounters();
 
         FlexCounter(

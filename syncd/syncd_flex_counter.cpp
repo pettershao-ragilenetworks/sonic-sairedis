@@ -1,6 +1,9 @@
 #include "syncd_flex_counter.h"
 #include "syncd.h"
+
 #include "swss/redisapi.h"
+#include "swss/tokenize.h"
+
 #include <inttypes.h>
 
 /* Global map with FlexCounter instances for different polling interval */
@@ -1047,6 +1050,68 @@ void FlexCounter::removeCounterPlugin(
     {
         lkMgr.unlock();
         removeInstance(instanceId);
+    }
+}
+
+void FlexCounter::addCounterPlugin(
+        _In_ const std::string& groupName,
+        _In_ const std::vector<swss::FieldValueTuple>& values)
+{
+    SWSS_LOG_ENTER();
+
+    for (const auto& valuePair : values)
+    {
+        const auto field = fvField(valuePair);
+        const auto value = fvValue(valuePair);
+
+        if (field == POLL_INTERVAL_FIELD)
+        {
+            FlexCounter::setPollInterval(stoi(value), groupName);
+        }
+        else if (field == QUEUE_PLUGIN_FIELD)
+        {
+            auto shaStrings = swss::tokenize(value, ',');
+            for (const auto &sha : shaStrings)
+            {
+                FlexCounter::addQueueCounterPlugin(sha, groupName);
+            }
+        }
+        else if (field == PG_PLUGIN_FIELD)
+        {
+            auto shaStrings = swss::tokenize(value, ',');
+            for (const auto &sha : shaStrings)
+            {
+                FlexCounter::addPriorityGroupCounterPlugin(sha, groupName);
+            }
+        }
+        else if (field == PORT_PLUGIN_FIELD)
+        {
+            auto shaStrings = swss::tokenize(value, ',');
+            for (const auto &sha : shaStrings)
+            {
+                FlexCounter::addPortCounterPlugin(sha, groupName);
+            }
+        }
+        else if (field == BUFFER_POOL_PLUGIN_FIELD)
+        {
+            auto shaStrings = swss::tokenize(value, ',');
+            for (const auto &sha : shaStrings)
+            {
+                FlexCounter::addBufferPoolCounterPlugin(sha, groupName);
+            }
+        }
+        else if (field == FLEX_COUNTER_STATUS_FIELD)
+        {
+            FlexCounter::updateFlexCounterStatus(value, groupName);
+        }
+        else if (field == STATS_MODE_FIELD)
+        {
+            FlexCounter::updateFlexCounterStatsMode(value, groupName);
+        }
+        else
+        {
+            SWSS_LOG_ERROR("Field is not supported %s", field.c_str());
+        }
     }
 }
 

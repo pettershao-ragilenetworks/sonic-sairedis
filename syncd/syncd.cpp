@@ -3380,72 +3380,17 @@ void processFlexCounterGroupEvent(
         consumer.pop(kco);
     }
 
-    const auto &groupName = kfvKey(kco);
-    const auto &op = kfvOp(kco);
-    const auto values = kfvFieldsValues(kco);
+    auto& groupName = kfvKey(kco);
+    auto& op = kfvOp(kco);
+    auto& values = kfvFieldsValues(kco);
 
-    if (op == DEL_COMMAND)
+    if (op == SET_COMMAND)
+    {
+        FlexCounter::addCounterPlugin(groupName, values);
+    }
+    else if (op == DEL_COMMAND)
     {
         FlexCounter::removeCounterPlugin(groupName);
-        return;
-    }
-
-    for (const auto& valuePair : values)
-    {
-        const auto field = fvField(valuePair);
-        const auto value = fvValue(valuePair);
-
-        if (op == SET_COMMAND)
-        {
-            if (field == POLL_INTERVAL_FIELD)
-            {
-                FlexCounter::setPollInterval(stoi(value), groupName);
-            }
-            else if (field == QUEUE_PLUGIN_FIELD)
-            {
-                auto shaStrings = swss::tokenize(value, ',');
-                for (const auto &sha : shaStrings)
-                {
-                    FlexCounter::addQueueCounterPlugin(sha, groupName);
-                }
-            }
-            else if (field == PG_PLUGIN_FIELD)
-            {
-                auto shaStrings = swss::tokenize(value, ',');
-                for (const auto &sha : shaStrings)
-                {
-                    FlexCounter::addPriorityGroupCounterPlugin(sha, groupName);
-                }
-            }
-            else if (field == PORT_PLUGIN_FIELD)
-            {
-                auto shaStrings = swss::tokenize(value, ',');
-                for (const auto &sha : shaStrings)
-                {
-                    FlexCounter::addPortCounterPlugin(sha, groupName);
-                }
-            }
-            else if (field == BUFFER_POOL_PLUGIN_FIELD)
-            {
-                auto shaStrings = swss::tokenize(value, ',');
-                for (const auto &sha : shaStrings)
-                {
-                    FlexCounter::addBufferPoolCounterPlugin(sha, groupName);
-                }
-            }
-            else if (field == FLEX_COUNTER_STATUS_FIELD)
-            {
-                FlexCounter::updateFlexCounterStatus(value, groupName);
-            }
-            else if (field == STATS_MODE_FIELD)
-            {
-                FlexCounter::updateFlexCounterStatsMode(value, groupName);
-            }
-            else
-            {
-                SWSS_LOG_ERROR("Field is not supported %s", field.c_str());
-            }
-        }
     }
 }
 
