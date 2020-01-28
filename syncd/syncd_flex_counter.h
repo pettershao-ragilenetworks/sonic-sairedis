@@ -107,9 +107,6 @@ class FlexCounter
                 _In_ std::string sha,
                 _In_ std::string instanceId);
         static void removeCounterPlugin(
-                _In_ std::string sha,
-                _In_ std::string instanceId);
-        static void removeCounterPlugin(
                 _In_ std::string instanceId);
         static void removeAllCounters();
 

@@ -1029,29 +1029,6 @@ void FlexCounter::addBufferPoolCounterPlugin(
 }
 
 void FlexCounter::removeCounterPlugin(
-        _In_ std::string sha,
-        _In_ std::string instanceId)
-{
-    SWSS_LOG_ENTER();
-
-    FlexCounter &fc = getInstance(instanceId);
-
-    std::unique_lock<std::mutex> lkMgr(fc.m_mtx);
-
-    fc.m_queuePlugins.erase(sha);
-    fc.m_portPlugins.erase(sha);
-    fc.m_priorityGroupPlugins.erase(sha);
-    fc.m_bufferPoolPlugins.erase(sha);
-
-    // Remove flex counter if all counter IDs and plugins are unregistered
-    if (fc.isEmpty())
-    {
-        lkMgr.unlock();
-        removeInstance(instanceId);
-    }
-}
-
-void FlexCounter::removeCounterPlugin(
         _In_ std::string instanceId)
 {
     SWSS_LOG_ENTER();
