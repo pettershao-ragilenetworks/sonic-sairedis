@@ -11,16 +11,20 @@
 
 using namespace syncd;
 
+#define MUTEX std::unique_lock<std::mutex> _lock(m_mtx);
+#define MUTEX_UNLOCK _lock.unlock();
+
 extern std::shared_ptr<sairedis::SaiInterface> g_vendorSai;
 
-/* Global map with FlexCounter instances for different polling interval */
-static std::map<std::string, std::shared_ptr<FlexCounter>> g_flex_counters_map;
-// List with supported counters
-static std::set<sai_port_stat_t> supportedPortCounters;
-static std::set<sai_queue_stat_t> supportedQueueCounters;
-static std::set<sai_ingress_priority_group_stat_t> supportedPriorityGroupCounters;
-static std::set<sai_router_interface_stat_t> supportedRifCounters;
-static std::set<sai_buffer_pool_stat_t> supportedBufferPoolCounters;
+FlexCounter::FlexCounter(std::string instanceId):
+    m_pollInterval(0),
+    m_instanceId(instanceId)
+{
+    SWSS_LOG_ENTER();
+
+    m_runFlexCounterThread = false;
+    m_enable = false;
+}
 
 FlexCounter::PortCounterIds::PortCounterIds(
         _In_ sai_object_id_t port,
@@ -34,7 +38,7 @@ FlexCounter::SwitchCounterIds::SwitchCounterIds(
         _In_ sai_object_id_t oid,
         _In_ const std::vector<sai_switch_stat_t> &counterIds)
     : switchId(oid),
-      switchCounterIds(counterIds)
+    switchCounterIds(counterIds)
 {
     SWSS_LOG_ENTER();
 }
@@ -89,68 +93,58 @@ FlexCounter::BufferPoolCounterIds::BufferPoolCounterIds(
 }
 
 void FlexCounter::setPollInterval(
-        _In_ uint32_t pollInterval,
-        _In_ std::string instanceId)
+        _In_ uint32_t pollInterval)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
-    std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
-    fc.m_pollInterval = pollInterval;
-    if (pollInterval > 0)
-    {
-        fc.startFlexCounterThread();
-    }
+    m_pollInterval = pollInterval;
+
+    startFlexCounterThread();
 }
 
-void FlexCounter::updateFlexCounterStatus(
-        _In_ std::string status,
-        _In_ std::string instanceId)
+void FlexCounter::setStatus(
+        _In_ const std::string& status)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
     if (status == "enable")
     {
-        std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
-        fc.m_enable = true;
-        fc.startFlexCounterThread();
+        m_enable = true;
+
+        startFlexCounterThread();
     }
     else if (status == "disable")
     {
-        std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
-        fc.m_enable = false;
+        m_enable = false;
     }
     else
     {
-        SWSS_LOG_NOTICE("Input value %s is not supported for Flex counter status, enter enable or disable", status.c_str());
+        SWSS_LOG_WARN("Input value %s is not supported for Flex counter status, enter enable or disable", status.c_str());
     }
-
 }
 
-void FlexCounter::updateFlexCounterStatsMode(
-        _In_ std::string mode,
-        _In_ std::string instanceId)
+void FlexCounter::setStatsMode(
+        _In_ const std::string& mode)
 {
     SWSS_LOG_ENTER();
-    FlexCounter &fc = getInstance(instanceId);
+
     if (mode == STATS_MODE_READ)
     {
-        std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
-        fc.m_statsMode = SAI_STATS_MODE_READ;
-        SWSS_LOG_DEBUG("Set STATS MODE %s for FC %s", mode.c_str(), fc.m_instanceId.c_str());
+        m_statsMode = SAI_STATS_MODE_READ;
+
+        SWSS_LOG_DEBUG("Set STATS MODE %s for FC %s", mode.c_str(), m_instanceId.c_str());
     }
     else if (mode == STATS_MODE_READ_AND_CLEAR)
     {
-        std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
-        fc.m_statsMode = SAI_STATS_MODE_READ_AND_CLEAR;
-        SWSS_LOG_DEBUG("Set STATS MODE %s for FC %s", mode.c_str(), fc.m_instanceId.c_str());
+        m_statsMode = SAI_STATS_MODE_READ_AND_CLEAR;
+
+        SWSS_LOG_DEBUG("Set STATS MODE %s for FC %s", mode.c_str(), m_instanceId.c_str());
     }
     else
     {
         SWSS_LOG_WARN("Input value %s is not supported for Flex counter stats mode, enter STATS_MODE_READ or STATS_MODE_READ_AND_CLEAR", mode.c_str());
     }
- }
+}
 
 void FlexCounter::addCollectCountersHandler(const std::string &key, const collect_counters_handler_t &handler)
 {
@@ -174,24 +168,18 @@ void FlexCounter::removeCollectCountersHandler(const std::string &key)
 void FlexCounter::setPortCounterList(
         _In_ sai_object_id_t portVid,
         _In_ sai_object_id_t portId,
-        _In_ std::string instanceId,
         _In_ const std::vector<sai_port_stat_t> &counterIds)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
-
-    // Initialize the supported counters list before setting
-    if (supportedPortCounters.size() == 0)
-    {
-        fc.saiUpdateSupportedPortCounters(portId);
-    }
+    updateSupportedPortCounters(portId);
 
     // Remove unsupported counters
     std::vector<sai_port_stat_t> supportedIds;
+
     for (auto &counter : counterIds)
     {
-        if (fc.isPortCounterSupported(counter))
+        if (isPortCounterSupported(counter))
         {
             supportedIds.push_back(counter);
         }
@@ -200,102 +188,74 @@ void FlexCounter::setPortCounterList(
     if (supportedIds.size() == 0)
     {
         SWSS_LOG_NOTICE("Port %s does not has supported counters", sai_serialize_object_id(portId).c_str());
-
-        // Remove flex counter if all counter IDs and plugins are unregistered
-        if (fc.isEmpty())
-        {
-            removeInstance(instanceId);
-        }
-
         return;
     }
 
-    std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
+    auto it = m_portCounterIdsMap.find(portVid);
 
-    auto it = fc.m_portCounterIdsMap.find(portVid);
-    if (it != fc.m_portCounterIdsMap.end())
+    if (it != m_portCounterIdsMap.end())
     {
-        (*it).second->portCounterIds = supportedIds;
+        it->second->portCounterIds = supportedIds;
         return;
     }
 
     auto portCounterIds = std::make_shared<PortCounterIds>(portId, supportedIds);
-    fc.m_portCounterIdsMap.emplace(portVid, portCounterIds);
 
-    fc.addCollectCountersHandler(PORT_COUNTER_ID_LIST, &FlexCounter::collectPortCounters);
+    m_portCounterIdsMap.emplace(portVid, portCounterIds);
 
-    // Start flex counter thread in case it was not running due to empty counter IDs map
-    if (fc.m_pollInterval > 0)
-    {
-        fc.startFlexCounterThread();
-    }
+    addCollectCountersHandler(PORT_COUNTER_ID_LIST, &FlexCounter::collectPortCounters);
+
+    startFlexCounterThread();
 }
 
 void FlexCounter::setPortDebugCounterList(
         _In_ sai_object_id_t portVid,
         _In_ sai_object_id_t portId,
-        _In_ std::string instanceId,
         _In_ const std::vector<sai_port_stat_t> &counterIds)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
-
     // Because debug counters can be added and removed over time, we currently
     // check that the provided list of counters is valid every time.
-    std::vector<sai_port_stat_t> supportedIds = fc.saiCheckSupportedPortDebugCounters(portId, counterIds);
+    auto supportedIds = saiCheckSupportedPortDebugCounters(portId, counterIds);
 
     if (supportedIds.size() == 0)
     {
         SWSS_LOG_NOTICE("Port %s does not have supported debug counters", sai_serialize_object_id(portId).c_str());
-
-        // Remove flex counter if all counter IDs and plugins are unregistered
-        if (fc.isEmpty())
-        {
-            removeInstance(instanceId);
-        }
-
         return;
     }
 
-    std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
+    auto it = m_portDebugCounterIdsMap.find(portVid);
 
-    auto it = fc.m_portDebugCounterIdsMap.find(portVid);
-    if (it != fc.m_portDebugCounterIdsMap.end())
+    if (it != m_portDebugCounterIdsMap.end())
     {
         it->second->portCounterIds = supportedIds;
         return;
     }
 
     auto portDebugCounterIds = std::make_shared<PortCounterIds>(portId, supportedIds);
-    fc.m_portDebugCounterIdsMap.emplace(portVid, portDebugCounterIds);
 
-    fc.addCollectCountersHandler(PORT_DEBUG_COUNTER_ID_LIST, &FlexCounter::collectPortDebugCounters);
+    m_portDebugCounterIdsMap.emplace(portVid, portDebugCounterIds);
 
-    // Start flex counter thread in case it was not running due to empty counter IDs map
-    if (fc.m_pollInterval > 0)
-    {
-        fc.startFlexCounterThread();
-    }
+    addCollectCountersHandler(PORT_DEBUG_COUNTER_ID_LIST, &FlexCounter::collectPortDebugCounters);
+
+    startFlexCounterThread();
 }
 
 void FlexCounter::setQueueCounterList(
         _In_ sai_object_id_t queueVid,
-        _In_ sai_object_id_t queueId,
-        _In_ std::string instanceId,
+        _In_ sai_object_id_t queueRid,
         _In_ const std::vector<sai_queue_stat_t> &counterIds)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
-
-    fc.saiUpdateSupportedQueueCounters(queueId, counterIds);
+    updateSupportedQueueCounters(queueRid, counterIds);
 
     // Remove unsupported counters
     std::vector<sai_queue_stat_t> supportedIds;
     for (auto &counter : counterIds)
     {
-        if (fc.isQueueCounterSupported(counter))
+        if (isQueueCounterSupported(counter))
         {
             supportedIds.push_back(counter);
         }
@@ -303,107 +263,82 @@ void FlexCounter::setQueueCounterList(
 
     if (supportedIds.size() == 0)
     {
-        SWSS_LOG_NOTICE("%s: queue %s does not has supported counters", instanceId.c_str(), sai_serialize_object_id(queueId).c_str());
-
-        // Remove flex counter if all counter IDs and plugins are unregistered
-        if (fc.isEmpty())
-        {
-            removeInstance(instanceId);
-        }
-
+        SWSS_LOG_NOTICE("%s: queue %s does not has supported counters", m_instanceId.c_str(), sai_serialize_object_id(queueRid).c_str());
         return;
     }
 
     // Check if queue is able to provide the statistic
     std::vector<uint64_t> queueStats(supportedIds.size());
-    sai_status_t status = g_vendorSai->getStats(SAI_OBJECT_TYPE_QUEUE,
-            queueId,
+
+    sai_status_t status = g_vendorSai->getStats(
+            SAI_OBJECT_TYPE_QUEUE,
+            queueRid,
             static_cast<uint32_t>(supportedIds.size()),
             (const sai_stat_id_t *)supportedIds.data(),
             queueStats.data());
 
     if (status != SAI_STATUS_SUCCESS)
     {
-        SWSS_LOG_ERROR("Queue %s can't provide the statistic",  sai_serialize_object_id(queueId).c_str());
-
-        // Remove flex counter if all counter IDs and plugins are unregistered
-        if (fc.isEmpty())
-        {
-            removeInstance(instanceId);
-        }
-
+        SWSS_LOG_ERROR("Queue RID %s can't provide the statistic",  sai_serialize_object_id(queueRid).c_str());
         return;
     }
 
-    std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
+    auto it = m_queueCounterIdsMap.find(queueVid);
 
-    auto it = fc.m_queueCounterIdsMap.find(queueVid);
-    if (it != fc.m_queueCounterIdsMap.end())
+    if (it != m_queueCounterIdsMap.end())
     {
-        (*it).second->queueCounterIds = supportedIds;
+        it->second->queueCounterIds = supportedIds;
         return;
     }
 
-    auto queueCounterIds = std::make_shared<QueueCounterIds>(queueId, supportedIds);
-    fc.m_queueCounterIdsMap.emplace(queueVid, queueCounterIds);
+    auto queueCounterIds = std::make_shared<QueueCounterIds>(queueRid, supportedIds);
 
-    fc.addCollectCountersHandler(QUEUE_COUNTER_ID_LIST, &FlexCounter::collectQueueCounters);
+    m_queueCounterIdsMap.emplace(queueVid, queueCounterIds);
 
-    // Start flex counter thread in case it was not running due to empty counter IDs map
-    if (fc.m_pollInterval > 0)
-    {
-        fc.startFlexCounterThread();
-    }
+    addCollectCountersHandler(QUEUE_COUNTER_ID_LIST, &FlexCounter::collectQueueCounters);
+
+    startFlexCounterThread();
 }
 
 void FlexCounter::setQueueAttrList(
         _In_ sai_object_id_t queueVid,
-        _In_ sai_object_id_t queueId,
-        _In_ std::string instanceId,
+        _In_ sai_object_id_t queueRid,
         _In_ const std::vector<sai_queue_attr_t> &attrIds)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
+    auto it = m_queueAttrIdsMap.find(queueVid);
 
-    std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
-
-    auto it = fc.m_queueAttrIdsMap.find(queueVid);
-    if (it != fc.m_queueAttrIdsMap.end())
+    if (it != m_queueAttrIdsMap.end())
     {
-        (*it).second->queueAttrIds = attrIds;
+        it->second->queueAttrIds = attrIds;
         return;
     }
 
-    auto queueAttrIds = std::make_shared<QueueAttrIds>(queueId, attrIds);
-    fc.m_queueAttrIdsMap.emplace(queueVid, queueAttrIds);
+    auto queueAttrIds = std::make_shared<QueueAttrIds>(queueRid, attrIds);
 
-    fc.addCollectCountersHandler(QUEUE_ATTR_ID_LIST, &FlexCounter::collectQueueAttrs);
+    m_queueAttrIdsMap.emplace(queueVid, queueAttrIds);
 
-    // Start flex counter thread in case it was not running due to empty counter IDs map
-    if (fc.m_pollInterval > 0)
-    {
-        fc.startFlexCounterThread();
-    }
+    addCollectCountersHandler(QUEUE_ATTR_ID_LIST, &FlexCounter::collectQueueAttrs);
+
+    startFlexCounterThread();
 }
 
 void FlexCounter::setPriorityGroupCounterList(
         _In_ sai_object_id_t priorityGroupVid,
-        _In_ sai_object_id_t priorityGroupId,
-        _In_ std::string instanceId,
+        _In_ sai_object_id_t priorityGroupRid,
         _In_ const std::vector<sai_ingress_priority_group_stat_t> &counterIds)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
-
-    fc.saiUpdateSupportedPriorityGroupCounters(priorityGroupId, counterIds);
+    updateSupportedPriorityGroupCounters(priorityGroupRid, counterIds);
 
     // Remove unsupported counters
     std::vector<sai_ingress_priority_group_stat_t> supportedIds;
+
     for (auto &counter : counterIds)
     {
-        if (fc.isPriorityGroupCounterSupported(counter))
+        if (isPriorityGroupCounterSupported(counter))
         {
             supportedIds.push_back(counter);
         }
@@ -411,159 +346,118 @@ void FlexCounter::setPriorityGroupCounterList(
 
     if (supportedIds.size() == 0)
     {
-        SWSS_LOG_NOTICE("%s: priority group %s does not have supported counters", instanceId.c_str(), sai_serialize_object_id(priorityGroupId).c_str());
-
-        // Remove flex counter if all counter IDs and plugins are unregistered
-        if (fc.isEmpty())
-        {
-            removeInstance(instanceId);
-        }
-
+        SWSS_LOG_NOTICE("%s: priority group %s does not have supported counters",
+                m_instanceId.c_str(),
+                sai_serialize_object_id(priorityGroupRid).c_str());
         return;
     }
 
     // Check if PG is able to provide the statistic
     std::vector<uint64_t> priorityGroupStats(supportedIds.size());
-    sai_status_t status = g_vendorSai->getStats(SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP,
-            priorityGroupId,
+
+    sai_status_t status = g_vendorSai->getStats(
+            SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP,
+            priorityGroupRid,
             static_cast<uint32_t>(supportedIds.size()),
             (const sai_stat_id_t *)supportedIds.data(),
             priorityGroupStats.data());
 
     if (status != SAI_STATUS_SUCCESS)
     {
-        SWSS_LOG_ERROR("Priority group %s can't provide the statistic",  sai_serialize_object_id(priorityGroupId).c_str());
-
-        // Remove flex counter if all counter IDs and plugins are unregistered
-        if (fc.isEmpty())
-        {
-            removeInstance(instanceId);
-        }
-
+        SWSS_LOG_ERROR("Priority group %s can't provide the statistic",  sai_serialize_object_id(priorityGroupRid).c_str());
         return;
     }
 
-    std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
+    auto it = m_priorityGroupCounterIdsMap.find(priorityGroupVid);
 
-    auto it = fc.m_priorityGroupCounterIdsMap.find(priorityGroupVid);
-    if (it != fc.m_priorityGroupCounterIdsMap.end())
+    if (it != m_priorityGroupCounterIdsMap.end())
     {
-        (*it).second->priorityGroupCounterIds = supportedIds;
+        it->second->priorityGroupCounterIds = supportedIds;
         return;
     }
 
-    auto priorityGroupCounterIds = std::make_shared<IngressPriorityGroupCounterIds>(priorityGroupId, supportedIds);
-    fc.m_priorityGroupCounterIdsMap.emplace(priorityGroupVid, priorityGroupCounterIds);
+    auto priorityGroupCounterIds = std::make_shared<IngressPriorityGroupCounterIds>(priorityGroupRid, supportedIds);
 
-    fc.addCollectCountersHandler(PG_COUNTER_ID_LIST, &FlexCounter::collectPriorityGroupCounters);
+    m_priorityGroupCounterIdsMap.emplace(priorityGroupVid, priorityGroupCounterIds);
 
-    // Start flex counter thread in case it was not running due to empty counter IDs map
-    if (fc.m_pollInterval > 0)
-    {
-        fc.startFlexCounterThread();
-    }
+    addCollectCountersHandler(PG_COUNTER_ID_LIST, &FlexCounter::collectPriorityGroupCounters);
+
+    startFlexCounterThread();
 }
 
 void FlexCounter::setSwitchDebugCounterList(
         _In_ sai_object_id_t switchVid,
-        _In_ sai_object_id_t switchId,
-        _In_ std::string instanceId,
+        _In_ sai_object_id_t switchRid,
         _In_ const std::vector<sai_switch_stat_t> &counterIds)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
-
     // Because debug counters can be added and removed over time, we currently
     // check that the provided list of counters is valid every time.
-    std::vector<sai_switch_stat_t> supportedIds = fc.saiCheckSupportedSwitchDebugCounters(switchId, counterIds);
+    std::vector<sai_switch_stat_t> supportedIds = saiCheckSupportedSwitchDebugCounters(switchRid, counterIds);
 
     if (supportedIds.size() == 0)
     {
-        SWSS_LOG_NOTICE("Switch %s does not have supported debug counters", sai_serialize_object_id(switchId).c_str());
-
-        // Remove flex counter if all counter IDs and plugins are unregistered
-        if (fc.isEmpty())
-        {
-            removeInstance(instanceId);
-        }
-
+        SWSS_LOG_NOTICE("Switch %s does not have supported debug counters", sai_serialize_object_id(switchRid).c_str());
         return;
     }
 
-    std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
+    auto it = m_switchDebugCounterIdsMap.find(switchVid);
 
-    auto it = fc.m_switchDebugCounterIdsMap.find(switchVid);
-    if (it != fc.m_switchDebugCounterIdsMap.end())
+    if (it != m_switchDebugCounterIdsMap.end())
     {
         it->second->switchCounterIds = supportedIds;
         return;
     }
 
-    auto switchDebugCounterIds = std::make_shared<SwitchCounterIds>(switchId, supportedIds);
-    fc.m_switchDebugCounterIdsMap.emplace(switchVid, switchDebugCounterIds);
+    auto switchDebugCounterIds = std::make_shared<SwitchCounterIds>(switchRid, supportedIds);
 
-    fc.addCollectCountersHandler(SWITCH_DEBUG_COUNTER_ID_LIST, &FlexCounter::collectSwitchDebugCounters);
+    m_switchDebugCounterIdsMap.emplace(switchVid, switchDebugCounterIds);
 
-    // Start flex counter thread in case it was not running due to empty counter IDs map
-    if (fc.m_pollInterval > 0)
-    {
-        fc.startFlexCounterThread();
-    }
+    addCollectCountersHandler(SWITCH_DEBUG_COUNTER_ID_LIST, &FlexCounter::collectSwitchDebugCounters);
+
+    startFlexCounterThread();
 }
 
 void FlexCounter::setPriorityGroupAttrList(
         _In_ sai_object_id_t priorityGroupVid,
-        _In_ sai_object_id_t priorityGroupId,
-        _In_ std::string instanceId,
+        _In_ sai_object_id_t priorityGroupRid,
         _In_ const std::vector<sai_ingress_priority_group_attr_t> &attrIds)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
+    auto it = m_priorityGroupAttrIdsMap.find(priorityGroupVid);
 
-    std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
-
-    auto it = fc.m_priorityGroupAttrIdsMap.find(priorityGroupVid);
-    if (it != fc.m_priorityGroupAttrIdsMap.end())
+    if (it != m_priorityGroupAttrIdsMap.end())
     {
-        (*it).second->priorityGroupAttrIds = attrIds;
+        it->second->priorityGroupAttrIds = attrIds;
         return;
     }
 
-    auto priorityGroupAttrIds = std::make_shared<IngressPriorityGroupAttrIds>(priorityGroupId, attrIds);
-    fc.m_priorityGroupAttrIdsMap.emplace(priorityGroupVid, priorityGroupAttrIds);
+    auto priorityGroupAttrIds = std::make_shared<IngressPriorityGroupAttrIds>(priorityGroupRid, attrIds);
 
-    fc.addCollectCountersHandler(PG_ATTR_ID_LIST, &FlexCounter::collectPriorityGroupAttrs);
+    m_priorityGroupAttrIdsMap.emplace(priorityGroupVid, priorityGroupAttrIds);
 
-    // Start flex counter thread in case it was not running due to empty counter IDs map
-    if (fc.m_pollInterval > 0)
-    {
-        fc.startFlexCounterThread();
-    }
+    addCollectCountersHandler(PG_ATTR_ID_LIST, &FlexCounter::collectPriorityGroupAttrs);
+
+    startFlexCounterThread();
 }
 
 void FlexCounter::setRifCounterList(
         _In_ sai_object_id_t rifVid,
-        _In_ sai_object_id_t rifId,
-        _In_ std::string instanceId,
+        _In_ sai_object_id_t rifRid,
         _In_ const std::vector<sai_router_interface_stat_t> &counterIds)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
-
-    // Initialize the supported counters list before setting
-    if (supportedRifCounters.empty())
-    {
-        fc.saiUpdateSupportedRifCounters(rifId);
-    }
+    updateSupportedRifCounters(rifRid);
 
     // Remove unsupported counters
     std::vector<sai_router_interface_stat_t> supportedIds;
+
     for (auto &counter : counterIds)
     {
-        if (fc.isRifCounterSupported(counter))
+        if (isRifCounterSupported(counter))
         {
             supportedIds.push_back(counter);
         }
@@ -571,50 +465,37 @@ void FlexCounter::setRifCounterList(
 
     if (supportedIds.empty())
     {
-        SWSS_LOG_NOTICE("Router interface %s does not have supported counters", sai_serialize_object_id(rifId).c_str());
-
-        // Remove flex counter if all counter IDs and plugins are unregistered
-        if (fc.isEmpty())
-        {
-            removeInstance(instanceId);
-        }
-
+        SWSS_LOG_NOTICE("Router interface %s does not have supported counters", sai_serialize_object_id(rifRid).c_str());
         return;
     }
 
-    std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
+    auto it = m_rifCounterIdsMap.find(rifVid);
 
-    auto it = fc.m_rifCounterIdsMap.find(rifVid);
-    if (it != fc.m_rifCounterIdsMap.end())
+    if (it != m_rifCounterIdsMap.end())
     {
-        (*it).second->rifCounterIds = supportedIds;
+        it->second->rifCounterIds = supportedIds;
         return;
     }
 
-    auto rifCounterIds = std::make_shared<RifCounterIds>(rifId, supportedIds);
-    fc.m_rifCounterIdsMap.emplace(rifVid, rifCounterIds);
+    auto rifCounterIds = std::make_shared<RifCounterIds>(rifRid, supportedIds);
 
-    fc.addCollectCountersHandler(RIF_COUNTER_ID_LIST, &FlexCounter::collectRifCounters);
+    m_rifCounterIdsMap.emplace(rifVid, rifCounterIds);
 
-    // Start flex counter thread in case it was not running due to empty counter IDs map
-    if (fc.m_pollInterval > 0)
-    {
-        fc.startFlexCounterThread();
-    }
+    addCollectCountersHandler(RIF_COUNTER_ID_LIST, &FlexCounter::collectRifCounters);
+
+    startFlexCounterThread();
 }
 
 void FlexCounter::setBufferPoolCounterList(
         _In_ sai_object_id_t bufferPoolVid,
         _In_ sai_object_id_t bufferPoolId,
-        _In_ const std::string &instanceId,
         _In_ const std::vector<sai_buffer_pool_stat_t> &counterIds,
         _In_ const std::string &statsMode)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
-
     sai_stats_mode_t bufferPoolStatsMode = SAI_STATS_MODE_READ_AND_CLEAR;
+
     if (statsMode == STATS_MODE_READ_AND_CLEAR)
     {
         bufferPoolStatsMode = SAI_STATS_MODE_READ_AND_CLEAR;
@@ -628,13 +509,14 @@ void FlexCounter::setBufferPoolCounterList(
         SWSS_LOG_WARN("Stats mode %s not supported for flex counter. Using STATS_MODE_READ_AND_CLEAR", statsMode.c_str());
     }
 
-    fc.saiUpdateSupportedBufferPoolCounters(bufferPoolId, counterIds, bufferPoolStatsMode);
+    updateSupportedBufferPoolCounters(bufferPoolId, counterIds, bufferPoolStatsMode);
 
     // Filter unsupported counters
     std::vector<sai_buffer_pool_stat_t> supportedIds;
+
     for (auto counterId : counterIds)
     {
-        if (fc.isBufferPoolCounterSupported(counterId))
+        if (isBufferPoolCounterSupported(counterId))
         {
             supportedIds.push_back(counterId);
         }
@@ -643,190 +525,141 @@ void FlexCounter::setBufferPoolCounterList(
     if (supportedIds.size() == 0)
     {
         SWSS_LOG_NOTICE("Buffer pool %s does not has supported counters", sai_serialize_object_id(bufferPoolId).c_str());
-
-        // Remove flex counter if all counter IDs and plugins are unregistered
-        if (fc.isEmpty())
-        {
-            removeInstance(instanceId);
-        }
-
         return;
     }
 
-    std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
+    auto it = m_bufferPoolCounterIdsMap.find(bufferPoolVid);
 
-    auto it = fc.m_bufferPoolCounterIdsMap.find(bufferPoolVid);
-    if (it != fc.m_bufferPoolCounterIdsMap.end())
+    if (it != m_bufferPoolCounterIdsMap.end())
     {
         it->second->bufferPoolCounterIds = supportedIds;
         return;
     }
 
     auto bufferPoolCounterIds = std::make_shared<BufferPoolCounterIds>(bufferPoolId, supportedIds, bufferPoolStatsMode);
-    fc.m_bufferPoolCounterIdsMap.emplace(bufferPoolVid, bufferPoolCounterIds);
 
-    fc.addCollectCountersHandler(BUFFER_POOL_COUNTER_ID_LIST, &FlexCounter::collectBufferPoolCounters);
+    m_bufferPoolCounterIdsMap.emplace(bufferPoolVid, bufferPoolCounterIds);
 
-    // Start flex counter thread in case it was not running due to empty counter IDs map
-    if (fc.m_pollInterval > 0)
-    {
-        fc.startFlexCounterThread();
-    }
+    addCollectCountersHandler(BUFFER_POOL_COUNTER_ID_LIST, &FlexCounter::collectBufferPoolCounters);
+
+    startFlexCounterThread();
 }
 
 void FlexCounter::removePort(
-        _In_ sai_object_id_t portVid,
-        _In_ std::string instanceId)
+        _In_ sai_object_id_t portVid)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
+    auto it = m_portCounterIdsMap.find(portVid);
 
-    std::unique_lock<std::mutex> lkMgr(fc.m_mtx);
-
-    auto it = fc.m_portCounterIdsMap.find(portVid);
-    if (it == fc.m_portCounterIdsMap.end())
+    if (it == m_portCounterIdsMap.end())
     {
         SWSS_LOG_NOTICE("Trying to remove nonexisting port counter Ids 0x%" PRIx64, portVid);
-
-        // Remove flex counter if all counter IDs and plugins are unregistered
-        if (fc.isEmpty())
-        {
-            lkMgr.unlock();
-            removeInstance(instanceId);
-        }
         return;
     }
 
-    fc.m_portCounterIdsMap.erase(it);
-    if (fc.m_portCounterIdsMap.empty())
-    {
-        fc.removeCollectCountersHandler(PORT_COUNTER_ID_LIST);
-    }
+    m_portCounterIdsMap.erase(it);
 
-    // Remove flex counter if all counter IDs and plugins are unregistered
-    if (fc.isEmpty())
+    if (m_portCounterIdsMap.empty())
     {
-        lkMgr.unlock();
-        removeInstance(instanceId);
+        removeCollectCountersHandler(PORT_COUNTER_ID_LIST);
     }
 }
 
 void FlexCounter::removePortDebugCounters(
-        _In_ sai_object_id_t portVid,
-        _In_ std::string instanceId)
+        _In_ sai_object_id_t portVid)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
+    auto it = m_portDebugCounterIdsMap.find(portVid);
 
-    std::unique_lock<std::mutex> lkMgr(fc.m_mtx);
-
-    auto it = fc.m_portDebugCounterIdsMap.find(portVid);
-    if (it == fc.m_portDebugCounterIdsMap.end())
+    if (it == m_portDebugCounterIdsMap.end())
     {
         SWSS_LOG_NOTICE("Trying to remove nonexisting port debug counter Ids 0x%" PRIx64, portVid);
-
-        // Remove flex counter if all counter IDs and plugins are unregistered
-        if (fc.isEmpty())
-        {
-            lkMgr.unlock();
-            removeInstance(instanceId);
-        }
         return;
     }
 
-    fc.m_portDebugCounterIdsMap.erase(it);
-    if (fc.m_portDebugCounterIdsMap.empty())
-    {
-        fc.removeCollectCountersHandler(PORT_DEBUG_COUNTER_ID_LIST);
-    }
+    m_portDebugCounterIdsMap.erase(it);
 
-    // Remove flex counter if all counter IDs and plugins are unregistered
-    if (fc.isEmpty())
+    if (m_portDebugCounterIdsMap.empty())
     {
-        lkMgr.unlock();
-        removeInstance(instanceId);
+        removeCollectCountersHandler(PORT_DEBUG_COUNTER_ID_LIST);
     }
 }
 
 void FlexCounter::removeQueue(
-        _In_ sai_object_id_t queueVid,
-        _In_ std::string instanceId)
+        _In_ sai_object_id_t queueVid)
 {
     SWSS_LOG_ENTER();
 
     bool found = false;
-    FlexCounter &fc = getInstance(instanceId);
 
-    std::unique_lock<std::mutex> lkMgr(fc.m_mtx);
+    auto counterIter = m_queueCounterIdsMap.find(queueVid);
 
-    auto counterIter = fc.m_queueCounterIdsMap.find(queueVid);
-    if (counterIter != fc.m_queueCounterIdsMap.end())
+    if (counterIter != m_queueCounterIdsMap.end())
     {
-        fc.m_queueCounterIdsMap.erase(counterIter);
-        if (fc.m_queueCounterIdsMap.empty())
+        m_queueCounterIdsMap.erase(counterIter);
+
+        if (m_queueCounterIdsMap.empty())
         {
-            fc.removeCollectCountersHandler(QUEUE_COUNTER_ID_LIST);
+            removeCollectCountersHandler(QUEUE_COUNTER_ID_LIST);
         }
+
         found = true;
     }
 
-    auto attrIter = fc.m_queueAttrIdsMap.find(queueVid);
-    if (attrIter != fc.m_queueAttrIdsMap.end())
+    auto attrIter = m_queueAttrIdsMap.find(queueVid);
+
+    if (attrIter != m_queueAttrIdsMap.end())
     {
-        fc.m_queueAttrIdsMap.erase(attrIter);
-        if (fc.m_queueAttrIdsMap.empty())
+        m_queueAttrIdsMap.erase(attrIter);
+
+        if (m_queueAttrIdsMap.empty())
         {
-            fc.removeCollectCountersHandler(QUEUE_ATTR_ID_LIST);
+            removeCollectCountersHandler(QUEUE_ATTR_ID_LIST);
         }
+
         found = true;
     }
 
     if (!found)
     {
         SWSS_LOG_NOTICE("Trying to remove nonexisting queue from flex counter 0x%" PRIx64, queueVid);
-        return;
-    }
-
-    // Remove flex counter if all counter IDs and plugins are unregistered
-    if (fc.isEmpty())
-    {
-        lkMgr.unlock();
-        removeInstance(instanceId);
     }
 }
 
 void FlexCounter::removePriorityGroup(
-        _In_ sai_object_id_t priorityGroupVid,
-        _In_ std::string instanceId)
+        _In_ sai_object_id_t priorityGroupVid)
 {
     SWSS_LOG_ENTER();
 
     bool found = false;
-    FlexCounter &fc = getInstance(instanceId);
 
-    std::unique_lock<std::mutex> lkMgr(fc.m_mtx);
+    auto counterIter = m_priorityGroupCounterIdsMap.find(priorityGroupVid);
 
-    auto counterIter = fc.m_priorityGroupCounterIdsMap.find(priorityGroupVid);
-    if (counterIter != fc.m_priorityGroupCounterIdsMap.end())
+    if (counterIter != m_priorityGroupCounterIdsMap.end())
     {
-        fc.m_priorityGroupCounterIdsMap.erase(counterIter);
-        if (fc.m_priorityGroupCounterIdsMap.empty())
+        m_priorityGroupCounterIdsMap.erase(counterIter);
+
+        if (m_priorityGroupCounterIdsMap.empty())
         {
-            fc.removeCollectCountersHandler(PG_COUNTER_ID_LIST);
+            removeCollectCountersHandler(PG_COUNTER_ID_LIST);
         }
+
         found = true;
     }
 
-    auto attrIter = fc.m_priorityGroupAttrIdsMap.find(priorityGroupVid);
-    if (attrIter != fc.m_priorityGroupAttrIdsMap.end())
+    auto attrIter = m_priorityGroupAttrIdsMap.find(priorityGroupVid);
+
+    if (attrIter != m_priorityGroupAttrIdsMap.end())
     {
-        fc.m_priorityGroupAttrIdsMap.erase(attrIter);
-        if (fc.m_priorityGroupAttrIdsMap.empty())
+        m_priorityGroupAttrIdsMap.erase(attrIter);
+
+        if (m_priorityGroupAttrIdsMap.empty())
         {
-            fc.removeCollectCountersHandler(PG_ATTR_ID_LIST);
+            removeCollectCountersHandler(PG_ATTR_ID_LIST);
         }
+
         found = true;
     }
 
@@ -835,285 +668,205 @@ void FlexCounter::removePriorityGroup(
         SWSS_LOG_NOTICE("Trying to remove nonexisting PG from flex counter 0x%" PRIx64, priorityGroupVid);
         return;
     }
-
-    // Remove flex counter if all counter IDs and plugins are unregistered
-    if (fc.isEmpty())
-    {
-        lkMgr.unlock();
-        removeInstance(instanceId);
-    }
 }
 
 void FlexCounter::removeRif(
-        _In_ sai_object_id_t rifVid,
-        _In_ std::string instanceId)
+        _In_ sai_object_id_t rifVid)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
+    auto it = m_rifCounterIdsMap.find(rifVid);
 
-    std::unique_lock<std::mutex> lkMgr(fc.m_mtx);
-
-    auto it = fc.m_rifCounterIdsMap.find(rifVid);
-    if (it == fc.m_rifCounterIdsMap.end())
+    if (it == m_rifCounterIdsMap.end())
     {
         SWSS_LOG_NOTICE("Trying to remove nonexisting router interface counter from Id 0x%" PRIx64, rifVid);
-
-        // Remove flex counter if all counter IDs and plugins are unregistered
-        if (fc.isEmpty())
-        {
-            lkMgr.unlock();
-            removeInstance(instanceId);
-        }
         return;
     }
 
-    fc.m_rifCounterIdsMap.erase(it);
-    if (fc.m_rifCounterIdsMap.empty())
-    {
-        fc.removeCollectCountersHandler(RIF_COUNTER_ID_LIST);
-    }
+    m_rifCounterIdsMap.erase(it);
 
-    // Remove flex counter if all counter IDs and plugins are unregistered
-    if (fc.isEmpty())
+    if (m_rifCounterIdsMap.empty())
     {
-        lkMgr.unlock();
-        removeInstance(instanceId);
+        removeCollectCountersHandler(RIF_COUNTER_ID_LIST);
     }
 }
 
 void FlexCounter::removeBufferPool(
-        _In_ sai_object_id_t bufferPoolVid,
-        _In_ std::string instanceId)
+        _In_ sai_object_id_t bufferPoolVid)
 {
     SWSS_LOG_ENTER();
 
     bool found = false;
-    FlexCounter &fc = getInstance(instanceId);
 
-    std::unique_lock<std::mutex> lkMgr(fc.m_mtx);
+    auto it = m_bufferPoolCounterIdsMap.find(bufferPoolVid);
 
-    auto it = fc.m_bufferPoolCounterIdsMap.find(bufferPoolVid);
-    if (it != fc.m_bufferPoolCounterIdsMap.end())
+    if (it != m_bufferPoolCounterIdsMap.end())
     {
-        fc.m_bufferPoolCounterIdsMap.erase(it);
-        if (fc.m_bufferPoolCounterIdsMap.empty())
+        m_bufferPoolCounterIdsMap.erase(it);
+
+        if (m_bufferPoolCounterIdsMap.empty())
         {
-            fc.removeCollectCountersHandler(BUFFER_POOL_COUNTER_ID_LIST);
+            removeCollectCountersHandler(BUFFER_POOL_COUNTER_ID_LIST);
         }
         found = true;
     }
 
     if (!found)
     {
-        SWSS_LOG_NOTICE("Trying to remove nonexisting buffer pool 0x%" PRIx64 " from flex counter %s", bufferPoolVid, fc.m_instanceId.c_str());
-        return;
-    }
-
-    // Remove flex counter if all counter IDs and plugins are unregistered
-    if (fc.isEmpty())
-    {
-        lkMgr.unlock();
-        removeInstance(instanceId);
+        SWSS_LOG_NOTICE("Trying to remove nonexisting buffer pool 0x%" PRIx64 " from flex counter %s", bufferPoolVid, m_instanceId.c_str());
     }
 }
 
 void FlexCounter::removeSwitchDebugCounters(
-        _In_ sai_object_id_t switchVid,
-        _In_ std::string instanceId)
+        _In_ sai_object_id_t switchVid)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
+    auto it = m_switchDebugCounterIdsMap.find(switchVid);
 
-    std::unique_lock<std::mutex> lkMgr(fc.m_mtx);
-
-    auto it = fc.m_switchDebugCounterIdsMap.find(switchVid);
-    if (it == fc.m_switchDebugCounterIdsMap.end())
+    if (it == m_switchDebugCounterIdsMap.end())
     {
         SWSS_LOG_NOTICE("Trying to remove nonexisting switch debug counter Ids 0x%" PRIx64, switchVid);
-
-        // Remove flex counter if all counter IDs and plugins are unregistered
-        if (fc.isEmpty())
-        {
-            lkMgr.unlock();
-            removeInstance(instanceId);
-        }
         return;
     }
 
-    fc.m_switchDebugCounterIdsMap.erase(it);
-    if (fc.m_switchDebugCounterIdsMap.empty())
-    {
-        fc.removeCollectCountersHandler(SWITCH_DEBUG_COUNTER_ID_LIST);
-    }
+    m_switchDebugCounterIdsMap.erase(it);
 
-    // Remove flex counter if all counter IDs and plugins are unregistered
-    if (fc.isEmpty())
+    if (m_switchDebugCounterIdsMap.empty())
     {
-        lkMgr.unlock();
-        removeInstance(instanceId);
+        removeCollectCountersHandler(SWITCH_DEBUG_COUNTER_ID_LIST);
+    }
+}
+
+void FlexCounter::checkPluginRegistered(
+        _In_ const std::string& sha) const
+{
+    SWSS_LOG_ENTER();
+
+    if (
+            m_portPlugins.find(sha) != m_portPlugins.end() ||
+            m_queuePlugins.find(sha) != m_queuePlugins.end() ||
+            m_priorityGroupPlugins.find(sha) != m_priorityGroupPlugins.end() ||
+            m_bufferPoolPlugins.find(sha) != m_bufferPoolPlugins.end()
+       )
+    {
+        SWSS_LOG_ERROR("Plugin %s already registered", sha.c_str());
     }
 }
 
 void FlexCounter::addPortCounterPlugin(
-        _In_ std::string sha,
-        _In_ std::string instanceId)
+        _In_ const std::string& sha)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
+    checkPluginRegistered(sha);
 
-    std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
+    m_portPlugins.insert(sha);
 
-    if (fc.m_portPlugins.find(sha) != fc.m_portPlugins.end() ||
-            fc.m_queuePlugins.find(sha) != fc.m_queuePlugins.end() ||
-            fc.m_priorityGroupPlugins.find(sha) != fc.m_priorityGroupPlugins.end())
-    {
-        SWSS_LOG_ERROR("Plugin %s already registered", sha.c_str());
-    }
-
-    fc.m_portPlugins.insert(sha);
     SWSS_LOG_NOTICE("Port counters plugin %s registered", sha.c_str());
 }
 
 void FlexCounter::addQueueCounterPlugin(
-        _In_ std::string sha,
-        _In_ std::string instanceId)
+        _In_ const std::string& sha)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
+    checkPluginRegistered(sha);
 
-    std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
+    m_queuePlugins.insert(sha);
 
-    if (fc.m_portPlugins.find(sha) != fc.m_portPlugins.end() ||
-            fc.m_queuePlugins.find(sha) != fc.m_queuePlugins.end() ||
-            fc.m_priorityGroupPlugins.find(sha) != fc.m_priorityGroupPlugins.end())
-    {
-        SWSS_LOG_ERROR("Plugin %s already registered", sha.c_str());
-    }
-
-    fc.m_queuePlugins.insert(sha);
     SWSS_LOG_NOTICE("Queue counters plugin %s registered", sha.c_str());
 }
 
 void FlexCounter::addPriorityGroupCounterPlugin(
-        _In_ std::string sha,
-        _In_ std::string instanceId)
+        _In_ const std::string& sha)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
+    checkPluginRegistered(sha);
 
-    std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
+    m_priorityGroupPlugins.insert(sha);
 
-    if (fc.m_portPlugins.find(sha) != fc.m_portPlugins.end() ||
-            fc.m_queuePlugins.find(sha) != fc.m_queuePlugins.end() ||
-            fc.m_priorityGroupPlugins.find(sha) != fc.m_priorityGroupPlugins.end())
-    {
-        SWSS_LOG_ERROR("Plugin %s already registered", sha.c_str());
-    }
-
-    fc.m_priorityGroupPlugins.insert(sha);
     SWSS_LOG_NOTICE("Priority group counters plugin %s registered", sha.c_str());
 }
 
 void FlexCounter::addBufferPoolCounterPlugin(
-        _In_ std::string sha,
-        _In_ std::string instanceId)
+        _In_ const std::string& sha)
 {
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
+    checkPluginRegistered(sha);
 
-    std::lock_guard<std::mutex> lkMgr(fc.m_mtx);
+    m_bufferPoolPlugins.insert(sha);
 
-    if (fc.m_bufferPoolPlugins.find(sha) != fc.m_bufferPoolPlugins.end())
-    {
-        SWSS_LOG_ERROR("Plugin %s already registered", sha.c_str());
-    }
-
-    fc.m_bufferPoolPlugins.insert(sha);
     SWSS_LOG_NOTICE("Buffer pool counters plugin %s registered", sha.c_str());
 }
 
-void FlexCounter::removeCounterPlugin(
-        _In_ std::string instanceId)
+void FlexCounter::removeCounterPlugins()
 {
+    MUTEX;
+
     SWSS_LOG_ENTER();
 
-    FlexCounter &fc = getInstance(instanceId);
-
-    std::unique_lock<std::mutex> lkMgr(fc.m_mtx);
-
-    fc.m_queuePlugins.clear();
-    fc.m_portPlugins.clear();
-    fc.m_priorityGroupPlugins.clear();
-    fc.m_bufferPoolPlugins.clear();
-
-    // Remove flex counter if all counter IDs and plugins are unregistered
-    if (fc.isEmpty())
-    {
-        lkMgr.unlock();
-        removeInstance(instanceId);
-    }
+    m_queuePlugins.clear();
+    m_portPlugins.clear();
+    m_priorityGroupPlugins.clear();
+    m_bufferPoolPlugins.clear();
 }
 
 void FlexCounter::addCounterPlugin(
-        _In_ const std::string& groupName,
         _In_ const std::vector<swss::FieldValueTuple>& values)
 {
+    MUTEX;
+
     SWSS_LOG_ENTER();
 
-    for (const auto& valuePair : values)
+    for (auto& fvt: values)
     {
-        const auto field = fvField(valuePair);
-        const auto value = fvValue(valuePair);
+        auto& field = fvField(fvt);
+        auto& value = fvValue(fvt);
+
+        auto shaStrings = swss::tokenize(value, ',');
 
         if (field == POLL_INTERVAL_FIELD)
         {
-            FlexCounter::setPollInterval(stoi(value), groupName);
+            setPollInterval(stoi(value));
+        }
+        else if (field == FLEX_COUNTER_STATUS_FIELD)
+        {
+            setStatus(value);
+        }
+        else if (field == STATS_MODE_FIELD)
+        {
+            setStatsMode(value);
         }
         else if (field == QUEUE_PLUGIN_FIELD)
         {
-            auto shaStrings = swss::tokenize(value, ',');
-            for (const auto &sha : shaStrings)
+            for (auto& sha: shaStrings)
             {
-                FlexCounter::addQueueCounterPlugin(sha, groupName);
+                addQueueCounterPlugin(sha);
             }
         }
         else if (field == PG_PLUGIN_FIELD)
         {
-            auto shaStrings = swss::tokenize(value, ',');
-            for (const auto &sha : shaStrings)
+            for (auto& sha: shaStrings)
             {
-                FlexCounter::addPriorityGroupCounterPlugin(sha, groupName);
+                addPriorityGroupCounterPlugin(sha);
             }
         }
         else if (field == PORT_PLUGIN_FIELD)
         {
-            auto shaStrings = swss::tokenize(value, ',');
-            for (const auto &sha : shaStrings)
+            for (auto& sha: shaStrings)
             {
-                FlexCounter::addPortCounterPlugin(sha, groupName);
+                addPortCounterPlugin(sha);
             }
         }
         else if (field == BUFFER_POOL_PLUGIN_FIELD)
         {
-            auto shaStrings = swss::tokenize(value, ',');
-            for (const auto &sha : shaStrings)
+            for (auto& sha: shaStrings)
             {
-                FlexCounter::addBufferPoolCounterPlugin(sha, groupName);
+                addBufferPoolCounterPlugin(sha);
             }
-        }
-        else if (field == FLEX_COUNTER_STATUS_FIELD)
-        {
-            FlexCounter::updateFlexCounterStatus(value, groupName);
-        }
-        else if (field == STATS_MODE_FIELD)
-        {
-            FlexCounter::updateFlexCounterStatsMode(value, groupName);
         }
         else
         {
@@ -1121,14 +874,6 @@ void FlexCounter::addCounterPlugin(
         }
     }
 }
-
-void FlexCounter::removeAllCounters()
-{
-    SWSS_LOG_ENTER();
-
-    g_flex_counters_map.clear();
-}
-
 
 FlexCounter::~FlexCounter(void)
 {
@@ -1139,94 +884,75 @@ FlexCounter::~FlexCounter(void)
 
 bool FlexCounter::isEmpty()
 {
+    MUTEX;
+
     SWSS_LOG_ENTER();
 
     return allIdsEmpty() && allPluginsEmpty();
 }
 
-bool FlexCounter::allIdsEmpty()
+bool FlexCounter::allIdsEmpty() const
 {
     SWSS_LOG_ENTER();
 
     return m_priorityGroupCounterIdsMap.empty() &&
-           m_priorityGroupAttrIdsMap.empty() &&
-           m_queueCounterIdsMap.empty() &&
-           m_queueAttrIdsMap.empty() &&
-           m_portCounterIdsMap.empty() &&
-           m_portDebugCounterIdsMap.empty() &&
-           m_rifCounterIdsMap.empty() &&
-           m_bufferPoolCounterIdsMap.empty() &&
-           m_switchDebugCounterIdsMap.empty();
+        m_priorityGroupAttrIdsMap.empty() &&
+        m_queueCounterIdsMap.empty() &&
+        m_queueAttrIdsMap.empty() &&
+        m_portCounterIdsMap.empty() &&
+        m_portDebugCounterIdsMap.empty() &&
+        m_rifCounterIdsMap.empty() &&
+        m_bufferPoolCounterIdsMap.empty() &&
+        m_switchDebugCounterIdsMap.empty();
 }
 
-bool FlexCounter::allPluginsEmpty()
+bool FlexCounter::allPluginsEmpty() const
 {
     SWSS_LOG_ENTER();
 
     return m_priorityGroupPlugins.empty() &&
-           m_queuePlugins.empty() &&
-           m_portPlugins.empty() &&
-           m_bufferPoolPlugins.empty();
+        m_queuePlugins.empty() &&
+        m_portPlugins.empty() &&
+        m_bufferPoolPlugins.empty();
 }
 
 bool FlexCounter::isPortCounterSupported(sai_port_stat_t counter) const
 {
     SWSS_LOG_ENTER();
 
-    return supportedPortCounters.count(counter) != 0;
+    return m_supportedPortCounters.count(counter) != 0;
 }
 
-bool FlexCounter::isQueueCounterSupported(sai_queue_stat_t counter) const
+bool FlexCounter::isQueueCounterSupported(
+        _In_ sai_queue_stat_t counter) const
 {
     SWSS_LOG_ENTER();
 
-    return supportedQueueCounters.count(counter) != 0;
+    return m_supportedQueueCounters.count(counter) != 0;
 }
 
-bool FlexCounter::isPriorityGroupCounterSupported(sai_ingress_priority_group_stat_t counter) const
+bool FlexCounter::isPriorityGroupCounterSupported(
+        _In_ sai_ingress_priority_group_stat_t counter) const
 {
     SWSS_LOG_ENTER();
 
-    return supportedPriorityGroupCounters.count(counter) != 0;
+    return m_supportedPriorityGroupCounters.count(counter) != 0;
 }
 
-bool FlexCounter::isRifCounterSupported(sai_router_interface_stat_t counter) const
+bool FlexCounter::isRifCounterSupported(
+        _In_ sai_router_interface_stat_t counter) const
 {
     SWSS_LOG_ENTER();
 
-    return supportedRifCounters.count(counter) != 0;
+    return m_supportedRifCounters.count(counter) != 0;
 }
 
-bool FlexCounter::isBufferPoolCounterSupported(sai_buffer_pool_stat_t counter) const
+bool FlexCounter::isBufferPoolCounterSupported(
+        _In_ sai_buffer_pool_stat_t counter) const
 {
     SWSS_LOG_ENTER();
 
-    return supportedBufferPoolCounters.count(counter) != 0;
-}
-
-FlexCounter::FlexCounter(std::string instanceId) : m_instanceId(instanceId)
-{
-    SWSS_LOG_ENTER();
-}
-
-FlexCounter& FlexCounter::getInstance(std::string instanceId)
-{
-    SWSS_LOG_ENTER();
-
-    if (g_flex_counters_map.count(instanceId) == 0)
-    {
-        std::shared_ptr<FlexCounter> instance(new FlexCounter(instanceId));
-        g_flex_counters_map.emplace(instanceId, instance);
-    }
-
-    return *(g_flex_counters_map[instanceId]);
-}
-
-void FlexCounter::removeInstance(std::string instanceId)
-{
-    SWSS_LOG_ENTER();
-
-    g_flex_counters_map.erase(instanceId);
+    return m_supportedBufferPoolCounters.count(counter) != 0;
 }
 
 void FlexCounter::collectCounters(
@@ -1242,7 +968,8 @@ void FlexCounter::collectCounters(
     countersTable.flush();
 }
 
-void FlexCounter::collectPortCounters(_In_ swss::Table &countersTable)
+void FlexCounter::collectPortCounters(
+        _In_ swss::Table &countersTable)
 {
     SWSS_LOG_ENTER();
 
@@ -1256,11 +983,13 @@ void FlexCounter::collectPortCounters(_In_ swss::Table &countersTable)
         std::vector<uint64_t> portStats(portCounterIds.size());
 
         // Get port stats
-        sai_status_t status = g_vendorSai->getStats(SAI_OBJECT_TYPE_PORT,
+        sai_status_t status = g_vendorSai->getStats(
+                SAI_OBJECT_TYPE_PORT,
                 portId,
                 static_cast<uint32_t>(portCounterIds.size()),
                 (const sai_stat_id_t *)portCounterIds.data(),
                 portStats.data());
+
         if (status != SAI_STATUS_SUCCESS)
         {
             SWSS_LOG_ERROR("Failed to get stats of port 0x%" PRIx64 ": %d", portId, status);
@@ -1273,6 +1002,7 @@ void FlexCounter::collectPortCounters(_In_ swss::Table &countersTable)
         for (size_t i = 0; i != portCounterIds.size(); i++)
         {
             const std::string &counterName = sai_serialize_port_stat(portCounterIds[i]);
+
             values.emplace_back(counterName, std::to_string(portStats[i]));
         }
 
@@ -1283,7 +1013,8 @@ void FlexCounter::collectPortCounters(_In_ swss::Table &countersTable)
     }
 }
 
-void FlexCounter::collectPortDebugCounters(_In_ swss::Table &countersTable)
+void FlexCounter::collectPortDebugCounters(
+        _In_ swss::Table &countersTable)
 {
     SWSS_LOG_ENTER();
 
@@ -1297,12 +1028,14 @@ void FlexCounter::collectPortDebugCounters(_In_ swss::Table &countersTable)
         std::vector<uint64_t> portStats(portCounterIds.size());
 
         // Get port stats
-        sai_status_t status = g_vendorSai->getStatsExt(SAI_OBJECT_TYPE_PORT,
+        sai_status_t status = g_vendorSai->getStatsExt(
+                SAI_OBJECT_TYPE_PORT,
                 portId,
                 static_cast<uint32_t>(portCounterIds.size()),
                 (const sai_stat_id_t *)portCounterIds.data(),
                 SAI_STATS_MODE_READ,
                 portStats.data());
+
         if (status != SAI_STATUS_SUCCESS)
         {
             SWSS_LOG_ERROR("Failed to get stats of port 0x%" PRIx64 ": %d", portId, status);
@@ -1315,6 +1048,7 @@ void FlexCounter::collectPortDebugCounters(_In_ swss::Table &countersTable)
         for (size_t i = 0; i != portCounterIds.size(); i++)
         {
             const std::string &counterName = sai_serialize_port_stat(portCounterIds[i]);
+
             values.emplace_back(counterName, std::to_string(portStats[i]));
         }
 
@@ -1325,7 +1059,8 @@ void FlexCounter::collectPortDebugCounters(_In_ swss::Table &countersTable)
     }
 }
 
-void FlexCounter::collectQueueCounters(_In_ swss::Table &countersTable)
+void FlexCounter::collectQueueCounters(
+        _In_ swss::Table &countersTable)
 {
     SWSS_LOG_ENTER();
 
@@ -1348,21 +1083,27 @@ void FlexCounter::collectQueueCounters(_In_ swss::Table &countersTable)
         //         queueCounterIds.data(),
         //         m_statsMode,
         //         queueStats.data());
-        status = g_vendorSai->getStats(SAI_OBJECT_TYPE_QUEUE,
+        status = g_vendorSai->getStats(
+                SAI_OBJECT_TYPE_QUEUE,
                 queueId,
                 static_cast<uint32_t>(queueCounterIds.size()),
                 (const sai_stat_id_t *)queueCounterIds.data(),
                 queueStats.data());
+
         if (status != SAI_STATUS_SUCCESS)
         {
             SWSS_LOG_ERROR("%s: failed to get stats of queue 0x%" PRIx64 ": %d", m_instanceId.c_str(), queueVid, status);
             continue;
         }
-        if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR){
-            status = g_vendorSai->clearStats(SAI_OBJECT_TYPE_QUEUE,
+
+        if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR)
+        {
+            status = g_vendorSai->clearStats(
+                    SAI_OBJECT_TYPE_QUEUE,
                     queueId,
                     static_cast<uint32_t>(queueCounterIds.size()),
                     (const sai_stat_id_t *)queueCounterIds.data());
+
             if (status != SAI_STATUS_SUCCESS)
             {
                 SWSS_LOG_ERROR("%s: failed to clear stats of queue 0x%" PRIx64 ": %d", m_instanceId.c_str(), queueVid, status);
@@ -1376,6 +1117,7 @@ void FlexCounter::collectQueueCounters(_In_ swss::Table &countersTable)
         for (size_t i = 0; i != queueCounterIds.size(); i++)
         {
             const std::string &counterName = sai_serialize_queue_stat(queueCounterIds[i]);
+
             values.emplace_back(counterName, std::to_string(queueStats[i]));
         }
 
@@ -1386,7 +1128,8 @@ void FlexCounter::collectQueueCounters(_In_ swss::Table &countersTable)
     }
 }
 
-void FlexCounter::collectQueueAttrs(_In_ swss::Table &countersTable)
+void FlexCounter::collectQueueAttrs(
+        _In_ swss::Table &countersTable)
 {
     SWSS_LOG_ENTER();
 
@@ -1405,7 +1148,8 @@ void FlexCounter::collectQueueAttrs(_In_ swss::Table &countersTable)
         }
 
         // Get queue attr
-        sai_status_t status = g_vendorSai->get(SAI_OBJECT_TYPE_QUEUE,
+        sai_status_t status = g_vendorSai->get(
+                SAI_OBJECT_TYPE_QUEUE,
                 queueId,
                 static_cast<uint32_t>(queueAttrIds.size()),
                 queueAttr.data());
@@ -1422,6 +1166,7 @@ void FlexCounter::collectQueueAttrs(_In_ swss::Table &countersTable)
         for (size_t i = 0; i != queueAttrIds.size(); i++)
         {
             const std::string &counterName = sai_serialize_queue_attr(queueAttrIds[i]);
+
             auto meta = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_QUEUE, queueAttr[i].id);
 
             values.emplace_back(counterName, sai_serialize_attr_value(*meta, queueAttr[i]));
@@ -1433,7 +1178,8 @@ void FlexCounter::collectQueueAttrs(_In_ swss::Table &countersTable)
     }
 }
 
-void FlexCounter::collectPriorityGroupCounters(_In_ swss::Table &countersTable)
+void FlexCounter::collectPriorityGroupCounters(
+        _In_ swss::Table &countersTable)
 {
     SWSS_LOG_ENTER();
 
@@ -1449,24 +1195,40 @@ void FlexCounter::collectPriorityGroupCounters(_In_ swss::Table &countersTable)
         // Get PG stats
         sai_status_t status = -1;
         // TODO: replace if with get_ingress_priority_group_stats_ext() call when it is fully supported
-        status = g_vendorSai->getStats(SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP,
-                        priorityGroupId,
-                        static_cast<uint32_t>(priorityGroupCounterIds.size()),
-                        (const sai_stat_id_t *)priorityGroupCounterIds.data(),
-                        priorityGroupStats.data());
+        status = g_vendorSai->getStats(
+                SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP,
+                priorityGroupId,
+                static_cast<uint32_t>(priorityGroupCounterIds.size()),
+                (const sai_stat_id_t *)priorityGroupCounterIds.data(),
+                priorityGroupStats.data());
+
         if (status != SAI_STATUS_SUCCESS)
         {
-            SWSS_LOG_ERROR("%s: failed to get %ld/%ld stats of PG 0x%" PRIx64 ": %d", m_instanceId.c_str(), priorityGroupCounterIds.size(), priorityGroupStats.size(), priorityGroupVid, status);
+            SWSS_LOG_ERROR("%s: failed to get %ld/%ld stats of PG 0x%" PRIx64 ": %d",
+                    m_instanceId.c_str(),
+                    priorityGroupCounterIds.size(),
+                    priorityGroupStats.size(),
+                    priorityGroupVid,
+                    status);
             continue;
         }
-        if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR){
-            status = g_vendorSai->clearStats(SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP,
-                            priorityGroupId,
-                            static_cast<uint32_t>(priorityGroupCounterIds.size()),
-                            (const sai_stat_id_t *)priorityGroupCounterIds.data());
+
+        if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR)
+        {
+            status = g_vendorSai->clearStats(
+                    SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP,
+                    priorityGroupId,
+                    static_cast<uint32_t>(priorityGroupCounterIds.size()),
+                    (const sai_stat_id_t *)priorityGroupCounterIds.data());
+
             if (status != SAI_STATUS_SUCCESS)
             {
-                SWSS_LOG_ERROR("%s: failed to clear %ld/%ld stats of PG 0x%" PRIx64 ": %d", m_instanceId.c_str(), priorityGroupCounterIds.size(), priorityGroupStats.size(), priorityGroupVid, status);
+                SWSS_LOG_ERROR("%s: failed to clear %ld/%ld stats of PG 0x%" PRIx64 ": %d",
+                        m_instanceId.c_str(),
+                        priorityGroupCounterIds.size(),
+                        priorityGroupStats.size(),
+                        priorityGroupVid,
+                        status);
                 continue;
             }
         }
@@ -1477,6 +1239,7 @@ void FlexCounter::collectPriorityGroupCounters(_In_ swss::Table &countersTable)
         for (size_t i = 0; i != priorityGroupCounterIds.size(); i++)
         {
             const std::string &counterName = sai_serialize_ingress_priority_group_stat(priorityGroupCounterIds[i]);
+
             values.emplace_back(counterName, std::to_string(priorityGroupStats[i]));
         }
 
@@ -1487,7 +1250,8 @@ void FlexCounter::collectPriorityGroupCounters(_In_ swss::Table &countersTable)
     }
 }
 
-void FlexCounter::collectSwitchDebugCounters(_In_ swss::Table &countersTable)
+void FlexCounter::collectSwitchDebugCounters(
+        _In_ swss::Table &countersTable)
 {
     SWSS_LOG_ENTER();
 
@@ -1501,12 +1265,14 @@ void FlexCounter::collectSwitchDebugCounters(_In_ swss::Table &countersTable)
         std::vector<uint64_t> switchStats(switchCounterIds.size());
 
         // Get port stats
-        sai_status_t status = g_vendorSai->getStatsExt(SAI_OBJECT_TYPE_SWITCH,
+        sai_status_t status = g_vendorSai->getStatsExt(
+                SAI_OBJECT_TYPE_SWITCH,
                 switchId,
                 static_cast<uint32_t>(switchCounterIds.size()),
                 (const sai_stat_id_t *)switchCounterIds.data(),
                 SAI_STATS_MODE_READ,
                 switchStats.data());
+
         if (status != SAI_STATUS_SUCCESS)
         {
             SWSS_LOG_ERROR("Failed to get stats of port 0x%" PRIx64 ": %d", switchId, status);
@@ -1519,6 +1285,7 @@ void FlexCounter::collectSwitchDebugCounters(_In_ swss::Table &countersTable)
         for (size_t i = 0; i != switchCounterIds.size(); i++)
         {
             const std::string &counterName = sai_serialize_switch_stat(switchCounterIds[i]);
+
             values.emplace_back(counterName, std::to_string(switchStats[i]));
         }
 
@@ -1529,7 +1296,8 @@ void FlexCounter::collectSwitchDebugCounters(_In_ swss::Table &countersTable)
     }
 }
 
-void FlexCounter::collectPriorityGroupAttrs(_In_ swss::Table &countersTable)
+void FlexCounter::collectPriorityGroupAttrs(
+        _In_ swss::Table &countersTable)
 {
     SWSS_LOG_ENTER();
 
@@ -1548,7 +1316,8 @@ void FlexCounter::collectPriorityGroupAttrs(_In_ swss::Table &countersTable)
         }
 
         // Get PG attr
-        sai_status_t status = g_vendorSai->get(SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP,
+        sai_status_t status = g_vendorSai->get(
+                SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP,
                 priorityGroupId,
                 static_cast<uint32_t>(priorityGroupAttrIds.size()),
                 priorityGroupAttr.data());
@@ -1565,6 +1334,7 @@ void FlexCounter::collectPriorityGroupAttrs(_In_ swss::Table &countersTable)
         for (size_t i = 0; i != priorityGroupAttrIds.size(); i++)
         {
             const std::string &counterName = sai_serialize_ingress_priority_group_attr(priorityGroupAttrIds[i]);
+
             auto meta = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP, priorityGroupAttr[i].id);
 
             values.emplace_back(counterName, sai_serialize_attr_value(*meta, priorityGroupAttr[i]));
@@ -1576,7 +1346,8 @@ void FlexCounter::collectPriorityGroupAttrs(_In_ swss::Table &countersTable)
     }
 }
 
-void FlexCounter::collectRifCounters(_In_ swss::Table &countersTable)
+void FlexCounter::collectRifCounters(
+        _In_ swss::Table &countersTable)
 {
     SWSS_LOG_ENTER();
 
@@ -1590,11 +1361,13 @@ void FlexCounter::collectRifCounters(_In_ swss::Table &countersTable)
         std::vector<uint64_t> rifStats(rifCounterIds.size());
 
         // Get rif stats
-        sai_status_t status = g_vendorSai->getStats(SAI_OBJECT_TYPE_ROUTER_INTERFACE,
+        sai_status_t status = g_vendorSai->getStats(
+                SAI_OBJECT_TYPE_ROUTER_INTERFACE,
                 rifId,
                 static_cast<uint32_t>(rifCounterIds.size()),
                 (const sai_stat_id_t *)rifCounterIds.data(),
                 rifStats.data());
+
         if (status != SAI_STATUS_SUCCESS)
         {
             SWSS_LOG_ERROR("Failed to get stats of router interface 0x%" PRIx64 ": %d", rifId, status);
@@ -1607,6 +1380,7 @@ void FlexCounter::collectRifCounters(_In_ swss::Table &countersTable)
         for (size_t i = 0; i != rifCounterIds.size(); i++)
         {
             const std::string &counterName = sai_serialize_router_interface_stat(rifCounterIds[i]);
+
             values.emplace_back(counterName, std::to_string(rifStats[i]));
         }
 
@@ -1617,7 +1391,8 @@ void FlexCounter::collectRifCounters(_In_ swss::Table &countersTable)
     }
 }
 
-void FlexCounter::collectBufferPoolCounters(_In_ swss::Table &countersTable)
+void FlexCounter::collectBufferPoolCounters(
+        _In_ swss::Table &countersTable)
 {
     SWSS_LOG_ENTER();
 
@@ -1634,11 +1409,13 @@ void FlexCounter::collectBufferPoolCounters(_In_ swss::Table &countersTable)
         // Get buffer pool stats
         sai_status_t status = -1;
 
-        status = g_vendorSai->getStats(SAI_OBJECT_TYPE_BUFFER_POOL,
-                        bufferPoolId,
-                        static_cast<uint32_t>(bufferPoolCounterIds.size()),
-                        reinterpret_cast<const sai_stat_id_t *>(bufferPoolCounterIds.data()),
-                        bufferPoolStats.data());
+        status = g_vendorSai->getStats(
+                SAI_OBJECT_TYPE_BUFFER_POOL,
+                bufferPoolId,
+                static_cast<uint32_t>(bufferPoolCounterIds.size()),
+                reinterpret_cast<const sai_stat_id_t *>(bufferPoolCounterIds.data()),
+                bufferPoolStats.data());
+
         if (status != SAI_STATUS_SUCCESS)
         {
             // Because of stat pre-qualification in setting the buffer pool counter list,
@@ -1651,10 +1428,12 @@ void FlexCounter::collectBufferPoolCounters(_In_ swss::Table &countersTable)
         }
         if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR || bufferPoolStatsMode == SAI_STATS_MODE_READ_AND_CLEAR)
         {
-            status = g_vendorSai->clearStats(SAI_OBJECT_TYPE_BUFFER_POOL,
-                            bufferPoolId,
-                            static_cast<uint32_t>(bufferPoolCounterIds.size()),
-                            reinterpret_cast<const sai_stat_id_t *>(bufferPoolCounterIds.data()));
+            status = g_vendorSai->clearStats(
+                    SAI_OBJECT_TYPE_BUFFER_POOL,
+                    bufferPoolId,
+                    static_cast<uint32_t>(bufferPoolCounterIds.size()),
+                    reinterpret_cast<const sai_stat_id_t *>(bufferPoolCounterIds.data()));
+
             if (status != SAI_STATUS_SUCCESS)
             {
                 // Because of stat pre-qualification in setting the buffer pool counter list,
@@ -1669,6 +1448,7 @@ void FlexCounter::collectBufferPoolCounters(_In_ swss::Table &countersTable)
 
         // Write counter values to DB table
         std::vector<swss::FieldValueTuple> fvTuples;
+
         for (size_t i = 0; i < bufferPoolCounterIds.size(); ++i)
         {
             fvTuples.emplace_back(sai_serialize_buffer_pool_stat(bufferPoolCounterIds[i]), std::to_string(bufferPoolStats[i]));
@@ -1691,51 +1471,63 @@ void FlexCounter::runPlugins(
     };
 
     std::vector<std::string> portList;
+
     portList.reserve(m_portCounterIdsMap.size());
+
     for (const auto& kv : m_portCounterIdsMap)
     {
         portList.push_back(sai_serialize_object_id(kv.first));
     }
+
     for (const auto& sha : m_portPlugins)
     {
         runRedisScript(db, sha, portList, argv);
     }
 
     std::vector<std::string> queueList;
+
     queueList.reserve(m_queueCounterIdsMap.size());
+
     for (const auto& kv : m_queueCounterIdsMap)
     {
         queueList.push_back(sai_serialize_object_id(kv.first));
     }
+
     for (const auto& sha : m_queuePlugins)
     {
         runRedisScript(db, sha, queueList, argv);
     }
 
     std::vector<std::string> priorityGroupList;
+
     priorityGroupList.reserve(m_priorityGroupCounterIdsMap.size());
+
     for (const auto& kv : m_priorityGroupCounterIdsMap)
     {
         priorityGroupList.push_back(sai_serialize_object_id(kv.first));
     }
+
     for (const auto& sha : m_priorityGroupPlugins)
     {
         runRedisScript(db, sha, priorityGroupList, argv);
     }
 
     std::vector<std::string> bufferPoolVids;
+
     bufferPoolVids.reserve(m_bufferPoolCounterIdsMap.size());
+
     for (const auto& it : m_bufferPoolCounterIdsMap)
     {
         bufferPoolVids.push_back(sai_serialize_object_id(it.first));
     }
+
     for (const auto& sha : m_bufferPoolPlugins)
     {
         runRedisScript(db, sha, bufferPoolVids, argv);
     }
 }
 
-void FlexCounter::flexCounterThread(void)
+void FlexCounter::flexCounterThreadRunFunction()
 {
     SWSS_LOG_ENTER();
 
@@ -1747,42 +1539,54 @@ void FlexCounter::flexCounterThread(void)
     {
         auto start = std::chrono::steady_clock::now();
 
-        std::unique_lock<std::mutex> lkMgr(m_mtx);
+        MUTEX;
 
         if (!m_runFlexCounterThread)
         {
             return;
         }
+
         while (!m_enable || allIdsEmpty() || (m_pollInterval == 0))
         {
             if (!m_runFlexCounterThread)
             {
                 return;
             }
-            m_pollCond.wait(lkMgr);
+
+            m_pollCond.wait(_lock); // wait on mutex
         }
 
         collectCounters(countersTable);
+
         runPlugins(db);
 
         auto finish = std::chrono::steady_clock::now();
+
         uint32_t delay = static_cast<uint32_t>(
                 std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count());
+
         uint32_t correction = delay % m_pollInterval;
 
-        lkMgr.unlock();
+        MUTEX_UNLOCK; // explicit unlock
 
         SWSS_LOG_DEBUG("End of flex counter thread FC %s, took %d ms", m_instanceId.c_str(), delay);
+
         std::unique_lock<std::mutex> lk(m_mtxSleep);
+
         m_cvSleep.wait_for(lk, std::chrono::milliseconds(m_pollInterval - correction));
     }
 }
 
-void FlexCounter::startFlexCounterThread(void)
+void FlexCounter::startFlexCounterThread()
 {
     SWSS_LOG_ENTER();
 
-    if (m_runFlexCounterThread == true)
+    if (m_pollInterval == 0)
+    {
+        return;
+    }
+
+    if (m_runFlexCounterThread)
     {
         m_pollCond.notify_all();
         return;
@@ -1790,7 +1594,7 @@ void FlexCounter::startFlexCounterThread(void)
 
     m_runFlexCounterThread = true;
 
-    m_flexCounterThread = std::make_shared<std::thread>(&FlexCounter::flexCounterThread, this);
+    m_flexCounterThread = std::make_shared<std::thread>(&FlexCounter::flexCounterThreadRunFunction, this);
 
     SWSS_LOG_INFO("Flex Counter thread started");
 }
@@ -1799,7 +1603,7 @@ void FlexCounter::endFlexCounterThread(void)
 {
     SWSS_LOG_ENTER();
 
-    std::unique_lock<std::mutex> lkMgr(m_mtx);
+    MUTEX;
 
     if (!m_runFlexCounterThread)
     {
@@ -1809,12 +1613,15 @@ void FlexCounter::endFlexCounterThread(void)
     m_runFlexCounterThread = false;
 
     m_pollCond.notify_all();
+
     m_cvSleep.notify_all();
 
     if (m_flexCounterThread != nullptr)
     {
-        std::shared_ptr<std::thread> fcThread = std::move(m_flexCounterThread);
-        lkMgr.unlock();
+        auto fcThread = std::move(m_flexCounterThread);
+
+        MUTEX_UNLOCK; // NOTE: explicit unlock before join to not cause deadlock
+
         SWSS_LOG_INFO("Wait for Flex Counter thread to end");
 
         fcThread->join();
@@ -1823,39 +1630,48 @@ void FlexCounter::endFlexCounterThread(void)
     SWSS_LOG_INFO("Flex Counter thread ended");
 }
 
-void FlexCounter::saiUpdateSupportedPortCounters(sai_object_id_t portId)
+void FlexCounter::updateSupportedPortCounters(
+        _In_ sai_object_id_t portRid)
 {
     SWSS_LOG_ENTER();
 
-    uint64_t value;
-    for (int cntr_id = SAI_PORT_STAT_IF_IN_OCTETS; cntr_id <= SAI_PORT_STAT_PFC_7_ON2OFF_RX_PKTS; ++cntr_id)
+    if (m_supportedPortCounters.size())
     {
-        sai_port_stat_t counter = static_cast<sai_port_stat_t>(cntr_id);
+        return;
+    }
 
-        sai_status_t status = g_vendorSai->getStats(SAI_OBJECT_TYPE_PORT, portId, 1, (const sai_stat_id_t *)&counter, &value);
+    uint64_t value;
+
+    for (int id = SAI_PORT_STAT_IF_IN_OCTETS; id <= SAI_PORT_STAT_PFC_7_ON2OFF_RX_PKTS; ++id)
+    {
+        sai_port_stat_t counter = static_cast<sai_port_stat_t>(id);
+
+        sai_status_t status = g_vendorSai->getStats(SAI_OBJECT_TYPE_PORT, portRid, 1, (sai_stat_id_t *)&counter, &value);
 
         if (status != SAI_STATUS_SUCCESS)
         {
             SWSS_LOG_INFO("Counter %s is not supported on port RID %s: %s",
                     sai_serialize_port_stat(counter).c_str(),
-                    sai_serialize_object_id(portId).c_str(),
+                    sai_serialize_object_id(portRid).c_str(),
                     sai_serialize_status(status).c_str());
 
             continue;
         }
 
-        supportedPortCounters.insert(counter);
+        m_supportedPortCounters.insert(counter);
     }
 }
 
 std::vector<sai_port_stat_t> FlexCounter::saiCheckSupportedPortDebugCounters(
-    _In_ sai_object_id_t portId,
-    _In_ const std::vector<sai_port_stat_t> &counterIds)
+        _In_ sai_object_id_t portId,
+        _In_ const std::vector<sai_port_stat_t> &counterIds)
 {
     SWSS_LOG_ENTER();
 
     std::vector<sai_port_stat_t> supportedPortDebugCounters;
+
     uint64_t value;
+
     for (auto counter: counterIds)
     {
         if (counter < SAI_PORT_STAT_IN_DROP_REASON_RANGE_BASE || counter >= SAI_PORT_STAT_OUT_DROP_REASON_RANGE_END)
@@ -1864,7 +1680,13 @@ std::vector<sai_port_stat_t> FlexCounter::saiCheckSupportedPortDebugCounters(
             continue;
         }
 
-        sai_status_t status = g_vendorSai->getStatsExt(SAI_OBJECT_TYPE_PORT, portId, 1, (const sai_stat_id_t *)&counter, SAI_STATS_MODE_READ, &value);
+        sai_status_t status = g_vendorSai->getStatsExt(
+                SAI_OBJECT_TYPE_PORT,
+                portId,
+                1,
+                (const sai_stat_id_t *)&counter,
+                SAI_STATS_MODE_READ,
+                &value);
 
         if (status != SAI_STATUS_SUCCESS)
         {
@@ -1882,18 +1704,23 @@ std::vector<sai_port_stat_t> FlexCounter::saiCheckSupportedPortDebugCounters(
     return supportedPortDebugCounters;
 }
 
-void FlexCounter::saiUpdateSupportedQueueCounters(
+void FlexCounter::updateSupportedQueueCounters(
         _In_ sai_object_id_t queueId,
         _In_ const std::vector<sai_queue_stat_t> &counterIds)
 {
     SWSS_LOG_ENTER();
 
     uint64_t value;
-    supportedQueueCounters.clear();
+
+    m_supportedQueueCounters.clear();
 
     for (auto &counter : counterIds)
     {
-        sai_status_t status = g_vendorSai->getStats(SAI_OBJECT_TYPE_QUEUE, queueId, 1, (const sai_stat_id_t *)&counter, &value);
+        sai_status_t status = g_vendorSai->getStats(
+                SAI_OBJECT_TYPE_QUEUE,
+                queueId,
+                1, (const sai_stat_id_t *)&counter,
+                &value);
 
         if (status != SAI_STATUS_SUCCESS)
         {
@@ -1921,29 +1748,35 @@ void FlexCounter::saiUpdateSupportedQueueCounters(
             }
         }
 
-        supportedQueueCounters.insert(counter);
+        m_supportedQueueCounters.insert(counter);
     }
 }
 
-void FlexCounter::saiUpdateSupportedPriorityGroupCounters(
-        _In_ sai_object_id_t priorityGroupId,
+void FlexCounter::updateSupportedPriorityGroupCounters(
+        _In_ sai_object_id_t priorityGroupRid,
         _In_ const std::vector<sai_ingress_priority_group_stat_t> &counterIds)
 {
     SWSS_LOG_ENTER();
 
     uint64_t value;
-    supportedPriorityGroupCounters.clear();
+
+    m_supportedPriorityGroupCounters.clear();
 
     for (auto &counter : counterIds)
     {
-        sai_status_t status = g_vendorSai->getStats(SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP, priorityGroupId, 1, (const sai_stat_id_t *)&counter, &value);
+        sai_status_t status = g_vendorSai->getStats(
+                SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP,
+                priorityGroupRid,
+                1,
+                (const sai_stat_id_t *)&counter,
+                &value);
 
         if (status != SAI_STATUS_SUCCESS)
         {
             SWSS_LOG_NOTICE("%s: counter %s is not supported on PG %s, rv: %s",
                     m_instanceId.c_str(),
                     sai_serialize_ingress_priority_group_stat(counter).c_str(),
-                    sai_serialize_object_id(priorityGroupId).c_str(),
+                    sai_serialize_object_id(priorityGroupRid).c_str(),
                     sai_serialize_status(status).c_str());
 
             continue;
@@ -1951,49 +1784,65 @@ void FlexCounter::saiUpdateSupportedPriorityGroupCounters(
 
         if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR)
         {
-            status = g_vendorSai->clearStats(SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP, priorityGroupId, 1, (const sai_stat_id_t *)&counter);
+            status = g_vendorSai->clearStats(
+                    SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP,
+                    priorityGroupRid,
+                    1,
+                    (const sai_stat_id_t *)&counter);
+
             if (status != SAI_STATUS_SUCCESS)
             {
                 SWSS_LOG_NOTICE("%s: clear counter %s is not supported on PG %s, rv: %s",
                         m_instanceId.c_str(),
                         sai_serialize_ingress_priority_group_stat(counter).c_str(),
-                        sai_serialize_object_id(priorityGroupId).c_str(),
+                        sai_serialize_object_id(priorityGroupRid).c_str(),
                         sai_serialize_status(status).c_str());
 
                 continue;
             }
         }
 
-        supportedPriorityGroupCounters.insert(counter);
+        m_supportedPriorityGroupCounters.insert(counter);
     }
 }
 
-void FlexCounter::saiUpdateSupportedRifCounters(sai_object_id_t rifId)
+void FlexCounter::updateSupportedRifCounters(
+        _In_ sai_object_id_t rifRid)
 {
     SWSS_LOG_ENTER();
+
+    if (m_supportedRifCounters.size())
+    {
+        return;
+    }
 
     uint64_t value;
     for (int cntr_id = SAI_ROUTER_INTERFACE_STAT_IN_OCTETS; cntr_id <= SAI_ROUTER_INTERFACE_STAT_OUT_ERROR_PACKETS; ++cntr_id)
     {
         sai_router_interface_stat_t counter = static_cast<sai_router_interface_stat_t>(cntr_id);
 
-        sai_status_t status = g_vendorSai->getStats(SAI_OBJECT_TYPE_ROUTER_INTERFACE, rifId, 1, (const sai_stat_id_t *)&counter, &value);
+        sai_status_t status = g_vendorSai->getStats(
+                SAI_OBJECT_TYPE_ROUTER_INTERFACE,
+                rifRid,
+                1,
+                (const sai_stat_id_t *)&counter,
+                &value);
 
         if (status != SAI_STATUS_SUCCESS)
         {
             SWSS_LOG_INFO("Counter %s is not supported on router interface RID %s: %s",
                     sai_serialize_router_interface_stat(counter).c_str(),
-                    sai_serialize_object_id(rifId).c_str(),
+                    sai_serialize_object_id(rifRid).c_str(),
                     sai_serialize_status(status).c_str());
 
             continue;
         }
 
-        supportedRifCounters.insert(counter);
+        m_supportedRifCounters.insert(counter);
     }
 }
 
-void FlexCounter::saiUpdateSupportedBufferPoolCounters(
+void FlexCounter::updateSupportedBufferPoolCounters(
         _In_ sai_object_id_t bufferPoolId,
         _In_ const std::vector<sai_buffer_pool_stat_t> &counterIds,
         _In_ sai_stats_mode_t statsMode)
@@ -2001,11 +1850,17 @@ void FlexCounter::saiUpdateSupportedBufferPoolCounters(
     SWSS_LOG_ENTER();
 
     uint64_t value;
-    supportedBufferPoolCounters.clear();
+    m_supportedBufferPoolCounters.clear();
 
     for (const auto &counterId : counterIds)
     {
-        sai_status_t status = g_vendorSai->getStats(SAI_OBJECT_TYPE_BUFFER_POOL, bufferPoolId, 1, (const sai_stat_id_t *)&counterId, &value);
+        sai_status_t status = g_vendorSai->getStats(
+                SAI_OBJECT_TYPE_BUFFER_POOL,
+                bufferPoolId,
+                1,
+                (const sai_stat_id_t *)&counterId,
+                &value);
+
         if (status != SAI_STATUS_SUCCESS)
         {
             SWSS_LOG_ERROR("%s: counter %s is not supported on buffer pool %s, rv: %s",
@@ -2019,7 +1874,12 @@ void FlexCounter::saiUpdateSupportedBufferPoolCounters(
 
         if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR || statsMode == SAI_STATS_MODE_READ_AND_CLEAR)
         {
-            status = g_vendorSai->clearStats(SAI_OBJECT_TYPE_BUFFER_POOL, bufferPoolId, 1, (const sai_stat_id_t *)&counterId);
+            status = g_vendorSai->clearStats(
+                    SAI_OBJECT_TYPE_BUFFER_POOL,
+                    bufferPoolId,
+                    1,
+                    (const sai_stat_id_t *)&counterId);
+
             if (status != SAI_STATUS_SUCCESS)
             {
                 SWSS_LOG_ERROR("%s: clear counter %s is not supported on buffer pool %s, rv: %s",
@@ -2032,13 +1892,13 @@ void FlexCounter::saiUpdateSupportedBufferPoolCounters(
             }
         }
 
-        supportedBufferPoolCounters.insert(counterId);
+        m_supportedBufferPoolCounters.insert(counterId);
     }
 }
 
 std::vector<sai_switch_stat_t> FlexCounter::saiCheckSupportedSwitchDebugCounters(
-    _In_ sai_object_id_t switchId,
-    _In_ const std::vector<sai_switch_stat_t> &counterIds)
+        _In_ sai_object_id_t switchId,
+        _In_ const std::vector<sai_switch_stat_t> &counterIds)
 {
     SWSS_LOG_ENTER();
 
@@ -2052,7 +1912,12 @@ std::vector<sai_switch_stat_t> FlexCounter::saiCheckSupportedSwitchDebugCounters
             continue;
         }
 
-        sai_status_t status = g_vendorSai->getStatsExt(SAI_OBJECT_TYPE_SWITCH, switchId, 1, (const sai_stat_id_t *)&counter, SAI_STATS_MODE_READ, &value);
+        sai_status_t status = g_vendorSai->getStatsExt(
+                SAI_OBJECT_TYPE_SWITCH,
+                switchId,
+                1, (const sai_stat_id_t *)&counter,
+                SAI_STATS_MODE_READ,
+                &value);
 
         if (status != SAI_STATUS_SUCCESS)
         {
@@ -2071,37 +1936,38 @@ std::vector<sai_switch_stat_t> FlexCounter::saiCheckSupportedSwitchDebugCounters
 }
 
 void FlexCounter::removeCounter(
-        _In_ sai_object_id_t vid,
-        _In_ const std::string& groupName)
+        _In_ sai_object_id_t vid)
 {
+    MUTEX;
+
     SWSS_LOG_ENTER();
 
     auto objectType = VidManager::objectTypeQuery(vid);
 
     if (objectType == SAI_OBJECT_TYPE_PORT)
     {
-        FlexCounter::removePort(vid, groupName);
-        FlexCounter::removePortDebugCounters(vid, groupName);
+        removePort(vid);
+        removePortDebugCounters(vid);
     }
     else if (objectType == SAI_OBJECT_TYPE_QUEUE)
     {
-        FlexCounter::removeQueue(vid, groupName);
+        removeQueue(vid);
     }
     else if (objectType == SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP)
     {
-        FlexCounter::removePriorityGroup(vid, groupName);
+        removePriorityGroup(vid);
     }
     else if (objectType == SAI_OBJECT_TYPE_ROUTER_INTERFACE)
     {
-        FlexCounter::removeRif(vid, groupName);
+        removeRif(vid);
     }
     else if (objectType == SAI_OBJECT_TYPE_BUFFER_POOL)
     {
-        FlexCounter::removeBufferPool(vid, groupName);
+        removeBufferPool(vid);
     }
     else if (objectType == SAI_OBJECT_TYPE_SWITCH)
     {
-        FlexCounter::removeSwitchDebugCounters(vid, groupName);
+        removeSwitchDebugCounters(vid);
     }
     else
     {
@@ -2113,17 +1979,19 @@ void FlexCounter::removeCounter(
 void FlexCounter::addCounter(
         _In_ sai_object_id_t vid,
         _In_ sai_object_id_t rid,
-        _In_ const std::string& groupName,
         _In_ const std::vector<swss::FieldValueTuple>& values)
 {
+    MUTEX;
+
     SWSS_LOG_ENTER();
 
     sai_object_type_t objectType = VidManager::objectTypeQuery(vid); // VID and RID will have the same object type
 
     std::vector<std::string> counterIds;
+
     std::string statsMode;
 
-    for (const auto& valuePair : values)
+    for (const auto& valuePair: values)
     {
         const auto field = fvField(valuePair);
         const auto value = fvValue(valuePair);
@@ -2133,6 +2001,7 @@ void FlexCounter::addCounter(
         if (objectType == SAI_OBJECT_TYPE_PORT && field == PORT_COUNTER_ID_LIST)
         {
             std::vector<sai_port_stat_t> portCounterIds;
+
             for (const auto &str : idStrings)
             {
                 sai_port_stat_t stat;
@@ -2140,11 +2009,13 @@ void FlexCounter::addCounter(
                 portCounterIds.push_back(stat);
             }
 
-            FlexCounter::setPortCounterList(vid, rid, groupName, portCounterIds);
+            setPortCounterList(vid, rid, portCounterIds);
+
         }
         else if (objectType == SAI_OBJECT_TYPE_PORT && field == PORT_DEBUG_COUNTER_ID_LIST)
         {
             std::vector<sai_port_stat_t> portDebugCounterIds;
+
             for (const auto &str : idStrings)
             {
                 sai_port_stat_t stat;
@@ -2152,11 +2023,12 @@ void FlexCounter::addCounter(
                 portDebugCounterIds.push_back(stat);
             }
 
-            FlexCounter::setPortDebugCounterList(vid, rid, groupName, portDebugCounterIds);
+            setPortDebugCounterList(vid, rid, portDebugCounterIds);
         }
         else if (objectType == SAI_OBJECT_TYPE_QUEUE && field == QUEUE_COUNTER_ID_LIST)
         {
             std::vector<sai_queue_stat_t> queueCounterIds;
+
             for (const auto &str : idStrings)
             {
                 sai_queue_stat_t stat;
@@ -2164,11 +2036,12 @@ void FlexCounter::addCounter(
                 queueCounterIds.push_back(stat);
             }
 
-            FlexCounter::setQueueCounterList(vid, rid, groupName, queueCounterIds);
+            setQueueCounterList(vid, rid, queueCounterIds);
         }
         else if (objectType == SAI_OBJECT_TYPE_QUEUE && field == QUEUE_ATTR_ID_LIST)
         {
             std::vector<sai_queue_attr_t> queueAttrIds;
+
             for (const auto &str : idStrings)
             {
                 sai_queue_attr_t attr;
@@ -2176,11 +2049,12 @@ void FlexCounter::addCounter(
                 queueAttrIds.push_back(attr);
             }
 
-            FlexCounter::setQueueAttrList(vid, rid, groupName, queueAttrIds);
+            setQueueAttrList(vid, rid, queueAttrIds);
         }
         else if (objectType == SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP && field == PG_COUNTER_ID_LIST)
         {
             std::vector<sai_ingress_priority_group_stat_t> pgCounterIds;
+
             for (const auto &str : idStrings)
             {
                 sai_ingress_priority_group_stat_t stat;
@@ -2188,11 +2062,12 @@ void FlexCounter::addCounter(
                 pgCounterIds.push_back(stat);
             }
 
-            FlexCounter::setPriorityGroupCounterList(vid, rid, groupName, pgCounterIds);
+            setPriorityGroupCounterList(vid, rid, pgCounterIds);
         }
         else if (objectType == SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP && field == PG_ATTR_ID_LIST)
         {
             std::vector<sai_ingress_priority_group_attr_t> pgAttrIds;
+
             for (const auto &str : idStrings)
             {
                 sai_ingress_priority_group_attr_t attr;
@@ -2200,11 +2075,12 @@ void FlexCounter::addCounter(
                 pgAttrIds.push_back(attr);
             }
 
-            FlexCounter::setPriorityGroupAttrList(vid, rid, groupName, pgAttrIds);
+            setPriorityGroupAttrList(vid, rid, pgAttrIds);
         }
         else if (objectType == SAI_OBJECT_TYPE_ROUTER_INTERFACE && field == RIF_COUNTER_ID_LIST)
         {
             std::vector<sai_router_interface_stat_t> rifCounterIds;
+
             for (const auto &str : idStrings)
             {
                 sai_router_interface_stat_t stat;
@@ -2212,11 +2088,12 @@ void FlexCounter::addCounter(
                 rifCounterIds.push_back(stat);
             }
 
-            FlexCounter::setRifCounterList(vid, rid, groupName, rifCounterIds);
+            setRifCounterList(vid, rid, rifCounterIds);
         }
         else if (objectType == SAI_OBJECT_TYPE_SWITCH && field == SWITCH_DEBUG_COUNTER_ID_LIST)
         {
             std::vector<sai_switch_stat_t> switchCounterIds;
+
             for (const auto &str : idStrings)
             {
                 sai_switch_stat_t stat;
@@ -2224,7 +2101,7 @@ void FlexCounter::addCounter(
                 switchCounterIds.push_back(stat);
             }
 
-            FlexCounter::setSwitchDebugCounterList(vid, rid, groupName, switchCounterIds);
+            setSwitchDebugCounterList(vid, rid, switchCounterIds);
         }
         else if (objectType == SAI_OBJECT_TYPE_BUFFER_POOL && field == BUFFER_POOL_COUNTER_ID_LIST)
         {
@@ -2255,6 +2132,6 @@ void FlexCounter::addCounter(
             bufferPoolCounterIds.push_back(stat);
         }
 
-        FlexCounter::setBufferPoolCounterList(vid, rid, groupName, bufferPoolCounterIds, statsMode);
+        setBufferPoolCounterList(vid, rid, bufferPoolCounterIds, statsMode);
     }
 }
