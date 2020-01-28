@@ -1,7 +1,8 @@
-#include "syncd_flex_counter.h"
-#include "syncd.h"
-
+#include "FlexCounter.h"
 #include "VidManager.h"
+
+#include "meta/sai_serialize.h"
+#include "lib/inc/SaiInterface.h"
 
 #include "swss/redisapi.h"
 #include "swss/tokenize.h"
@@ -9,6 +10,8 @@
 #include <inttypes.h>
 
 using namespace syncd;
+
+extern std::shared_ptr<sairedis::SaiInterface> g_vendorSai;
 
 /* Global map with FlexCounter instances for different polling interval */
 static std::map<std::string, std::shared_ptr<FlexCounter>> g_flex_counters_map;

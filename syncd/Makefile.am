@@ -32,7 +32,7 @@ libsyncd_a_SOURCES = \
 				syncd_hard_reinit.cpp \
 				syncd_notifications.cpp \
 				syncd_applyview.cpp \
-				syncd_flex_counter.cpp \
+				FlexCounter.cpp \
 				TimerWatchdog.cpp \
 				NotificationQueue.cpp \
 				CommandLineOptions.cpp \

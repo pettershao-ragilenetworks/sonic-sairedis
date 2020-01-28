@@ -1,7 +1,6 @@
 #include "syncd.h"
 #include "syncd_saiswitch.h"
 #include "sairediscommon.h"
-#include "syncd_flex_counter.h"
 #include "swss/tokenize.h"
 #include <inttypes.h>
 #include <limits.h>
@@ -14,6 +13,7 @@
 #include "CommandLineOptionsParser.h"
 #include "PortMapParser.h"
 #include "VidManager.h"
+#include "FlexCounter.h"
 
 #include "VirtualObjectIdManager.h"
 #include "RedisVidIndexGenerator.h"
