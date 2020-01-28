@@ -13,7 +13,7 @@
 #include "CommandLineOptionsParser.h"
 #include "PortMapParser.h"
 #include "VidManager.h"
-#include "FlexCounter.h"
+#include "FlexCounterManager.h"
 
 #include "VirtualObjectIdManager.h"
 #include "RedisVidIndexGenerator.h"
@@ -30,6 +30,8 @@ using namespace syncd;
 std::shared_ptr<sairedis::SaiInterface> g_vendorSai = std::make_shared<VendorSai>();
 
 std::shared_ptr<sairedis::VirtualObjectIdManager> g_virtualObjectIdManager;
+
+static auto g_manager = std::make_shared<FlexCounterManager>();
 
 /**
  * @brief Global mutex for thread synchronization
@@ -3252,11 +3254,11 @@ void processFlexCounterGroupEvent(
 
     if (op == SET_COMMAND)
     {
-        FlexCounter::addCounterPlugin(groupName, values);
+        g_manager->addCounterPlugin(groupName, values);
     }
     else if (op == DEL_COMMAND)
     {
-        FlexCounter::removeCounterPlugin(groupName);
+        g_manager->removeCounterPlugins(groupName);
     }
 }
 
@@ -3305,11 +3307,11 @@ void processFlexCounterEvent(
 
     if (op == SET_COMMAND)
     {
-        FlexCounter::addCounter(vid, rid, groupName, values);
+        g_manager->addCounter(vid, rid, groupName, values);
     }
     else if (op == DEL_COMMAND)
     {
-        FlexCounter::removeCounter(vid, groupName);
+        g_manager->removeCounter(vid, groupName);
     }
 }
 
@@ -3843,7 +3845,7 @@ int syncd_main(int argc, char **argv)
 
                 SWSS_LOG_TIMER("warm pre-shutdown");
 
-                FlexCounter::removeAllCounters();
+                g_manager->removeAllCounters();
 
                 sai_attribute_t attr;
 
@@ -3984,7 +3986,7 @@ int syncd_main(int argc, char **argv)
 
 #endif
 
-    FlexCounter::removeAllCounters();
+    g_manager->removeAllCounters();
 
     {
         SWSS_LOG_TIMER("remove switch");

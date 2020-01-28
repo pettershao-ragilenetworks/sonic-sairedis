@@ -16,6 +16,8 @@ endif
 
 noinst_LIBRARIES = libsyncd.a
 libsyncd_a_SOURCES = \
+				FlexCounterManager.cpp \
+				FlexCounter.cpp \
 				../lib/src/SwitchConfig.cpp \
 				../lib/src/SwitchConfigContainer.cpp \
 				../lib/src/VirtualObjectIdManager.cpp \
@@ -32,7 +34,6 @@ libsyncd_a_SOURCES = \
 				syncd_hard_reinit.cpp \
 				syncd_notifications.cpp \
 				syncd_applyview.cpp \
-				FlexCounter.cpp \
 				TimerWatchdog.cpp \
 				NotificationQueue.cpp \
 				CommandLineOptions.cpp \
