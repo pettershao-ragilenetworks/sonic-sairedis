@@ -59,7 +59,7 @@ void SaiSwitch::saiGetMacAddress(
 }
 
 void SaiSwitch::getDefaultMacAddress(
-        _Out_ sai_mac_t& mac)
+        _Out_ sai_mac_t& mac) const
 {
     SWSS_LOG_ENTER();
 

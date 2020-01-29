@@ -5,6 +5,8 @@ extern "C" {
 #include "sai.h"
 }
 
+#include <set>
+
 /**
  * @def SAI_DISCOVERY_LIST_MAX_ELEMENTS
  *
@@ -163,7 +165,7 @@ class SaiSwitch
          * @param[out] mac MAC address to be obtained.
          */
         void getDefaultMacAddress(
-                _Out_ sai_mac_t& mac);
+                _Out_ sai_mac_t& mac) const;
 
         /**
          * @brief Gets default value of attribute for given object.
