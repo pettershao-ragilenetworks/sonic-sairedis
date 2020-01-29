@@ -65,25 +65,6 @@ void processAttributesForOids(
 sai_object_type_t getObjectTypeFromAsicKey(
         _In_ const std::string &key);
 
-sai_object_type_t getObjectTypeFromVid(
-        _In_ sai_object_id_t object_vid)
-{
-    SWSS_LOG_ENTER();
-
-    sai_object_type_t objectType = VidManager::objectTypeQuery(object_vid);
-
-    // TODO metadata is valid object type
-    if (objectType >= SAI_OBJECT_TYPE_EXTENSIONS_MAX ||
-            objectType == SAI_OBJECT_TYPE_NULL)
-    {
-        SWSS_LOG_THROW("invalid object type: %s on object id: %s",
-                sai_serialize_object_type(objectType).c_str(),
-                sai_serialize_object_id(object_vid).c_str());
-    }
-
-    return objectType;
-}
-
 std::shared_ptr<SaiAttributeList> redisGetAttributesFromAsicKey(
         _In_ const std::string &key)
 {
@@ -213,7 +194,7 @@ void checkAllIds()
     {
         for (auto &kv: g_vidToRidMap)
         {
-            sai_object_type_t objectType = getObjectTypeFromVid(kv.first);
+            sai_object_type_t objectType = VidManager::objectTypeQuery(kv.first);
 
             SWSS_LOG_ERROR("vid not translated: %s, object type: %s",
                     sai_serialize_object_id(kv.first).c_str(),
@@ -620,7 +601,7 @@ sai_object_id_t processSingleVid(
         return it->second;
     }
 
-    sai_object_type_t objectType = getObjectTypeFromVid(vid);
+    sai_object_type_t objectType = VidManager::objectTypeQuery(vid);
 
     std::string strVid = sai_serialize_object_id(vid);
 

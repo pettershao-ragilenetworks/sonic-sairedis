@@ -16,6 +16,7 @@ endif
 
 noinst_LIBRARIES = libsyncd.a
 libsyncd_a_SOURCES = \
+				BestCandidateFinder.cpp \
 				FlexCounterManager.cpp \
 				FlexCounter.cpp \
 				../lib/src/SwitchConfig.cpp \

@@ -83,9 +83,6 @@ void translate_vid_to_rid_non_object_id(
 void redisClearVidToRidMap();
 void redisClearRidToVidMap();
 
-sai_object_type_t getObjectTypeFromVid(
-        _In_ sai_object_id_t sai_object_id);
-
 extern std::shared_ptr<swss::NotificationProducer>  notifications;
 extern std::shared_ptr<swss::RedisClient>   g_redisClient;
 extern std::shared_ptr<swss::DBConnector>   dbAsic;
