@@ -479,7 +479,7 @@ void SaiSwitch::removeExistingObject(
 
     SWSS_LOG_INFO("removing %s", sai_serialize_object_meta_key(meta_key).c_str());
 
-    sai_status_t status = info->remove(&meta_key);
+    sai_status_t status = g_vendorSai->remove(meta_key.objecttype, meta_key.objectkey.key.object_id);
 
     if (status == SAI_STATUS_SUCCESS)
     {
