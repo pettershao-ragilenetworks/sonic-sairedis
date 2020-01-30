@@ -293,23 +293,6 @@ namespace syncd
                     _In_ sai_attr_id_t attr_id);
 
             /**
-             * @brief Discover objects on the switch.
-             *
-             * Method will query recursively all OID attributes (oid and list) on
-             * the given object.
-             *
-             * This method should be called only once inside constructor right
-             * after switch has been created to obtain actual ASIC view.
-             *
-             * @param rid Object to discover other objects.
-             * @param processed Set of already processed objects. This set will be
-             * updated every time new object ID is discovered.
-             */
-            void saiDiscover(
-                    _In_ sai_object_id_t rid,
-                    _Inout_ std::set<sai_object_id_t> &processed);
-
-            /**
              * @brief Discover helper.
              *
              * Method will call saiDiscovery and collect all discovered objects.
