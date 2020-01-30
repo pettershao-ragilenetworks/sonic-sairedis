@@ -149,7 +149,7 @@ void SaiDiscovery::discover(
             SWSS_LOG_DEBUG("getting %s for %s", md->attridname,
                     sai_serialize_object_id(rid).c_str());
 
-            sai_status_t status = info->get(&mk, 1, &attr);
+            sai_status_t status = m_sai->get(mk.objecttype, mk.objectkey.key.object_id, 1, &attr);
 
             if (status != SAI_STATUS_SUCCESS)
             {
@@ -209,7 +209,7 @@ void SaiDiscovery::discover(
             attr.value.objlist.count = SAI_DISCOVERY_LIST_MAX_ELEMENTS;
             attr.value.objlist.list = local;
 
-            sai_status_t status = info->get(&mk, 1, &attr);
+            sai_status_t status = m_sai->get(mk.objecttype, mk.objectkey.key.object_id, 1, &attr);
 
             if (status != SAI_STATUS_SUCCESS)
             {
