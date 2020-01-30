@@ -67,6 +67,7 @@ ECN
 eg
 EIO
 encap
+endif
 endl
 enum
 eth
@@ -94,6 +95,7 @@ hostif
 HSV
 https
 hw
+ifdef
 IFF
 ifindex
 inattr
