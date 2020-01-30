@@ -19,7 +19,7 @@ namespace syncd
             SaiDiscovery(
                     _In_ std::shared_ptr<sairedis::SaiInterface> sai);
 
-            virtual ~SaiDiscovery() = default;
+            virtual ~SaiDiscovery();
 
         public:
 

@@ -28,6 +28,13 @@ SaiDiscovery::SaiDiscovery(
     // empty
 }
 
+SaiDiscovery::~SaiDiscovery()
+{
+    SWSS_LOG_ENTER();
+
+    // empty
+}
+
 void SaiDiscovery::discover(
         _In_ sai_object_id_t rid,
         _Inout_ std::set<sai_object_id_t> &discovered)
