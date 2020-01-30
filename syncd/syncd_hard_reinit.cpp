@@ -664,8 +664,6 @@ sai_object_id_t processSingleVid(
         trapGroupWorkaround(vid, rid, createObject, attrCount, attrList);
     }
 
-    auto info = sai_metadata_get_object_type_info(objectType);
-
     if (createObject)
     {
         sai_object_meta_key_t meta_key;
@@ -680,7 +678,7 @@ sai_object_id_t processSingleVid(
         auto start = std::chrono::high_resolution_clock::now();
 #endif
 
-        sai_status_t status = info->create(&meta_key, g_switch_rid, attrCount, attrList);
+        sai_status_t status = g_vendorSai->create(meta_key.objecttype, &meta_key.objectkey.key.object_id, g_switch_rid, attrCount, attrList);
 
 #ifdef ENABLE_PERF
         auto end = std::chrono::high_resolution_clock::now();
@@ -766,7 +764,7 @@ sai_object_id_t processSingleVid(
             auto start = std::chrono::high_resolution_clock::now();
 #endif
 
-            sai_status_t status = info->set(&meta_key, attr);
+            sai_status_t status = g_vendorSai->set(meta_key.objecttype, meta_key.objectkey.key.object_id, attr);
 
 #ifdef ENABLE_PERF
             auto end = std::chrono::high_resolution_clock::now();
