@@ -16,6 +16,7 @@ endif
 
 noinst_LIBRARIES = libsyncd.a
 libsyncd_a_SOURCES = \
+				SaiSwitch.cpp \
 				BestCandidateFinder.cpp \
 				FlexCounterManager.cpp \
 				FlexCounter.cpp \
@@ -31,7 +32,6 @@ libsyncd_a_SOURCES = \
 				SaiAttr.cpp \
 				VendorSai.cpp \
 				syncd.cpp \
-				syncd_saiswitch.cpp \
 				syncd_hard_reinit.cpp \
 				syncd_notifications.cpp \
 				syncd_applyview.cpp \

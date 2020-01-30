@@ -2,7 +2,7 @@
 
 #include "SaiObj.h"
 #include "AsicView.h"
-#include "syncd_saiswitch.h" // TODO rename
+#include "SaiSwitch.h"
 
 #include <memory>
 

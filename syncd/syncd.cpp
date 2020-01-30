@@ -1,5 +1,4 @@
 #include "syncd.h"
-#include "syncd_saiswitch.h"
 #include "sairediscommon.h"
 #include "swss/tokenize.h"
 #include <inttypes.h>

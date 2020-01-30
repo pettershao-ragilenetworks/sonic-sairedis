@@ -1,13 +1,32 @@
-#include "syncd.h"
-#include "syncd_saiswitch.h"
+#include "SaiSwitch.h"
+#include "VendorSai.h"
+
 #include "sairediscommon.h"
 
-#include <string>
-#include <vector>
-#include <unordered_map>
-#include <set>
+#include "meta/sai_serialize.h"
+#include "swss/logger.h"
+
+// TODO to be removed
+#include "syncd.h"
+
+using namespace syncd;
+
+//extern std::map<sai_object_id_t, std::shared_ptr<SaiSwitch>> switches;
 
 const int maxLanesPerPort = 8;
+
+
+/**
+ * @def SAI_DISCOVERY_LIST_MAX_ELEMENTS
+ *
+ * Defines maximum elements that can be obtained from the OID list when
+ * performing list attribute query (discovery) on the switch.
+ *
+ * This value will be used to allocate memory on the stack for obtaining object
+ * list, and should be big enough to obtain list for all ports on the switch
+ * and vlan members.
+ */
+#define SAI_DISCOVERY_LIST_MAX_ELEMENTS 1024
 
 /*
  * NOTE: all those methods could be implemented inside SaiSwitch class so then

@@ -39,7 +39,7 @@ extern "C" {
 #include "swss/logger.h"
 #include "swss/table.h"
 
-#include "syncd_saiswitch.h"
+#include "SaiSwitch.h"
 
 #include "VendorSai.h"
 
@@ -62,7 +62,7 @@ extern std::shared_ptr<sairedis::SaiInterface> g_vendorSai;
 
 extern std::mutex g_mutex;
 
-extern std::map<sai_object_id_t, std::shared_ptr<SaiSwitch>> switches;
+extern std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> switches;
 
 void startDiagShell();
 
