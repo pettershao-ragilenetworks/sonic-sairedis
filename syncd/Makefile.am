@@ -16,6 +16,8 @@ endif
 
 noinst_LIBRARIES = libsyncd.a
 libsyncd_a_SOURCES = \
+				SingleReiniter.cpp \
+				HardReiniter.cpp \
 				SaiDiscovery.cpp \
 				SaiSwitch.cpp \
 				BestCandidateFinder.cpp \

@@ -1,8 +1,6 @@
 #include "syncd.h"
 #include "sairediscommon.h"
 #include "swss/tokenize.h"
-#include <inttypes.h>
-#include <limits.h>
 
 #include "swss/warm_restart.h"
 #include "swss/table.h"
@@ -13,9 +11,13 @@
 #include "PortMapParser.h"
 #include "VidManager.h"
 #include "FlexCounterManager.h"
+#include "HardReiniter.h"
 
 #include "VirtualObjectIdManager.h"
 #include "RedisVidIndexGenerator.h"
+
+#include <inttypes.h>
+#include <limits.h>
 
 #include <iostream>
 #include <map>
@@ -93,7 +95,7 @@ volatile bool g_asicInitViewMode = false;
 /*
  * SAI switch global needed for RPC server and for remove_switch
  */
-sai_object_id_t gSwitchId;
+sai_object_id_t gSwitchId = SAI_NULL_OBJECT_ID;
 
 std::string fdbFlushSha;
 std::string fdbFlushLuaScriptName = "fdb_flush.lua";
@@ -3547,7 +3549,23 @@ void onSyncdStart(bool warmStart)
      * recreate switches map.
      */
 
-    hardReinit();
+    if (switches.size() != 0)
+    {
+        SWSS_LOG_THROW("performing hard reinit, but there are %zu switches defined, bug!", switches.size());
+    }
+
+    try{
+   // swss::Logger::getInstance().setMinPrio(swss::Logger::SWSS_DEBUG);
+    HardReiniter hr(g_vendorSai);
+
+    hr.hardReinit();
+    }
+    catch (std::exception&e)
+    {
+    swss::Logger::getInstance().setMinPrio(swss::Logger::SWSS_NOTICE);
+    throw;
+    }
+    swss::Logger::getInstance().setMinPrio(swss::Logger::SWSS_NOTICE);
 }
 
 void sai_meta_log_syncd(
@@ -3731,6 +3749,7 @@ int syncd_main(int argc, char **argv)
         gProfileMap[SAI_KEY_BOOT_TYPE] = std::to_string(g_commandLineOptions->m_startType); // number value is needed
     }
 
+    // TODO need per api test service method table static template
     sai_status_t status = g_vendorSai->initialize(0, (sai_service_method_table_t*)&test_services);
 
     if (status != SAI_STATUS_SUCCESS)
