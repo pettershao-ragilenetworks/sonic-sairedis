@@ -2,6 +2,8 @@
 
 #define NOTIFICATION_QUEUE_DROP_COUNT_INDICATOR (1000)
 
+using namespace syncd;
+
 NotificationQueue::NotificationQueue(
         _In_ size_t queueLimit):
     m_queueSizeLimit(queueLimit),

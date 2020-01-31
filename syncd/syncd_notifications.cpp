@@ -8,6 +8,17 @@
 
 #include "NotificationQueue.h"
 
+using namespace syncd;
+
+/*
+ * Make sure that notification queue pointer is populated before we start
+ * thread, and before we create_switch, since at switch_create we can start
+ * receiving fdb_notifications which will arrive on different thread and
+ * will call getQueueSize() when queue pointer could be null (this=0x0).
+ */
+
+static auto g_notificationQueue = std::make_shared<NotificationQueue>();
+
 void send_notification(
         _In_ std::string op,
         _In_ std::string data,
@@ -603,15 +614,6 @@ void processNotification(
 // that some notification arrived
 
 std::condition_variable cv;
-
-/*
- * Make sure that notification queue pointer is populated before we start
- * thread, and before we create_switch, since at switch_create we can start
- * receiving fdb_notifications which will arrive on different thread and
- * will call getQueueSize() when queue pointer could be null (this=0x0).
- */
-
-static auto g_notificationQueue = std::make_shared<NotificationQueue>();
 
 void enqueue_notification(
         _In_ std::string op,
