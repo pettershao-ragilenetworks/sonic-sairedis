@@ -1,5 +1,13 @@
 #include "NotificationHandlerWrapper.h"
 
+#include "swss/logger.h"
+
+#include "meta/sai_serialize.h"
+
+using namespace syncd;
+
+std::shared_ptr<NotificationHandler> NotificationHandlerWrapper::m_handler = nullptr;
+
 void NotificationHandlerWrapper::setNotificationHandler(
         _In_ std::shared_ptr<NotificationHandler> handler)
 {
@@ -7,9 +15,7 @@ void NotificationHandlerWrapper::setNotificationHandler(
 
     m_handler = handler;
 
-    sai_switch_notifications_t sn;
-
-    memset(&sn,0,sizeof(sn));
+    sai_switch_notifications_t sn = { };
 
     // TODO add other callbacks when needed
 
