@@ -1,12 +1,30 @@
 #include "NotificationHandler.h"
+#include "sairediscommon.h"
 
-NotificationHandler::NotificationHandler()
+#include "swss/logger.h"
+
+#include "meta/sai_serialize.h"
+
+#include <inttypes.h>
+
+using namespace syncd;
+
+NotificationHandler::NotificationHandler(
+        _In_ std::shared_ptr<NotificationProcessor> processor):
+    m_processor(processor)
 {
     SWSS_LOG_ENTER();
 
     memset(&m_switchNotifications, 0, sizeof(m_switchNotifications));
 
-    m_notificationQueue = std::make_shared<NotificationQueue>();
+    m_notificationQueue = processor->getQueue();
+}
+
+NotificationHandler::~NotificationHandler()
+{
+    SWSS_LOG_ENTER();
+
+    // empty
 }
 
 void NotificationHandler::setSwitchNotifications(
@@ -100,13 +118,14 @@ void NotificationHandler::updateNotificationsPointers(
                 continue;
         }
 
-        /*
-         * Here we translated pointer, just log it.
-         */
+        // Here we translated pointer, just log it.
 
         SWSS_LOG_INFO("%s: 0x%" PRIx64 " (orch) => 0x%" PRIx64 " (syncd)", meta->attridname, (uint64_t)prev, (uint64_t)attr.value.ptr);
     }
 }
+
+// TODO use same Notification class from sairedis lib
+// then this will handle deserialize free
 
 void NotificationHandler::onFdbEvent(
         _In_ uint32_t count,
@@ -116,7 +135,7 @@ void NotificationHandler::onFdbEvent(
 
     std::string s = sai_serialize_fdb_event_ntf(count, data);
 
-    enqueueNotification("fdb_event", s);
+    enqueueNotification(SAI_SWITCH_NOTIFICATION_NAME_FDB_EVENT, s);
 }
 
 void NotificationHandler::onPortStateChange(
@@ -125,9 +144,9 @@ void NotificationHandler::onPortStateChange(
 {
     SWSS_LOG_ENTER();
 
-    std::string s = sai_serialize_port_oper_status_ntf(count, data);
+    auto s = sai_serialize_port_oper_status_ntf(count, data);
 
-    enqueueNotification("port_state_change", s);
+    enqueueNotification(SAI_SWITCH_NOTIFICATION_NAME_PORT_STATE_CHANGE, s);
 }
 
 void NotificationHandler::onQueuePfcDeadlock(
@@ -136,9 +155,9 @@ void NotificationHandler::onQueuePfcDeadlock(
 {
     SWSS_LOG_ENTER();
 
-    std::string s = sai_serialize_queue_deadlock_ntf(count, data);
+    auto s = sai_serialize_queue_deadlock_ntf(count, data);
 
-    enqueueNotification("queue_deadlock", s);
+    enqueueNotification(SAI_SWITCH_NOTIFICATION_NAME_QUEUE_PFC_DEADLOCK, s);
 }
 
 void NotificationHandler::onSwitchShutdownRequest(
@@ -146,9 +165,9 @@ void NotificationHandler::onSwitchShutdownRequest(
 {
     SWSS_LOG_ENTER();
 
-    std::string s = sai_serialize_switch_shutdown_request(switch_id);
+    auto s = sai_serialize_switch_shutdown_request(switch_id);
 
-    enqueueNotification("switch_shutdown_request", "");
+    enqueueNotification(SAI_SWITCH_NOTIFICATION_NAME_SWITCH_SHUTDOWN_REQUEST, s);
 }
 
 void NotificationHandler::onSwitchStateChange(
@@ -157,9 +176,9 @@ void NotificationHandler::onSwitchStateChange(
 {
     SWSS_LOG_ENTER();
 
-    std::string s = sai_serialize_switch_oper_status(switch_id, switch_oper_status);
+    auto s = sai_serialize_switch_oper_status(switch_id, switch_oper_status);
 
-    enqueueNotification("switch_state_change", s);
+    enqueueNotification(SAI_SWITCH_NOTIFICATION_NAME_SWITCH_STATE_CHANGE, s);
 }
 
 void NotificationHandler::enqueueNotification(
@@ -175,7 +194,7 @@ void NotificationHandler::enqueueNotification(
 
     if (m_notificationQueue->enqueue(item))
     {
-        cv.notify_all();
+        m_processor->signal();
     }
 }
 
