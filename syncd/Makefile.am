@@ -16,6 +16,9 @@ endif
 
 noinst_LIBRARIES = libsyncd.a
 libsyncd_a_SOURCES = \
+				NotificationProcessor.cpp \
+				NotificationHandlerWrapper.cpp \
+				NotificationHandler.cpp \
 				SingleReiniter.cpp \
 				HardReiniter.cpp \
 				SaiDiscovery.cpp \

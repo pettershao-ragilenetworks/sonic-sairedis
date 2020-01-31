@@ -12,6 +12,9 @@
 #include "VidManager.h"
 #include "FlexCounterManager.h"
 #include "HardReiniter.h"
+#include "NotificationProcessor.h"
+#include "NotificationHandler.h"
+#include "NotificationHandlerWrapper.h"
 
 #include "VirtualObjectIdManager.h"
 #include "RedisVidIndexGenerator.h"
@@ -27,6 +30,16 @@
 #define MAX_OBJLIST_LEN 128
 
 using namespace syncd;
+
+/*
+ * Make sure that notification queue pointer is populated before we start
+ * thread, and before we create_switch, since at switch_create we can start
+ * receiving fdb_notifications which will arrive on different thread and
+ * will call getQueueSize() when queue pointer could be null (this=0x0).
+ */
+
+std::shared_ptr<NotificationProcessor> g_processor = std::make_shared<NotificationProcessor>();
+std::shared_ptr<NotificationHandler> g_handler = std::make_shared<NotificationHandler>(g_processor);
 
 std::shared_ptr<sairedis::SaiInterface> g_vendorSai = std::make_shared<VendorSai>();
 
@@ -3119,7 +3132,7 @@ sai_status_t processEvent(
              * will receive all notifications, but redis only those that were set.
              */
 
-            check_notifications_pointers(attr_count, attr_list);
+            g_handler->updateNotificationsPointers(attr_count, attr_list);
         }
 
         if (isInitViewMode())
@@ -3647,6 +3660,8 @@ int syncd_main(int argc, char **argv)
     swss::WarmStart::initialize("syncd", "syncd");
     swss::WarmStart::checkWarmStart("syncd", "syncd");
 
+    NotificationHandlerWrapper::setNotificationHandler(g_handler);
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsuggest-attribute=format"
     sai_metadata_log = &sai_meta_log_syncd;
@@ -3790,7 +3805,7 @@ int syncd_main(int argc, char **argv)
         // make sure, we have switch_id translated to VID before we start
         // processing possible quick fdb notifications, and pointer for
         // notification queue is created before we create switch
-        startNotificationsProcessingThread();
+        g_processor->startNotificationsProcessingThread();
 
         SWSS_LOG_NOTICE("syncd listening for events");
 
@@ -4012,7 +4027,7 @@ int syncd_main(int argc, char **argv)
     }
 
     // Stop notification thread after removing switch
-    stopNotificationsProcessingThread();
+    g_processor->stopNotificationsProcessingThread();
 
     if (status != SAI_STATUS_SUCCESS)
     {

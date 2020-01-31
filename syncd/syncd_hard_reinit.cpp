@@ -2,6 +2,7 @@
 #include "sairediscommon.h"
 
 #include "VidManager.h"
+#include "NotificationHandler.h"
 
 #include <string>
 #include <vector>
@@ -10,6 +11,7 @@
 
 using namespace syncd;
 
+extern std::shared_ptr<NotificationHandler> g_handler;
 extern sai_object_id_t gSwitchId;
 
 void redisClearVidToRidMap()
@@ -168,7 +170,7 @@ void performWarmRestart()
         switch_attrs[i+1].id        = notifs[i];
         switch_attrs[i+1].value.ptr = (void *)1; // any non-null pointer
     }
-    check_notifications_pointers((uint32_t)NELMS(switch_attrs), &switch_attrs[0]);
+    g_handler->updateNotificationsPointers((uint32_t)NELMS(switch_attrs), &switch_attrs[0]);
     sai_status_t status;
 
     {

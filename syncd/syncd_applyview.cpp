@@ -10,6 +10,7 @@
 #include "AsicView.h"
 #include "VidManager.h"
 #include "BestCandidateFinder.h"
+#include "NotificationHandler.h"
 
 #include <inttypes.h>
 #include <algorithm>
@@ -17,6 +18,7 @@
 
 using namespace syncd;
 
+extern std::shared_ptr<NotificationHandler> g_handler;
 extern std::shared_ptr<CommandLineOptions> g_commandLineOptions; // TODO move to syncd object
 // TODO part of sai meta (valid only when used with vslib)
 void dump_object_reference()
@@ -3452,7 +3454,8 @@ sai_status_t asic_process_event(
 
     if (object_type == SAI_OBJECT_TYPE_SWITCH)
     {
-        check_notifications_pointers(attr_count, attr_list);
+        // only because user could change notifications he wanted to subscribe
+        g_handler->updateNotificationsPointers(attr_count, attr_list);
     }
 
     if (info->isnonobjectid)

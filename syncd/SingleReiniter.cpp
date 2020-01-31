@@ -1,6 +1,7 @@
 #include "SingleReiniter.h"
 #include "VidManager.h"
 #include "CommandLineOptions.h"
+#include "NotificationHandler.h"
 
 #include "swss/logger.h"
 
@@ -10,6 +11,7 @@
 
 using namespace syncd;
 
+extern std::shared_ptr<NotificationHandler> g_handler;
 extern sai_object_id_t gSwitchId;
 extern std::shared_ptr<CommandLineOptions> g_commandLineOptions; // TODO to be removed
 
@@ -226,7 +228,7 @@ void SingleReiniter::processSwitches()
          * point to callbacks in syncd memory.
          */
 
-        check_notifications_pointers(attrCount, attrList); // TODO need per switch template static
+        g_handler->updateNotificationsPointers(attrCount, attrList); // TODO need per switch template static
 
         /*
          * Now we need to select only attributes MANDATORY_ON_CREATE and
