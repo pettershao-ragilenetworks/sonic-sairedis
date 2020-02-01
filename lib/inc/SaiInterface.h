@@ -183,6 +183,26 @@ namespace sairedis
             SAIREDIS_SAIINTERFACE_DECLARE_BULK_SET_ENTRY(nat_entry);
             SAIREDIS_SAIINTERFACE_DECLARE_BULK_SET_ENTRY(route_entry);
 
+        public: // QUAD meta key
+
+            virtual sai_status_t create(
+                    _Inout_ sai_object_meta_key_t& metaKey,
+                    _In_ sai_object_id_t switch_id,
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
+
+            virtual sai_status_t remove(
+                    _In_ const sai_object_meta_key_t& metaKey);
+
+            virtual sai_status_t set(
+                    _In_ const sai_object_meta_key_t& metaKey,
+                    _In_ const sai_attribute_t *attr);
+
+            virtual sai_status_t get(
+                    _In_ const sai_object_meta_key_t& metaKey,
+                    _In_ uint32_t attr_count,
+                    _Inout_ sai_attribute_t *attr_list);
+
         public: // stats API
 
             virtual sai_status_t getStats(
