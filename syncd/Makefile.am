@@ -39,7 +39,6 @@ libsyncd_a_SOURCES = \
 				VendorSai.cpp \
 				syncd.cpp \
 				syncd_hard_reinit.cpp \
-				syncd_notifications.cpp \
 				syncd_applyview.cpp \
 				TimerWatchdog.cpp \
 				NotificationQueue.cpp \
