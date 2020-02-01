@@ -8,7 +8,6 @@ extern "C"{
 #include <unordered_map>
 
 // TODO can be child class (redis translator etc)
-// TODO sai_object_type_query can be functor function
 
 namespace syncd
 {
