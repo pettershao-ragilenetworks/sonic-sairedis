@@ -373,7 +373,7 @@ void SaiSwitch::redisSetDummyAsicStateForRealObjectId(
 {
     SWSS_LOG_ENTER();
 
-    sai_object_id_t vid = translate_rid_to_vid(rid, m_switch_vid);
+    sai_object_id_t vid = g_translator->translateRidToVid(rid, m_switch_vid);
 
     sai_object_type_t objectType = g_vendorSai->objectTypeQuery(rid);
 
@@ -636,7 +636,7 @@ bool SaiSwitch::isColdBootDiscoveredRid(
      * except objects that were removed like VLAN_MEMBER.
      */
 
-    sai_object_id_t vid = translate_rid_to_vid(rid, m_switch_vid);
+    sai_object_id_t vid = g_translator->translateRidToVid(rid, m_switch_vid);
 
     return coldBootDiscoveredVids.find(vid) != coldBootDiscoveredVids.end();
 }
@@ -811,7 +811,7 @@ std::set<sai_object_id_t> SaiSwitch::getColdBootDiscoveredVids() const
 
     for (sai_object_id_t rid: m_discovered_rids)
     {
-        sai_object_id_t vid = translate_rid_to_vid(rid, m_switch_vid);
+        sai_object_id_t vid = g_translator->translateRidToVid(rid, m_switch_vid);
 
         discoveredVids.insert(vid);
     }
@@ -832,7 +832,7 @@ void SaiSwitch::redisSaveColdBootDiscoveredVids() const
 
     for (sai_object_id_t rid: m_discovered_rids)
     {
-        sai_object_id_t vid = translate_rid_to_vid(rid, m_switch_vid);
+        sai_object_id_t vid = g_translator->translateRidToVid(rid, m_switch_vid);
 
         sai_object_type_t objectType = g_vendorSai->objectTypeQuery(rid);
 
@@ -1000,7 +1000,7 @@ void SaiSwitch::helperPopulateWarmBootVids()
 
     for (sai_object_id_t rid: m_discovered_rids)
     {
-        sai_object_id_t vid = translate_rid_to_vid(rid, m_switch_vid);
+        sai_object_id_t vid = g_translator->translateRidToVid(rid, m_switch_vid);
 
        m_warmBootDiscoveredVids.insert(vid);
     }

@@ -40,6 +40,7 @@ extern "C" {
 #include "swss/table.h"
 
 #include "SaiSwitch.h"
+#include "VirtualOidTranslator.h"
 
 #include "VendorSai.h"
 
@@ -64,21 +65,13 @@ extern std::mutex g_mutex;
 
 extern std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> switches;
 
+extern std::shared_ptr<syncd::VirtualOidTranslator> g_translator; // TODO move to syncd object
+
 void startDiagShell();
 
 void hardReinit();
 
 void performWarmRestart();
-
-sai_object_id_t translate_vid_to_rid(_In_ sai_object_id_t vid);
-
-void translate_vid_to_rid_list(
-        _In_ sai_object_type_t object_type,
-        _In_ uint32_t attr_count,
-        _In_ sai_attribute_t *attr_list);
-
-void translate_vid_to_rid_non_object_id(
-        _Inout_ sai_object_meta_key_t &meta_key);
 
 void redisClearVidToRidMap();
 void redisClearRidToVidMap();
@@ -87,19 +80,6 @@ extern std::shared_ptr<swss::NotificationProducer>  notifications;
 extern std::shared_ptr<swss::RedisClient>   g_redisClient;
 extern std::shared_ptr<swss::DBConnector>   dbAsic;
 extern std::string fdbFlushSha;
-
-sai_object_id_t translate_rid_to_vid(
-        _In_ sai_object_id_t rid,
-        _In_ sai_object_id_t switch_vid);
-
-bool check_rid_exists(
-        _In_ sai_object_id_t rid);
-
-void translate_rid_to_vid_list(
-        _In_ sai_object_type_t object_type,
-        _In_ sai_object_id_t switch_vid,
-        _In_ uint32_t attr_count,
-        _In_ sai_attribute_t *attr_list);
 
 sai_status_t syncdApplyView();
 void check_notifications_pointers(

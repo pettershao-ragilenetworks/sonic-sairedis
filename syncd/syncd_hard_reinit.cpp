@@ -150,7 +150,7 @@ void performWarmRestart()
 
     sai_deserialize_object_id(strSwitchVid, switch_vid);
 
-    sai_object_id_t orig_rid = translate_vid_to_rid(switch_vid);
+    sai_object_id_t orig_rid = g_translator->translateVidToRid(switch_vid);
 
     sai_object_id_t switch_rid;
     sai_attr_id_t   notifs[] = {

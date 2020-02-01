@@ -15,6 +15,8 @@
 #include "NotificationProcessor.h"
 #include "NotificationHandler.h"
 #include "NotificationHandlerWrapper.h"
+#include "VirtualOidTranslator.h"
+
 
 #include "VirtualObjectIdManager.h"
 #include "RedisVidIndexGenerator.h"
@@ -113,6 +115,11 @@ sai_object_id_t gSwitchId = SAI_NULL_OBJECT_ID;
 std::string fdbFlushSha;
 std::string fdbFlushLuaScriptName = "fdb_flush.lua";
 
+// TODO we must be sure that all threads and notifications will be stopped
+// before destructor will be called on those objects
+
+std::shared_ptr<VirtualOidTranslator> g_translator; // TODO move to syncd object
+
 std::shared_ptr<CommandLineOptions> g_commandLineOptions; // TODO move to syncd object
 
 bool isInitViewMode()
@@ -179,416 +186,6 @@ void sai_diag_shell(
         }
 
         sleep(1);
-    }
-}
-
-std::unordered_map<sai_object_id_t, sai_object_id_t> local_rid_to_vid;
-std::unordered_map<sai_object_id_t, sai_object_id_t> local_vid_to_rid;
-
-void save_rid_and_vid_to_local(
-        _In_ sai_object_id_t rid,
-        _In_ sai_object_id_t vid)
-{
-    SWSS_LOG_ENTER();
-
-    local_rid_to_vid[rid] = vid;
-    local_vid_to_rid[vid] = rid;
-}
-
-void remove_rid_and_vid_from_local(
-        _In_ sai_object_id_t rid,
-        _In_ sai_object_id_t vid)
-{
-    SWSS_LOG_ENTER();
-
-    local_rid_to_vid.erase(rid);
-    local_vid_to_rid.erase(vid);
-}
-
-/*
- * This method will create VID for actual RID retrieved from device when doing
- * GET api and snooping while in init view mode.
- *
- * This function should not be used to create VID for SWITCH object type.
- */
-sai_object_id_t translate_rid_to_vid(
-        _In_ sai_object_id_t rid,
-        _In_ sai_object_id_t switch_vid)
-{
-    SWSS_LOG_ENTER();
-
-    /*
-     * NOTE: switch_vid here is Virtual ID of switch for which we need
-     * create VID for given RID.
-     */
-
-    if (rid == SAI_NULL_OBJECT_ID)
-    {
-        SWSS_LOG_DEBUG("translated RID null to VID null");
-
-        return SAI_NULL_OBJECT_ID;
-    }
-
-    auto it = local_rid_to_vid.find(rid);
-
-    if (it != local_rid_to_vid.end())
-    {
-        return it->second;
-    }
-
-    sai_object_id_t vid;
-
-    std::string str_rid = sai_serialize_object_id(rid);
-
-    auto pvid = g_redisClient->hget(RIDTOVID, str_rid);
-
-    if (pvid != NULL)
-    {
-        /*
-         * Object exists.
-         */
-
-        std::string str_vid = *pvid;
-
-        sai_deserialize_object_id(str_vid, vid);
-
-        SWSS_LOG_DEBUG("translated RID 0x%" PRIx64 " to VID 0x%" PRIx64, rid, vid);
-
-        return vid;
-    }
-
-    SWSS_LOG_DEBUG("spotted new RID 0x%" PRIx64, rid);
-
-    sai_object_type_t object_type = g_vendorSai->objectTypeQuery(rid);
-
-    if (object_type == SAI_OBJECT_TYPE_NULL)
-    {
-        SWSS_LOG_THROW("g_vendorSai->objectTypeQuery returned NULL type for RID 0x%" PRIx64, rid);
-    }
-
-    if (object_type == SAI_OBJECT_TYPE_SWITCH)
-    {
-        /*
-         * Switch ID should be already inside local db or redis db when we
-         * created switch, so we should never get here.
-         */
-
-        SWSS_LOG_THROW("RID 0x%" PRIx64 " is switch object, but not in local or redis db, bug!", rid);
-    }
-
-    vid = g_virtualObjectIdManager->allocateNewObjectId(object_type, switch_vid);
-
-    SWSS_LOG_DEBUG("translated RID 0x%" PRIx64 " to VID 0x%" PRIx64, rid, vid);
-
-    std::string str_vid = sai_serialize_object_id(vid);
-
-    /*
-     * TODO: This must be ATOMIC.
-     *
-     * TODO: To support multiple switches we need this map per switch;
-     */
-
-    g_redisClient->hset(RIDTOVID, str_rid, str_vid);
-    g_redisClient->hset(VIDTORID, str_vid, str_rid);
-
-    save_rid_and_vid_to_local(rid, vid);
-
-    return vid;
-}
-
-/**
- * @brief Check if RID exists on the ASIC DB.
- *
- * @param rid Real object id to check.
- *
- * @return True if exists or SAI_NULL_OBJECT_ID, otherwise false.
- */
-bool check_rid_exists(
-        _In_ sai_object_id_t rid)
-{
-    SWSS_LOG_ENTER();
-
-    if (rid == SAI_NULL_OBJECT_ID)
-        return true;
-
-    if (local_rid_to_vid.find(rid) != local_rid_to_vid.end())
-        return true;
-
-    std::string str_rid = sai_serialize_object_id(rid);
-
-    auto pvid = g_redisClient->hget(RIDTOVID, str_rid);
-
-    if (pvid != NULL)
-        return true;
-
-    return false;
-}
-
-void translate_list_rid_to_vid(
-        _In_ sai_object_list_t &element,
-        _In_ sai_object_id_t switch_id)
-{
-    SWSS_LOG_ENTER();
-
-    for (uint32_t i = 0; i < element.count; i++)
-    {
-        element.list[i] = translate_rid_to_vid(element.list[i], switch_id);
-    }
-}
-
-/*
- * This method is required to translate RID to VIDs when we are doing snoop for
- * new ID's in init view mode, on in apply view mode when we are executing GET
- * api, and new object RIDs were spotted the we will create new VIDs for those
- * objects and we will put them to redis db.
- */
-void translate_rid_to_vid_list(
-        _In_ sai_object_type_t object_type,
-        _In_ sai_object_id_t switch_id,
-        _In_ uint32_t attr_count,
-        _In_ sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    /*
-     * We receive real id's here, if they are new then create new VIDs for them
-     * and put in db, if entry exists in db, use it.
-     *
-     * NOTE: switch_id is VID of switch on which those RIDs are provided.
-     */
-
-    for (uint32_t i = 0; i < attr_count; i++)
-    {
-        sai_attribute_t &attr = attr_list[i];
-
-        auto meta = sai_metadata_get_attr_metadata(object_type, attr.id);
-
-        if (meta == NULL)
-        {
-            SWSS_LOG_THROW("unable to get metadata for object type %x, attribute %d", object_type, attr.id);
-        }
-
-        /*
-         * TODO: Many times we do switch for list of attributes to perform some
-         * operation on each oid from that attribute, we should provide clever
-         * way via sai metadata utils to get that.
-         */
-
-        switch (meta->attrvaluetype)
-        {
-            case SAI_ATTR_VALUE_TYPE_OBJECT_ID:
-                attr.value.oid = translate_rid_to_vid(attr.value.oid, switch_id);
-                break;
-
-            case SAI_ATTR_VALUE_TYPE_OBJECT_LIST:
-                translate_list_rid_to_vid(attr.value.objlist, switch_id);
-                break;
-
-            case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_OBJECT_ID:
-                if (attr.value.aclfield.enable)
-                    attr.value.aclfield.data.oid = translate_rid_to_vid(attr.value.aclfield.data.oid, switch_id);
-                break;
-
-            case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_OBJECT_LIST:
-                if (attr.value.aclfield.enable)
-                    translate_list_rid_to_vid(attr.value.aclfield.data.objlist, switch_id);
-                break;
-
-            case SAI_ATTR_VALUE_TYPE_ACL_ACTION_DATA_OBJECT_ID:
-                if (attr.value.aclaction.enable)
-                    attr.value.aclaction.parameter.oid = translate_rid_to_vid(attr.value.aclaction.parameter.oid, switch_id);
-                break;
-
-            case SAI_ATTR_VALUE_TYPE_ACL_ACTION_DATA_OBJECT_LIST:
-                if (attr.value.aclaction.enable)
-                    translate_list_rid_to_vid(attr.value.aclaction.parameter.objlist, switch_id);
-                break;
-
-            default:
-
-                /*
-                 * If in future new attribute with object id will be added this
-                 * will make sure that we will need to add handler here.
-                 */
-
-                if (meta->isoidattribute)
-                {
-                    SWSS_LOG_THROW("attribute %s is object id, but not processed, FIXME", meta->attridname);
-                }
-
-                break;
-        }
-    }
-}
-
-/*
- * NOTE: We could have in metadata utils option to execute function on each
- * object on oid like this.  Problem is that we can't then add extra
- * parameters.
- */
-
-sai_object_id_t translate_vid_to_rid(
-        _In_ sai_object_id_t vid)
-{
-    SWSS_LOG_ENTER();
-
-    if (vid == SAI_NULL_OBJECT_ID)
-    {
-        SWSS_LOG_DEBUG("translated VID null to RID null");
-
-        return SAI_NULL_OBJECT_ID;
-    }
-
-    auto it = local_vid_to_rid.find(vid);
-
-    if (it != local_vid_to_rid.end())
-    {
-        return it->second;
-    }
-
-    std::string str_vid = sai_serialize_object_id(vid);
-
-    std::string str_rid;
-
-    auto prid = g_redisClient->hget(VIDTORID, str_vid);
-
-    if (prid == NULL)
-    {
-        if (isInitViewMode())
-        {
-            /*
-             * If user created object that is object id, then it should not
-             * query attributes of this object in init view mode, because he
-             * knows all attributes passed to that object.
-             *
-             * NOTE: This may be a problem for some objects in init view mode.
-             * We will need to revisit this after checking with real SAI
-             * implementation.  Problem here may be that user will create some
-             * object and actually will need to to query some of it's values,
-             * like buffer limitations etc, mostly probably this will happen on
-             * SWITCH object.
-             */
-
-            SWSS_LOG_THROW("can't get RID in init view mode - don't query created objects");
-        }
-
-        SWSS_LOG_THROW("unable to get RID for VID: 0x%" PRIx64, vid);
-    }
-
-    str_rid = *prid;
-
-    sai_object_id_t rid;
-
-    sai_deserialize_object_id(str_rid, rid);
-
-    /*
-     * We got this RID from redis db, so put it also to local db so it will be
-     * faster to retrieve it late on.
-     */
-
-    local_vid_to_rid[vid] = rid;
-
-    SWSS_LOG_DEBUG("translated VID 0x%" PRIx64 " to RID 0x%" PRIx64, vid, rid);
-
-    return rid;
-}
-
-bool try_translate_vid_to_rid(
-        _In_ sai_object_id_t vid,
-        _Out_ sai_object_id_t& rid)
-{
-    SWSS_LOG_ENTER();
-
-    try
-    {
-        rid = translate_vid_to_rid(vid);
-        return true;
-    }
-    catch (const std::exception& e)
-    {
-        // message was logged already when throwing
-        return false;
-    }
-}
-
-void translate_list_vid_to_rid(
-        _In_ sai_object_list_t &element)
-{
-    SWSS_LOG_ENTER();
-
-    for (uint32_t i = 0; i < element.count; i++)
-    {
-        element.list[i] = translate_vid_to_rid(element.list[i]);
-    }
-}
-
-void translate_vid_to_rid_list(
-        _In_ sai_object_type_t object_type,
-        _In_ uint32_t attr_count,
-        _In_ sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    /*
-     * All id's received from sairedis should be virtual, so lets translate
-     * them to real id's before we execute actual api.
-     */
-
-    for (uint32_t i = 0; i < attr_count; i++)
-    {
-        sai_attribute_t &attr = attr_list[i];
-
-        auto meta = sai_metadata_get_attr_metadata(object_type, attr.id);
-
-        if (meta == NULL)
-        {
-            SWSS_LOG_THROW("unable to get metadata for object type %x, attribute %d", object_type, attr.id);
-        }
-
-        switch (meta->attrvaluetype)
-        {
-            case SAI_ATTR_VALUE_TYPE_OBJECT_ID:
-                attr.value.oid = translate_vid_to_rid(attr.value.oid);
-                break;
-
-            case SAI_ATTR_VALUE_TYPE_OBJECT_LIST:
-                translate_list_vid_to_rid(attr.value.objlist);
-                break;
-
-            case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_OBJECT_ID:
-                if (attr.value.aclfield.enable)
-                    attr.value.aclfield.data.oid = translate_vid_to_rid(attr.value.aclfield.data.oid);
-                break;
-
-            case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_OBJECT_LIST:
-                if (attr.value.aclfield.enable)
-                    translate_list_vid_to_rid(attr.value.aclfield.data.objlist);
-                break;
-
-            case SAI_ATTR_VALUE_TYPE_ACL_ACTION_DATA_OBJECT_ID:
-                if (attr.value.aclaction.enable)
-                    attr.value.aclaction.parameter.oid = translate_vid_to_rid(attr.value.aclaction.parameter.oid);
-                break;
-
-            case SAI_ATTR_VALUE_TYPE_ACL_ACTION_DATA_OBJECT_LIST:
-                if (attr.value.aclaction.enable)
-                    translate_list_vid_to_rid(attr.value.aclaction.parameter.objlist);
-                break;
-
-            default:
-
-                /*
-                 * If in future new attribute with object id will be added this
-                 * will make sure that we will need to add handler here.
-                 */
-
-                if (meta->isoidattribute)
-                {
-                    SWSS_LOG_THROW("attribute %s is object id, but not processed, FIXME", meta->attridname);
-                }
-
-                break;
-        }
     }
 }
 
@@ -802,7 +399,7 @@ void internal_syncd_get_send(
 
     if (status == SAI_STATUS_SUCCESS)
     {
-        translate_rid_to_vid_list(object_type, switch_id, attr_count, attr_list);
+        g_translator->translateRidToVid(object_type, switch_id, attr_count, attr_list);
 
         /*
          * Normal serialization + translate RID to VID.
@@ -1001,7 +598,7 @@ void on_switch_create(
 {
     SWSS_LOG_ENTER();
 
-    sai_object_id_t switch_rid = translate_vid_to_rid(switch_vid);
+    sai_object_id_t switch_rid = g_translator->translateVidToRid(switch_vid);
 
     if (switches.size() > 0)
     {
@@ -1176,12 +773,9 @@ void post_port_remove(
         sai_object_id_t vid;
         sai_deserialize_object_id(str_vid, vid);
 
-        g_redisClient->hdel(VIDTORID, str_vid);
-        g_redisClient->hdel(RIDTOVID, str_rid);
+        // TODO should this remove rid,vid and object be as db op?
 
-        // remove from local vid2rid and rid2vid map
-
-        remove_rid_and_vid_from_local(rid, vid);
+        g_translator->eraseRidAndVid(rid, vid);
 
         // remove from ASIC DB
 
@@ -1279,7 +873,7 @@ sai_status_t handle_generic(
                      * but use translate for all other objects.
                      */
 
-                    switch_id = translate_vid_to_rid(switch_id);
+                    switch_id = g_translator->translateVidToRid(switch_id);
                 }
                 else
                 {
@@ -1321,18 +915,7 @@ sai_status_t handle_generic(
                     std::string str_vid = sai_serialize_object_id(object_id);
                     std::string str_rid = sai_serialize_object_id(real_object_id);
 
-                    /*
-                     * TODO: This must be ATOMIC.
-                     *
-                     * To support multiple switches vid/rid map must be per switch.
-                     */
-
-                    {
-                        g_redisClient->hset(VIDTORID, str_vid, str_rid);
-                        g_redisClient->hset(RIDTOVID, str_rid, str_vid);
-
-                        save_rid_and_vid_to_local(real_object_id, object_id);
-                    }
+                    g_translator->insertRidAndVid(real_object_id, object_id);
 
                     SWSS_LOG_INFO("saved VID %s to RID %s", str_vid.c_str(), str_rid.c_str());
 
@@ -1357,7 +940,7 @@ sai_status_t handle_generic(
         case SAI_COMMON_API_REMOVE:
 
             {
-                sai_object_id_t rid = translate_vid_to_rid(object_id);
+                sai_object_id_t rid = g_translator->translateVidToRid(object_id);
 
                 meta_key.objectkey.key.object_id = rid;
 
@@ -1387,17 +970,7 @@ sai_status_t handle_generic(
                     std::string str_vid = sai_serialize_object_id(object_id);
                     std::string str_rid = sai_serialize_object_id(rid);
 
-                    /*
-                     * TODO: This must be ATOMIC.
-                     */
-
-                    {
-
-                        g_redisClient->hdel(VIDTORID, str_vid);
-                        g_redisClient->hdel(RIDTOVID, str_rid);
-
-                        remove_rid_and_vid_from_local(rid, object_id);
-                    }
+                    g_translator->eraseRidAndVid(rid, object_id);
 
                     // TODO remove all related objects from REDIS DB and also
                     // from existing object references since at this point
@@ -1451,7 +1024,7 @@ sai_status_t handle_generic(
         case SAI_COMMON_API_SET:
 
             {
-                sai_object_id_t rid = translate_vid_to_rid(object_id);
+                sai_object_id_t rid = g_translator->translateVidToRid(object_id);
 
                 meta_key.objectkey.key.object_id = rid;
 
@@ -1468,7 +1041,7 @@ sai_status_t handle_generic(
         case SAI_COMMON_API_GET:
 
             {
-                sai_object_id_t rid = translate_vid_to_rid(object_id);
+                sai_object_id_t rid = g_translator->translateVidToRid(object_id);
 
                 meta_key.objectkey.key.object_id = rid;
 
@@ -1481,38 +1054,6 @@ sai_status_t handle_generic(
     }
 }
 
-void translate_vid_to_rid_non_object_id(
-        _Inout_ sai_object_meta_key_t &meta_key)
-{
-    SWSS_LOG_ENTER();
-
-    auto info = sai_metadata_get_object_type_info(meta_key.objecttype);
-
-    if (info->isobjectid)
-    {
-        SWSS_LOG_WARN("function used on OID object");
-
-        meta_key.objectkey.key.object_id =
-            translate_vid_to_rid(meta_key.objectkey.key.object_id);
-
-        return;
-    }
-
-    for (size_t j = 0; j < info->structmemberscount; ++j)
-    {
-        const sai_struct_member_info_t *m = info->structmembers[j];
-
-        if (m->membervaluetype == SAI_ATTR_VALUE_TYPE_OBJECT_ID)
-        {
-            sai_object_id_t vid = m->getoid(&meta_key);
-
-            sai_object_id_t rid = translate_vid_to_rid(vid);
-
-            m->setoid(&meta_key, rid);
-        }
-    }
-}
-
 sai_status_t handle_non_object_id(
         _In_ sai_object_meta_key_t &meta_key,
         _In_ sai_common_api_t api,
@@ -1521,7 +1062,7 @@ sai_status_t handle_non_object_id(
 {
     SWSS_LOG_ENTER();
 
-    translate_vid_to_rid_non_object_id(meta_key);
+    g_translator->translateVidToRid(meta_key);
 
     auto info = sai_metadata_get_object_type_info(meta_key.objecttype);
 
@@ -1653,8 +1194,10 @@ void InspectAsic()
                 sai_fdb_entry_t fdb_entry;
                 sai_deserialize_fdb_entry(str_object_id, fdb_entry);
 
-                fdb_entry.switch_id = translate_vid_to_rid(fdb_entry.switch_id);
-                fdb_entry.bv_id = translate_vid_to_rid(fdb_entry.bv_id);
+                // TODO make those translation generic iterating members !
+
+                fdb_entry.switch_id = g_translator->translateVidToRid(fdb_entry.switch_id);
+                fdb_entry.bv_id = g_translator->translateVidToRid(fdb_entry.bv_id);
 
                 status = g_vendorSai->get(&fdb_entry, attr_count, attr_list);
                 break;
@@ -1665,8 +1208,8 @@ void InspectAsic()
                 sai_neighbor_entry_t neighbor_entry;
                 sai_deserialize_neighbor_entry(str_object_id, neighbor_entry);
 
-                neighbor_entry.switch_id = translate_vid_to_rid(neighbor_entry.switch_id);
-                neighbor_entry.rif_id = translate_vid_to_rid(neighbor_entry.rif_id);
+                neighbor_entry.switch_id = g_translator->translateVidToRid(neighbor_entry.switch_id);
+                neighbor_entry.rif_id = g_translator->translateVidToRid(neighbor_entry.rif_id);
 
                 status = g_vendorSai->get(&neighbor_entry, attr_count, attr_list);
                 break;
@@ -1677,8 +1220,8 @@ void InspectAsic()
                 sai_route_entry_t route_entry;
                 sai_deserialize_route_entry(str_object_id, route_entry);
 
-                route_entry.switch_id = translate_vid_to_rid(route_entry.switch_id);
-                route_entry.vr_id = translate_vid_to_rid(route_entry.vr_id);
+                route_entry.switch_id = g_translator->translateVidToRid(route_entry.switch_id);
+                route_entry.vr_id = g_translator->translateVidToRid(route_entry.vr_id);
 
                 status = g_vendorSai->get(&route_entry, attr_count, attr_list);
                 break;
@@ -1689,8 +1232,8 @@ void InspectAsic()
                 sai_nat_entry_t nat_entry;
                 sai_deserialize_nat_entry(str_object_id, nat_entry);
 
-                nat_entry.switch_id = translate_vid_to_rid(nat_entry.switch_id);
-                nat_entry.vr_id = translate_vid_to_rid(nat_entry.vr_id);
+                nat_entry.switch_id = g_translator->translateVidToRid(nat_entry.switch_id);
+                nat_entry.vr_id = g_translator->translateVidToRid(nat_entry.vr_id);
 
                 status = g_vendorSai->get(&nat_entry, attr_count, attr_list);
                 break;
@@ -1711,7 +1254,7 @@ void InspectAsic()
                 sai_object_meta_key_t meta_key;
 
                 meta_key.objecttype = object_type;
-                meta_key.objectkey.key.object_id = translate_vid_to_rid(object_id);
+                meta_key.objectkey.key.object_id = g_translator->translateVidToRid(object_id);
 
                 status = info->get(&meta_key, attr_count, attr_list);
                 break;
@@ -1898,10 +1441,16 @@ sai_status_t notifySyncd(
              * We successfully applied new view, VID mapping could change, so we
              * need to clear local db, and all new VIDs will be queried using
              * redis.
+             *
+             * TODO possible race condition - get notification when new view is
+             * applied and cache have old values, and notification start's
+             * translating vid/rid, we need to stop processing notifications
+             * for transition (queue can still grow), possible fdb
+             * notifications but fdb learning was disabled on warm boot, so
+             * there should be no issue
              */
 
-            local_rid_to_vid.clear();
-            local_vid_to_rid.clear();
+            g_translator->clearLocalCache();
         }
         else
         {
@@ -2009,7 +1558,7 @@ sai_status_t processGetStatsEvent(
 
     sai_object_id_t object_id;
     sai_deserialize_object_id(str_object_id, object_id);
-    sai_object_id_t rid = translate_vid_to_rid(object_id);
+    sai_object_id_t rid = g_translator->translateVidToRid(object_id);
     sai_object_type_t object_type;
     sai_deserialize_object_type(str_object_type, object_type);
 
@@ -2077,12 +1626,12 @@ sai_status_t processClearStatsEvent(
     const std::string &str_object_type = key.substr(0, key.find(":"));
     const std::string &str_object_id = key.substr(key.find(":") + 1);
 
-    sai_object_id_t object_id;
-    sai_deserialize_object_id(str_object_id, object_id);
+    sai_object_id_t objectVid;
+    sai_deserialize_object_id(str_object_id, objectVid);
     sai_object_id_t rid;
     sai_status_t status = SAI_STATUS_FAILURE;
     std::vector<swss::FieldValueTuple> fvTuples;
-    if (!try_translate_vid_to_rid(object_id, rid))
+    if (!g_translator->tryTranslateVidToRid(objectVid, rid))
     {
         SWSS_LOG_ERROR("VID %s to RID translation error", str_object_id.c_str());
         status = SAI_STATUS_INVALID_OBJECT_ID;
@@ -2214,16 +1763,7 @@ void on_switch_create_in_init_view(
 
         SWSS_LOG_NOTICE("created real switch VID %s to RID %s in init view mode", str_vid.c_str(), str_rid.c_str());
 
-        /*
-         * TODO: This must be ATOMIC.
-         *
-         * To support multiple switches vid/rid map must be per switch.
-         */
-
-        g_redisClient->hset(VIDTORID, str_vid, str_rid);
-        g_redisClient->hset(RIDTOVID, str_rid, str_vid);
-
-        save_rid_and_vid_to_local(switch_rid, switch_vid);
+        g_translator->insertRidAndVid(switch_rid, switch_vid);
 
         /*
          * Make switch initialization and get all default data.
@@ -2455,7 +1995,7 @@ sai_status_t processEventInInitViewMode(
                      * and it have RID defined, so we can query it.
                      */
 
-                    sai_object_id_t rid = translate_vid_to_rid(object_id);
+                    sai_object_id_t rid = g_translator->translateVidToRid(object_id);
 
                     sai_object_meta_key_t meta_key;
 
@@ -2790,7 +2330,7 @@ sai_status_t processBulkEvent(
             sai_attribute_t *attr_list = list->get_attr_list();
             uint32_t attr_count = list->get_attr_count();
 
-            translate_vid_to_rid_list(object_type, attr_count, attr_list);
+            g_translator->translateVidToRid(object_type, attr_count, attr_list);
         }
     }
 
@@ -2836,7 +2376,7 @@ sai_status_t processFdbFlush(
 
     sai_deserialize_object_id(str_object_id, switch_vid);
 
-    sai_object_id_t switch_rid = translate_vid_to_rid(switch_vid);
+    sai_object_id_t switch_rid = g_translator->translateVidToRid(switch_vid);
 
     const std::vector<swss::FieldValueTuple> &values = kfvFieldsValues(kco);
 
@@ -2855,7 +2395,7 @@ sai_status_t processFdbFlush(
     sai_attribute_t *attr_list = list.get_attr_list();
     uint32_t attr_count = list.get_attr_count();
 
-    translate_vid_to_rid_list(SAI_OBJECT_TYPE_FDB_FLUSH, attr_count, attr_list);
+    g_translator->translateVidToRid(SAI_OBJECT_TYPE_FDB_FLUSH, attr_count, attr_list);
 
     sai_status_t status = g_vendorSai->flushFdbEntries(switch_rid, attr_count, attr_list);
 
@@ -2876,7 +2416,7 @@ sai_status_t processAttrEnumValuesCapabilityQuery(
     sai_object_id_t switch_vid;
     sai_deserialize_object_id(switch_str_id, switch_vid);
 
-    const sai_object_id_t switch_rid = translate_vid_to_rid(switch_vid);
+    const sai_object_id_t switch_rid = g_translator->translateVidToRid(switch_vid);
 
     const std::vector<swss::FieldValueTuple> &values = kfvFieldsValues(kco);
 
@@ -2942,7 +2482,7 @@ sai_status_t processObjectTypeGetAvailabilityQuery(
     sai_object_id_t switch_vid;
     sai_deserialize_object_id(switch_str_id, switch_vid);
 
-    const sai_object_id_t switch_rid = translate_vid_to_rid(switch_vid);
+    const sai_object_id_t switch_rid = g_translator->translateVidToRid(switch_vid);
 
     std::vector<swss::FieldValueTuple> values = kfvFieldsValues(kco);
 
@@ -2957,7 +2497,7 @@ sai_status_t processObjectTypeGetAvailabilityQuery(
     sai_attribute_t *sai_attr_list = attr_list.get_attr_list();
     uint32_t attr_count = attr_list.get_attr_count();
 
-    translate_vid_to_rid_list(object_type, attr_count, sai_attr_list);
+    g_translator->translateVidToRid(object_type, attr_count, sai_attr_list);
 
     uint64_t count;
     sai_status_t status = g_vendorSai->objectTypeGetAvailability(
@@ -3150,7 +2690,7 @@ sai_status_t processEvent(
 
             SWSS_LOG_DEBUG("translating VID to RIDs on all attributes");
 
-            translate_vid_to_rid_list(object_type, attr_count, attr_list);
+            g_translator->translateVidToRid(object_type, attr_count, attr_list);
         }
 
         // TODO use metadata utils
@@ -3224,7 +2764,7 @@ sai_status_t processEvent(
                 sai_object_id_t vid;
                 sai_deserialize_object_id(str_object_id, vid);
 
-                sai_object_id_t rid = translate_vid_to_rid(vid);
+                sai_object_id_t rid = g_translator->translateVidToRid(vid);
 
                 SWSS_LOG_ERROR("VID: %s RID: %s",
                         sai_serialize_object_id(vid).c_str(),
@@ -3308,7 +2848,7 @@ void processFlexCounterEvent(
     sai_object_id_t rid;
     {
         std::lock_guard<std::mutex> lock(g_mutex);
-        if (!try_translate_vid_to_rid(vid, rid))
+        if (!g_translator->tryTranslateVidToRid(vid, rid))
         {
             SWSS_LOG_WARN("port VID %s, was not found (probably port was removed/splitted) and will remove from counters now",
               sai_serialize_object_id(vid).c_str());
@@ -3500,6 +3040,7 @@ void set_sai_api_loglevel()
 
     for (uint32_t idx = 1; idx < sai_metadata_enum_sai_api_t.valuescount; ++idx)
     {
+        // TODO std::function<void(void)> f = std::bind(&Foo::doSomething, this);
         swss::Logger::linkToDb(
                 sai_metadata_enum_sai_api_t.valuesnames[idx],
                 saiLoglevelNotify,
@@ -3695,6 +3236,9 @@ int syncd_main(int argc, char **argv)
     std::shared_ptr<swss::NotificationConsumer> restartQuery = std::make_shared<swss::NotificationConsumer>(dbAsic.get(), "RESTARTQUERY");
     std::shared_ptr<swss::ConsumerTable> flexCounter = std::make_shared<swss::ConsumerTable>(dbFlexCounter.get(), FLEX_COUNTER_TABLE);
     std::shared_ptr<swss::ConsumerTable> flexCounterGroup = std::make_shared<swss::ConsumerTable>(dbFlexCounter.get(), FLEX_COUNTER_GROUP_TABLE);
+
+    // TODO move to syncd object
+    g_translator = std::make_shared<VirtualOidTranslator>();
 
     auto switchConfigContainer = std::make_shared<sairedis::SwitchConfigContainer>();
     auto redisVidIndexGenerator = std::make_shared<sairedis::RedisVidIndexGenerator>(dbAsic, REDIS_KEY_VIDCOUNTER);
