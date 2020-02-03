@@ -1,6 +1,7 @@
 #include "SaiSwitch.h"
 #include "VendorSai.h"
 #include "SaiDiscovery.h"
+#include "VidManager.h"
 
 #include "sairediscommon.h"
 
@@ -289,27 +290,46 @@ std::unordered_map<sai_object_id_t, sai_object_id_t> SaiSwitch::redisGetObjectMa
     return map;
 }
 
-// TODO maybe remove this from switch or filter each one
 std::unordered_map<sai_object_id_t, sai_object_id_t> SaiSwitch::redisGetVidToRidMap() const
 {
     SWSS_LOG_ENTER();
 
-    /*
-     * TODO: To support multiple switches VIDTORID must be per switch.
-     */
+    auto map = redisGetObjectMap(VIDTORID);
 
-    return redisGetObjectMap(VIDTORID);
+    std::unordered_map<sai_object_id_t, sai_object_id_t> filtered;
+
+    for (auto& v2r: map)
+    {
+        auto switchId = VidManager::switchIdQuery(v2r.first);
+
+        if (switchId == m_switch_vid)
+        {
+            filtered[v2r.first] = v2r.second;
+        }
+    }
+
+    return filtered;
 }
 
 std::unordered_map<sai_object_id_t, sai_object_id_t> SaiSwitch::redisGetRidToVidMap() const
 {
     SWSS_LOG_ENTER();
 
-    /*
-     * TODO: To support multiple switches RIDTOVID must be per switch.
-     */
+    auto map = redisGetObjectMap(RIDTOVID);
 
-    return redisGetObjectMap(RIDTOVID);
+    std::unordered_map<sai_object_id_t, sai_object_id_t> filtered;
+
+    for (auto& r2v: map)
+    {
+        auto switchId = VidManager::switchIdQuery(r2v.second);
+
+        if (switchId == m_switch_vid)
+        {
+            filtered[r2v.first] = r2v.second;
+        }
+    }
+
+    return filtered;
 }
 
 void SaiSwitch::helperCheckLaneMap()
