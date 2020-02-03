@@ -16,6 +16,7 @@ endif
 
 noinst_LIBRARIES = libsyncd.a
 libsyncd_a_SOURCES = \
+				ComparisonLogic.cpp \
 				VirtualOidTranslator.cpp \
 				NotificationProcessor.cpp \
 				NotificationHandlerWrapper.cpp \
