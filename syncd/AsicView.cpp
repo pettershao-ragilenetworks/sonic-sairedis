@@ -1221,3 +1221,32 @@ void AsicView::updateNonObjectIdVidReferenceCountByValue(
         }
     }
 }
+
+void AsicView::checkObjectsStatus() const
+{
+    SWSS_LOG_ENTER();
+
+    int count = 0;
+
+    for (const auto &p: m_soAll)
+    {
+        if (p.second->getObjectStatus() != SAI_OBJECT_STATUS_FINAL)
+        {
+            const auto &o = *p.second;
+
+            SWSS_LOG_ERROR("object was not processed: %s %s, status: %d (ref: %d)",
+                    o.m_str_object_type.c_str(),
+                    o.m_str_object_id.c_str(),
+                    o.getObjectStatus(),
+                    o.isOidObject() ? getVidReferenceCount(o.getVid()): -1);
+
+            count++;
+        }
+    }
+
+    if (count > 0)
+    {
+        SWSS_LOG_THROW("%d objects were not processed", count);
+    }
+}
+

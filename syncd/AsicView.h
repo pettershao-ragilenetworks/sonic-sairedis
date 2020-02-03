@@ -51,6 +51,8 @@ namespace syncd
             void fromDump(
                     _In_ const swss::TableDump &dump);
 
+            void checkObjectsStatus() const;
+
         private:
 
             /**
