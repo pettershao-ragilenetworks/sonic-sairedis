@@ -289,12 +289,13 @@ std::unordered_map<sai_object_id_t, sai_object_id_t> SaiSwitch::redisGetObjectMa
     return map;
 }
 
+// TODO maybe remove this from switch or filter each one
 std::unordered_map<sai_object_id_t, sai_object_id_t> SaiSwitch::redisGetVidToRidMap() const
 {
     SWSS_LOG_ENTER();
 
     /*
-     * NOTE: To support multiple switches VIDTORID must be per switch.
+     * TODO: To support multiple switches VIDTORID must be per switch.
      */
 
     return redisGetObjectMap(VIDTORID);
@@ -305,7 +306,7 @@ std::unordered_map<sai_object_id_t, sai_object_id_t> SaiSwitch::redisGetRidToVid
     SWSS_LOG_ENTER();
 
     /*
-     * NOTE: To support multiple switches RIDTOVID must be per switch.
+     * TODO: To support multiple switches RIDTOVID must be per switch.
      */
 
     return redisGetObjectMap(RIDTOVID);
