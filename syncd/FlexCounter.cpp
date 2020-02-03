@@ -22,8 +22,16 @@ FlexCounter::FlexCounter(std::string instanceId):
 {
     SWSS_LOG_ENTER();
 
-    m_runFlexCounterThread = false;
     m_enable = false;
+
+    startFlexCounterThread();
+}
+
+FlexCounter::~FlexCounter(void)
+{
+    SWSS_LOG_ENTER();
+
+    endFlexCounterThread();
 }
 
 FlexCounter::PortCounterIds::PortCounterIds(
@@ -98,8 +106,6 @@ void FlexCounter::setPollInterval(
     SWSS_LOG_ENTER();
 
     m_pollInterval = pollInterval;
-
-    startFlexCounterThread();
 }
 
 void FlexCounter::setStatus(
@@ -110,8 +116,6 @@ void FlexCounter::setStatus(
     if (status == "enable")
     {
         m_enable = true;
-
-        startFlexCounterThread();
     }
     else if (status == "disable")
     {
@@ -204,8 +208,6 @@ void FlexCounter::setPortCounterList(
     m_portCounterIdsMap.emplace(portVid, portCounterIds);
 
     addCollectCountersHandler(PORT_COUNTER_ID_LIST, &FlexCounter::collectPortCounters);
-
-    startFlexCounterThread();
 }
 
 void FlexCounter::setPortDebugCounterList(
@@ -238,8 +240,6 @@ void FlexCounter::setPortDebugCounterList(
     m_portDebugCounterIdsMap.emplace(portVid, portDebugCounterIds);
 
     addCollectCountersHandler(PORT_DEBUG_COUNTER_ID_LIST, &FlexCounter::collectPortDebugCounters);
-
-    startFlexCounterThread();
 }
 
 void FlexCounter::setQueueCounterList(
@@ -296,8 +296,6 @@ void FlexCounter::setQueueCounterList(
     m_queueCounterIdsMap.emplace(queueVid, queueCounterIds);
 
     addCollectCountersHandler(QUEUE_COUNTER_ID_LIST, &FlexCounter::collectQueueCounters);
-
-    startFlexCounterThread();
 }
 
 void FlexCounter::setQueueAttrList(
@@ -320,8 +318,6 @@ void FlexCounter::setQueueAttrList(
     m_queueAttrIdsMap.emplace(queueVid, queueAttrIds);
 
     addCollectCountersHandler(QUEUE_ATTR_ID_LIST, &FlexCounter::collectQueueAttrs);
-
-    startFlexCounterThread();
 }
 
 void FlexCounter::setPriorityGroupCounterList(
@@ -381,8 +377,6 @@ void FlexCounter::setPriorityGroupCounterList(
     m_priorityGroupCounterIdsMap.emplace(priorityGroupVid, priorityGroupCounterIds);
 
     addCollectCountersHandler(PG_COUNTER_ID_LIST, &FlexCounter::collectPriorityGroupCounters);
-
-    startFlexCounterThread();
 }
 
 void FlexCounter::setSwitchDebugCounterList(
@@ -415,8 +409,6 @@ void FlexCounter::setSwitchDebugCounterList(
     m_switchDebugCounterIdsMap.emplace(switchVid, switchDebugCounterIds);
 
     addCollectCountersHandler(SWITCH_DEBUG_COUNTER_ID_LIST, &FlexCounter::collectSwitchDebugCounters);
-
-    startFlexCounterThread();
 }
 
 void FlexCounter::setPriorityGroupAttrList(
@@ -439,8 +431,6 @@ void FlexCounter::setPriorityGroupAttrList(
     m_priorityGroupAttrIdsMap.emplace(priorityGroupVid, priorityGroupAttrIds);
 
     addCollectCountersHandler(PG_ATTR_ID_LIST, &FlexCounter::collectPriorityGroupAttrs);
-
-    startFlexCounterThread();
 }
 
 void FlexCounter::setRifCounterList(
@@ -482,8 +472,6 @@ void FlexCounter::setRifCounterList(
     m_rifCounterIdsMap.emplace(rifVid, rifCounterIds);
 
     addCollectCountersHandler(RIF_COUNTER_ID_LIST, &FlexCounter::collectRifCounters);
-
-    startFlexCounterThread();
 }
 
 void FlexCounter::setBufferPoolCounterList(
@@ -541,8 +529,6 @@ void FlexCounter::setBufferPoolCounterList(
     m_bufferPoolCounterIdsMap.emplace(bufferPoolVid, bufferPoolCounterIds);
 
     addCollectCountersHandler(BUFFER_POOL_COUNTER_ID_LIST, &FlexCounter::collectBufferPoolCounters);
-
-    startFlexCounterThread();
 }
 
 void FlexCounter::removePort(
@@ -873,13 +859,9 @@ void FlexCounter::addCounterPlugin(
             SWSS_LOG_ERROR("Field is not supported %s", field.c_str());
         }
     }
-}
 
-FlexCounter::~FlexCounter(void)
-{
-    SWSS_LOG_ENTER();
-
-    endFlexCounterThread();
+    // notify thread to start polling
+    m_pollCond.notify_all();
 }
 
 bool FlexCounter::isEmpty()
@@ -1535,62 +1517,49 @@ void FlexCounter::flexCounterThreadRunFunction()
     swss::RedisPipeline pipeline(&db);
     swss::Table countersTable(&pipeline, COUNTERS_TABLE, true);
 
-    while (1)
+    while (m_runFlexCounterThread)
     {
-        auto start = std::chrono::steady_clock::now();
-
         MUTEX;
 
-        if (!m_runFlexCounterThread)
+        if (m_enable && !allIdsEmpty() && (m_pollInterval > 0))
         {
-            return;
+            auto start = std::chrono::steady_clock::now();
+
+            collectCounters(countersTable);
+
+            runPlugins(db);
+
+            auto finish = std::chrono::steady_clock::now();
+
+            uint32_t delay = static_cast<uint32_t>(
+                    std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count());
+
+            uint32_t correction = delay % m_pollInterval;
+
+            MUTEX_UNLOCK; // explicit unlock
+
+            SWSS_LOG_DEBUG("End of flex counter thread FC %s, took %d ms", m_instanceId.c_str(), delay);
+
+            std::unique_lock<std::mutex> lk(m_mtxSleep);
+
+            m_cvSleep.wait_for(lk, std::chrono::milliseconds(m_pollInterval - correction));
+
+            continue;
         }
-
-        while (!m_enable || allIdsEmpty() || (m_pollInterval == 0))
-        {
-            if (!m_runFlexCounterThread)
-            {
-                return;
-            }
-
-            m_pollCond.wait(_lock); // wait on mutex
-        }
-
-        collectCounters(countersTable);
-
-        runPlugins(db);
-
-        auto finish = std::chrono::steady_clock::now();
-
-        uint32_t delay = static_cast<uint32_t>(
-                std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count());
-
-        uint32_t correction = delay % m_pollInterval;
 
         MUTEX_UNLOCK; // explicit unlock
 
-        SWSS_LOG_DEBUG("End of flex counter thread FC %s, took %d ms", m_instanceId.c_str(), delay);
+        // nothing to collect, wait until notified
 
         std::unique_lock<std::mutex> lk(m_mtxSleep);
 
-        m_cvSleep.wait_for(lk, std::chrono::milliseconds(m_pollInterval - correction));
+        m_pollCond.wait(lk); // wait on mutex
     }
 }
 
 void FlexCounter::startFlexCounterThread()
 {
     SWSS_LOG_ENTER();
-
-    if (m_pollInterval == 0)
-    {
-        return;
-    }
-
-    if (m_runFlexCounterThread)
-    {
-        m_pollCond.notify_all();
-        return;
-    }
 
     m_runFlexCounterThread = true;
 
@@ -2134,4 +2103,7 @@ void FlexCounter::addCounter(
 
         setBufferPoolCounterList(vid, rid, bufferPoolCounterIds, statsMode);
     }
+
+    // notify thread to start polling
+    m_pollCond.notify_all();
 }
