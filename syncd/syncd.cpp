@@ -694,8 +694,6 @@ void get_port_related_objects(
         SAI_PORT_ATTR_INGRESS_PRIORITY_GROUP_LIST
     };
 
-    auto info = sai_metadata_get_object_type_info(SAI_OBJECT_TYPE_PORT);
-
     for (size_t i = 0; i < sizeof(attrs)/sizeof(sai_attr_id_t); i++)
     {
         std::vector<sai_object_id_t> objlist;
@@ -709,7 +707,7 @@ void get_port_related_objects(
         attr.value.objlist.count = MAX_OBJLIST_LEN;
         attr.value.objlist.list = objlist.data();
 
-        auto status = info->get(&meta_key, 1, &attr);
+        auto status = g_vendorSai->get(meta_key, 1, &attr);
 
         if (status != SAI_STATUS_SUCCESS)
         {
@@ -901,7 +899,7 @@ sai_status_t handle_generic(
                     }
                 }
 
-                sai_status_t status = info->create(&meta_key, switch_id, attr_count, attr_list);
+                sai_status_t status = g_vendorSai->create(meta_key, switch_id, attr_count, attr_list);
 
                 if (status == SAI_STATUS_SUCCESS)
                 {
@@ -963,7 +961,7 @@ sai_status_t handle_generic(
                     get_port_related_objects(rid, related);
                 }
 
-                sai_status_t status = info->remove(&meta_key);
+                sai_status_t status = g_vendorSai->remove(meta_key);
 
                 if (status == SAI_STATUS_SUCCESS)
                 {
@@ -1028,7 +1026,7 @@ sai_status_t handle_generic(
 
                 meta_key.objectkey.key.object_id = rid;
 
-                sai_status_t status = info->set(&meta_key, attr_list);
+                sai_status_t status = g_vendorSai->set(meta_key, attr_list);
 
                 if (is_set_attribute_workaround(meta_key.objecttype, attr_list->id, status))
                 {
@@ -1045,7 +1043,7 @@ sai_status_t handle_generic(
 
                 meta_key.objectkey.key.object_id = rid;
 
-                return info->get(&meta_key, attr_count, attr_list);
+                return g_vendorSai->get(meta_key, attr_count, attr_list);
             }
 
         default:
@@ -1064,21 +1062,19 @@ sai_status_t handle_non_object_id(
 
     g_translator->translateVidToRid(meta_key);
 
-    auto info = sai_metadata_get_object_type_info(meta_key.objecttype);
-
     switch (api)
     {
         case SAI_COMMON_API_CREATE:
-            return info->create(&meta_key, SAI_NULL_OBJECT_ID, attr_count, attr_list);
+            return g_vendorSai->create(meta_key, SAI_NULL_OBJECT_ID, attr_count, attr_list);
 
         case SAI_COMMON_API_REMOVE:
-            return info->remove(&meta_key);
+            return g_vendorSai->remove(meta_key);
 
         case SAI_COMMON_API_SET:
-            return info->set(&meta_key, attr_list);
+            return g_vendorSai->set(meta_key, attr_list);
 
         case SAI_COMMON_API_GET:
-            return info->get(&meta_key, attr_count, attr_list);
+            return g_vendorSai->get(meta_key, attr_count, attr_list);
 
         default:
             SWSS_LOG_THROW("other apis not implemented");
@@ -1256,7 +1252,7 @@ void InspectAsic()
                 meta_key.objecttype = object_type;
                 meta_key.objectkey.key.object_id = g_translator->translateVidToRid(object_id);
 
-                status = info->get(&meta_key, attr_count, attr_list);
+                status = g_vendorSai->get(meta_key, attr_count, attr_list);
                 break;
             }
         }
@@ -2002,7 +1998,7 @@ sai_status_t processEventInInitViewMode(
                     meta_key.objecttype = object_type;
                     meta_key.objectkey.key.object_id = rid;
 
-                    status = info->get(&meta_key, attr_count, attr_list);
+                    status = g_vendorSai->get(meta_key, attr_count, attr_list);
                 }
 
                 sai_object_id_t switch_id;
