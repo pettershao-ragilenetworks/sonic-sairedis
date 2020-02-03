@@ -2482,7 +2482,7 @@ void checkAsicVsDatabaseConsistency(
 
                 auto meta = info->attrmetadata[0];
 
-                sai_status_t status = info->get(&meta_key, 1, &attr);
+                sai_status_t status = g_vendorSai->get(meta_key, 1, &attr);
 
                 switch (status)
                 {
@@ -2530,7 +2530,7 @@ void checkAsicVsDatabaseConsistency(
 
                 const std::string& dbValue = sai_serialize_attr_value(*meta, attr);
 
-                sai_status_t status = info->get(&meta_key, 1, &attr);
+                sai_status_t status = g_vendorSai->get(meta_key, 1, &attr);
 
                 if (meta->attrid == SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST && meta->objecttype == SAI_OBJECT_TYPE_QOS_MAP && status == SAI_STATUS_SUCCESS)
                 {
@@ -3202,8 +3202,6 @@ sai_status_t asic_handle_generic(
      * And this needs to be executed in sai_meta_apis_query.
      */
 
-    auto info = sai_metadata_get_object_type_info(meta_key.objecttype);
-
     sai_object_id_t object_id = meta_key.objectkey.key.object_id;
 
     switch (api)
@@ -3219,7 +3217,7 @@ sai_status_t asic_handle_generic(
 
                 sai_object_id_t switch_rid = asic_translate_vid_to_rid(current, temporary, switch_vid);
 
-                sai_status_t status = info->create(&meta_key, switch_rid, attr_count, attr_list);
+                sai_status_t status = g_vendorSai->create(meta_key, switch_rid, attr_count, attr_list);
 
                 sai_object_id_t real_object_id = meta_key.objectkey.key.object_id;
 
@@ -3262,7 +3260,7 @@ sai_status_t asic_handle_generic(
 
                 current.m_removedVidToRid.erase(object_id);
 
-                sai_status_t status = info->remove(&meta_key);
+                sai_status_t status = g_vendorSai->remove(meta_key);
 
                 if (status != SAI_STATUS_SUCCESS)
                 {
@@ -3302,7 +3300,7 @@ sai_status_t asic_handle_generic(
 
                 meta_key.objectkey.key.object_id = rid;
 
-                sai_status_t status = info->set(&meta_key, attr_list);
+                sai_status_t status = g_vendorSai->set(meta_key, attr_list);
 
                 if (is_set_attribute_workaround(meta_key.objecttype, attr_list->id, status))
                 {
@@ -3362,18 +3360,16 @@ sai_status_t asic_handle_non_object_id(
 
     asic_translate_vid_to_rid_non_object_id(current, temporary, meta_key);
 
-    auto info = sai_metadata_get_object_type_info(meta_key.objecttype);
-
     switch (api)
     {
         case SAI_COMMON_API_CREATE:
-            return info->create(&meta_key, SAI_NULL_OBJECT_ID, attr_count, attr_list);
+            return g_vendorSai->create(meta_key, SAI_NULL_OBJECT_ID, attr_count, attr_list);
 
         case SAI_COMMON_API_REMOVE:
-            return info->remove(&meta_key);
+            return g_vendorSai->remove(meta_key);
 
         case SAI_COMMON_API_SET:
-            return info->set(&meta_key, attr_list);
+            return g_vendorSai->set(meta_key, attr_list);
 
         default:
             SWSS_LOG_ERROR("other apis not implemented");
