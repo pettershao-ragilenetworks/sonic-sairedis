@@ -21,7 +21,6 @@ bool is_set_attribute_workaround(
 
 extern bool enableRefernceCountLogs;
 extern std::shared_ptr<NotificationHandler> g_handler;
-extern std::shared_ptr<CommandLineOptions> g_commandLineOptions; // TODO move to syncd object
 extern std::shared_ptr<VirtualOidTranslator> g_translator; // TODO move to syncd object
 
 /*
@@ -33,14 +32,44 @@ extern std::shared_ptr<VirtualOidTranslator> g_translator; // TODO move to syncd
 ComparisonLogic::ComparisonLogic(
         _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,
         _In_ std::shared_ptr<SaiSwitch> sw,
-        _In_ std::set<sai_object_id_t> initViewRemovedVids):
+        _In_ std::set<sai_object_id_t> initViewRemovedVids,
+        _In_ std::shared_ptr<AsicView> current,
+        _In_ std::shared_ptr<AsicView> temp):
     m_vendorSai(vendorSai),
     m_switch(sw),
-    m_initViewRemovedVids(initViewRemovedVids)
+    m_initViewRemovedVids(initViewRemovedVids),
+    m_current(current),
+    m_temp(temp)
 {
     SWSS_LOG_ENTER();
 
-    // empty
+    // will inside filter only RID/VID to this particular switch
+
+    // TODO move outside switch ? since later could be in different ASIC_DB
+    m_current->m_ridToVid = m_switch->redisGetRidToVidMap();
+    m_current->m_vidToRid = m_switch->redisGetVidToRidMap();
+
+    /*
+     * Those calls could be calls to SAI, but when this will be separate lib
+     * then we would like to limit sai to minimum or reimplement getting those.
+     *
+     * TODO: This needs to be refactored and solved in other way since asic
+     * view can contain multiple switches.
+     *
+     * TODO: This also can be optimized using metadata.
+     * We need to add access to SaiSwitch in AsicView.
+     */
+
+    // TODO needs to be removed and done in generic
+
+    m_current->m_defaultTrapGroupRid     = m_switch->getSwitchDefaultAttrOid(SAI_SWITCH_ATTR_DEFAULT_TRAP_GROUP);
+    m_temp->m_defaultTrapGroupRid        = m_switch->getSwitchDefaultAttrOid(SAI_SWITCH_ATTR_DEFAULT_TRAP_GROUP);
+
+    auto seed = (unsigned int)std::time(0);
+
+    SWSS_LOG_NOTICE("srand seed for switch %s: %u", sai_serialize_object_id(m_switch->getVid()).c_str(), seed);
+
+    std::srand(seed);
 }
 
 ComparisonLogic::~ComparisonLogic()
@@ -48,6 +77,93 @@ ComparisonLogic::~ComparisonLogic()
     SWSS_LOG_ENTER();
 
     // empty
+}
+
+void ComparisonLogic::compareViews()
+{
+    SWSS_LOG_ENTER();
+
+    AsicView& current = *m_current;
+    AsicView& temp = *m_temp;
+
+    /*
+     * Match oids before calling populate existing objects since after
+     * matching oids RID and VID maps will be populated.
+     */
+
+    matchOids(current, temp);
+
+    /*
+     * Populate existing objects to current and temp view if they don't
+     * exist since we are populating them when syncd starts, and when we
+     * switch view we don't want to loose any of those objects since during
+     * syncd runtime is counting on that those objects exists.
+     *
+     * TODO: If some object's will be removed like VLAN members then this
+     * existing objects needs to be updated in the switch!
+     */
+
+    populateExistingObjects(current, temp);
+
+    checkInternalObjects(current, temp);
+
+    /*
+     * Call main method!
+     */
+
+    if (enableRefernceCountLogs)
+    {
+        current.dumpRef("current START");
+        temp.dumpRef("temp START");
+    }
+
+    createPreMatchMap(current, temp);
+
+    logViewObjectCount(current, temp);
+
+    applyViewTransition(current, temp);
+
+    SWSS_LOG_NOTICE("ASIC operations to execute: %zu", current.asicGetOperationsCount());
+
+    temp.checkObjectsStatus();
+
+    SWSS_LOG_NOTICE("all temporary view objects were processed to FINAL state");
+
+    current.checkObjectsStatus();
+
+    SWSS_LOG_NOTICE("all current view objects were processed to FINAL state");
+
+    /*
+     * After all operations both views should look the same so number of
+     * rid/vid should look the same.
+     */
+
+    checkMap(current, temp);
+
+    /*
+     * At the end number of m_soAll objects must be equal on both views. If
+     * some on temporary views are missing, we need to transport empty
+     * objects to temporary view, like queues, scheduler groups, virtual
+     * router, trap groups etc.
+     */
+
+    if (current.m_soAll.size() != temp.m_soAll.size())
+    {
+        /*
+         * If this will happen that means non object id values are
+         * different since number of RID/VID maps is identical (previous
+         * check).
+         *
+         * Unlikely to be routes/neighbors/fdbs, can be traps, switch,
+         * vlan.
+         *
+         * TODO: For debug we will need to display differences
+         */
+
+        SWSS_LOG_THROW("wrong number of all objects current: %zu vs temp %zu, FIXME",
+                current.m_soAll.size(),
+                temp.m_soAll.size());
+    }
 }
 
 /**
@@ -1896,10 +2012,11 @@ void ComparisonLogic::bringDefaultTrapGroupToFinalState(
 
 void ComparisonLogic::populateExistingObjects(
         _In_ AsicView &currentView,
-        _In_ AsicView &temporaryView,
-        _In_ const std::set<sai_object_id_t> rids)
+        _In_ AsicView &temporaryView)
 {
     SWSS_LOG_ENTER();
+
+    auto rids = m_switch->getDiscoveredRids();
 
     /*
      * We should transfer existing objects from current view to temporary view.
@@ -2062,9 +2179,7 @@ void ComparisonLogic::populateExistingObjects(
     }
 }
 
-void ComparisonLogic::checkAsicVsDatabaseConsistency(
-        _In_ const AsicView &cur,
-        _In_ const AsicView &tmp)
+bool ComparisonLogic::checkAsicVsDatabaseConsistency()
 {
     SWSS_LOG_ENTER();
 
@@ -2075,7 +2190,7 @@ void ComparisonLogic::checkAsicVsDatabaseConsistency(
 
         SWSS_LOG_WARN("performing consistency check");
 
-        for (const auto &pair: tmp.m_soAll)
+        for (const auto &pair: m_temp->m_soAll)
         {
             const auto &obj = pair.second;
 
@@ -2212,10 +2327,7 @@ void ComparisonLogic::checkAsicVsDatabaseConsistency(
 
     swss::Logger::getInstance().setMinPrio(swss::Logger::SWSS_NOTICE);
 
-    if (hasErrors && g_commandLineOptions->m_enableUnittests)
-    {
-        SWSS_LOG_THROW("ASIC content is differnt than DB content!");
-    }
+    return hasErrors == false;
 }
 
 void ComparisonLogic::checkMap(
@@ -3085,11 +3197,12 @@ sai_status_t ComparisonLogic::asic_process_event(
             sai_serialize_status(status).c_str());
 }
 
-void ComparisonLogic::executeOperationsOnAsic(
-        _In_ AsicView& currentView,
-        _In_ AsicView& temporaryView)
+void ComparisonLogic::executeOperationsOnAsic()
 {
     SWSS_LOG_ENTER();
+
+    AsicView& currentView = *m_current;
+    AsicView& temporaryView = *m_temp;
 
     SWSS_LOG_NOTICE("operations to execute on ASIC: %zu", currentView.asicGetOperationsCount());
 

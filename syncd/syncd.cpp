@@ -3192,10 +3192,12 @@ int syncd_main(int argc, char **argv)
 
     set_sai_api_loglevel();
 
-    swss::Logger::linkToDbNative("syncd");
+    swss::Logger::linkToDbNative("syncd"); // TODO fix also in discovery
 
     swss::WarmStart::initialize("syncd", "syncd");
     swss::WarmStart::checkWarmStart("syncd", "syncd");
+
+    bool isWarmStart = swss::WarmStart::isWarmStart(); // since global, can be applied in main
 
     NotificationHandlerWrapper::setNotificationHandler(g_handler);
 
@@ -3224,7 +3226,7 @@ int syncd_main(int argc, char **argv)
     std::shared_ptr<swss::DBConnector> dbNtf = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
     std::shared_ptr<swss::DBConnector> dbFlexCounter = std::make_shared<swss::DBConnector>("FLEX_COUNTER_DB", 0);
     std::shared_ptr<swss::DBConnector> dbState = std::make_shared<swss::DBConnector>("STATE_DB", 0);
-    std::unique_ptr<swss::Table> warmRestartTable = std::unique_ptr<swss::Table>(new swss::Table(dbState.get(), STATE_WARM_RESTART_TABLE_NAME));
+    std::shared_ptr<swss::Table> warmRestartTable = std::make_shared<swss::Table>(dbState.get(), STATE_WARM_RESTART_TABLE_NAME);
 
     g_redisClient = std::make_shared<swss::RedisClient>(dbAsic.get());
 
@@ -3260,7 +3262,7 @@ int syncd_main(int argc, char **argv)
     g_veryFirstRun = isVeryFirstRun();
 
     /* ignore warm logic here if syncd starts in Mellanox fastfast boot mode */
-    if (swss::WarmStart::isWarmStart() && (g_commandLineOptions->m_startType != SAI_START_TYPE_FASTFAST_BOOT))
+    if (isWarmStart && (g_commandLineOptions->m_startType != SAI_START_TYPE_FASTFAST_BOOT))
     {
         g_commandLineOptions->m_startType = SAI_START_TYPE_WARM_BOOT;
     }

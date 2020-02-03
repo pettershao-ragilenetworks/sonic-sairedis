@@ -30,12 +30,15 @@ namespace syncd
              * avoid copy of data of entire view. This is not needed for now.
              */
 
-            AsicView(const SaiAttr&);
-            AsicView& operator=(const SaiAttr&);
+            AsicView(const AsicView&) = delete;
+            AsicView& operator=(const SaiAttr&) = delete;
 
         public:
 
             AsicView();
+
+            AsicView(
+                    _In_ const swss::TableDump &dump);
 
             virtual ~AsicView();
 
@@ -52,6 +55,8 @@ namespace syncd
                     _In_ const swss::TableDump &dump);
 
             void checkObjectsStatus() const;
+
+            sai_object_id_t getSwitchVid() const;
 
         private:
 

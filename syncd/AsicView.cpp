@@ -23,6 +23,15 @@ AsicView::AsicView():
     // empty
 }
 
+AsicView::AsicView(
+        _In_ const swss::TableDump &dump):
+    m_asicOperationId(0)
+{
+    SWSS_LOG_ENTER();
+
+    fromDump(dump);
+}
+
 AsicView::~AsicView()
 {
     SWSS_LOG_ENTER();
@@ -46,6 +55,8 @@ void AsicView::fromDump(
      * Input should be also existing objects, so they could be created
      * here right away but we would need VIDs as well.
      */
+
+    int switchesCount = 0;
 
     for (const auto &key: dump)
     {
@@ -110,6 +121,11 @@ void AsicView::fromDump(
                 m_soOids[o->m_str_object_id] = o;
                 m_oOids[o->m_meta_key.objectkey.key.object_id] = o;
 
+                if (o->m_meta_key.objecttype == SAI_OBJECT_TYPE_SWITCH)
+                {
+                    switchesCount++;
+                }
+
                 break;
         }
 
@@ -135,6 +151,13 @@ void AsicView::fromDump(
         }
 
         populateAttributes(o, key.second);
+    }
+
+    if (switchesCount != 1)
+    {
+        // NOTE: In our solution multiple switches are not supported in single AsicView
+
+        SWSS_LOG_THROW("only one switch is expected in ASIC view, got: %d switches", switchesCount);
     }
 }
 
@@ -1250,3 +1273,19 @@ void AsicView::checkObjectsStatus() const
     }
 }
 
+sai_object_id_t AsicView::getSwitchVid() const
+{
+    SWSS_LOG_ENTER();
+
+    for (auto& kvp: m_vidToRid)
+    {
+        auto vid = kvp.first;
+
+        if (VidManager::objectTypeQuery(vid) == SAI_OBJECT_TYPE_SWITCH)
+        {
+            return vid;
+        }
+    }
+
+    SWSS_LOG_THROW("no SWITCH present in ASIC view, FATAL");
+}

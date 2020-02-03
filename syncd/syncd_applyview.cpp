@@ -1,22 +1,9 @@
 #include "syncd.h"
 #include "sairediscommon.h"
-#include "swss/table.h"
-#include "swss/logger.h"
-#include "swss/dbconnector.h"
 
 #include "CommandLineOptions.h"
-#include "SaiAttr.h"
-#include "SaiObj.h"
-#include "AsicView.h"
 #include "VidManager.h"
-#include "BestCandidateFinder.h"
-#include "NotificationHandler.h"
-#include "VirtualOidTranslator.h"
 #include "ComparisonLogic.h"
-
-#include <inttypes.h>
-#include <algorithm>
-#include <list>
 
 using namespace syncd;
 
@@ -29,9 +16,15 @@ extern std::shared_ptr<CommandLineOptions> g_commandLineOptions; // TODO move to
  */
 bool enableRefernceCountLogs = false;
 
-void redisGetAsicView(
-        _In_ const std::string &tableName,
-        _In_ AsicView &view)
+// TODO for future we can have each switch in separate redis db index or even
+// some switches in the same db index and some in separate.  Current redis get
+// asic view is assuming all switches are in the same db index an also some
+// operations per switch are accessing data base in SaiSwitch class.  This
+// needs to be reorganised to access database per switch basis and get only
+// data that corresponds to each particular switch and access correct db index.
+
+std::map<sai_object_id_t, swss::TableDump> redisGetAsicView(
+        _In_ const std::string &tableName)
 {
     SWSS_LOG_ENTER();
 
@@ -45,24 +38,39 @@ void redisGetAsicView(
 
     table.dump(dump);
 
-    view.fromDump(dump);
+    std::map<sai_object_id_t, swss::TableDump> map;
 
-    SWSS_LOG_NOTICE("objects count for %s: %zu", tableName.c_str(), view.m_soAll.size());
+    for (auto& key: dump)
+    {
+        sai_object_meta_key_t mk;
+        sai_deserialize_object_meta_key(key.first, mk);
+
+        auto switchVID = VidManager::switchIdQuery(mk.objectkey.key.object_id);
+
+        map[switchVID][key.first] = key.second;
+    }
+
+    SWSS_LOG_NOTICE("%s switch count: %zu:", tableName.c_str(), map.size());
+
+    for (auto& kvp: map)
+    {
+        SWSS_LOG_NOTICE("%s: objects count: %zu",
+                sai_serialize_object_id(kvp.first).c_str(),
+                kvp.second.size());
+    }
+
+    return map;
 }
 
-// TODO we can do this in generic way, we need serialize
-
 void updateRedisDatabase(
-        _In_ const AsicView &currentView,
-        _In_ const AsicView &temporaryView)
+    _In_ const std::vector<std::shared_ptr<AsicView>>& temporaryViews)
 {
     SWSS_LOG_ENTER();
 
-    /*
-     * TODO: We can make LUA script for this which will be much faster.
-     *
-     * TODO: This needs to be updated if we want to support multiple switches.
-     */
+    // TODO: We can make LUA script for this which will be much faster.
+    //
+    // TODO: Needs to be revisited if ASIC views will be across multiple redis
+    // database indexes.
 
     SWSS_LOG_TIMER("redis update");
 
@@ -84,34 +92,37 @@ void updateRedisDatabase(
         g_redisClient->del(key);
     }
 
-    // Save temporary view as current view in redis database.
+    // Save temporary views as current view in redis database.
 
-    for (const auto &pair: temporaryView.m_soAll)
+    for (auto& tv: temporaryViews)
     {
-        const auto &obj = pair.second;
-
-        const auto &attr = obj->getAllAttributes();
-
-        std::string key = std::string(ASIC_STATE_TABLE) + ":" + obj->m_str_object_type + ":" + obj->m_str_object_id;
-
-        SWSS_LOG_DEBUG("setting key %s", key.c_str());
-
-        if (attr.size() == 0)
+        for (const auto &pair: tv->m_soAll)
         {
-            /*
-             * Object has no attributes, so populate using NULL just to
-             * indicate that object exists.
-             */
+            const auto &obj = pair.second;
 
-            g_redisClient->hset(key, "NULL", "NULL");
-        }
-        else
-        {
-            for (const auto &ap: attr)
+            const auto &attr = obj->getAllAttributes();
+
+            std::string key = std::string(ASIC_STATE_TABLE) + ":" + obj->m_str_object_type + ":" + obj->m_str_object_id;
+
+            SWSS_LOG_DEBUG("setting key %s", key.c_str());
+
+            if (attr.size() == 0)
             {
-                const auto saiAttr = ap.second;
+                /*
+                 * Object has no attributes, so populate using NULL just to
+                 * indicate that object exists.
+                 */
 
-                g_redisClient->hset(key, saiAttr->getStrAttrId(), saiAttr->getStrAttrValue());
+                g_redisClient->hset(key, "NULL", "NULL");
+            }
+            else
+            {
+                for (const auto &ap: attr)
+                {
+                    const auto saiAttr = ap.second;
+
+                    g_redisClient->hset(key, saiAttr->getStrAttrId(), saiAttr->getStrAttrValue());
+                }
             }
         }
     }
@@ -125,13 +136,18 @@ void updateRedisDatabase(
     redisClearVidToRidMap();
     redisClearRidToVidMap();
 
-    for (auto &kv: temporaryView.m_ridToVid)
-    {
-        std::string strVid = sai_serialize_object_id(kv.second);
-        std::string strRid = sai_serialize_object_id(kv.first);
+    // TODO check if those 2 maps are consistent
 
-        g_redisClient->hset(VIDTORID, strVid, strRid);
-        g_redisClient->hset(RIDTOVID, strRid, strVid);
+    for (auto& tv: temporaryViews)
+    {
+        for (auto &kv: tv->m_ridToVid)
+        {
+            std::string strVid = sai_serialize_object_id(kv.second);
+            std::string strRid = sai_serialize_object_id(kv.first);
+
+            g_redisClient->hset(VIDTORID, strVid, strRid);
+            g_redisClient->hset(RIDTOVID, strRid, strVid);
+        }
     }
 
     SWSS_LOG_NOTICE("updated redis database");
@@ -139,27 +155,42 @@ void updateRedisDatabase(
 
 extern std::set<sai_object_id_t> initViewRemovedVidSet;
 
-// TODO all switches must include
 void dumpComparisonLogicOutput(
-        _In_ const AsicView &currentView)
+    _In_ const std::vector<std::shared_ptr<AsicView>>& currentViews)
 {
     SWSS_LOG_ENTER();
 
     std::stringstream ss;
 
-    ss << "ASIC_OPERATIONS: " << currentView.asicGetOperationsCount() << std::endl;
+    size_t total = 0; // total operations from all switches
 
-    for (const auto &op: currentView.asicGetWithOptimizedRemoveOperations())
+    for (auto& c: currentViews)
     {
-        const std::string &key = kfvKey(*op.m_op);
-        const std::string &opp = kfvOp(*op.m_op);
+        total += c->asicGetOperationsCount();
+    }
 
-        ss << "o " << opp << ": " << key << std::endl;
+    ss << "ASIC_OPERATIONS: " << total << std::endl;
 
-        const auto &values = kfvFieldsValues(*op.m_op);
+    for (auto& c: currentViews)
+    {
+        ss << "ASIC_OPERATIONS on "
+            << sai_serialize_object_id(c->getSwitchVid())
+            << " : "
+            << c->asicGetOperationsCount()
+            << std::endl;
 
-        for (auto v: values)
-            ss << "a: " << fvField(v) << " " << fvValue(v) << std::endl;
+        for (const auto &op: c->asicGetWithOptimizedRemoveOperations())
+        {
+            const std::string &key = kfvKey(*op.m_op);
+            const std::string &opp = kfvOp(*op.m_op);
+
+            ss << "o " << opp << ": " << key << std::endl;
+
+            const auto &values = kfvFieldsValues(*op.m_op);
+
+            for (auto v: values)
+                ss << "a: " << fvField(v) << " " << fvValue(v) << std::endl;
+        }
     }
 
     std::ofstream log("applyview.log");
@@ -177,7 +208,6 @@ void dumpComparisonLogicOutput(
         SWSS_LOG_ERROR("failed to open applyview.log");
     }
 }
-
 
 sai_status_t syncdApplyView()
 {
@@ -217,155 +247,72 @@ sai_status_t syncdApplyView()
      * sorted.
      */
 
-    std::srand((unsigned int)std::time(0));
+    // Read current and temporary views from REDIS.
 
-    /*
-     * NOTE: Current view can contain multiple switches at once but in our
-     * implementation we only will have 1 switch.
-     */
+    auto currentMap = redisGetAsicView(ASIC_STATE_TABLE);
+    auto temporaryMap = redisGetAsicView(TEMP_PREFIX ASIC_STATE_TABLE);
 
-    AsicView current;
-    AsicView temp;
+    if (currentMap.size() != temporaryMap.size())
+    {
+        SWSS_LOG_THROW("current view switches: %zu != temporary view switches: %zu, FATAL",
+                currentMap.size(),
+                temporaryMap.size());
+    }
 
-    /*
-     * We are starting first stage here, it still can throw exceptions but it's
-     * non destructive for ASIC, so just catch and return failure.
-     */
+    if (currentMap.size() != switches.size())
+    {
+        SWSS_LOG_THROW("current asic view switches %zu != defined switches %zu, FATAL",
+                currentMap.size(),
+                switches.size());
+    }
 
-    std::shared_ptr<ComparisonLogic> cl;
+    // VID of switches must match for each map
+
+    for (auto& kvp: currentMap)
+    {
+        if (temporaryMap.find(kvp.first) == temporaryMap.end())
+        {
+            SWSS_LOG_THROW("switch VID %s missing from temporary view!, FATAL",
+                    sai_serialize_object_id(kvp.first).c_str());
+        }
+
+        if (switches.find(kvp.first) == switches.end())
+        {
+            SWSS_LOG_THROW("switch VID %s missing from ASIC, FATAL",
+                    sai_serialize_object_id(kvp.first).c_str());
+        }
+    }
+
+    std::vector<std::shared_ptr<AsicView>> currentViews;
+    std::vector<std::shared_ptr<AsicView>> tempViews;
+    std::vector<std::shared_ptr<ComparisonLogic>> cls;
 
     try
     {
-        /*
-         * NOTE: Need to be per switch. Asic view may contain multiple switches.
-         *
-         * In our current solution we will deal with only one switch, since
-         * supporting multiple switches will have serious impact on redesign
-         * current implementation.
-         */
-
-        if (switches.size() != 1)
+        for (auto& kvp: switches)
         {
+            auto switchVid = kvp.first;
+
+            auto sw = switches.at(switchVid);
+
             /*
-             * NOTE: In our solution multiple switches are not supported.
+             * We are starting first stage here, it still can throw exceptions
+             * but it's non destructive for ASIC, so just catch and return in
+             * case of failure.
+             *
+             * Each ASIC view at this point will contain only 1 switch.
              */
 
-            SWSS_LOG_THROW("only one switch is expected, got: %zu switches", switches.size());
-        }
+            auto current = std::make_shared<AsicView>(currentMap.at(switchVid));
+            auto temp = std::make_shared<AsicView>(temporaryMap.at(switchVid));
 
-        // XXX we have only 1 switch, so we can get away with this
+            auto cl = std::make_shared<ComparisonLogic>(g_vendorSai, sw, initViewRemovedVidSet, current, temp);
 
-        auto sw = switches.begin()->second;
+            cl->compareViews();
 
-        AsicView::ObjectIdMap vidToRidMap = sw->redisGetVidToRidMap();
-        AsicView::ObjectIdMap ridToVidMap = sw->redisGetRidToVidMap();
-
-        current.m_ridToVid = ridToVidMap;
-        current.m_vidToRid = vidToRidMap;
-
-        /*
-         * Those calls could be calls to SAI, but when this will be separate lib
-         * then we would like to limit sai to minimum or reimplement getting those.
-         *
-         * TODO: This needs to be refactored and solved in other way since asic
-         * view can contain multiple switches.
-         *
-         * TODO: This also can be optimized using metadata.
-         * We need to add access to SaiSwitch in AsicView.
-         */
-
-        // TODO needs to be removed and done in generic
-        current.m_defaultTrapGroupRid     = sw->getSwitchDefaultAttrOid(SAI_SWITCH_ATTR_DEFAULT_TRAP_GROUP);
-        temp.m_defaultTrapGroupRid        = current.m_defaultTrapGroupRid;
-
-        /*
-         * Read current and temporary view from REDIS.
-         */
-
-        redisGetAsicView(ASIC_STATE_TABLE, current);
-        redisGetAsicView(TEMP_PREFIX ASIC_STATE_TABLE, temp);
-
-        /*
-         * Match oids before calling populate existing objects since after
-         * matching oids RID and VID maps will be populated.
-         */
-
-        cl = std::make_shared<ComparisonLogic>(g_vendorSai, sw, initViewRemovedVidSet);
-
-        cl->matchOids(current, temp);
-
-        /*
-         * Populate existing objects to current and temp view if they don't
-         * exist since we are populating them when syncd starts, and when we
-         * switch view we don't want to loose any of those objects since during
-         * syncd runtime is counting on that those objects exists.
-         *
-         * TODO: If some object's will be removed like VLAN members then this
-         * existing objects needs to be updated in the switch!
-         */
-
-        const auto &existingObjects = sw->getDiscoveredRids();
-
-        cl->populateExistingObjects(current, temp, existingObjects);
-
-        cl->checkInternalObjects(current, temp);
-
-        /*
-         * Call main method!
-         */
-
-        if (enableRefernceCountLogs)
-        {
-            current.dumpRef("current START");
-            temp.dumpRef("temp START");
-        }
-
-        cl->createPreMatchMap(current, temp);
-
-        cl->logViewObjectCount(current, temp);
-
-        cl->applyViewTransition(current, temp);
-
-        SWSS_LOG_NOTICE("ASIC operations to execute: %zu", current.asicGetOperationsCount());
-
-        temp.checkObjectsStatus();
-
-        SWSS_LOG_NOTICE("all temporary view objects were processed to FINAL state");
-
-        current.checkObjectsStatus();
-
-        SWSS_LOG_NOTICE("all current view objects were processed to FINAL state");
-
-        /*
-         * After all operations both views should look the same so number of
-         * rid/vid should look the same.
-         */
-
-        cl->checkMap(current, temp);
-
-        /*
-         * At the end number of m_soAll objects must be equal on both views. If
-         * some on temporary views are missing, we need to transport empty
-         * objects to temporary view, like queues, scheduler groups, virtual
-         * router, trap groups etc.
-         */
-
-        if (current.m_soAll.size() != temp.m_soAll.size())
-        {
-            /*
-             * If this will happen that means non object id values are
-             * different since number of RID/VID maps is identical (previous
-             * check).
-             *
-             * Unlikely to be routes/neighbors/fdbs, can be traps, switch,
-             * vlan.
-             *
-             * TODO: For debug we will need to display differences
-             */
-
-            SWSS_LOG_THROW("wrong number of all objects current: %zu vs temp %zu, FIXME",
-                    current.m_soAll.size(),
-                    temp.m_soAll.size());
+            currentViews.push_back(current);
+            tempViews.push_back(temp);
+            cls.push_back(cl);
         }
     }
     catch (const std::exception &e)
@@ -385,21 +332,30 @@ sai_status_t syncdApplyView()
      * fail, then we will have inconsistent state in ASIC.
      */
 
-    if (g_commandLineOptions->m_enableUnittests) // TODO must include all ASICS
+    if (g_commandLineOptions->m_enableUnittests)
     {
-        dumpComparisonLogicOutput(current);
+        dumpComparisonLogicOutput(currentViews);
     }
 
-    cl->executeOperationsOnAsic(current, temp);
-
-    updateRedisDatabase(current, temp);
-
-    if (g_commandLineOptions->m_enableConsistencyCheck)
+    for (auto& cl: cls)
     {
-        cl->checkAsicVsDatabaseConsistency(current, temp);
+        cl->executeOperationsOnAsic(); // can throw, if so asic will be in inconsistent state
+    }
+
+    updateRedisDatabase(tempViews);
+
+    for (auto& cl: cls)
+    {
+        if (g_commandLineOptions->m_enableConsistencyCheck)
+        {
+            bool consistent = cl->checkAsicVsDatabaseConsistency();
+
+            if (!consistent && g_commandLineOptions->m_enableUnittests)
+            {
+                SWSS_LOG_THROW("ASIC content is differnt than DB content!");
+            }
+        }
     }
 
     return SAI_STATUS_SUCCESS;
 }
-
-

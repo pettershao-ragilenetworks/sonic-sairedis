@@ -19,11 +19,21 @@ namespace syncd
             ComparisonLogic(
                 _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,
                 _In_ std::shared_ptr<SaiSwitch> sw,
-                _In_ std::set<sai_object_id_t> initViewRemovedVids);
+                _In_ std::set<sai_object_id_t> initViewRemovedVids,
+                _In_ std::shared_ptr<AsicView> current,
+                _In_ std::shared_ptr<AsicView> temp);
 
             virtual ~ComparisonLogic();;
 
         public:
+
+            bool checkAsicVsDatabaseConsistency();
+
+            void executeOperationsOnAsic();
+
+            void compareViews();
+
+        private:
 
             void matchOids(
                     _In_ AsicView& currentView,
@@ -31,8 +41,7 @@ namespace syncd
 
             void populateExistingObjects(
                     _In_ AsicView& currentView,
-                    _In_ AsicView& temporaryView,
-                    _In_ const std::set<sai_object_id_t> rids);
+                    _In_ AsicView& temporaryView);
 
             void createPreMatchMap(
                     _In_ const AsicView& cur,
@@ -49,14 +58,6 @@ namespace syncd
             void logViewObjectCount(
                     _In_ const AsicView& currentView,
                     _In_ const AsicView& temporaryView);
-
-            void executeOperationsOnAsic(
-                    _In_ AsicView& currentView,
-                    _In_ AsicView& temporaryView);
-
-            void checkAsicVsDatabaseConsistency(
-                    _In_ const AsicView& cur,
-                    _In_ const AsicView& tmp);
 
             void checkMap(
                     _In_ const AsicView& cur,
@@ -204,5 +205,8 @@ namespace syncd
 
             std::set<sai_object_id_t> m_initViewRemovedVids;
 
+            std::shared_ptr<AsicView> m_current;
+
+            std::shared_ptr<AsicView> m_temp;
     };
 }
