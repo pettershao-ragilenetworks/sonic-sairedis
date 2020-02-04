@@ -369,7 +369,7 @@ sai_status_t SwitchStateBase::setPort(
     {
         bool up = attr->value.booldata;
 
-        // find correnspoding host if interface and bring it down !
+        // find corresponding host if interface and bring it down !
         for (auto& kvp: m_hostif_info_map)
         {
             auto tapname = kvp.first;
