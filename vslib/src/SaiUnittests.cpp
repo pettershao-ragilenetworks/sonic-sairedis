@@ -16,7 +16,7 @@ void Sai::startUnittestThread()
     m_unittestChannelThreadEvent = std::make_shared<swss::SelectableEvent>();
 
     // TODO may require to pass correct DB information
-    m_dbNtf = std::make_shared<swss::DBConnector>(ASIC_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+    m_dbNtf = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
 
     m_unittestChannelNotificationConsumer = std::make_shared<swss::NotificationConsumer>(m_dbNtf.get(), SAI_VS_UNITTEST_CHANNEL);
 
