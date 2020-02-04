@@ -158,7 +158,6 @@ void performWarmRestart()
         SAI_SWITCH_ATTR_SHUTDOWN_REQUEST_NOTIFY,
         SAI_SWITCH_ATTR_FDB_EVENT_NOTIFY,
         SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY,
-        SAI_SWITCH_ATTR_PACKET_EVENT_NOTIFY,
         SAI_SWITCH_ATTR_QUEUE_PFC_DEADLOCK_NOTIFY
     };
 #define NELMS(arr) (sizeof(arr) / sizeof(arr[0]))
@@ -173,6 +172,7 @@ void performWarmRestart()
     g_handler->updateNotificationsPointers((uint32_t)NELMS(switch_attrs), &switch_attrs[0]);
     sai_status_t status;
 
+    // TODO pass all non oid attributes needed for conditionals and for hardware info
     {
         SWSS_LOG_TIMER("Warm boot: create switch");
         status = g_vendorSai->create(SAI_OBJECT_TYPE_SWITCH, &switch_rid, 0, (uint32_t)NELMS(switch_attrs), &switch_attrs[0]);
