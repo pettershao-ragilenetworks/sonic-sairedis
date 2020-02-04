@@ -222,7 +222,9 @@ void SwitchStateBase::send_port_oper_status_notification(
 
 int SwitchStateBase::ifup(
         _In_ const char *dev,
-        _In_ sai_object_id_t port_id)
+        _In_ sai_object_id_t port_id,
+        _In_ bool up,
+        _In_ bool explicitNotification)
 {
     SWSS_LOG_ENTER();
 
@@ -252,7 +254,7 @@ int SwitchStateBase::ifup(
         return err;
     }
 
-    if (ifr.ifr_flags & IFF_UP)
+    if (up && explicitNotification && (ifr.ifr_flags & IFF_UP))
     {
         close(s);
 
@@ -267,7 +269,14 @@ int SwitchStateBase::ifup(
         return 0;
     }
 
-    ifr.ifr_flags |= IFF_UP;
+    if (up)
+    {
+        ifr.ifr_flags |= IFF_UP;
+    }
+    else
+    {
+        ifr.ifr_flags &= ~IFF_UP;
+    }
 
     err = ioctl(s, SIOCSIFFLAGS, &ifr);
 
@@ -463,7 +472,7 @@ bool SwitchStateBase::hostif_create_tap_veth_forwarding(
 
     SWSS_LOG_NOTICE("interface index = %d, %s\n", sock_address.sll_ifindex, vethname.c_str());
 
-    if (ifup(vethname.c_str(), port_id))
+    if (ifup(vethname.c_str(), port_id, true, true))
     {
         SWSS_LOG_ERROR("ifup failed on %s", vethname.c_str());
 

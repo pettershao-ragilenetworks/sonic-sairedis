@@ -359,7 +359,62 @@ sai_status_t SwitchStateBase::remove_internal(
     return SAI_STATUS_SUCCESS;
 }
 
+sai_status_t SwitchStateBase::setPort(
+        _In_ sai_object_id_t portId,
+        _In_ const sai_attribute_t* attr)
+{
+    SWSS_LOG_ENTER();
+
+    if (attr && attr->id == SAI_PORT_ATTR_ADMIN_STATE)
+    {
+        bool up = attr->value.booldata;
+
+        // find correnspoding host if interface and bring it down !
+        for (auto& kvp: m_hostif_info_map)
+        {
+            auto tapname = kvp.first;
+
+            if (kvp.second->m_portId == portId)
+            {
+                std::string vethname = vs_get_veth_name(tapname, portId);
+
+                if (ifup(vethname.c_str(), portId, up, false))
+                {
+                    SWSS_LOG_ERROR("if admin %s failed on %s failed: %s", (up ? "UP" : "DOWN"), vethname.c_str(),  strerror(errno));
+
+                    return SAI_STATUS_FAILURE;
+                }
+
+                SWSS_LOG_NOTICE("if admin %s success on %s", (up ? "UP" : "DOWN"), vethname.c_str());
+
+                break;
+            }
+        }
+    }
+
+    auto sid = sai_serialize_object_id(portId);
+
+    return set_internal(SAI_OBJECT_TYPE_PORT, sid, attr);
+}
+
 sai_status_t SwitchStateBase::set(
+        _In_ sai_object_type_t objectType,
+        _In_ const std::string &serializedObjectId,
+        _In_ const sai_attribute_t* attr)
+{
+    SWSS_LOG_ENTER();
+
+    if (objectType == SAI_OBJECT_TYPE_PORT)
+    {
+        sai_object_id_t objectId;
+        sai_deserialize_object_id(serializedObjectId, objectId);
+        return setPort(objectId, attr);
+    }
+
+    return set_internal(objectType, serializedObjectId, attr);
+}
+
+sai_status_t SwitchStateBase::set_internal(
         _In_ sai_object_type_t objectType,
         _In_ const std::string &serializedObjectId,
         _In_ const sai_attribute_t* attr)

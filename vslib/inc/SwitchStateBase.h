@@ -199,6 +199,11 @@ namespace saivs
                     _In_ uint32_t attr_count,
                     _In_ const sai_attribute_t *attr_list);
 
+            virtual sai_status_t set_internal(
+                    _In_ sai_object_type_t objectType,
+                    _In_ const std::string &serializedObjectId,
+                    _In_ const sai_attribute_t* attr);
+
         private:
 
             sai_object_type_t objectTypeQuery(
@@ -256,6 +261,10 @@ namespace saivs
 
             sai_status_t removePort(
                     _In_ sai_object_id_t objectId);
+
+            sai_status_t setPort(
+                    _In_ sai_object_id_t objectId,
+                    _In_ const sai_attribute_t* attr);
 
             bool isPortReadyToBeRemove(
                     _In_ sai_object_id_t portId);
@@ -349,7 +358,9 @@ namespace saivs
 
             int ifup(
                     _In_ const char *dev,
-                    _In_ sai_object_id_t port_id);
+                    _In_ sai_object_id_t port_id,
+                    _In_ bool up,
+                    _In_ bool explicitNotification);
 
             std::string vs_get_veth_name(
                     _In_ const std::string& tapname,

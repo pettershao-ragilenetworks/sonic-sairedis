@@ -146,8 +146,11 @@ void HostInterfaceInfo::veth2tap_fun()
 
         if (size < 0)
         {
-            SWSS_LOG_ERROR("failed to read from socket fd %d, errno(%d): %s",
-                    m_packet_socket, errno, strerror(errno));
+            if (errno != ENETDOWN)
+            {
+                SWSS_LOG_ERROR("failed to read from socket fd %d, errno(%d): %s",
+                        m_packet_socket, errno, strerror(errno));
+            }
 
             continue;
         }
@@ -267,8 +270,11 @@ void HostInterfaceInfo::tap2veth_fun()
 
         if (write(m_packet_socket, buffer, (int)size) < 0)
         {
-            SWSS_LOG_ERROR("failed to write to socket fd %d, errno(%d): %s",
-                    m_packet_socket, errno, strerror(errno));
+            if (errno != ENETDOWN)
+            {
+                SWSS_LOG_ERROR("failed to write to socket fd %d, errno(%d): %s",
+                        m_packet_socket, errno, strerror(errno));
+            }
 
             continue;
         }
