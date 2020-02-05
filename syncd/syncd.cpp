@@ -16,7 +16,7 @@
 #include "NotificationHandler.h"
 #include "NotificationHandlerWrapper.h"
 #include "VirtualOidTranslator.h"
-
+#include "ServiceMethodTable.h"
 
 #include "VirtualObjectIdManager.h"
 #include "RedisVidIndexGenerator.h"
@@ -569,11 +569,6 @@ int profile_get_next_value(
 
     return 0;
 }
-
-sai_service_method_table_t test_services = {
-    profile_get_value,
-    profile_get_next_value
-};
 
 void startDiagShell()
 {
@@ -3305,6 +3300,13 @@ int syncd_main(int argc, char **argv)
     } else {
         gProfileMap[SAI_KEY_BOOT_TYPE] = std::to_string(g_commandLineOptions->m_startType); // number value is needed
     }
+
+    ServiceMethodTable smt;
+
+    smt.profileGetValue = &profile_get_value;
+    smt.profileGetNextValue = &profile_get_next_value;
+
+    auto test_services = smt.getServiceMethodTable();
 
     // TODO need per api test service method table static template
     sai_status_t status = g_vendorSai->initialize(0, (sai_service_method_table_t*)&test_services);
