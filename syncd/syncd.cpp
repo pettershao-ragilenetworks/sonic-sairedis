@@ -14,9 +14,9 @@
 #include "HardReiniter.h"
 #include "NotificationProcessor.h"
 #include "NotificationHandler.h"
-#include "NotificationHandlerWrapper.h"
 #include "VirtualOidTranslator.h"
 #include "ServiceMethodTable.h"
+#include "SwitchNotifications.h"
 
 #include "VirtualObjectIdManager.h"
 #include "RedisVidIndexGenerator.h"
@@ -3194,7 +3194,15 @@ int syncd_main(int argc, char **argv)
 
     bool isWarmStart = swss::WarmStart::isWarmStart(); // since global, can be applied in main
 
-    NotificationHandlerWrapper::setNotificationHandler(g_handler);
+    SwitchNotifications sn;
+
+    sn.onFdbEvent = std::bind(&NotificationHandler::onFdbEvent, *g_handler, std::placeholders::_1, std::placeholders::_2);
+    sn.onPortStateChange = std::bind(&NotificationHandler::onPortStateChange, *g_handler, std::placeholders::_1, std::placeholders::_2);
+    sn.onQueuePfcDeadlock = std::bind(&NotificationHandler::onQueuePfcDeadlock, *g_handler, std::placeholders::_1, std::placeholders::_2);
+    sn.onSwitchShutdownRequest = std::bind(&NotificationHandler::onSwitchShutdownRequest, *g_handler, std::placeholders::_1);
+    sn.onSwitchStateChange = std::bind(&NotificationHandler::onSwitchStateChange, *g_handler, std::placeholders::_1, std::placeholders::_2);
+
+    g_handler->setSwitchNotifications(sn.getSwitchNotifications());
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsuggest-attribute=format"

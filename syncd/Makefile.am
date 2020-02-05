@@ -17,6 +17,7 @@ endif
 noinst_LIBRARIES = libsyncd.a
 libsyncd_a_SOURCES = \
 				ServiceMethodTable.cpp \
+				SwitchNotifications.cpp \
 				ComparisonLogic.cpp \
 				VirtualOidTranslator.cpp \
 				NotificationProcessor.cpp \
