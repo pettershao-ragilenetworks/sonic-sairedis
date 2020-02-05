@@ -7,6 +7,7 @@ extern "C"{
 #include "swss/logger.h"
 
 #include <functional>
+#include <vector>
 
 namespace syncd
 {
@@ -65,7 +66,7 @@ namespace syncd
                     sai_switch_notifications_t m_sn;
             };
 
-            template<int context> 
+            template<size_t context>
                 class Slot:
                     public SlotBase
         {
@@ -132,7 +133,7 @@ namespace syncd
                 }
         };
 
-            static SlotBase* m_slots[];
+            static std::vector<SwitchNotifications::SlotBase*> m_slots;
 
         public:
 

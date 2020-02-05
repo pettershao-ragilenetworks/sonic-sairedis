@@ -7,6 +7,7 @@ extern "C"{
 #include "swss/logger.h"
 
 #include <functional>
+#include <vector>
 
 namespace syncd
 {
@@ -52,7 +53,7 @@ namespace syncd
                     sai_service_method_table_t m_smt;
             };
 
-            template<int context> 
+            template<size_t context>
                 class Slot:
                     public SlotBase
         {
@@ -88,7 +89,7 @@ namespace syncd
                 }
         };
 
-            static SlotBase* m_slots[];
+            static std::vector<SlotBase*> m_slots;
 
         public:
 

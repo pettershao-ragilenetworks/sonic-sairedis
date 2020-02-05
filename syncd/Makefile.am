@@ -50,7 +50,7 @@ libsyncd_a_SOURCES = \
 				PortMap.cpp \
 				PortMapParser.cpp
 
-libsyncd_a_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON) $(SAIFLAGS)
+libsyncd_a_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON) $(SAIFLAGS) -std=c++14
 
 syncd_SOURCES = main.cpp
 

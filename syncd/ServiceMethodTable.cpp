@@ -2,6 +2,8 @@
 
 #include "swss/logger.h"
 
+#include <utility>
+
 using namespace syncd;
 
 ServiceMethodTable::SlotBase::SlotBase(
@@ -43,7 +45,7 @@ const char* ServiceMethodTable::SlotBase::profileGetValue(
 {
     SWSS_LOG_ENTER();
 
-    return m_slots[context]->m_handler->profileGetValue(profile_id, variable);
+    return m_slots.at(context)->m_handler->profileGetValue(profile_id, variable);
 }
 
 int ServiceMethodTable::SlotBase::profileGetNextValue(
@@ -52,7 +54,7 @@ int ServiceMethodTable::SlotBase::profileGetNextValue(
         _Out_ const char** variable,
         _Out_ const char** value)
 {
-    return m_slots[context]->m_handler->profileGetNextValue(profile_id, variable, value);
+    return m_slots.at(context)->m_handler->profileGetNextValue(profile_id, variable, value);
 }
 
 const sai_service_method_table_t& ServiceMethodTable::SlotBase::getServiceMethodTable() const
@@ -62,23 +64,29 @@ const sai_service_method_table_t& ServiceMethodTable::SlotBase::getServiceMethod
     return m_smt;
 }
 
-ServiceMethodTable::SlotBase* ServiceMethodTable::m_slots[] =
-{
-    new ServiceMethodTable::Slot<0>(),
-    new ServiceMethodTable::Slot<1>(),
-};
+template<class B, template<size_t> class D, size_t... i>
+constexpr auto declare_static(std::index_sequence<i...>) {
+        return std::array<B*, sizeof...(i)>{{new D<i>()...}};
+}
+
+template<class B, template<size_t> class D, size_t size>
+constexpr auto declare_static() {
+        auto arr = declare_static<B,D>(std::make_index_sequence<size>{});
+            return std::vector<B*>{arr.begin(), arr.end()};
+}
+
+std::vector<ServiceMethodTable::SlotBase*> ServiceMethodTable::m_slots =
+    declare_static<ServiceMethodTable::SlotBase, ServiceMethodTable::Slot, 10>();
 
 ServiceMethodTable::ServiceMethodTable()
 {
     SWSS_LOG_ENTER();
 
-    int max = sizeof(ServiceMethodTable::m_slots)/sizeof(ServiceMethodTable::m_slots[0]);
-
-    for (int i = 0; i < max; i ++) 
+    for (auto& slot: m_slots)
     {
-        if (m_slots[i]->getHandler() == nullptr)
+        if (slot->getHandler() == nullptr)
         {
-            m_slot = m_slots[i];
+            m_slot = slot;
 
             m_slot->setHandler(this);
 
@@ -86,7 +94,7 @@ ServiceMethodTable::ServiceMethodTable()
         }
     }
 
-    SWSS_LOG_THROW("no more available slots, max slots: %d", max);
+    SWSS_LOG_THROW("no more available slots, max slots: %zu", m_slots.size());
 }
 
 ServiceMethodTable::~ServiceMethodTable()

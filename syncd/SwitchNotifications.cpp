@@ -93,38 +93,29 @@ const sai_switch_notifications_t& SwitchNotifications::SlotBase::getSwitchNotifi
     return m_sn;
 }
 
-SwitchNotifications::SlotBase* SwitchNotifications::m_slots[] =
-{
-    new SwitchNotifications::Slot<0x00>(),
-    new SwitchNotifications::Slot<0x01>(),
-    new SwitchNotifications::Slot<0x02>(),
-    new SwitchNotifications::Slot<0x03>(),
-    new SwitchNotifications::Slot<0x04>(),
-    new SwitchNotifications::Slot<0x05>(),
-    new SwitchNotifications::Slot<0x06>(),
-    new SwitchNotifications::Slot<0x07>(),
-    new SwitchNotifications::Slot<0x08>(),
-    new SwitchNotifications::Slot<0x09>(),
-    new SwitchNotifications::Slot<0x0A>(),
-    new SwitchNotifications::Slot<0x0B>(),
-    new SwitchNotifications::Slot<0x0C>(),
-    new SwitchNotifications::Slot<0x0D>(),
-    new SwitchNotifications::Slot<0x0E>(),
-    new SwitchNotifications::Slot<0x0F>(),
-    new SwitchNotifications::Slot<0x10>(),
-};
+template<class B, template<size_t> class D, size_t... i>
+constexpr auto declare_static(std::index_sequence<i...>) {
+        return std::array<B*, sizeof...(i)>{{new D<i>()...}};
+}
+
+template<class B, template<size_t> class D, size_t size>
+constexpr auto declare_static() {
+        auto arr = declare_static<B,D>(std::make_index_sequence<size>{});
+            return std::vector<B*>{arr.begin(), arr.end()};
+}
+
+std::vector<SwitchNotifications::SlotBase*> SwitchNotifications::m_slots =
+    declare_static<SwitchNotifications::SlotBase, SwitchNotifications::Slot, 0x10>();
 
 SwitchNotifications::SwitchNotifications()
 {
     SWSS_LOG_ENTER();
 
-    int max = sizeof(SwitchNotifications::m_slots)/sizeof(SwitchNotifications::m_slots[0]);
-
-    for (int i = 0; i < max; i ++) 
+    for (auto& slot: m_slots)
     {
-        if (m_slots[i]->getHandler() == nullptr)
+        if (slot->getHandler() == nullptr)
         {
-            m_slot = m_slots[i];
+            m_slot = slot;
 
             m_slot->setHandler(this);
 
@@ -132,7 +123,7 @@ SwitchNotifications::SwitchNotifications()
         }
     }
 
-    SWSS_LOG_THROW("no more available slots, max slots: %d", max);
+    SWSS_LOG_THROW("no more available slots, max slots: %zu", m_slots.size());
 }
 
 SwitchNotifications::~SwitchNotifications()
