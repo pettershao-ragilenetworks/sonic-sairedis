@@ -21,7 +21,6 @@ libsyncd_a_SOURCES = \
 				ComparisonLogic.cpp \
 				VirtualOidTranslator.cpp \
 				NotificationProcessor.cpp \
-				NotificationHandlerWrapper.cpp \
 				NotificationHandler.cpp \
 				SingleReiniter.cpp \
 				HardReiniter.cpp \
