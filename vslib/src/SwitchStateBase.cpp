@@ -365,7 +365,7 @@ sai_status_t SwitchStateBase::setPort(
 {
     SWSS_LOG_ENTER();
 
-    if (attr && attr->id == SAI_PORT_ATTR_ADMIN_STATE)
+    if (attr && attr->id == SAI_PORT_ATTR_ADMIN_STATE && m_switchConfig->m_useTapDevice)
     {
         bool up = attr->value.booldata;
 
