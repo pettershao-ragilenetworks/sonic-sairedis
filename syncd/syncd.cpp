@@ -32,6 +32,7 @@
 #define MAX_OBJLIST_LEN 128
 
 using namespace syncd;
+using namespace std::placeholders;
 
 /*
  * Make sure that notification queue pointer is populated before we start
@@ -3196,11 +3197,11 @@ int syncd_main(int argc, char **argv)
 
     SwitchNotifications sn;
 
-    sn.onFdbEvent = std::bind(&NotificationHandler::onFdbEvent, *g_handler, std::placeholders::_1, std::placeholders::_2);
-    sn.onPortStateChange = std::bind(&NotificationHandler::onPortStateChange, *g_handler, std::placeholders::_1, std::placeholders::_2);
-    sn.onQueuePfcDeadlock = std::bind(&NotificationHandler::onQueuePfcDeadlock, *g_handler, std::placeholders::_1, std::placeholders::_2);
-    sn.onSwitchShutdownRequest = std::bind(&NotificationHandler::onSwitchShutdownRequest, *g_handler, std::placeholders::_1);
-    sn.onSwitchStateChange = std::bind(&NotificationHandler::onSwitchStateChange, *g_handler, std::placeholders::_1, std::placeholders::_2);
+    sn.onFdbEvent = std::bind(&NotificationHandler::onFdbEvent, *g_handler, _1, _2);
+    sn.onPortStateChange = std::bind(&NotificationHandler::onPortStateChange, *g_handler, _1, _2);
+    sn.onQueuePfcDeadlock = std::bind(&NotificationHandler::onQueuePfcDeadlock, *g_handler, _1, _2);
+    sn.onSwitchShutdownRequest = std::bind(&NotificationHandler::onSwitchShutdownRequest, *g_handler, _1);
+    sn.onSwitchStateChange = std::bind(&NotificationHandler::onSwitchStateChange, *g_handler, _1, _2);
 
     g_handler->setSwitchNotifications(sn.getSwitchNotifications());
 
