@@ -2035,55 +2035,6 @@ sai_status_t processEventInInitViewMode(
 
 }
 
-sai_object_id_t extractSwitchVid(
-        _In_ sai_object_type_t object_type,
-        _In_ const std::string& str_object_id)
-{
-    SWSS_LOG_ENTER();
-
-    auto info = sai_metadata_get_object_type_info(object_type);
-
-    /*
-     * Could be replaced by meta_key.
-     */
-
-    sai_fdb_entry_t fdb_entry;
-    sai_neighbor_entry_t neighbor_entry;
-    sai_route_entry_t route_entry;
-    sai_nat_entry_t nat_entry;
-    sai_object_id_t oid;
-
-    switch (object_type)
-    {
-        case SAI_OBJECT_TYPE_FDB_ENTRY:
-            sai_deserialize_fdb_entry(str_object_id, fdb_entry);
-            return fdb_entry.switch_id;
-
-        case SAI_OBJECT_TYPE_NEIGHBOR_ENTRY:
-            sai_deserialize_neighbor_entry(str_object_id, neighbor_entry);
-            return neighbor_entry.switch_id;
-
-        case SAI_OBJECT_TYPE_ROUTE_ENTRY:
-            sai_deserialize_route_entry(str_object_id, route_entry);
-            return route_entry.switch_id;
-
-        case SAI_OBJECT_TYPE_NAT_ENTRY:
-            sai_deserialize_nat_entry(str_object_id, nat_entry);
-            return nat_entry.switch_id;
-
-        default:
-
-            if (info->isnonobjectid)
-            {
-                SWSS_LOG_THROW("passing non object id %s as generic object", info->objecttypename);
-            }
-
-            sai_deserialize_object_id(str_object_id, oid);
-
-            return VidManager::switchIdQuery(oid);
-    }
-}
-
 sai_status_t handle_bulk_generic(
         _In_ sai_object_type_t object_type,
         _In_ const std::vector<std::string> &object_ids,
@@ -2551,12 +2502,6 @@ sai_status_t processEvent(
             return status;
         }
 
-        /*
-         * TODO: Key is serialized meta_key, we could use deserialize
-         * to extract it here.
-         */
-
-        const std::string &str_object_type = key.substr(0, key.find(":"));
         const std::string &str_object_id = key.substr(key.find(":") + 1);
 
         SWSS_LOG_INFO("key: %s op: %s", key.c_str(), op.c_str());
@@ -2620,16 +2565,12 @@ sai_status_t processEvent(
             SWSS_LOG_THROW("api '%s' is not implemented", op.c_str());
         }
 
-        sai_object_type_t object_type;
-        sai_deserialize_object_type(str_object_type, object_type);
+        sai_object_meta_key_t metaKey;
+        sai_deserialize_object_meta_key(key, metaKey);
 
-        /*
-         * TODO: use metadata utils is object type valid.
-         */
-
-        if (object_type == SAI_OBJECT_TYPE_NULL || object_type >= SAI_OBJECT_TYPE_EXTENSIONS_MAX)
+        if (!sai_metadata_is_object_type_valid(metaKey.objecttype))
         {
-            SWSS_LOG_THROW("undefined object type %s", sai_serialize_object_type(object_type).c_str());
+            SWSS_LOG_THROW("undefined object type %s", key.c_str());
         }
 
         const std::vector<swss::FieldValueTuple> &values = kfvFieldsValues(kco);
@@ -2639,7 +2580,7 @@ sai_status_t processEvent(
             SWSS_LOG_DEBUG("attr: %s: %s", fvField(v).c_str(), fvValue(v).c_str());
         }
 
-        SaiAttributeList list(object_type, values, false);
+        SaiAttributeList list(metaKey.objecttype, values, false);
 
         /*
          * Attribute list can't be const since we will use it to translate VID to
@@ -2655,7 +2596,7 @@ sai_status_t processEvent(
          * memory space.
          */
 
-        if (object_type == SAI_OBJECT_TYPE_SWITCH && (api == SAI_COMMON_API_CREATE || api == SAI_COMMON_API_SET))
+        if (metaKey.objecttype == SAI_OBJECT_TYPE_SWITCH && (api == SAI_COMMON_API_CREATE || api == SAI_COMMON_API_SET))
         {
             /*
              * We don't need to clear those pointers on switch remove (even last),
@@ -2669,7 +2610,7 @@ sai_status_t processEvent(
 
         if (isInitViewMode())
         {
-            return processEventInInitViewMode(object_type, str_object_id, api, attr_count, attr_list);
+            return processEventInInitViewMode(metaKey.objecttype, str_object_id, api, attr_count, attr_list);
         }
 
         if (api != SAI_COMMON_API_GET)
@@ -2682,50 +2623,18 @@ sai_status_t processEvent(
 
             SWSS_LOG_DEBUG("translating VID to RIDs on all attributes");
 
-            g_translator->translateVidToRid(object_type, attr_count, attr_list);
+            g_translator->translateVidToRid(metaKey.objecttype, attr_count, attr_list);
         }
 
-        // TODO use metadata utils
-        auto info = sai_metadata_get_object_type_info(object_type);
-
-        /*
-         * TODO use sai meta key deserialize
-         */
+        auto info = sai_metadata_get_object_type_info(metaKey.objecttype);
 
         if (info->isnonobjectid)
         {
-            sai_object_meta_key_t meta_key;
-
-            meta_key.objecttype = object_type;
-
-            switch (object_type)
-            {
-                case SAI_OBJECT_TYPE_FDB_ENTRY:
-                    sai_deserialize_fdb_entry(str_object_id, meta_key.objectkey.key.fdb_entry);
-                    break;
-
-                case SAI_OBJECT_TYPE_NEIGHBOR_ENTRY:
-                    sai_deserialize_neighbor_entry(str_object_id, meta_key.objectkey.key.neighbor_entry);
-                    break;
-
-                case SAI_OBJECT_TYPE_ROUTE_ENTRY:
-                    sai_deserialize_route_entry(str_object_id, meta_key.objectkey.key.route_entry);
-                    break;
-
-                case SAI_OBJECT_TYPE_NAT_ENTRY:
-                    sai_deserialize_nat_entry(str_object_id, meta_key.objectkey.key.nat_entry);
-                    break;
-
-                default:
-
-                    SWSS_LOG_THROW("non object id %s is not supported yet, FIXME", info->objecttypename);
-            }
-
-            status = handle_non_object_id(meta_key, api, attr_count, attr_list);
+            status = handle_non_object_id(metaKey, api, attr_count, attr_list);
         }
         else
         {
-            status = handle_generic(object_type, str_object_id, api, attr_count, attr_list);
+            status = handle_generic(metaKey.objecttype, str_object_id, api, attr_count, attr_list);
         }
 
         if (api == SAI_COMMON_API_GET)
@@ -2738,20 +2647,17 @@ sai_status_t processEvent(
                         sai_serialize_status(status).c_str());
             }
 
-            /*
-             * Extracting switch is double work here, we can avoid this when we
-             * will use meta_key.
-             */
+            // extract switch VID from any object type
 
-            sai_object_id_t switch_vid = extractSwitchVid(object_type, str_object_id);
+            sai_object_id_t switch_vid = VidManager::switchIdQuery(metaKey.objectkey.key.object_id);
 
-            internal_syncd_get_send(object_type, str_object_id, switch_vid, status, attr_count, attr_list);
+            internal_syncd_get_send(metaKey.objecttype, str_object_id, switch_vid, status, attr_count, attr_list);
         }
         else if (status != SAI_STATUS_SUCCESS)
         {
             internal_syncd_api_send_response(api, status);
 
-            if (!info->isnonobjectid && api == SAI_COMMON_API_SET)
+            if (info->isobjectid && api == SAI_COMMON_API_SET)
             {
                 sai_object_id_t vid;
                 sai_deserialize_object_id(str_object_id, vid);
