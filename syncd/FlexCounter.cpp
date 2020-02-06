@@ -16,7 +16,8 @@ using namespace syncd;
 
 extern std::shared_ptr<sairedis::SaiInterface> g_vendorSai;
 
-FlexCounter::FlexCounter(std::string instanceId):
+FlexCounter::FlexCounter(
+        _In_ const std::string& instanceId):
     m_pollInterval(0),
     m_instanceId(instanceId)
 {

@@ -22,7 +22,7 @@ namespace syncd
         public:
 
             FlexCounter(
-                    _In_ std::string instanceId);
+                    _In_ const std::string& instanceId);
 
             virtual ~FlexCounter();
 
