@@ -1819,6 +1819,214 @@ void on_switch_create_in_init_view(
     }
 }
 
+sai_status_t initViewCreate(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::string &str_object_id,
+        _In_ uint32_t attr_count,
+        _In_ sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    if (object_type == SAI_OBJECT_TYPE_PORT)
+    {
+        // reason for this is that if user will create port,
+        // new port is not actually created so when for example
+        // querying new queues for new created port, there are
+        // not there, since no actual port create was issued on
+        // the ASIC
+        SWSS_LOG_THROW("port object can't be created in init view mode");
+    }
+
+    auto info = sai_metadata_get_object_type_info(object_type);
+
+    // we assume create of those non object id object types will succeed
+
+    if (info->isobjectid)
+    {
+        sai_object_id_t object_id;
+        sai_deserialize_object_id(str_object_id, object_id);
+
+        /*
+         * Object ID here is actual VID returned from redis during
+         * creation this is floating VID in init view mode.
+         */
+
+        SWSS_LOG_DEBUG("generic create (init view) for %s, floating VID: %s",
+                sai_serialize_object_type(object_type).c_str(),
+                sai_serialize_object_id(object_id).c_str());
+
+        if (object_type == SAI_OBJECT_TYPE_SWITCH)
+        {
+            on_switch_create_in_init_view(object_id, attr_count, attr_list);
+        }
+    }
+
+    internal_syncd_api_send_response(SAI_COMMON_API_CREATE, SAI_STATUS_SUCCESS);
+
+    return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t initViewRemove(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::string &str_object_id)
+{
+    SWSS_LOG_ENTER();
+
+    if (object_type == SAI_OBJECT_TYPE_PORT)
+    {
+        // reason for this is that if user will remove port, actual
+        // resources for it wont be release, lanes would be still
+        // occupied and there is extra logic required in post port
+        // remove which clears OIDs (ipgs,queues,SGs) from redis db
+        // that are automatically removed by vendor SAI, and comparison
+        // logic don't support that
+        SWSS_LOG_THROW("port object can't be removed in init view mode");
+    }
+
+    if (object_type == SAI_OBJECT_TYPE_SWITCH)
+    {
+        /*
+         * NOTE: Special care needs to be taken to clear all this
+         * switch id's from all db's currently we skip this since we
+         * assume that orchagent will not be removing just created
+         * switches. But it may happen when asic will fail etc.
+         *
+         * To support multiple switches this case must be refactored.
+         */
+
+        SWSS_LOG_THROW("remove switch (%s) is not supported in init view mode yet! FIXME", str_object_id.c_str());
+    }
+
+    auto info = sai_metadata_get_object_type_info(object_type);
+
+    if (info->isobjectid)
+    {
+        /*
+         * If object is existing object (like bridge port, vlan member)
+         * user may want to remove them, but this is temporary view,
+         * and when we receive apply view, we will populate existing
+         * objects to temporary view (since not all of them user may
+         * query) and this will produce conflict, since some of those
+         * objects user could explicitly remove. So to solve that we
+         * need to have a list of removed objects, and then only
+         * populate objects which not exist on removed list.
+         */
+
+        sai_object_id_t object_vid;
+        sai_deserialize_object_id(str_object_id, object_vid);
+
+        initViewRemovedVidSet.insert(object_vid);
+    }
+
+    internal_syncd_api_send_response(SAI_COMMON_API_REMOVE, SAI_STATUS_SUCCESS);
+
+    return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t initViewSet(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::string &str_object_id,
+        _In_ sai_attribute_t *attr)
+{
+    SWSS_LOG_ENTER();
+
+    // we support SET api on all objects in init view mode.
+
+    internal_syncd_api_send_response(SAI_COMMON_API_SET, SAI_STATUS_SUCCESS);
+
+    return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t initViewGet(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::string &str_object_id,
+        _In_ uint32_t attr_count,
+        _In_ sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    sai_status_t status;
+
+    auto info = sai_metadata_get_object_type_info(object_type);
+
+    if (info->isnonobjectid)
+    {
+        /*
+         * Those objects are user created, so if user created ROUTE he
+         * passed some attributes, there is no sense to support GET
+         * since user explicitly know what attributes were set, similar
+         * for other non object id types.
+         */
+
+        SWSS_LOG_ERROR("get is not supported on %s in init view mode", sai_serialize_object_type(object_type).c_str());
+
+        status = SAI_STATUS_NOT_SUPPORTED;
+    }
+    else
+    {
+        sai_object_id_t object_id;
+        sai_deserialize_object_id(str_object_id, object_id);
+
+        SWSS_LOG_DEBUG("generic get (init view) for object type %s:%s",
+                sai_serialize_object_type(object_type).c_str(),
+                str_object_id.c_str());
+
+        /*
+         * Object must exists, we can't call GET on created object
+         * in init view mode, get here can be called on existing
+         * objects like default trap group to get some vendor
+         * specific values.
+         *
+         * Exception here is switch, since all switches must be
+         * created, when user will create switch on init view mode,
+         * switch will be matched with existing switch, or it will
+         * be explicitly created so user can query it properties.
+         *
+         * Translate vid to rid will make sure that object exist
+         * and it have RID defined, so we can query it.
+         */
+
+        sai_object_id_t rid = g_translator->translateVidToRid(object_id);
+
+        sai_object_meta_key_t meta_key;
+
+        meta_key.objecttype = object_type;
+        meta_key.objectkey.key.object_id = rid;
+
+        status = g_vendorSai->get(meta_key, attr_count, attr_list);
+    }
+
+    sai_object_id_t switch_id;
+
+    if (switches.size() == 1)
+    {
+        /*
+         * We are in init view mode, but ether switch already
+         * existed or first command was creating switch and user
+         * created switch.
+         *
+         * We could change that later on, depends on object type we
+         * can extract switch id, we could also have this method
+         * inside metadata to get meta key.
+         */
+
+        switch_id = switches.begin()->second->getVid();
+    }
+    else
+    {
+        /*
+         * This needs to be updated to support multiple switches
+         * scenario.
+         */
+
+        SWSS_LOG_THROW("multiple switches are not supported yet: %zu", switches.size());
+    }
+
+    internal_syncd_get_send(object_type, str_object_id, switch_id, status, attr_count, attr_list);
+
+    return status;
+}
+
 sai_status_t processEventInInitViewMode(
         _In_ sai_object_type_t object_type,
         _In_ const std::string &str_object_id,
@@ -1835,204 +2043,28 @@ sai_status_t processEventInInitViewMode(
      * existing one.
      */
 
-    /*
-     * TODO: use metadata utils.
-     */
-
-    auto info = sai_metadata_get_object_type_info(object_type);
-
     switch (api)
     {
         case SAI_COMMON_API_CREATE:
 
-            if (object_type == SAI_OBJECT_TYPE_PORT)
-            {
-                // reason for this is that if user will create port,
-                // new port is not actually created so when for example
-                // querying new queues for new created port, there are
-                // not there, since no actual port create was issued on
-                // the ASIC
-                SWSS_LOG_THROW("port object can't be created in init view mode");
-            }
-
-            if (info->isnonobjectid)
-            {
-                /*
-                 * We assume create of those non object id object types will succeed.
-                 */
-            }
-            else
-            {
-                sai_object_id_t object_id;
-                sai_deserialize_object_id(str_object_id, object_id);
-
-                /*
-                 * Object ID here is actual VID returned from redis during
-                 * creation this is floating VID in init view mode.
-                 */
-
-                SWSS_LOG_DEBUG("generic create (init view) for %s, floating VID: %s",
-                        sai_serialize_object_type(object_type).c_str(),
-                        sai_serialize_object_id(object_id).c_str());
-
-                if (object_type == SAI_OBJECT_TYPE_SWITCH)
-                {
-                    on_switch_create_in_init_view(object_id, attr_count, attr_list);
-                }
-            }
-
-            internal_syncd_api_send_response(api, SAI_STATUS_SUCCESS);
-
-            return SAI_STATUS_SUCCESS;
+            return initViewCreate(object_type, str_object_id, attr_count, attr_list);
 
         case SAI_COMMON_API_REMOVE:
 
-            if (object_type == SAI_OBJECT_TYPE_PORT)
-            {
-                // reason for this is that if user will remove port, actual
-                // resources for it wont be release, lanes would be still
-                // occupied and there is extra logic required in post port
-                // remove which clears OIDs (ipgs,queues,SGs) from redis db
-                // that are automatically removed by vendor SAI, and comparison
-                // logic don't support that
-                SWSS_LOG_THROW("port object can't be removed in init view mode");
-            }
-
-            if (object_type == SAI_OBJECT_TYPE_SWITCH)
-            {
-                /*
-                 * NOTE: Special care needs to be taken to clear all this
-                 * switch id's from all db's currently we skip this since we
-                 * assume that orchagent will not be removing just created
-                 * switches. But it may happen when asic will fail etc.
-                 *
-                 * To support multiple switches this case must be refactored.
-                 */
-
-                SWSS_LOG_THROW("remove switch (%s) is not supported in init view mode yet! FIXME", str_object_id.c_str());
-            }
-
-            if (!info->isnonobjectid)
-            {
-                /*
-                 * If object is existing object (like bridge port, vlan member)
-                 * user may want to remove them, but this is temporary view,
-                 * and when we receive apply view, we will populate existing
-                 * objects to temporary view (since not all of them user may
-                 * query) and this will produce conflict, since some of those
-                 * objects user could explicitly remove. So to solve that we
-                 * need to have a list of removed objects, and then only
-                 * populate objects which not exist on removed list.
-                 */
-
-                sai_object_id_t object_vid;
-                sai_deserialize_object_id(str_object_id, object_vid);
-
-                initViewRemovedVidSet.insert(object_vid);
-            }
-
-            internal_syncd_api_send_response(api, SAI_STATUS_SUCCESS);
-
-            return SAI_STATUS_SUCCESS;
+            return initViewRemove(object_type, str_object_id);
 
         case SAI_COMMON_API_SET:
 
-            /*
-             * We support SET api on all objects in init view mode.
-             */
-
-            internal_syncd_api_send_response(api, SAI_STATUS_SUCCESS);
-
-            return SAI_STATUS_SUCCESS;
+            return initViewSet(object_type, str_object_id, attr_list);
 
         case SAI_COMMON_API_GET:
 
-            {
-                sai_status_t status;
-
-                if (info->isnonobjectid)
-                {
-                    /*
-                     * Those objects are user created, so if user created ROUTE he
-                     * passed some attributes, there is no sense to support GET
-                     * since user explicitly know what attributes were set, similar
-                     * for other non object id types.
-                     */
-
-                    SWSS_LOG_ERROR("get is not supported on %s in init view mode", sai_serialize_object_type(object_type).c_str());
-
-                    status = SAI_STATUS_NOT_SUPPORTED;
-                }
-                else
-                {
-                    sai_object_id_t object_id;
-                    sai_deserialize_object_id(str_object_id, object_id);
-
-                    SWSS_LOG_DEBUG("generic get (init view) for object type %s:%s",
-                            sai_serialize_object_type(object_type).c_str(),
-                            str_object_id.c_str());
-
-                    /*
-                     * Object must exists, we can't call GET on created object
-                     * in init view mode, get here can be called on existing
-                     * objects like default trap group to get some vendor
-                     * specific values.
-                     *
-                     * Exception here is switch, since all switches must be
-                     * created, when user will create switch on init view mode,
-                     * switch will be matched with existing switch, or it will
-                     * be explicitly created so user can query it properties.
-                     *
-                     * Translate vid to rid will make sure that object exist
-                     * and it have RID defined, so we can query it.
-                     */
-
-                    sai_object_id_t rid = g_translator->translateVidToRid(object_id);
-
-                    sai_object_meta_key_t meta_key;
-
-                    meta_key.objecttype = object_type;
-                    meta_key.objectkey.key.object_id = rid;
-
-                    status = g_vendorSai->get(meta_key, attr_count, attr_list);
-                }
-
-                sai_object_id_t switch_id;
-
-                if (switches.size() == 1)
-                {
-                    /*
-                     * We are in init view mode, but ether switch already
-                     * existed or first command was creating switch and user
-                     * created switch.
-                     *
-                     * We could change that later on, depends on object type we
-                     * can extract switch id, we could also have this method
-                     * inside metadata to get meta key.
-                     */
-
-                    switch_id = switches.begin()->second->getVid();
-                }
-                else
-                {
-                    /*
-                     * This needs to be updated to support multiple switches
-                     * scenario.
-                     */
-
-                    SWSS_LOG_THROW("multiple switches are not supported yet: %zu", switches.size());
-                }
-
-                internal_syncd_get_send(object_type, str_object_id, switch_id, status, attr_count, attr_list);
-
-                return status;
-            }
+            return initViewGet(object_type, str_object_id, attr_count, attr_list);
 
         default:
 
             SWSS_LOG_THROW("common api (%s) is not implemented in init view mode", sai_serialize_common_api(api).c_str());
     }
-
 }
 
 sai_status_t handle_bulk_generic(
