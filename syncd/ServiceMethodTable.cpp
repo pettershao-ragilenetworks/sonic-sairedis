@@ -64,6 +64,9 @@ const sai_service_method_table_t& ServiceMethodTable::SlotBase::getServiceMethod
     return m_smt;
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Winline"
+
 template<class B, template<size_t> class D, size_t... i>
 constexpr auto declare_static(std::index_sequence<i...>)
 {
@@ -81,6 +84,8 @@ constexpr auto declare_static()
 
 std::vector<ServiceMethodTable::SlotBase*> ServiceMethodTable::m_slots =
     declare_static<ServiceMethodTable::SlotBase, ServiceMethodTable::Slot, 10>();
+
+#pragma GCC diagnostic pop
 
 ServiceMethodTable::ServiceMethodTable()
 {

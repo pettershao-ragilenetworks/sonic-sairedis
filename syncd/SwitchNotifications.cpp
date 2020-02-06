@@ -44,7 +44,7 @@ void SwitchNotifications::SlotBase::onFdbEvent(
 {
     SWSS_LOG_ENTER();
 
-    return m_slots[context]->m_handler->onFdbEvent(count,data);
+    return m_slots.at(context)->m_handler->onFdbEvent(count,data);
 }
 
 void SwitchNotifications::SlotBase::onPortStateChange(
@@ -54,7 +54,7 @@ void SwitchNotifications::SlotBase::onPortStateChange(
 {
     SWSS_LOG_ENTER();
 
-    return m_slots[context]->m_handler->onPortStateChange(count, data);
+    return m_slots.at(context)->m_handler->onPortStateChange(count, data);
 }
 
 void SwitchNotifications::SlotBase::onQueuePfcDeadlock(
@@ -73,7 +73,7 @@ void SwitchNotifications::SlotBase::onSwitchShutdownRequest(
 {
     SWSS_LOG_ENTER();
 
-    return m_slots[context]->m_handler->onSwitchShutdownRequest(switch_id);
+    return m_slots.at(context)->m_handler->onSwitchShutdownRequest(switch_id);
 }
 
 void SwitchNotifications::SlotBase::onSwitchStateChange(
@@ -83,7 +83,7 @@ void SwitchNotifications::SlotBase::onSwitchStateChange(
 {
     SWSS_LOG_ENTER();
 
-    return m_slots[context]->m_handler->onSwitchStateChange(switch_id, switch_oper_status);
+    return m_slots.at(context)->m_handler->onSwitchStateChange(switch_id, switch_oper_status);
 }
 
 const sai_switch_notifications_t& SwitchNotifications::SlotBase::getSwitchNotifications() const
@@ -92,6 +92,9 @@ const sai_switch_notifications_t& SwitchNotifications::SlotBase::getSwitchNotifi
 
     return m_sn;
 }
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Winline"
 
 template<class B, template<size_t> class D, size_t... i>
 constexpr auto declare_static(std::index_sequence<i...>)
@@ -110,6 +113,8 @@ constexpr auto declare_static()
 
 std::vector<SwitchNotifications::SlotBase*> SwitchNotifications::m_slots =
     declare_static<SwitchNotifications::SlotBase, SwitchNotifications::Slot, 0x10>();
+
+#pragma GCC diagnostic pop
 
 SwitchNotifications::SwitchNotifications()
 {
