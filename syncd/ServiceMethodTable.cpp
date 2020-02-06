@@ -65,14 +65,18 @@ const sai_service_method_table_t& ServiceMethodTable::SlotBase::getServiceMethod
 }
 
 template<class B, template<size_t> class D, size_t... i>
-constexpr auto declare_static(std::index_sequence<i...>) {
-        return std::array<B*, sizeof...(i)>{{new D<i>()...}};
+constexpr auto declare_static(std::index_sequence<i...>)
+{
+    SWSS_LOG_ENTER();
+    return std::array<B*, sizeof...(i)>{{new D<i>()...}};
 }
 
 template<class B, template<size_t> class D, size_t size>
-constexpr auto declare_static() {
-        auto arr = declare_static<B,D>(std::make_index_sequence<size>{});
-            return std::vector<B*>{arr.begin(), arr.end()};
+constexpr auto declare_static()
+{
+    SWSS_LOG_ENTER();
+    auto arr = declare_static<B,D>(std::make_index_sequence<size>{});
+    return std::vector<B*>{arr.begin(), arr.end()};
 }
 
 std::vector<ServiceMethodTable::SlotBase*> ServiceMethodTable::m_slots =
