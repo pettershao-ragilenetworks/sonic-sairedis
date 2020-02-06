@@ -458,7 +458,7 @@ void internal_syncd_get_send(
      * response will not put any data to table, only queue is used.
      */
 
-    getResponse->set(str_status, entry, "getresponse");
+    getResponse->set(str_status, entry, REDIS_ASIC_STATE_COMMAND_GETRESPONSE);
 
     SWSS_LOG_INFO("response for GET api was send");
 }
@@ -502,7 +502,7 @@ void internal_syncd_api_send_response(
 
     SWSS_LOG_INFO("sending response for %d api with status: %s", api, str_status.c_str());
 
-    getResponse->set(str_status, entry, "getresponse");
+    getResponse->set(str_status, entry, REDIS_ASIC_STATE_COMMAND_GETRESPONSE);
 
     SWSS_LOG_INFO("response for %d api was send", api);
 }
@@ -1604,7 +1604,7 @@ sai_status_t processGetStatsEvent(
         }
     }
 
-    getResponse->set(sai_serialize_status(status), entry, "getresponse");
+    getResponse->set(sai_serialize_status(status), entry, REDIS_ASIC_STATE_COMMAND_GETRESPONSE);
 
     return status;
 }
@@ -1627,7 +1627,7 @@ sai_status_t processClearStatsEvent(
     {
         SWSS_LOG_ERROR("VID %s to RID translation error", str_object_id.c_str());
         status = SAI_STATUS_INVALID_OBJECT_ID;
-        getResponse->set(sai_serialize_status(status), fvTuples, "getresponse");
+        getResponse->set(sai_serialize_status(status), fvTuples, REDIS_ASIC_STATE_COMMAND_GETRESPONSE);
         return status;
     }
 
@@ -1659,7 +1659,7 @@ sai_status_t processClearStatsEvent(
         }
     }
 
-    getResponse->set(sai_serialize_status(status), fvTuples, "getresponse");
+    getResponse->set(sai_serialize_status(status), fvTuples, REDIS_ASIC_STATE_COMMAND_GETRESPONSE);
     return status;
 }
 
@@ -3226,9 +3226,10 @@ int syncd_main(int argc, char **argv)
     }
 #endif // SAITHRIFT
 
+    // we need STATE_DB ASIC_DB and COUNTERS_DB
+
     dbAsic = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
     std::shared_ptr<swss::DBConnector> dbNtf = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
-    std::shared_ptr<swss::DBConnector> dbFlexCounter = std::make_shared<swss::DBConnector>("FLEX_COUNTER_DB", 0);
     std::shared_ptr<swss::DBConnector> dbState = std::make_shared<swss::DBConnector>("STATE_DB", 0);
     std::shared_ptr<swss::Table> warmRestartTable = std::make_shared<swss::Table>(dbState.get(), STATE_WARM_RESTART_TABLE_NAME);
 
@@ -3236,6 +3237,9 @@ int syncd_main(int argc, char **argv)
 
     std::shared_ptr<swss::ConsumerTable> asicState = std::make_shared<swss::ConsumerTable>(dbAsic.get(), ASIC_STATE_TABLE);
     std::shared_ptr<swss::NotificationConsumer> restartQuery = std::make_shared<swss::NotificationConsumer>(dbAsic.get(), "RESTARTQUERY");
+
+    // TODO to be moved to ASIC_DB
+    std::shared_ptr<swss::DBConnector> dbFlexCounter = std::make_shared<swss::DBConnector>("FLEX_COUNTER_DB", 0);
     std::shared_ptr<swss::ConsumerTable> flexCounter = std::make_shared<swss::ConsumerTable>(dbFlexCounter.get(), FLEX_COUNTER_TABLE);
     std::shared_ptr<swss::ConsumerTable> flexCounterGroup = std::make_shared<swss::ConsumerTable>(dbFlexCounter.get(), FLEX_COUNTER_GROUP_TABLE);
 
@@ -3318,7 +3322,7 @@ int syncd_main(int argc, char **argv)
     auto test_services = smt.getServiceMethodTable();
 
     // TODO need per api test service method table static template
-    sai_status_t status = g_vendorSai->initialize(0, (sai_service_method_table_t*)&test_services);
+    sai_status_t status = g_vendorSai->initialize(0, &test_services);
 
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -3326,11 +3330,6 @@ int syncd_main(int argc, char **argv)
                 sai_serialize_status(status).c_str());
         return EXIT_FAILURE;
     }
-
-    /*
-     * TODO: user should create switch from OA, so shell should be started only
-     * after we create switch.
-     */
 
 #ifdef SAITHRIFT
     if (g_commandLineOptions->m_runRPCServer)
