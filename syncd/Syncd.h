@@ -4,6 +4,7 @@
 #include "FlexCounterManager.h"
 
 #include "swss/consumertable.h"
+#include "swss/producertable.h"
 
 #include <memory>
 
@@ -40,6 +41,26 @@ namespace syncd
 
         private:
 
+            sai_status_t processSingleEvent(
+                    _In_ const swss::KeyOpFieldsValuesTuple &kco);
+
+            sai_status_t processAttrEnumValuesCapabilityQuery(
+                    _In_ const swss::KeyOpFieldsValuesTuple &kco);
+
+            sai_status_t processObjectTypeGetAvailabilityQuery(
+                    _In_ const swss::KeyOpFieldsValuesTuple &kco);
+
+            sai_status_t processFdbFlush(
+                    _In_ const swss::KeyOpFieldsValuesTuple &kco);
+
+            sai_status_t processClearStatsEvent(
+                    _In_ const swss::KeyOpFieldsValuesTuple &kco);
+
+            sai_status_t processGetStatsEvent(
+                    _In_ const swss::KeyOpFieldsValuesTuple &kco);
+
+        private:
+
             std::shared_ptr<CommandLineOptions> m_commandLineOptions;
 
             bool m_isWarmStart;
@@ -49,6 +70,8 @@ namespace syncd
             bool m_asicInitViewMode;
 
             std::shared_ptr<FlexCounterManager> m_manager;
+
+            std::shared_ptr<swss::ProducerTable> m_getResponse;
 
     };
 }

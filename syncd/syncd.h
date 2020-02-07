@@ -94,10 +94,6 @@ bool is_set_attribute_workaround(
 void startNotificationsProcessingThread();
 void stopNotificationsProcessingThread();
 
-sai_status_t processBulkEvent(
-        _In_ sai_common_api_t api,
-        _In_ const swss::KeyOpFieldsValuesTuple &kco);
-
 void set_sai_api_loglevel();
 
 void set_sai_api_log_min_prio(

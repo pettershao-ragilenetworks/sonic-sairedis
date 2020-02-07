@@ -168,6 +168,10 @@ bool starts_with(const std::string& str, const std::string& substr)
     return strncmp(str.c_str(), substr.c_str(), substr.size()) == 0;
 }
 
+sai_status_t processBulkEvent(
+        _In_ sai_common_api_t api,
+        _In_ const swss::KeyOpFieldsValuesTuple &kco);
+
 void bulk_nhgm_consumer_worker()
 {
     SWSS_LOG_ENTER();
