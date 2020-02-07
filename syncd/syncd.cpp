@@ -1921,7 +1921,7 @@ sai_status_t processEventInInitViewMode(
     }
 }
 
-sai_status_t handle_bulk_generic(
+sai_status_t processBulkOid(
         _In_ sai_object_type_t object_type,
         _In_ const std::vector<std::string> &object_ids,
         _In_ sai_common_api_t api,
@@ -1998,10 +1998,16 @@ sai_status_t handle_bulk_generic(
     // all can be success if all has been success
     internal_syncd_api_send_response(api, all, (uint32_t)object_ids.size(), statuses.data());
 
+    if (all != SAI_STATUS_SUCCESS && !g_commandLineOptions->m_enableSyncMode)
+    {
+        SWSS_LOG_THROW("failed to execute bulk api: %s",
+                sai_serialize_status(all).c_str());
+    }
+
     return all;
 }
 
-sai_status_t handle_bulk_non_object_id(
+sai_status_t processBulkEntry(
         _In_ sai_object_type_t object_type,
         _In_ const std::vector<std::string> &object_ids,
         _In_ sai_common_api_t api,
@@ -2016,10 +2022,7 @@ sai_status_t handle_bulk_non_object_id(
         SWSS_LOG_THROW("passing oid object to bulk non obejct id operation");
     }
 
-    /*
-     * Since we don't have asic support yet for bulk api, just execute one by
-     * one.
-     */
+    // vendor SAI don't bulk API yet, so execute one by one.
 
     std::vector<sai_status_t> statuses(object_ids.size());
 
@@ -2069,7 +2072,9 @@ sai_status_t handle_bulk_non_object_id(
         {
             if (!g_commandLineOptions->m_enableSyncMode)
             {
-                SWSS_LOG_THROW("operation failed in async mode!");
+                SWSS_LOG_THROW("operation %s for %s failed in async mode!",
+                        sai_serialize_common_api(api).c_str(),
+                        sai_serialize_object_type(object_type).c_str());
             }
 
             all = SAI_STATUS_FAILURE;
@@ -2082,115 +2087,6 @@ sai_status_t handle_bulk_non_object_id(
     internal_syncd_api_send_response(api, all, (uint32_t)object_ids.size(), statuses.data());
 
     return all;
-}
-
-sai_status_t processBulkEvent(
-        _In_ sai_common_api_t api,
-        _In_ const swss::KeyOpFieldsValuesTuple &kco)
-{
-    SWSS_LOG_ENTER();
-
-    const std::string &key = kfvKey(kco);
-
-    std::string str_object_type = key.substr(0, key.find(":"));
-
-    sai_object_type_t object_type;
-    sai_deserialize_object_type(str_object_type, object_type);
-
-    const std::vector<swss::FieldValueTuple> &values = kfvFieldsValues(kco);
-
-    // key = str_object_id
-    // val = attrid=attrvalue|...
-
-    std::vector<std::string> object_ids;
-
-    std::vector<std::shared_ptr<SaiAttributeList>> attributes;
-
-    for (const auto &fvt: values)
-    {
-        std::string str_object_id = fvField(fvt);
-        std::string joined = fvValue(fvt);
-
-        // decode values
-
-        auto v = swss::tokenize(joined, '|');
-
-        object_ids.push_back(str_object_id);
-
-        std::vector<swss::FieldValueTuple> entries; // attributes per object id
-
-        for (size_t i = 0; i < v.size(); ++i)
-        {
-            const std::string item = v.at(i);
-
-            auto start = item.find_first_of("=");
-
-            auto field = item.substr(0, start);
-            auto value = item.substr(start + 1);
-
-            swss::FieldValueTuple entry(field, value);
-
-            entries.push_back(entry);
-        }
-
-        // since now we converted this to proper list, we can extract attributes
-
-        std::shared_ptr<SaiAttributeList> list =
-            std::make_shared<SaiAttributeList>(object_type, entries, false);
-
-        attributes.push_back(list);
-    }
-
-    SWSS_LOG_NOTICE("bulk %s execute with %zu items",
-            str_object_type.c_str(),
-            object_ids.size());
-
-    if (g_syncd->isInitViewMode())
-    {
-        SWSS_LOG_THROW("bulk api (%d) is not supported in init view mode", api);
-    }
-
-    if (api != SAI_COMMON_API_BULK_GET)
-    {
-        // translate attributes for all objects
-
-        for (auto &list: attributes)
-        {
-            sai_attribute_t *attr_list = list->get_attr_list();
-            uint32_t attr_count = list->get_attr_count();
-
-            g_translator->translateVidToRid(object_type, attr_count, attr_list);
-        }
-    }
-
-    sai_status_t status;
-
-    switch (object_type)
-    {
-        case SAI_OBJECT_TYPE_ROUTE_ENTRY:
-        case SAI_OBJECT_TYPE_FDB_ENTRY:
-            status = handle_bulk_non_object_id(object_type, object_ids, api, attributes);
-            break;
-
-        case SAI_OBJECT_TYPE_NEXT_HOP_GROUP_MEMBER:
-            status = handle_bulk_generic(object_type, object_ids, api, attributes);
-            break;
-
-        default:
-            SWSS_LOG_THROW("bulk api for %s is not supported yet, FIXME",
-                    sai_serialize_object_type(object_type).c_str());
-    }
-
-    if (status != SAI_STATUS_SUCCESS && !g_commandLineOptions->m_enableSyncMode)
-    {
-        SWSS_LOG_THROW("failed to execute bulk api: %s",
-                sai_serialize_status(status).c_str());
-    }
-
-    // response was already sent in handle_bulk*
-    // TODO we can extract it here
-
-    return status;
 }
 
 sai_status_t processQuad(

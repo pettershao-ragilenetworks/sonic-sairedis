@@ -59,6 +59,10 @@ namespace syncd
             sai_status_t processGetStatsEvent(
                     _In_ const swss::KeyOpFieldsValuesTuple &kco);
 
+            sai_status_t processBulkEvent(
+                    _In_ sai_common_api_t api,
+                    _In_ const swss::KeyOpFieldsValuesTuple &kco);
+
         private:
 
             std::shared_ptr<CommandLineOptions> m_commandLineOptions;

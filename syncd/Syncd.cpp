@@ -2,6 +2,7 @@
 #include "lib/inc/sairediscommon.h"
 
 #include "swss/logger.h"
+#include "swss/tokenize.h"
 
 #include "meta/sai_serialize.h"
 
@@ -17,9 +18,17 @@ sai_status_t processQuad(
         _In_ sai_common_api_t api,
         _In_ const swss::KeyOpFieldsValuesTuple &kco);
 
-sai_status_t processBulkEvent(
+sai_status_t processBulkEntry(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::vector<std::string> &object_ids,
         _In_ sai_common_api_t api,
-        _In_ const swss::KeyOpFieldsValuesTuple &kco);
+        _In_ const std::vector<std::shared_ptr<SaiAttributeList>> &attributes);
+
+sai_status_t processBulkOid(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::vector<std::string> &object_ids,
+        _In_ sai_common_api_t api,
+        _In_ const std::vector<std::shared_ptr<SaiAttributeList>> &attributes);
 
 using namespace syncd;
 
@@ -177,8 +186,8 @@ sai_status_t Syncd::processAttrEnumValuesCapabilityQuery(
         return SAI_STATUS_INVALID_PARAMETER;
     }
 
-    sai_object_type_t object_type;
-    sai_deserialize_object_type(fvValue(values[0]), object_type);
+    sai_object_type_t objectType;
+    sai_deserialize_object_type(fvValue(values[0]), objectType);
 
     sai_attr_id_t attr_id;
     sai_deserialize_attr_id(fvValue(values[1]), attr_id);
@@ -192,7 +201,7 @@ sai_status_t Syncd::processAttrEnumValuesCapabilityQuery(
     enumCapList.count = list_size;
     enumCapList.list = enum_capabilities_list.data();
 
-    sai_status_t status = g_vendorSai->queryAattributeEnumValuesCapability(switchRid, object_type, attr_id, &enumCapList);
+    sai_status_t status = g_vendorSai->queryAattributeEnumValuesCapability(switchRid, objectType, attr_id, &enumCapList);
 
     std::vector<swss::FieldValueTuple> entry;
 
@@ -238,24 +247,24 @@ sai_status_t Syncd::processObjectTypeGetAvailabilityQuery(
     // Syncd needs to pop the object type off the end of the list in order to
     // retrieve the attribute list
 
-    sai_object_type_t object_type;
-    sai_deserialize_object_type(fvValue(values.back()), object_type);
+    sai_object_type_t objectType;
+    sai_deserialize_object_type(fvValue(values.back()), objectType);
 
     values.pop_back();
 
-    SaiAttributeList list(object_type, values, false);
+    SaiAttributeList list(objectType, values, false);
 
     sai_attribute_t *attr_list = list.get_attr_list();
 
     uint32_t attr_count = list.get_attr_count();
 
-    g_translator->translateVidToRid(object_type, attr_count, attr_list);
+    g_translator->translateVidToRid(objectType, attr_count, attr_list);
 
     uint64_t count;
 
     sai_status_t status = g_vendorSai->objectTypeGetAvailability(
             switchRid,
-            object_type,
+            objectType,
             attr_count,
             attr_list,
             &count);
@@ -311,47 +320,6 @@ sai_status_t Syncd::processFdbFlush(
     m_getResponse->set(sai_serialize_status(status), {} , REDIS_ASIC_STATE_COMMAND_FLUSHRESPONSE);
 
     return status;
-}
-
-template <typename T, typename G>
-std::vector<T> extractCounterIdsGeneric(
-        _In_ const swss::KeyOpFieldsValuesTuple &kco,
-        _In_ G deserializeIdFn)
-{
-    SWSS_LOG_ENTER();
-
-    const auto& values = kfvFieldsValues(kco);
-    std::vector<T> counterIdList;
-    for (const auto & v : values)
-    {
-        std::string field = fvField(v);
-        T counterId;
-        deserializeIdFn(field.c_str(), &counterId);
-
-        counterIdList.push_back(counterId);
-    }
-
-    return counterIdList;
-}
-
-template <typename T, typename G>
-sai_status_t clearStatsGeneric(
-        _In_ sai_object_type_t object_type,
-        _In_ sai_object_id_t object_id,
-        _In_ const swss::KeyOpFieldsValuesTuple &kco,
-        _In_ G deserializeIdFn)
-{
-    SWSS_LOG_ENTER();
-
-    const std::vector<T> counter_ids = extractCounterIdsGeneric<T>(
-            kco,
-            deserializeIdFn);
-
-    return g_vendorSai->clearStats(
-            object_type,
-            object_id,
-            static_cast<uint32_t>(counter_ids.size()),
-            reinterpret_cast<const sai_stat_id_t *>(counter_ids.data()));
 }
 
 sai_status_t Syncd::processClearStatsEvent(
@@ -452,3 +420,93 @@ sai_status_t Syncd::processGetStatsEvent(
 
     return status;
 }
+
+sai_status_t Syncd::processBulkEvent(
+        _In_ sai_common_api_t api,
+        _In_ const swss::KeyOpFieldsValuesTuple &kco)
+{
+    SWSS_LOG_ENTER();
+
+    if (isInitViewMode())
+    {
+        SWSS_LOG_THROW("bulk api (%s) is not supported in init view mode, FIXME",
+                sai_serialize_common_api(api).c_str());
+    }
+
+    const std::string& key = kfvKey(kco); // objectType:count
+
+    std::string strObjectType = key.substr(0, key.find(":"));
+
+    sai_object_type_t objectType;
+    sai_deserialize_object_type(strObjectType, objectType);
+
+    const std::vector<swss::FieldValueTuple> &values = kfvFieldsValues(kco);
+
+    // field = objectId
+    // value = attrid=attrvalue|...
+
+    std::vector<std::string> objectIds;
+
+    std::vector<std::shared_ptr<SaiAttributeList>> attributes;
+
+    for (const auto &fvt: values)
+    {
+        std::string strObjectId = fvField(fvt);
+        std::string joined = fvValue(fvt);
+
+        // decode values
+
+        auto v = swss::tokenize(joined, '|');
+
+        objectIds.push_back(strObjectId);
+
+        std::vector<swss::FieldValueTuple> entries; // attributes per object id
+
+        for (size_t i = 0; i < v.size(); ++i)
+        {
+            const std::string item = v.at(i);
+
+            auto start = item.find_first_of("=");
+
+            auto field = item.substr(0, start);
+            auto value = item.substr(start + 1);
+
+            entries.emplace_back(field, value);
+        }
+
+        // since now we converted this to proper list, we can extract attributes
+
+        auto list = std::make_shared<SaiAttributeList>(objectType, entries, false);
+
+        attributes.push_back(list);
+    }
+
+    SWSS_LOG_NOTICE("bulk %s execute with %zu items",
+            strObjectType.c_str(),
+            objectIds.size());
+
+    if (api != SAI_COMMON_API_BULK_GET)
+    {
+        // translate attributes for all objects
+
+        for (auto &list: attributes)
+        {
+            sai_attribute_t *attr_list = list->get_attr_list();
+            uint32_t attr_count = list->get_attr_count();
+
+            g_translator->translateVidToRid(objectType, attr_count, attr_list);
+        }
+    }
+
+    auto info = sai_metadata_get_object_type_info(objectType);
+
+    if (info->isobjectid)
+    {
+        return processBulkOid(objectType, objectIds, api, attributes);
+    }
+    else
+    {
+        return processBulkEntry(objectType, objectIds, api, attributes);
+    }
+}
+

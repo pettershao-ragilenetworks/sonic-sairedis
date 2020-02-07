@@ -170,7 +170,12 @@ bool starts_with(const std::string& str, const std::string& substr)
 
 sai_status_t processBulkEvent(
         _In_ sai_common_api_t api,
-        _In_ const swss::KeyOpFieldsValuesTuple &kco);
+        _In_ const swss::KeyOpFieldsValuesTuple &kco)
+{
+    SWSS_LOG_ENTER();
+
+    return SAI_STATUS_FAILURE;
+}
 
 void bulk_nhgm_consumer_worker()
 {
