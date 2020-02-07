@@ -186,6 +186,11 @@ std::string sai_serialize(
 
 // deserialize
 
+void sai_deserialize_enum(
+        _In_ const std::string& s,
+        _In_ const sai_enum_metadata_t * meta,
+        _Out_ int32_t& value);
+
 void sai_deserialize_number(
         _In_ const std::string& s,
         _Out_ uint32_t& number,
