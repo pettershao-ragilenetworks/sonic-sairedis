@@ -1,8 +1,11 @@
 #include "Syncd.h"
+#include "lib/inc/sairediscommon.h"
 
 #include "swss/logger.h"
 
 #include "meta/sai_serialize.h"
+
+#include "syncd.h" // TODO to be removed
 
 using namespace syncd;
 
@@ -39,3 +42,46 @@ void Syncd::setAsicInitViewMode(
 
     m_asicInitViewMode = enable;
 }
+
+bool Syncd::isInitViewMode() const
+{
+    SWSS_LOG_ENTER();
+
+    return m_asicInitViewMode && m_commandLineOptions->m_enableTempView;
+}
+
+sai_status_t processSingleEvent(
+        _In_ const swss::KeyOpFieldsValuesTuple &kco);
+
+void Syncd::processEvent(
+        _In_ swss::ConsumerTable &consumer)
+{
+    SWSS_LOG_ENTER();
+
+    std::lock_guard<std::mutex> lock(g_mutex);
+
+    do
+    {
+        swss::KeyOpFieldsValuesTuple kco;
+
+        if (isInitViewMode())
+        {
+            /*
+             * In init mode we put all data to TEMP view and we snoop.  We need
+             * to specify temporary view prefix in consumer since consumer puts
+             * data to redis db.
+             */
+
+            consumer.pop(kco, TEMP_PREFIX);
+        }
+        else
+        {
+            consumer.pop(kco);
+        }
+
+        processSingleEvent(kco);
+    }
+    while (!consumer.empty());
+}
+
+

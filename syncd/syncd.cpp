@@ -120,13 +120,6 @@ std::shared_ptr<VirtualOidTranslator> g_translator; // TODO move to syncd object
 
 std::shared_ptr<CommandLineOptions> g_commandLineOptions; // TODO move to syncd object
 
-bool isInitViewMode()
-{
-    SWSS_LOG_ENTER();
-
-    return g_syncd->m_asicInitViewMode && g_commandLineOptions->m_enableTempView;
-}
-
 bool g_veryFirstRun = false;
 
 void notify_OA_about_syncd_exception()
@@ -204,7 +197,7 @@ void snoop_get_attr(
 
     std::string prefix = "";
 
-    if (isInitViewMode())
+    if (g_syncd->isInitViewMode())
     {
         prefix = TEMP_PREFIX;
     }
@@ -848,7 +841,7 @@ sai_status_t genericCreate(
 
     if (object_type == SAI_OBJECT_TYPE_PORT)
     {
-        if (isInitViewMode())
+        if (g_syncd->isInitViewMode())
         {
             // reason for this is that if user will create port,
             // new port is not actually created so when for example
@@ -917,7 +910,7 @@ sai_status_t genericRemove(
 
     if (object_type == SAI_OBJECT_TYPE_PORT)
     {
-        if (isInitViewMode())
+        if (g_syncd->isInitViewMode())
         {
             // reason for this is that if user will remove port,
             // and the create new one in init view mode, then this
@@ -2340,7 +2333,7 @@ sai_status_t processBulkEvent(
             str_object_type.c_str(),
             object_ids.size());
 
-    if (isInitViewMode())
+    if (g_syncd->isInitViewMode())
     {
         SWSS_LOG_THROW("bulk api (%d) is not supported in init view mode", api);
     }
@@ -2601,7 +2594,7 @@ sai_status_t processQuad(
         g_handler->updateNotificationsPointers(attr_count, attr_list);
     }
 
-    if (isInitViewMode())
+    if (g_syncd->isInitViewMode())
     {
         return processEventInInitViewMode(metaKey.objecttype, str_object_id, api, attr_count, attr_list);
     }
@@ -2741,36 +2734,6 @@ sai_status_t processSingleEvent(
     SWSS_LOG_THROW("event op '%s' is not implemented, FIXME", op.c_str());
 }
 
-void processEvent(
-        _In_ swss::ConsumerTable &consumer)
-{
-    SWSS_LOG_ENTER();
-
-    std::lock_guard<std::mutex> lock(g_mutex);
-
-    do
-    {
-        swss::KeyOpFieldsValuesTuple kco;
-
-        if (isInitViewMode())
-        {
-            /*
-             * In init mode we put all data to TEMP view and we snoop.  We need
-             * to specify temporary view prefix in consumer since consumer puts
-             * data to redis db.
-             */
-
-            consumer.pop(kco, TEMP_PREFIX);
-        }
-        else
-        {
-            consumer.pop(kco);
-        }
-
-        processSingleEvent(kco);
-    }
-    while (!consumer.empty());
-}
 
 void processFlexCounterGroupEvent(
         _In_ swss::ConsumerTable &consumer)
@@ -3403,7 +3366,7 @@ int syncd_main(int argc, char **argv)
 
                 while (!asicState->empty())
                 {
-                    processEvent(*asicState.get());
+                    g_syncd->processEvent(*asicState.get());
                 }
 
                 SWSS_LOG_NOTICE("drained queue");
@@ -3479,7 +3442,7 @@ int syncd_main(int argc, char **argv)
             }
             else if (result == swss::Select::OBJECT)
             {
-                processEvent(*(swss::ConsumerTable*)sel);
+                g_syncd->processEvent(*(swss::ConsumerTable*)sel);
             }
 
             twd.setEndTime();

@@ -3,6 +3,8 @@
 #include "CommandLineOptions.h"
 #include "FlexCounterManager.h"
 
+#include "swss/consumertable.h"
+
 #include <memory>
 
 namespace syncd
@@ -29,6 +31,12 @@ namespace syncd
             void setAsicInitViewMode(
                     _In_ bool enable);
 
+            bool isInitViewMode() const;
+
+        public: // TODO private
+
+            void processEvent(
+                    _In_ swss::ConsumerTable &consumer);
 
         private:
 

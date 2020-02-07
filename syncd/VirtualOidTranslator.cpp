@@ -242,7 +242,7 @@ sai_object_id_t VirtualOidTranslator::translateVidToRid(
 
     if (prid == NULL)
     {
-        if (isInitViewMode())
+        if (0) // if in init view mode (since we throw any way no need to check)
         {
             /*
              * If user created object that is object id, then it should not
@@ -260,7 +260,8 @@ sai_object_id_t VirtualOidTranslator::translateVidToRid(
             SWSS_LOG_THROW("can't get RID in init view mode - don't query created objects");
         }
 
-        SWSS_LOG_THROW("unable to get RID for VID: 0x%" PRIx64, vid);
+        SWSS_LOG_THROW("unable to get RID for VID %s",
+                sai_serialize_object_id(vid).c_str());
     }
 
     strRid = *prid;
