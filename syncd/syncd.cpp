@@ -799,6 +799,252 @@ void post_port_create(
     SWSS_LOG_NOTICE("post port create actions succeeded");
 }
 
+sai_status_t genericCreate(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::string &str_object_id,
+        _In_ uint32_t attr_count,
+        _In_ sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t object_id;
+    sai_deserialize_object_id(str_object_id, object_id);
+
+    sai_object_meta_key_t meta_key;
+
+    meta_key.objecttype = object_type;
+    meta_key.objectkey.key.object_id = object_id;
+
+
+    // Object id is VID, we can use it to extract switch id.
+
+    sai_object_id_t switch_id = VidManager::switchIdQuery(object_id);
+
+    if (switch_id == SAI_NULL_OBJECT_ID)
+    {
+        SWSS_LOG_THROW("invalid switch_id translated from VID 0x%" PRIx64, object_id);
+    }
+
+    if (object_type != SAI_OBJECT_TYPE_SWITCH)
+    {
+        /*
+         * When we creating switch, then switch_id parameter is
+         * ignored, but we can't convert it using vid to rid map,
+         * since rid doesn't exist yet, so skip translate for switch,
+         * but use translate for all other objects.
+         */
+
+        switch_id = g_translator->translateVidToRid(switch_id);
+    }
+    else
+    {
+        if (switches.size() > 0)
+        {
+            /*
+             * NOTE: to support multiple switches we need support
+             * here for create.
+             */
+
+            SWSS_LOG_THROW("creating multiple switches is not supported yet, FIXME");
+        }
+    }
+
+    if (object_type == SAI_OBJECT_TYPE_PORT)
+    {
+        if (isInitViewMode())
+        {
+            // reason for this is that if user will create port,
+            // new port is not actually created so when for example
+            // querying new queues for new created port, there are
+            // not there, since no actual port create was issued on
+            // the ASIC
+            SWSS_LOG_THROW("port object can't be created in init view mode");
+        }
+    }
+
+    sai_status_t status = g_vendorSai->create(meta_key, switch_id, attr_count, attr_list);
+
+    if (status == SAI_STATUS_SUCCESS)
+    {
+        sai_object_id_t real_object_id = meta_key.objectkey.key.object_id;
+
+        /*
+         * Object was created so new object id was generated we
+         * need to save virtual id's to redis db.
+         */
+
+        std::string str_vid = sai_serialize_object_id(object_id);
+        std::string str_rid = sai_serialize_object_id(real_object_id);
+
+        g_translator->insertRidAndVid(real_object_id, object_id);
+
+        SWSS_LOG_INFO("saved VID %s to RID %s", str_vid.c_str(), str_rid.c_str());
+
+        if (object_type == SAI_OBJECT_TYPE_SWITCH)
+        {
+            on_switch_create(switch_id);
+            gSwitchId = real_object_id;
+            SWSS_LOG_NOTICE("Initialize gSwitchId with ID = 0x%" PRIx64, gSwitchId);
+        }
+
+        if (object_type == SAI_OBJECT_TYPE_PORT)
+        {
+            sai_object_id_t switch_vid = VidManager::switchIdQuery(object_id);
+
+            post_port_create(switches.at(switch_vid), real_object_id, object_id);
+        }
+    }
+
+    return status;
+}
+
+sai_status_t genericRemove(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::string &str_object_id)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t object_id;
+    sai_deserialize_object_id(str_object_id, object_id);
+
+    sai_object_meta_key_t meta_key;
+
+    meta_key.objecttype = object_type;
+    meta_key.objectkey.key.object_id = object_id;
+
+    sai_object_id_t rid = g_translator->translateVidToRid(object_id);
+
+    meta_key.objectkey.key.object_id = rid;
+
+    std::vector<sai_object_id_t> related;
+
+    if (object_type == SAI_OBJECT_TYPE_PORT)
+    {
+        if (isInitViewMode())
+        {
+            // reason for this is that if user will remove port,
+            // and the create new one in init view mode, then this
+            // new port is not actually created so when for example
+            // querying new queues for new created port, there are
+            // not there, since no actual port create was issued on
+            // the ASIC
+            SWSS_LOG_THROW("port object can't be removed in init view mode");
+        }
+
+        // collect queues, ipgs, sg that belong to port
+        get_port_related_objects(rid, related);
+    }
+
+    sai_status_t status = g_vendorSai->remove(meta_key);
+
+    if (status == SAI_STATUS_SUCCESS)
+    {
+        std::string str_vid = sai_serialize_object_id(object_id);
+        std::string str_rid = sai_serialize_object_id(rid);
+
+        g_translator->eraseRidAndVid(rid, object_id);
+
+        // TODO remove all related objects from REDIS DB and also
+        // from existing object references since at this point
+        // they are no longer valid
+
+        if (object_type == SAI_OBJECT_TYPE_SWITCH)
+        {
+            on_switch_remove(object_id);
+        }
+        else
+        {
+            /*
+             * Removing some object succeeded. Let's check if that
+             * object was default created object, eg. vlan member.
+             * Then we need to update default created object map in
+             * SaiSwitch to be in sync, and be prepared for apply
+             * view to transfer those synced default created
+             * objects to temporary view when it will be created,
+             * since that will be out basic switch state.
+             *
+             * TODO: there can be some issues with reference count
+             * like for schedulers on scheduler groups since they
+             * should have internal references, and we still need
+             * to create dependency tree from saiDiscovery and
+             * update those references to track them, this is
+             * printed in metadata sanitycheck as "default value
+             * needs to be stored".
+             *
+             * TODO lets add SAI metadata flag for that this will
+             * also needs to be of internal/vendor default but we
+             * can already deduce that.
+             */
+
+            sai_object_id_t switch_vid = VidManager::switchIdQuery(object_id);
+
+            if (switches.at(switch_vid)->isDiscoveredRid(rid))
+            {
+                switches.at(switch_vid)->removeExistingObjectReference(rid);
+            }
+
+            if (object_type == SAI_OBJECT_TYPE_PORT)
+            {
+                post_port_remove(switches.at(switch_vid), rid, related);
+            }
+        }
+    }
+
+    return status;
+}
+
+sai_status_t genericSet(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::string &str_object_id,
+        _In_ sai_attribute_t *attr)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t object_id;
+    sai_deserialize_object_id(str_object_id, object_id);
+
+    sai_object_meta_key_t meta_key;
+
+    meta_key.objecttype = object_type;
+    meta_key.objectkey.key.object_id = object_id;
+
+    sai_object_id_t rid = g_translator->translateVidToRid(object_id);
+
+    meta_key.objectkey.key.object_id = rid;
+
+    sai_status_t status = g_vendorSai->set(meta_key, attr);
+
+    if (is_set_attribute_workaround(meta_key.objecttype, attr->id, status))
+    {
+        return SAI_STATUS_SUCCESS;
+    }
+
+    return status;
+}
+
+sai_status_t genericGet(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::string &str_object_id,
+        _In_ uint32_t attr_count,
+        _In_ sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    sai_object_id_t object_id;
+    sai_deserialize_object_id(str_object_id, object_id);
+
+    sai_object_meta_key_t meta_key;
+
+    meta_key.objecttype = object_type;
+    meta_key.objectkey.key.object_id = object_id;
+
+    sai_object_id_t rid = g_translator->translateVidToRid(object_id);
+
+    meta_key.objectkey.key.object_id = rid;
+
+    return g_vendorSai->get(meta_key, attr_count, attr_list);
+}
+
 sai_status_t handle_generic(
         _In_ sai_object_type_t object_type,
         _In_ const std::string &str_object_id,
@@ -808,11 +1054,6 @@ sai_status_t handle_generic(
 {
     SWSS_LOG_ENTER();
 
-    /*
-     * TODO: Could deserialize to meta key and then we could combine with non
-     * object id.
-     */
-
     sai_object_id_t object_id;
     sai_deserialize_object_id(str_object_id, object_id);
 
@@ -820,19 +1061,15 @@ sai_status_t handle_generic(
             sai_serialize_common_api(api).c_str(),
             sai_serialize_object_type(object_type).c_str());
 
-    sai_object_meta_key_t meta_key;
-
-    meta_key.objecttype = object_type;
-    meta_key.objectkey.key.object_id = object_id;
+//    sai_object_meta_key_t meta_key;
+//
+//    meta_key.objecttype = object_type;
+//    meta_key.objectkey.key.object_id = object_id;
 
     /*
      * We need to do translate vid/rid except for create, since create will
      * create new RID value, and we will have to map them to VID we received in
      * create query.
-     */
-
-    /*
-     * TODO: use metadata utils.
      */
 
     auto info = sai_metadata_get_object_type_info(object_type);
@@ -845,202 +1082,16 @@ sai_status_t handle_generic(
     switch (api)
     {
         case SAI_COMMON_API_CREATE:
-
-            {
-                /*
-                 * Object id is VID, we can use it to extract switch id.
-                 */
-
-                sai_object_id_t switch_id = VidManager::switchIdQuery(object_id);
-
-                if (switch_id == SAI_NULL_OBJECT_ID)
-                {
-                    SWSS_LOG_THROW("invalid switch_id translated from VID 0x%" PRIx64, object_id);
-                }
-
-                if (object_type != SAI_OBJECT_TYPE_SWITCH)
-                {
-                    /*
-                     * When we creating switch, then switch_id parameter is
-                     * ignored, but we can't convert it using vid to rid map,
-                     * since rid doesn't exist yet, so skip translate for switch,
-                     * but use translate for all other objects.
-                     */
-
-                    switch_id = g_translator->translateVidToRid(switch_id);
-                }
-                else
-                {
-                    if (switches.size() > 0)
-                    {
-                        /*
-                         * NOTE: to support multiple switches we need support
-                         * here for create.
-                         */
-
-                        SWSS_LOG_THROW("creating multiple switches is not supported yet, FIXME");
-                    }
-                }
-
-                if (object_type == SAI_OBJECT_TYPE_PORT)
-                {
-                    if (isInitViewMode())
-                    {
-                        // reason for this is that if user will create port,
-                        // new port is not actually created so when for example
-                        // querying new queues for new created port, there are
-                        // not there, since no actual port create was issued on
-                        // the ASIC
-                        SWSS_LOG_THROW("port object can't be created in init view mode");
-                    }
-                }
-
-                sai_status_t status = g_vendorSai->create(meta_key, switch_id, attr_count, attr_list);
-
-                if (status == SAI_STATUS_SUCCESS)
-                {
-                    sai_object_id_t real_object_id = meta_key.objectkey.key.object_id;
-
-                    /*
-                     * Object was created so new object id was generated we
-                     * need to save virtual id's to redis db.
-                     */
-
-                    std::string str_vid = sai_serialize_object_id(object_id);
-                    std::string str_rid = sai_serialize_object_id(real_object_id);
-
-                    g_translator->insertRidAndVid(real_object_id, object_id);
-
-                    SWSS_LOG_INFO("saved VID %s to RID %s", str_vid.c_str(), str_rid.c_str());
-
-                    if (object_type == SAI_OBJECT_TYPE_SWITCH)
-                    {
-                        on_switch_create(switch_id);
-                        gSwitchId = real_object_id;
-                        SWSS_LOG_NOTICE("Initialize gSwitchId with ID = 0x%" PRIx64, gSwitchId);
-                    }
-
-                    if (object_type == SAI_OBJECT_TYPE_PORT)
-                    {
-                        sai_object_id_t switch_vid = VidManager::switchIdQuery(object_id);
-
-                        post_port_create(switches.at(switch_vid), real_object_id, object_id);
-                    }
-                }
-
-                return status;
-            }
+            return genericCreate(object_type, str_object_id, attr_count, attr_list);
 
         case SAI_COMMON_API_REMOVE:
-
-            {
-                sai_object_id_t rid = g_translator->translateVidToRid(object_id);
-
-                meta_key.objectkey.key.object_id = rid;
-
-                std::vector<sai_object_id_t> related;
-
-                if (object_type == SAI_OBJECT_TYPE_PORT)
-                {
-                    if (isInitViewMode())
-                    {
-                        // reason for this is that if user will remove port,
-                        // and the create new one in init view mode, then this
-                        // new port is not actually created so when for example
-                        // querying new queues for new created port, there are
-                        // not there, since no actual port create was issued on
-                        // the ASIC
-                        SWSS_LOG_THROW("port object can't be removed in init view mode");
-                    }
-
-                    // collect queues, ipgs, sg that belong to port
-                    get_port_related_objects(rid, related);
-                }
-
-                sai_status_t status = g_vendorSai->remove(meta_key);
-
-                if (status == SAI_STATUS_SUCCESS)
-                {
-                    std::string str_vid = sai_serialize_object_id(object_id);
-                    std::string str_rid = sai_serialize_object_id(rid);
-
-                    g_translator->eraseRidAndVid(rid, object_id);
-
-                    // TODO remove all related objects from REDIS DB and also
-                    // from existing object references since at this point
-                    // they are no longer valid
-
-                    if (object_type == SAI_OBJECT_TYPE_SWITCH)
-                    {
-                        on_switch_remove(object_id);
-                    }
-                    else
-                    {
-                        /*
-                         * Removing some object succeeded. Let's check if that
-                         * object was default created object, eg. vlan member.
-                         * Then we need to update default created object map in
-                         * SaiSwitch to be in sync, and be prepared for apply
-                         * view to transfer those synced default created
-                         * objects to temporary view when it will be created,
-                         * since that will be out basic switch state.
-                         *
-                         * TODO: there can be some issues with reference count
-                         * like for schedulers on scheduler groups since they
-                         * should have internal references, and we still need
-                         * to create dependency tree from saiDiscovery and
-                         * update those references to track them, this is
-                         * printed in metadata sanitycheck as "default value
-                         * needs to be stored".
-                         *
-                         * TODO lets add SAI metadata flag for that this will
-                         * also needs to be of internal/vendor default but we
-                         * can already deduce that.
-                         */
-
-                        sai_object_id_t switch_vid = VidManager::switchIdQuery(object_id);
-
-                        if (switches.at(switch_vid)->isDiscoveredRid(rid))
-                        {
-                            switches.at(switch_vid)->removeExistingObjectReference(rid);
-                        }
-
-                        if (object_type == SAI_OBJECT_TYPE_PORT)
-                        {
-                            post_port_remove(switches.at(switch_vid), rid, related);
-                        }
-                    }
-                }
-
-                return status;
-            }
+            return genericRemove(object_type, str_object_id);
 
         case SAI_COMMON_API_SET:
-
-            {
-                sai_object_id_t rid = g_translator->translateVidToRid(object_id);
-
-                meta_key.objectkey.key.object_id = rid;
-
-                sai_status_t status = g_vendorSai->set(meta_key, attr_list);
-
-                if (is_set_attribute_workaround(meta_key.objecttype, attr_list->id, status))
-                {
-                    return SAI_STATUS_SUCCESS;
-                }
-
-                return status;
-            }
+            return genericSet(object_type, str_object_id, attr_list);
 
         case SAI_COMMON_API_GET:
-
-            {
-                sai_object_id_t rid = g_translator->translateVidToRid(object_id);
-
-                meta_key.objectkey.key.object_id = rid;
-
-                return g_vendorSai->get(meta_key, attr_count, attr_list);
-            }
+            return genericGet(object_type, str_object_id, attr_count, attr_list);
 
         default:
 
@@ -1073,7 +1124,8 @@ sai_status_t handle_non_object_id(
             return g_vendorSai->get(meta_key, attr_count, attr_list);
 
         default:
-            SWSS_LOG_THROW("other apis not implemented");
+
+            SWSS_LOG_THROW("api %s not supported", sai_serialize_common_api(api).c_str());
     }
 }
 
