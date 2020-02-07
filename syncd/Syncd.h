@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CommandLineOptions.h"
+#include "FlexCounterManager.h"
 
 #include <memory>
 
@@ -38,5 +39,8 @@ namespace syncd
         public: // TODO to private
 
             bool m_asicInitViewMode;
+
+            std::shared_ptr<FlexCounterManager> m_manager;
+
     };
 }

@@ -14,14 +14,16 @@ Syncd::Syncd(
     m_asicInitViewMode(false) // by default we are in APPLY view mode
 {
     SWSS_LOG_ENTER();
+
+    m_manager = std::make_shared<FlexCounterManager>();
 }
 
 Syncd::~Syncd()
 {
     SWSS_LOG_ENTER();
 
+    // empty
 }
-
 
 bool Syncd::getAsicInitViewMode() const
 {
