@@ -1045,7 +1045,7 @@ sai_status_t genericGet(
     return g_vendorSai->get(meta_key, attr_count, attr_list);
 }
 
-sai_status_t handle_generic(
+sai_status_t handle_oid(
         _In_ sai_object_type_t object_type,
         _In_ const std::string &str_object_id,
         _In_ sai_common_api_t api,
@@ -1099,7 +1099,7 @@ sai_status_t handle_generic(
     }
 }
 
-sai_status_t handle_non_object_id(
+sai_status_t hangle_enrty(
         _In_ sai_object_meta_key_t &meta_key,
         _In_ sai_common_api_t api,
         _In_ uint32_t attr_count,
@@ -2165,15 +2165,15 @@ sai_status_t handle_bulk_generic(
 
         if (api == SAI_COMMON_API_BULK_SET)
         {
-            status = handle_generic(object_type, object_ids[idx], SAI_COMMON_API_SET, attr_count, attr_list);
+            status = handle_oid(object_type, object_ids[idx], SAI_COMMON_API_SET, attr_count, attr_list);
         }
         else if (api == SAI_COMMON_API_BULK_CREATE)
         {
-            status = handle_generic(object_type, object_ids[idx], SAI_COMMON_API_CREATE, attr_count, attr_list);
+            status = handle_oid(object_type, object_ids[idx], SAI_COMMON_API_CREATE, attr_count, attr_list);
         }
         else if (api == SAI_COMMON_API_BULK_REMOVE)
         {
-            status = handle_generic(object_type, object_ids[idx], SAI_COMMON_API_REMOVE, attr_count, attr_list);
+            status = handle_oid(object_type, object_ids[idx], SAI_COMMON_API_REMOVE, attr_count, attr_list);
         }
         else
         {
@@ -2248,15 +2248,15 @@ sai_status_t handle_bulk_non_object_id(
 
         if (api == SAI_COMMON_API_BULK_SET)
         {
-            status = handle_non_object_id(meta_key, SAI_COMMON_API_SET, attr_count, attr_list);
+            status = hangle_enrty(meta_key, SAI_COMMON_API_SET, attr_count, attr_list);
         }
         else if (api == SAI_COMMON_API_BULK_CREATE)
         {
-            status = handle_non_object_id(meta_key, SAI_COMMON_API_CREATE, attr_count, attr_list);
+            status = hangle_enrty(meta_key, SAI_COMMON_API_CREATE, attr_count, attr_list);
         }
         else if (api == SAI_COMMON_API_BULK_REMOVE)
         {
-            status = handle_non_object_id(meta_key, SAI_COMMON_API_REMOVE, attr_count, attr_list);
+            status = hangle_enrty(meta_key, SAI_COMMON_API_REMOVE, attr_count, attr_list);
         }
         else
         {
@@ -2714,11 +2714,11 @@ sai_status_t processEvent(
 
         if (info->isnonobjectid)
         {
-            status = handle_non_object_id(metaKey, api, attr_count, attr_list);
+            status = hangle_enrty(metaKey, api, attr_count, attr_list);
         }
         else
         {
-            status = handle_generic(metaKey.objecttype, str_object_id, api, attr_count, attr_list);
+            status = handle_oid(metaKey.objecttype, str_object_id, api, attr_count, attr_list);
         }
 
         if (api == SAI_COMMON_API_GET)
