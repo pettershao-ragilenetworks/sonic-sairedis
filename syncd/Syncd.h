@@ -41,6 +41,13 @@ namespace syncd
             void processEvent(
                     _In_ swss::ConsumerTable &consumer);
 
+            sai_status_t processQuadEventInInitViewMode(
+                    _In_ sai_object_type_t objectType,
+                    _In_ const std::string& strObjectId,
+                    _In_ sai_common_api_t api,
+                    _In_ uint32_t attr_count,
+                    _In_ sai_attribute_t *attr_list);
+
         private:
 
             sai_status_t processSingleEvent(
@@ -77,6 +84,29 @@ namespace syncd
                     _In_ sai_common_api_t api,
                     _In_ const std::vector<std::shared_ptr<SaiAttributeList>> &attributes);
 
+        private: // process quad in init view mode
+
+            sai_status_t processQuadInInitViewModeCreate(
+                    _In_ sai_object_type_t objectType,
+                    _In_ const std::string& strObjectId,
+                    _In_ uint32_t attr_count,
+                    _In_ sai_attribute_t *attr_list);
+
+            sai_status_t processQuadInInitViewModeRemove(
+                    _In_ sai_object_type_t objectType,
+                    _In_ const std::string& strObjectId);
+
+            sai_status_t processQuadInInitViewModeSet(
+                    _In_ sai_object_type_t objectType,
+                    _In_ const std::string& strObjectId,
+                    _In_ sai_attribute_t *attr);
+
+            sai_status_t processQuadInInitViewModeGet(
+                    _In_ sai_object_type_t objectType,
+                    _In_ const std::string& strObjectId,
+                    _In_ uint32_t attr_count,
+                    _In_ sai_attribute_t *attr_list);
+
         public: // TODO to private
 
             sai_status_t processEntry(
@@ -99,5 +129,15 @@ namespace syncd
 
             std::shared_ptr<swss::ProducerTable> m_getResponse;
 
+            /**
+             * @brief set of objects removed by user when we are in init view
+             * mode. Those could be vlan members, bridge ports etc.
+             *
+             * We need this list to later on not put them back to temp view
+             * mode when doing populate existing objects in apply view mode.
+             *
+             * Object ids here a VIDs.
+             */
+            std::set<sai_object_id_t> m_initViewRemovedVidSet;
     };
 }

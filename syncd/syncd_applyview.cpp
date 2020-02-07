@@ -4,6 +4,7 @@
 #include "CommandLineOptions.h"
 #include "VidManager.h"
 #include "ComparisonLogic.h"
+#include "Syncd.h"
 
 using namespace syncd;
 
@@ -153,7 +154,7 @@ void updateRedisDatabase(
     SWSS_LOG_NOTICE("updated redis database");
 }
 
-extern std::set<sai_object_id_t> initViewRemovedVidSet;
+extern std::shared_ptr<Syncd> g_syncd;
 
 void dumpComparisonLogicOutput(
     _In_ const std::vector<std::shared_ptr<AsicView>>& currentViews)
@@ -306,7 +307,7 @@ sai_status_t syncdApplyView()
             auto current = std::make_shared<AsicView>(currentMap.at(switchVid));
             auto temp = std::make_shared<AsicView>(temporaryMap.at(switchVid));
 
-            auto cl = std::make_shared<ComparisonLogic>(g_vendorSai, sw, initViewRemovedVidSet, current, temp);
+            auto cl = std::make_shared<ComparisonLogic>(g_vendorSai, sw, g_syncd->m_initViewRemovedVidSet, current, temp);
 
             cl->compareViews();
 
