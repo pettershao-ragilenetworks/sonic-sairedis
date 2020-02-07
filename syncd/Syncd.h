@@ -115,6 +115,21 @@ namespace syncd
                     _In_ uint32_t attr_count,
                     _In_ sai_attribute_t *attr_list);
 
+        public: // TODO private
+
+            /**
+             * @brief Send api response.
+             *
+             * This function should be use to send response to sairedis for
+             * create/remove/set API as well as their corresponding bulk versions.
+             *
+             * Should not be used on GET api.
+             */
+            void sendApiResponse(
+                    _In_ sai_common_api_t api,
+                    _In_ sai_status_t status,
+                    _In_ uint32_t object_count = 0,
+                    _In_ sai_status_t * object_statuses = NULL);
         private:
 
             std::shared_ptr<CommandLineOptions> m_commandLineOptions;

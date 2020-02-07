@@ -442,83 +442,6 @@ void sendGetResponse(
     SWSS_LOG_INFO("response for GET api was send");
 }
 
-/**
- * @brief Send api response.
- *
- * This function should be use to send response to sairedis for
- * create/remove/set API as well as their corresponding bulk versions.
- *
- * Should not be used on GET api.
- */
-void sendApiResponse(
-        _In_ sai_common_api_t api,
-        _In_ sai_status_t status,
-        _In_ uint32_t object_count = 0,
-        _In_ sai_status_t * object_statuses = NULL)
-{
-    SWSS_LOG_ENTER();
-
-    /*
-     * By default synchronous mode is disabled and can be enabled by command
-     * line on syncd start. This will also require to enable synchronous mode
-     * in OA/sairedis because same GET RESPONSE channel is used to generate
-     * response for sairedis quad API.
-     */
-
-    if (!g_commandLineOptions->m_enableSyncMode)
-    {
-        return;
-    }
-
-    switch (api)
-    {
-        case SAI_COMMON_API_CREATE:
-        case SAI_COMMON_API_REMOVE:
-        case SAI_COMMON_API_SET:
-        case SAI_COMMON_API_BULK_CREATE:
-        case SAI_COMMON_API_BULK_REMOVE:
-        case SAI_COMMON_API_BULK_SET:
-            break;
-
-        default:
-            SWSS_LOG_THROW("api %s not supported by this function",
-                    sai_serialize_common_api(api).c_str());
-    }
-
-    if (status != SAI_STATUS_SUCCESS)
-    {
-        /*
-         * TODO: If api fill fail in sync mode, we need to take some actions to
-         * handle that, and those are not trivial tasks:
-         *
-         * - in case create fail, remove object from redis database
-         * - in case remove fail, bring back removed object to database
-         * - in case set fail, bring back previous value if it was set
-         */
-
-        SWSS_LOG_THROW("api %s failed in syncd mode: %s, FIXME",
-                    sai_serialize_common_api(api).c_str(),
-                    sai_serialize_status(status).c_str());
-    }
-
-    std::vector<swss::FieldValueTuple> entry;
-
-    for (uint32_t idx = 0; idx < object_count; idx++)
-    {
-        swss::FieldValueTuple fvt(sai_serialize_status(object_statuses[idx]), "");
-
-        entry.push_back(fvt);
-    }
-
-    std::string str_status = sai_serialize_status(status);
-
-    SWSS_LOG_INFO("sending response for %d api with status: %s", api, str_status.c_str());
-
-    getResponse->set(str_status, entry, REDIS_ASIC_STATE_COMMAND_GETRESPONSE);
-
-    SWSS_LOG_INFO("response for %d api was send", api);
-}
-
 const char* profile_get_value(
         _In_ sai_switch_profile_id_t profile_id,
         _In_ const char* variable)
@@ -1768,7 +1691,7 @@ sai_status_t processQuadEvent(
     }
     else if (status != SAI_STATUS_SUCCESS)
     {
-        sendApiResponse(api, status);
+        g_syncd->sendApiResponse(api, status);
 
         if (info->isobjectid && api == SAI_COMMON_API_SET)
         {
@@ -1794,7 +1717,7 @@ sai_status_t processQuadEvent(
     }
     else // non GET api, status is SUCCESS
     {
-        sendApiResponse(api, status);
+        g_syncd->sendApiResponse(api, status);
     }
 
     return status;
@@ -1944,7 +1867,8 @@ typedef enum _syncd_restart_type_t
 
 } syncd_restart_type_t;
 
-syncd_restart_type_t handleRestartQuery(swss::NotificationConsumer &restartQuery)
+syncd_restart_type_t handleRestartQuery(
+        _In_ swss::NotificationConsumer &restartQuery)
 {
     SWSS_LOG_ENTER();
 

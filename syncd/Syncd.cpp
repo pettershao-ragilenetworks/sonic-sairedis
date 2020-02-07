@@ -960,3 +960,76 @@ sai_status_t Syncd::processQuadInInitViewModeGet(
     return status;
 }
 
+void Syncd::sendApiResponse(
+        _In_ sai_common_api_t api,
+        _In_ sai_status_t status,
+        _In_ uint32_t object_count,
+        _In_ sai_status_t* object_statuses)
+{
+    SWSS_LOG_ENTER();
+
+    /*
+     * By default synchronous mode is disabled and can be enabled by command
+     * line on syncd start. This will also require to enable synchronous mode
+     * in OA/sairedis because same GET RESPONSE channel is used to generate
+     * response for sairedis quad API.
+     */
+
+    if (!m_commandLineOptions->m_enableSyncMode)
+    {
+        return;
+    }
+
+    switch (api)
+    {
+        case SAI_COMMON_API_CREATE:
+        case SAI_COMMON_API_REMOVE:
+        case SAI_COMMON_API_SET:
+        case SAI_COMMON_API_BULK_CREATE:
+        case SAI_COMMON_API_BULK_REMOVE:
+        case SAI_COMMON_API_BULK_SET:
+            break;
+
+        default:
+            SWSS_LOG_THROW("api %s not supported by this function",
+                    sai_serialize_common_api(api).c_str());
+    }
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        /*
+         * TODO: If api fill fail in sync mode, we need to take some actions to
+         * handle that, and those are not trivial tasks:
+         *
+         * - in case create fail, remove object from redis database
+         * - in case remove fail, bring back removed object to database
+         * - in case set fail, bring back previous value if it was set
+         */
+
+        SWSS_LOG_THROW("api %s failed in syncd mode: %s, FIXME",
+                    sai_serialize_common_api(api).c_str(),
+                    sai_serialize_status(status).c_str());
+    }
+
+    std::vector<swss::FieldValueTuple> entry;
+
+    for (uint32_t idx = 0; idx < object_count; idx++)
+    {
+        swss::FieldValueTuple fvt(sai_serialize_status(object_statuses[idx]), "");
+
+        entry.push_back(fvt);
+    }
+
+    std::string strStatus = sai_serialize_status(status);
+
+    SWSS_LOG_INFO("sending response for %s api with status: %s",
+            sai_serialize_common_api(api).c_str(),
+            strStatus.c_str());
+
+    m_getResponse->set(strStatus, entry, REDIS_ASIC_STATE_COMMAND_GETRESPONSE);
+
+    SWSS_LOG_INFO("response for %s api was send",
+            sai_serialize_common_api(api).c_str());
+}
+
+
