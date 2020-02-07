@@ -1089,36 +1089,6 @@ sai_status_t handle_oid(
     }
 }
 
-sai_status_t hangle_enrty(
-        _In_ sai_object_meta_key_t &meta_key,
-        _In_ sai_common_api_t api,
-        _In_ uint32_t attr_count,
-        _In_ sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    g_translator->translateVidToRid(meta_key);
-
-    switch (api)
-    {
-        case SAI_COMMON_API_CREATE:
-            return g_vendorSai->create(meta_key, SAI_NULL_OBJECT_ID, attr_count, attr_list);
-
-        case SAI_COMMON_API_REMOVE:
-            return g_vendorSai->remove(meta_key);
-
-        case SAI_COMMON_API_SET:
-            return g_vendorSai->set(meta_key, attr_list);
-
-        case SAI_COMMON_API_GET:
-            return g_vendorSai->get(meta_key, attr_count, attr_list);
-
-        default:
-
-            SWSS_LOG_THROW("api %s not supported", sai_serialize_common_api(api).c_str());
-    }
-}
-
 void sendNotifyResponse(
         _In_ sai_status_t status)
 {
@@ -2007,88 +1977,6 @@ sai_status_t processBulkOid(
     return all;
 }
 
-sai_status_t processBulkEntry(
-        _In_ sai_object_type_t object_type,
-        _In_ const std::vector<std::string> &object_ids,
-        _In_ sai_common_api_t api,
-        _In_ const std::vector<std::shared_ptr<SaiAttributeList>> &attributes)
-{
-    SWSS_LOG_ENTER();
-
-    auto info = sai_metadata_get_object_type_info(object_type);
-
-    if (info->isobjectid)
-    {
-        SWSS_LOG_THROW("passing oid object to bulk non obejct id operation");
-    }
-
-    // vendor SAI don't bulk API yet, so execute one by one.
-
-    std::vector<sai_status_t> statuses(object_ids.size());
-
-    sai_status_t all = SAI_STATUS_SUCCESS;
-
-    for (size_t idx = 0; idx < object_ids.size(); ++idx)
-    {
-        sai_status_t status = SAI_STATUS_FAILURE;
-
-        auto &list = attributes[idx];
-
-        sai_attribute_t *attr_list = list->get_attr_list();
-        uint32_t attr_count = list->get_attr_count();
-
-        sai_object_meta_key_t meta_key;
-        meta_key.objecttype = object_type;
-        switch (object_type)
-        {
-            case SAI_OBJECT_TYPE_ROUTE_ENTRY:
-                sai_deserialize_route_entry(object_ids[idx], meta_key.objectkey.key.route_entry);
-                break;
-            case SAI_OBJECT_TYPE_FDB_ENTRY:
-                sai_deserialize_fdb_entry(object_ids[idx], meta_key.objectkey.key.fdb_entry);
-                break;
-            default:
-                SWSS_LOG_THROW("invalid object_type: %s", sai_serialize_object_type(object_type).c_str());
-        }
-
-        if (api == SAI_COMMON_API_BULK_SET)
-        {
-            status = hangle_enrty(meta_key, SAI_COMMON_API_SET, attr_count, attr_list);
-        }
-        else if (api == SAI_COMMON_API_BULK_CREATE)
-        {
-            status = hangle_enrty(meta_key, SAI_COMMON_API_CREATE, attr_count, attr_list);
-        }
-        else if (api == SAI_COMMON_API_BULK_REMOVE)
-        {
-            status = hangle_enrty(meta_key, SAI_COMMON_API_REMOVE, attr_count, attr_list);
-        }
-        else
-        {
-            SWSS_LOG_THROW("api %d is not supported in bulk route", api);
-        }
-
-        if (status != SAI_STATUS_SUCCESS)
-        {
-            if (!g_commandLineOptions->m_enableSyncMode)
-            {
-                SWSS_LOG_THROW("operation %s for %s failed in async mode!",
-                        sai_serialize_common_api(api).c_str(),
-                        sai_serialize_object_type(object_type).c_str());
-            }
-
-            all = SAI_STATUS_FAILURE;
-        }
-
-        statuses[idx] = status;
-    }
-
-    // all can be success if all has been success
-    internal_syncd_api_send_response(api, all, (uint32_t)object_ids.size(), statuses.data());
-
-    return all;
-}
-
 sai_status_t processQuad(
         _In_ sai_common_api_t api,
         _In_ const swss::KeyOpFieldsValuesTuple &kco)
@@ -2167,7 +2055,7 @@ sai_status_t processQuad(
 
     if (info->isnonobjectid)
     {
-        status = hangle_enrty(metaKey, api, attr_count, attr_list);
+        status = g_syncd->processEntry(metaKey, api, attr_count, attr_list);
     }
     else
     {

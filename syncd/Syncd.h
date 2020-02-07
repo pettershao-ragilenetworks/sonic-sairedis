@@ -3,6 +3,8 @@
 #include "CommandLineOptions.h"
 #include "FlexCounterManager.h"
 
+#include "meta/saiattributelist.h"
+
 #include "swss/consumertable.h"
 #include "swss/producertable.h"
 
@@ -62,6 +64,20 @@ namespace syncd
             sai_status_t processBulkEvent(
                     _In_ sai_common_api_t api,
                     _In_ const swss::KeyOpFieldsValuesTuple &kco);
+
+            sai_status_t processBulkEntry(
+                    _In_ sai_object_type_t object_type,
+                    _In_ const std::vector<std::string> &object_ids,
+                    _In_ sai_common_api_t api,
+                    _In_ const std::vector<std::shared_ptr<SaiAttributeList>> &attributes);
+
+        public: // TODO to private
+
+            sai_status_t processEntry(
+                    _In_ sai_object_meta_key_t &meta_key,
+                    _In_ sai_common_api_t api,
+                    _In_ uint32_t attr_count,
+                    _In_ sai_attribute_t *attr_list);
 
         private:
 
