@@ -2550,7 +2550,8 @@ sai_status_t processObjectTypeGetAvailabilityQuery(
     return status;
 }
 
-sai_status_t processSingleEvent(
+sai_status_t processQuad(
+        _In_ sai_common_api_t api,
         _In_ const swss::KeyOpFieldsValuesTuple &kco)
 {
     SWSS_LOG_ENTER();
@@ -2558,74 +2559,7 @@ sai_status_t processSingleEvent(
     const std::string &key = kfvKey(kco);
     const std::string &op = kfvOp(kco);
 
-    if (key.length() == 0)
-    {
-        SWSS_LOG_DEBUG("no elements in m_buffer");
-        return SAI_STATUS_SUCCESS;
-    }
-
     const std::string &str_object_id = key.substr(key.find(":") + 1);
-
-    SWSS_LOG_INFO("key: %s op: %s", key.c_str(), op.c_str());
-
-    sai_common_api_t api = SAI_COMMON_API_MAX;
-
-    if (op == "create")
-    {
-        api = SAI_COMMON_API_CREATE;
-    }
-    else if (op == "remove")
-    {
-        api = SAI_COMMON_API_REMOVE;
-    }
-    else if (op == "set")
-    {
-        api = SAI_COMMON_API_SET;
-    }
-    else if (op == "get")
-    {
-        api = SAI_COMMON_API_GET;
-    }
-    else if (op == "bulkset")
-    {
-        return processBulkEvent(SAI_COMMON_API_BULK_SET, kco);
-    }
-    else if (op == "bulkcreate")
-    {
-        return processBulkEvent(SAI_COMMON_API_BULK_CREATE, kco);
-    }
-    else if (op == "bulkremove")
-    {
-        return processBulkEvent(SAI_COMMON_API_BULK_REMOVE, kco);
-    }
-    else if (op == "notify")
-    {
-        return notifySyncd(key);
-    }
-    else if (op == "get_stats")
-    {
-        return processGetStatsEvent(kco);
-    }
-    else if (op == "clear_stats")
-    {
-        return processClearStatsEvent(kco);
-    }
-    else if (op == "flush")
-    {
-        return processFdbFlush(kco);
-    }
-    else if (op == REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_QUERY)
-    {
-        return processAttrEnumValuesCapabilityQuery(kco);
-    }
-    else if (op == REDIS_ASIC_STATE_COMMAND_OBJECT_TYPE_GET_AVAILABILITY_QUERY)
-    {
-        return processObjectTypeGetAvailabilityQuery(kco);
-    }
-    else
-    {
-        SWSS_LOG_THROW("api '%s' is not implemented", op.c_str());
-    }
 
     sai_object_meta_key_t metaKey;
     sai_deserialize_object_meta_key(key, metaKey);
@@ -2749,6 +2683,65 @@ sai_status_t processSingleEvent(
     }
 
     return status;
+}
+
+sai_status_t processSingleEvent(
+        _In_ const swss::KeyOpFieldsValuesTuple &kco)
+{
+    SWSS_LOG_ENTER();
+
+    auto& key = kfvKey(kco);
+    auto& op = kfvOp(kco);
+
+    SWSS_LOG_INFO("key: %s op: %s", key.c_str(), op.c_str());
+
+    if (key.length() == 0)
+    {
+        SWSS_LOG_DEBUG("no elements in m_buffer");
+
+        return SAI_STATUS_SUCCESS;
+    }
+
+    if (op == REDIS_ASIC_STATE_COMMAND_CREATE)
+        return processQuad(SAI_COMMON_API_CREATE, kco);
+
+    if (op == REDIS_ASIC_STATE_COMMAND_REMOVE)
+        return processQuad(SAI_COMMON_API_REMOVE, kco);
+
+    if (op == REDIS_ASIC_STATE_COMMAND_SET)
+        return processQuad(SAI_COMMON_API_SET, kco);
+
+    if (op == REDIS_ASIC_STATE_COMMAND_GET)
+        return processQuad(SAI_COMMON_API_GET, kco);
+
+    if (op == REDIS_ASIC_STATE_COMMAND_BULK_CREATE)
+        return processBulkEvent(SAI_COMMON_API_BULK_CREATE, kco);
+
+    if (op == REDIS_ASIC_STATE_COMMAND_BULK_REMOVE)
+        return processBulkEvent(SAI_COMMON_API_BULK_REMOVE, kco);
+
+    if (op == REDIS_ASIC_STATE_COMMAND_BULK_SET)
+        return processBulkEvent(SAI_COMMON_API_BULK_SET, kco);
+
+    if (op == REDIS_ASIC_STATE_COMMAND_NOTIFY)
+        return notifySyncd(key);
+
+    if (op == REDIS_ASIC_STATE_COMMAND_GET_STATS)
+        return processGetStatsEvent(kco);
+
+    if (op == REDIS_ASIC_STATE_COMMAND_CLEAR_STATS)
+        return processClearStatsEvent(kco);
+
+    if (op == REDIS_ASIC_STATE_COMMAND_FLUSH)
+        return processFdbFlush(kco);
+
+    if (op == REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_QUERY)
+        return processAttrEnumValuesCapabilityQuery(kco);
+
+    if (op == REDIS_ASIC_STATE_COMMAND_OBJECT_TYPE_GET_AVAILABILITY_QUERY)
+        return processObjectTypeGetAvailabilityQuery(kco);
+
+    SWSS_LOG_THROW("event op '%s' is not implemented, FIXME", op.c_str());
 }
 
 void processEvent(
