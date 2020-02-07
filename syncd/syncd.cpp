@@ -2550,25 +2550,224 @@ sai_status_t processObjectTypeGetAvailabilityQuery(
     return status;
 }
 
-sai_status_t processEvent(
+sai_status_t processSingleEvent(
+        _In_ const swss::KeyOpFieldsValuesTuple &kco)
+{
+    SWSS_LOG_ENTER();
+
+    const std::string &key = kfvKey(kco);
+    const std::string &op = kfvOp(kco);
+
+    if (key.length() == 0)
+    {
+        SWSS_LOG_DEBUG("no elements in m_buffer");
+        return SAI_STATUS_SUCCESS;
+    }
+
+    const std::string &str_object_id = key.substr(key.find(":") + 1);
+
+    SWSS_LOG_INFO("key: %s op: %s", key.c_str(), op.c_str());
+
+    sai_common_api_t api = SAI_COMMON_API_MAX;
+
+    if (op == "create")
+    {
+        api = SAI_COMMON_API_CREATE;
+    }
+    else if (op == "remove")
+    {
+        api = SAI_COMMON_API_REMOVE;
+    }
+    else if (op == "set")
+    {
+        api = SAI_COMMON_API_SET;
+    }
+    else if (op == "get")
+    {
+        api = SAI_COMMON_API_GET;
+    }
+    else if (op == "bulkset")
+    {
+        return processBulkEvent(SAI_COMMON_API_BULK_SET, kco);
+    }
+    else if (op == "bulkcreate")
+    {
+        return processBulkEvent(SAI_COMMON_API_BULK_CREATE, kco);
+    }
+    else if (op == "bulkremove")
+    {
+        return processBulkEvent(SAI_COMMON_API_BULK_REMOVE, kco);
+    }
+    else if (op == "notify")
+    {
+        return notifySyncd(key);
+    }
+    else if (op == "get_stats")
+    {
+        return processGetStatsEvent(kco);
+    }
+    else if (op == "clear_stats")
+    {
+        return processClearStatsEvent(kco);
+    }
+    else if (op == "flush")
+    {
+        return processFdbFlush(kco);
+    }
+    else if (op == REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_QUERY)
+    {
+        return processAttrEnumValuesCapabilityQuery(kco);
+    }
+    else if (op == REDIS_ASIC_STATE_COMMAND_OBJECT_TYPE_GET_AVAILABILITY_QUERY)
+    {
+        return processObjectTypeGetAvailabilityQuery(kco);
+    }
+    else
+    {
+        SWSS_LOG_THROW("api '%s' is not implemented", op.c_str());
+    }
+
+    sai_object_meta_key_t metaKey;
+    sai_deserialize_object_meta_key(key, metaKey);
+
+    if (!sai_metadata_is_object_type_valid(metaKey.objecttype))
+    {
+        SWSS_LOG_THROW("undefined object type %s", key.c_str());
+    }
+
+    const std::vector<swss::FieldValueTuple> &values = kfvFieldsValues(kco);
+
+    for (const auto &v: values)
+    {
+        SWSS_LOG_DEBUG("attr: %s: %s", fvField(v).c_str(), fvValue(v).c_str());
+    }
+
+    SaiAttributeList list(metaKey.objecttype, values, false);
+
+    /*
+     * Attribute list can't be const since we will use it to translate VID to
+     * RID in place.
+     */
+
+    sai_attribute_t *attr_list = list.get_attr_list();
+    uint32_t attr_count = list.get_attr_count();
+
+    /*
+     * NOTE: This check pointers must be executed before init view mode, since
+     * this methods replaces pointers from orchagent memory space to syncd
+     * memory space.
+     */
+
+    if (metaKey.objecttype == SAI_OBJECT_TYPE_SWITCH && (api == SAI_COMMON_API_CREATE || api == SAI_COMMON_API_SET))
+    {
+        /*
+         * We don't need to clear those pointers on switch remove (even last),
+         * since those pointers will reside inside attributes, also sairedis
+         * will internally check whether pointer is null or not, so we here
+         * will receive all notifications, but redis only those that were set.
+         */
+
+        g_handler->updateNotificationsPointers(attr_count, attr_list);
+    }
+
+    if (isInitViewMode())
+    {
+        return processEventInInitViewMode(metaKey.objecttype, str_object_id, api, attr_count, attr_list);
+    }
+
+    if (api != SAI_COMMON_API_GET)
+    {
+        /*
+         * TODO we can also call translate on get, if sairedis will clean
+         * buffer so then all OIDs will be NULL, and translation will also
+         * convert them to NULL.
+         */
+
+        SWSS_LOG_DEBUG("translating VID to RIDs on all attributes");
+
+        g_translator->translateVidToRid(metaKey.objecttype, attr_count, attr_list);
+    }
+
+    auto info = sai_metadata_get_object_type_info(metaKey.objecttype);
+
+    sai_status_t status;
+
+    if (info->isnonobjectid)
+    {
+        status = hangle_enrty(metaKey, api, attr_count, attr_list);
+    }
+    else
+    {
+        status = handle_oid(metaKey.objecttype, str_object_id, api, attr_count, attr_list);
+    }
+
+    if (api == SAI_COMMON_API_GET)
+    {
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_DEBUG("get API for key: %s op: %s returned status: %s",
+                    key.c_str(),
+                    op.c_str(),
+                    sai_serialize_status(status).c_str());
+        }
+
+        // extract switch VID from any object type
+
+        sai_object_id_t switch_vid = VidManager::switchIdQuery(metaKey.objectkey.key.object_id);
+
+        internal_syncd_get_send(metaKey.objecttype, str_object_id, switch_vid, status, attr_count, attr_list);
+    }
+    else if (status != SAI_STATUS_SUCCESS)
+    {
+        internal_syncd_api_send_response(api, status);
+
+        if (info->isobjectid && api == SAI_COMMON_API_SET)
+        {
+            sai_object_id_t vid;
+            sai_deserialize_object_id(str_object_id, vid);
+
+            sai_object_id_t rid = g_translator->translateVidToRid(vid);
+
+            SWSS_LOG_ERROR("VID: %s RID: %s",
+                    sai_serialize_object_id(vid).c_str(),
+                    sai_serialize_object_id(rid).c_str());
+        }
+
+        for (const auto &v: values)
+        {
+            SWSS_LOG_ERROR("attr: %s: %s", fvField(v).c_str(), fvValue(v).c_str());
+        }
+
+        SWSS_LOG_THROW("failed to execute api: %s, key: %s, status: %s",
+                op.c_str(),
+                key.c_str(),
+                sai_serialize_status(status).c_str());
+    }
+    else // non GET api, status is SUCCESS
+    {
+        internal_syncd_api_send_response(api, status);
+    }
+
+    return status;
+}
+
+void processEvent(
         _In_ swss::ConsumerTable &consumer)
 {
     SWSS_LOG_ENTER();
 
     std::lock_guard<std::mutex> lock(g_mutex);
 
-    swss::KeyOpFieldsValuesTuple kco;
-
-    sai_status_t status = SAI_STATUS_SUCCESS;
-
-    do {
+    do
+    {
+        swss::KeyOpFieldsValuesTuple kco;
 
         if (isInitViewMode())
         {
             /*
-             * In init mode we put all data to TEMP view and we snoop.  We need to
-             * specify temporary view prefix in consumer since consumer puts data
-             * to redis db.
+             * In init mode we put all data to TEMP view and we snoop.  We need
+             * to specify temporary view prefix in consumer since consumer puts
+             * data to redis db.
              */
 
             consumer.pop(kco, TEMP_PREFIX);
@@ -2578,199 +2777,9 @@ sai_status_t processEvent(
             consumer.pop(kco);
         }
 
-        const std::string &key = kfvKey(kco);
-        const std::string &op = kfvOp(kco);
-
-        if (key.length() == 0) {
-            SWSS_LOG_DEBUG("no elements in m_buffer");
-            return status;
-        }
-
-        const std::string &str_object_id = key.substr(key.find(":") + 1);
-
-        SWSS_LOG_INFO("key: %s op: %s", key.c_str(), op.c_str());
-
-        sai_common_api_t api = SAI_COMMON_API_MAX;
-
-        if (op == "create")
-        {
-            api = SAI_COMMON_API_CREATE;
-        }
-        else if (op == "remove")
-        {
-            api = SAI_COMMON_API_REMOVE;
-        }
-        else if (op == "set")
-        {
-            api = SAI_COMMON_API_SET;
-        }
-        else if (op == "get")
-        {
-            api = SAI_COMMON_API_GET;
-        }
-        else if (op == "bulkset")
-        {
-            return processBulkEvent(SAI_COMMON_API_BULK_SET, kco);
-        }
-        else if (op == "bulkcreate")
-        {
-            return processBulkEvent(SAI_COMMON_API_BULK_CREATE, kco);
-        }
-        else if (op == "bulkremove")
-        {
-            return processBulkEvent(SAI_COMMON_API_BULK_REMOVE, kco);
-        }
-        else if (op == "notify")
-        {
-            return notifySyncd(key);
-        }
-        else if (op == "get_stats")
-        {
-            return processGetStatsEvent(kco);
-        }
-        else if (op == "clear_stats")
-        {
-            return processClearStatsEvent(kco);
-        }
-        else if (op == "flush")
-        {
-            return processFdbFlush(kco);
-        }
-        else if (op == REDIS_ASIC_STATE_COMMAND_ATTR_ENUM_VALUES_CAPABILITY_QUERY)
-        {
-            return processAttrEnumValuesCapabilityQuery(kco);
-        }
-        else if (op == REDIS_ASIC_STATE_COMMAND_OBJECT_TYPE_GET_AVAILABILITY_QUERY)
-        {
-            return processObjectTypeGetAvailabilityQuery(kco);
-        }
-        else
-        {
-            SWSS_LOG_THROW("api '%s' is not implemented", op.c_str());
-        }
-
-        sai_object_meta_key_t metaKey;
-        sai_deserialize_object_meta_key(key, metaKey);
-
-        if (!sai_metadata_is_object_type_valid(metaKey.objecttype))
-        {
-            SWSS_LOG_THROW("undefined object type %s", key.c_str());
-        }
-
-        const std::vector<swss::FieldValueTuple> &values = kfvFieldsValues(kco);
-
-        for (const auto &v: values)
-        {
-            SWSS_LOG_DEBUG("attr: %s: %s", fvField(v).c_str(), fvValue(v).c_str());
-        }
-
-        SaiAttributeList list(metaKey.objecttype, values, false);
-
-        /*
-         * Attribute list can't be const since we will use it to translate VID to
-         * RID in place.
-         */
-
-        sai_attribute_t *attr_list = list.get_attr_list();
-        uint32_t attr_count = list.get_attr_count();
-
-        /*
-         * NOTE: This check pointers must be executed before init view mode, since
-         * this methods replaces pointers from orchagent memory space to syncd
-         * memory space.
-         */
-
-        if (metaKey.objecttype == SAI_OBJECT_TYPE_SWITCH && (api == SAI_COMMON_API_CREATE || api == SAI_COMMON_API_SET))
-        {
-            /*
-             * We don't need to clear those pointers on switch remove (even last),
-             * since those pointers will reside inside attributes, also sairedis
-             * will internally check whether pointer is null or not, so we here
-             * will receive all notifications, but redis only those that were set.
-             */
-
-            g_handler->updateNotificationsPointers(attr_count, attr_list);
-        }
-
-        if (isInitViewMode())
-        {
-            return processEventInInitViewMode(metaKey.objecttype, str_object_id, api, attr_count, attr_list);
-        }
-
-        if (api != SAI_COMMON_API_GET)
-        {
-            /*
-             * TODO we can also call translate on get, if sairedis will clean
-             * buffer so then all OIDs will be NULL, and translation will also
-             * convert them to NULL.
-             */
-
-            SWSS_LOG_DEBUG("translating VID to RIDs on all attributes");
-
-            g_translator->translateVidToRid(metaKey.objecttype, attr_count, attr_list);
-        }
-
-        auto info = sai_metadata_get_object_type_info(metaKey.objecttype);
-
-        if (info->isnonobjectid)
-        {
-            status = hangle_enrty(metaKey, api, attr_count, attr_list);
-        }
-        else
-        {
-            status = handle_oid(metaKey.objecttype, str_object_id, api, attr_count, attr_list);
-        }
-
-        if (api == SAI_COMMON_API_GET)
-        {
-            if (status != SAI_STATUS_SUCCESS)
-            {
-                SWSS_LOG_DEBUG("get API for key: %s op: %s returned status: %s",
-                        key.c_str(),
-                        op.c_str(),
-                        sai_serialize_status(status).c_str());
-            }
-
-            // extract switch VID from any object type
-
-            sai_object_id_t switch_vid = VidManager::switchIdQuery(metaKey.objectkey.key.object_id);
-
-            internal_syncd_get_send(metaKey.objecttype, str_object_id, switch_vid, status, attr_count, attr_list);
-        }
-        else if (status != SAI_STATUS_SUCCESS)
-        {
-            internal_syncd_api_send_response(api, status);
-
-            if (info->isobjectid && api == SAI_COMMON_API_SET)
-            {
-                sai_object_id_t vid;
-                sai_deserialize_object_id(str_object_id, vid);
-
-                sai_object_id_t rid = g_translator->translateVidToRid(vid);
-
-                SWSS_LOG_ERROR("VID: %s RID: %s",
-                        sai_serialize_object_id(vid).c_str(),
-                        sai_serialize_object_id(rid).c_str());
-            }
-
-            for (const auto &v: values)
-            {
-                SWSS_LOG_ERROR("attr: %s: %s", fvField(v).c_str(), fvValue(v).c_str());
-            }
-
-            SWSS_LOG_THROW("failed to execute api: %s, key: %s, status: %s",
-                    op.c_str(),
-                    key.c_str(),
-                    sai_serialize_status(status).c_str());
-        }
-        else // non GET api, status is SUCCESS
-        {
-            internal_syncd_api_send_response(api, status);
-        }
-
-    } while (!consumer.empty());
-
-    return status;
+        processSingleEvent(kco);
+    }
+    while (!consumer.empty());
 }
 
 void processFlexCounterGroupEvent(
