@@ -1745,6 +1745,8 @@ sai_status_t initViewRemove(
         SWSS_LOG_THROW("remove switch (%s) is not supported in init view mode yet! FIXME", str_object_id.c_str());
     }
 
+    // NOTE: we should also prevent removing some other non removable objects
+
     auto info = sai_metadata_get_object_type_info(object_type);
 
     if (info->isobjectid)
@@ -1778,7 +1780,7 @@ sai_status_t initViewSet(
 {
     SWSS_LOG_ENTER();
 
-    // we support SET api on all objects in init view mode.
+    // we support SET api on all objects in init view mode
 
     sendApiResponse(SAI_COMMON_API_SET, SAI_STATUS_SUCCESS);
 
@@ -1786,8 +1788,8 @@ sai_status_t initViewSet(
 }
 
 sai_status_t initViewGet(
-        _In_ sai_object_type_t object_type,
-        _In_ const std::string &str_object_id,
+        _In_ sai_object_type_t objectType,
+        _In_ const std::string &strObjectId,
         _In_ uint32_t attr_count,
         _In_ sai_attribute_t *attr_list)
 {
@@ -1795,7 +1797,9 @@ sai_status_t initViewGet(
 
     sai_status_t status;
 
-    auto info = sai_metadata_get_object_type_info(object_type);
+    auto info = sai_metadata_get_object_type_info(objectType);
+
+    sai_object_id_t switchVid = SAI_NULL_OBJECT_ID;
 
     if (info->isnonobjectid)
     {
@@ -1806,18 +1810,20 @@ sai_status_t initViewGet(
          * for other non object id types.
          */
 
-        SWSS_LOG_ERROR("get is not supported on %s in init view mode", sai_serialize_object_type(object_type).c_str());
+        SWSS_LOG_ERROR("get is not supported on %s in init view mode", sai_serialize_object_type(objectType).c_str());
 
         status = SAI_STATUS_NOT_SUPPORTED;
     }
     else
     {
-        sai_object_id_t object_id;
-        sai_deserialize_object_id(str_object_id, object_id);
+        sai_object_id_t objectVid;
+        sai_deserialize_object_id(strObjectId, objectVid);
+
+        switchVid = VidManager::switchIdQuery(objectVid);
 
         SWSS_LOG_DEBUG("generic get (init view) for object type %s:%s",
-                sai_serialize_object_type(object_type).c_str(),
-                str_object_id.c_str());
+                sai_serialize_object_type(objectType).c_str(),
+                strObjectId.c_str());
 
         /*
          * Object must exists, we can't call GET on created object
@@ -1834,43 +1840,26 @@ sai_status_t initViewGet(
          * and it have RID defined, so we can query it.
          */
 
-        sai_object_id_t rid = g_translator->translateVidToRid(object_id);
+        sai_object_id_t rid = g_translator->translateVidToRid(objectVid);
 
         sai_object_meta_key_t meta_key;
 
-        meta_key.objecttype = object_type;
+        meta_key.objecttype = objectType;
         meta_key.objectkey.key.object_id = rid;
 
         status = g_vendorSai->get(meta_key, attr_count, attr_list);
     }
 
-    sai_object_id_t switch_id;
+    /*
+     * We are in init view mode, but ether switch already existed or first
+     * command was creating switch and user created switch.
+     *
+     * We could change that later on, depends on object type we can extract
+     * switch id, we could also have this method inside metadata to get meta
+     * key.
+     */
 
-    if (switches.size() == 1)
-    {
-        /*
-         * We are in init view mode, but ether switch already
-         * existed or first command was creating switch and user
-         * created switch.
-         *
-         * We could change that later on, depends on object type we
-         * can extract switch id, we could also have this method
-         * inside metadata to get meta key.
-         */
-
-        switch_id = switches.begin()->second->getVid();
-    }
-    else
-    {
-        /*
-         * This needs to be updated to support multiple switches
-         * scenario.
-         */
-
-        SWSS_LOG_THROW("multiple switches are not supported yet: %zu", switches.size());
-    }
-
-    internal_syncd_get_send(object_type, str_object_id, switch_id, status, attr_count, attr_list);
+    internal_syncd_get_send(objectType, strObjectId, switchVid, status, attr_count, attr_list);
 
     return status;
 }
