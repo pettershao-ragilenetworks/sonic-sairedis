@@ -20,6 +20,7 @@
 
 #include "VirtualObjectIdManager.h"
 #include "RedisVidIndexGenerator.h"
+#include "Syncd.h"
 
 #include <inttypes.h>
 #include <limits.h>
@@ -47,6 +48,8 @@ std::shared_ptr<NotificationHandler> g_handler = std::make_shared<NotificationHa
 std::shared_ptr<sairedis::SaiInterface> g_vendorSai = std::make_shared<VendorSai>();
 
 std::shared_ptr<sairedis::VirtualObjectIdManager> g_virtualObjectIdManager;
+
+std::shared_ptr<Syncd> g_syncd;
 
 static auto g_manager = std::make_shared<FlexCounterManager>();
 
@@ -103,10 +106,6 @@ std::map<sai_object_id_t, std::shared_ptr<SaiSwitch>> switches;
  */
 std::set<sai_object_id_t> initViewRemovedVidSet;
 
-/*
- * By default we are in APPLY mode.
- */
-volatile bool g_asicInitViewMode = false;
 
 /*
  * SAI switch global needed for RPC server and for remove_switch
@@ -127,7 +126,7 @@ bool isInitViewMode()
 {
     SWSS_LOG_ENTER();
 
-    return g_asicInitViewMode && g_commandLineOptions->m_enableTempView;
+    return g_syncd->m_asicInitViewMode && g_commandLineOptions->m_enableTempView;
 }
 
 bool g_veryFirstRun = false;
@@ -1412,7 +1411,7 @@ sai_status_t notifySyncd(
              * init to false instead of true.
              */
 
-            g_asicInitViewMode = false;
+            g_syncd->m_asicInitViewMode = false;
 
             firstInitWasPerformed = true;
 
@@ -1426,7 +1425,7 @@ sai_status_t notifySyncd(
         {
             g_veryFirstRun = false;
 
-            g_asicInitViewMode = false;
+            g_syncd->m_asicInitViewMode = false;
 
             if (g_commandLineOptions->m_startType == SAI_START_TYPE_FASTFAST_BOOT)
             {
@@ -1448,12 +1447,12 @@ sai_status_t notifySyncd(
 
     if (redisNotifySyncd == SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW)
     {
-        if (g_asicInitViewMode)
+        if (g_syncd->m_asicInitViewMode)
         {
             SWSS_LOG_WARN("syncd is already in asic INIT VIEW mode, but received init again, orchagent restarted before apply?");
         }
 
-        g_asicInitViewMode = true;
+        g_syncd->m_asicInitViewMode = true;
 
         clearTempView();
 
@@ -1467,7 +1466,7 @@ sai_status_t notifySyncd(
     }
     else if (redisNotifySyncd == SAI_REDIS_NOTIFY_SYNCD_APPLY_VIEW)
     {
-        g_asicInitViewMode = false;
+        g_syncd->m_asicInitViewMode = false;
 
         /*
          * TODO: Currently as WARN to be easier to spot, later should be NOTICE.
@@ -3204,6 +3203,8 @@ int syncd_main(int argc, char **argv)
 
     // TODO move to syncd object
     g_commandLineOptions = CommandLineOptionsParser::parseCommandLine(argc, argv);
+
+    g_syncd = std::make_shared<Syncd>(g_commandLineOptions, isWarmStart);
 
     SWSS_LOG_NOTICE("command line: %s", g_commandLineOptions->getCommandLineString().c_str());
 
