@@ -61,9 +61,15 @@ namespace syncd
             sai_status_t processGetStatsEvent(
                     _In_ const swss::KeyOpFieldsValuesTuple &kco);
 
-            sai_status_t processBulkEvent(
+            sai_status_t processBulkQuadEvent(
                     _In_ sai_common_api_t api,
                     _In_ const swss::KeyOpFieldsValuesTuple &kco);
+
+            sai_status_t processBulkOid(
+                    _In_ sai_object_type_t object_type,
+                    _In_ const std::vector<std::string> &object_ids,
+                    _In_ sai_common_api_t api,
+                    _In_ const std::vector<std::shared_ptr<SaiAttributeList>> &attributes);
 
             sai_status_t processBulkEntry(
                     _In_ sai_object_type_t object_type,

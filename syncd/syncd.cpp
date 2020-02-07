@@ -454,14 +454,14 @@ void internal_syncd_get_send(
 }
 
 /**
- * @brief Internal syncd api send response.
+ * @brief Send api response.
  *
  * This function should be use to send response to sairedis for
  * create/remove/set API as well as their corresponding bulk versions.
  *
  * Should not be used on GET api.
  */
-void internal_syncd_api_send_response(
+void sendApiResponse(
         _In_ sai_common_api_t api,
         _In_ sai_status_t status,
         _In_ uint32_t object_count = 0,
@@ -477,7 +477,31 @@ void internal_syncd_api_send_response(
      */
 
     if (!g_commandLineOptions->m_enableSyncMode)
+    {
         return;
+    }
+
+    switch (api)
+    {
+        case SAI_COMMON_API_CREATE:
+        case SAI_COMMON_API_REMOVE:
+        case SAI_COMMON_API_SET:
+        case SAI_COMMON_API_BULK_CREATE:
+        case SAI_COMMON_API_BULK_REMOVE:
+        case SAI_COMMON_API_BULK_SET:
+            break;
+
+        default:
+            SWSS_LOG_THROW("api %s not supported by this function",
+                    sai_serialize_common_api(api).c_str());
+    }
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_THROW("api %s failed in syncd mode: %s, but entry STILL exists in REDIS db and must be removed, FIXME",
+                    sai_serialize_common_api(api).c_str(),
+                    sai_serialize_status(status).c_str());
+    }
 
     std::vector<swss::FieldValueTuple> entry;
 
@@ -1035,7 +1059,7 @@ sai_status_t genericGet(
     return g_vendorSai->get(meta_key, attr_count, attr_list);
 }
 
-sai_status_t handle_oid(
+sai_status_t processOid(
         _In_ sai_object_type_t object_type,
         _In_ const std::string &str_object_id,
         _In_ sai_common_api_t api,
@@ -1685,7 +1709,7 @@ sai_status_t initViewCreate(
         }
     }
 
-    internal_syncd_api_send_response(SAI_COMMON_API_CREATE, SAI_STATUS_SUCCESS);
+    sendApiResponse(SAI_COMMON_API_CREATE, SAI_STATUS_SUCCESS);
 
     return SAI_STATUS_SUCCESS;
 }
@@ -1742,7 +1766,7 @@ sai_status_t initViewRemove(
         initViewRemovedVidSet.insert(object_vid);
     }
 
-    internal_syncd_api_send_response(SAI_COMMON_API_REMOVE, SAI_STATUS_SUCCESS);
+    sendApiResponse(SAI_COMMON_API_REMOVE, SAI_STATUS_SUCCESS);
 
     return SAI_STATUS_SUCCESS;
 }
@@ -1756,7 +1780,7 @@ sai_status_t initViewSet(
 
     // we support SET api on all objects in init view mode.
 
-    internal_syncd_api_send_response(SAI_COMMON_API_SET, SAI_STATUS_SUCCESS);
+    sendApiResponse(SAI_COMMON_API_SET, SAI_STATUS_SUCCESS);
 
     return SAI_STATUS_SUCCESS;
 }
@@ -1851,7 +1875,7 @@ sai_status_t initViewGet(
     return status;
 }
 
-sai_status_t processEventInInitViewMode(
+sai_status_t processQuadEventInInitViewMode(
         _In_ sai_object_type_t object_type,
         _In_ const std::string &str_object_id,
         _In_ sai_common_api_t api,
@@ -1891,93 +1915,7 @@ sai_status_t processEventInInitViewMode(
     }
 }
 
-sai_status_t processBulkOid(
-        _In_ sai_object_type_t object_type,
-        _In_ const std::vector<std::string> &object_ids,
-        _In_ sai_common_api_t api,
-        _In_ const std::vector<std::shared_ptr<SaiAttributeList>> &attributes)
-{
-    SWSS_LOG_ENTER();
-
-    auto info = sai_metadata_get_object_type_info(object_type);
-
-    if (info->isnonobjectid)
-    {
-        SWSS_LOG_THROW("passing non object id to bulk oid obejct operation");
-    }
-
-    /*
-     * Since we don't have asic support yet for bulk api, just execute one by
-     * one.
-     */
-
-    std::vector<sai_status_t> statuses(object_ids.size());
-
-    sai_status_t all = SAI_STATUS_SUCCESS;
-
-    for (size_t idx = 0; idx < object_ids.size(); ++idx)
-    {
-        sai_status_t status = SAI_STATUS_FAILURE;
-
-        auto &list = attributes[idx];
-
-        sai_attribute_t *attr_list = list->get_attr_list();
-        uint32_t attr_count = list->get_attr_count();
-
-        sai_object_meta_key_t meta_key;
-        meta_key.objecttype = object_type;
-        switch (object_type)
-        {
-            case SAI_OBJECT_TYPE_NEXT_HOP_GROUP_MEMBER:
-                sai_deserialize_object_id(object_ids[idx], meta_key.objectkey.key.object_id);
-                break;
-            default:
-                SWSS_LOG_THROW("invalid object_type: %s", sai_serialize_object_type(object_type).c_str());
-        }
-
-        if (api == SAI_COMMON_API_BULK_SET)
-        {
-            status = handle_oid(object_type, object_ids[idx], SAI_COMMON_API_SET, attr_count, attr_list);
-        }
-        else if (api == SAI_COMMON_API_BULK_CREATE)
-        {
-            status = handle_oid(object_type, object_ids[idx], SAI_COMMON_API_CREATE, attr_count, attr_list);
-        }
-        else if (api == SAI_COMMON_API_BULK_REMOVE)
-        {
-            status = handle_oid(object_type, object_ids[idx], SAI_COMMON_API_REMOVE, attr_count, attr_list);
-        }
-        else
-        {
-            SWSS_LOG_THROW("api %d is not supported in bulk route", api);
-        }
-
-        if (status != SAI_STATUS_SUCCESS)
-        {
-            if (!g_commandLineOptions->m_enableSyncMode)
-            {
-                SWSS_LOG_THROW("operation failed in async mode!");
-            }
-
-            all = SAI_STATUS_FAILURE;
-        }
-
-        statuses[idx] = status;
-    }
-
-    // all can be success if all has been success
-    internal_syncd_api_send_response(api, all, (uint32_t)object_ids.size(), statuses.data());
-
-    if (all != SAI_STATUS_SUCCESS && !g_commandLineOptions->m_enableSyncMode)
-    {
-        SWSS_LOG_THROW("failed to execute bulk api: %s",
-                sai_serialize_status(all).c_str());
-    }
-
-    return all;
-}
-
-sai_status_t processQuad(
+sai_status_t processQuadEvent(
         _In_ sai_common_api_t api,
         _In_ const swss::KeyOpFieldsValuesTuple &kco)
 {
@@ -2033,7 +1971,7 @@ sai_status_t processQuad(
 
     if (g_syncd->isInitViewMode())
     {
-        return processEventInInitViewMode(metaKey.objecttype, str_object_id, api, attr_count, attr_list);
+        return processQuadEventInInitViewMode(metaKey.objecttype, str_object_id, api, attr_count, attr_list);
     }
 
     if (api != SAI_COMMON_API_GET)
@@ -2059,7 +1997,7 @@ sai_status_t processQuad(
     }
     else
     {
-        status = handle_oid(metaKey.objecttype, str_object_id, api, attr_count, attr_list);
+        status = processOid(metaKey.objecttype, str_object_id, api, attr_count, attr_list);
     }
 
     if (api == SAI_COMMON_API_GET)
@@ -2080,7 +2018,7 @@ sai_status_t processQuad(
     }
     else if (status != SAI_STATUS_SUCCESS)
     {
-        internal_syncd_api_send_response(api, status);
+        sendApiResponse(api, status);
 
         if (info->isobjectid && api == SAI_COMMON_API_SET)
         {
@@ -2106,7 +2044,7 @@ sai_status_t processQuad(
     }
     else // non GET api, status is SUCCESS
     {
-        internal_syncd_api_send_response(api, status);
+        sendApiResponse(api, status);
     }
 
     return status;

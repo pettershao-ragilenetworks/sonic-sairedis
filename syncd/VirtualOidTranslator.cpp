@@ -12,7 +12,6 @@ using namespace syncd;
 
 // TODO move all redis access to db object connector
 
-extern bool isInitViewMode(); // TODO move to shared module
 extern std::shared_ptr<sairedis::VirtualObjectIdManager> g_virtualObjectIdManager;
 
 sai_object_id_t VirtualOidTranslator::translateRidToVid(

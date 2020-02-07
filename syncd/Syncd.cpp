@@ -14,7 +14,7 @@
 sai_status_t notifySyncd(
         _In_ const std::string& op);
 
-sai_status_t processQuad(
+sai_status_t processQuadEvent(
         _In_ sai_common_api_t api,
         _In_ const swss::KeyOpFieldsValuesTuple &kco);
 
@@ -30,11 +30,18 @@ sai_status_t processBulkOid(
         _In_ sai_common_api_t api,
         _In_ const std::vector<std::shared_ptr<SaiAttributeList>> &attributes);
 
-void internal_syncd_api_send_response(
+void sendApiResponse(
         _In_ sai_common_api_t api,
         _In_ sai_status_t status,
         _In_ uint32_t object_count = 0,
         _In_ sai_status_t * object_statuses = NULL);
+
+sai_status_t processOid(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::string &str_object_id,
+        _In_ sai_common_api_t api,
+        _In_ uint32_t attr_count,
+        _In_ sai_attribute_t *attr_list);
 
 using namespace syncd;
 
@@ -128,25 +135,25 @@ sai_status_t Syncd::processSingleEvent(
     }
 
     if (op == REDIS_ASIC_STATE_COMMAND_CREATE)
-        return processQuad(SAI_COMMON_API_CREATE, kco);
+        return processQuadEvent(SAI_COMMON_API_CREATE, kco);
 
     if (op == REDIS_ASIC_STATE_COMMAND_REMOVE)
-        return processQuad(SAI_COMMON_API_REMOVE, kco);
+        return processQuadEvent(SAI_COMMON_API_REMOVE, kco);
 
     if (op == REDIS_ASIC_STATE_COMMAND_SET)
-        return processQuad(SAI_COMMON_API_SET, kco);
+        return processQuadEvent(SAI_COMMON_API_SET, kco);
 
     if (op == REDIS_ASIC_STATE_COMMAND_GET)
-        return processQuad(SAI_COMMON_API_GET, kco);
+        return processQuadEvent(SAI_COMMON_API_GET, kco);
 
     if (op == REDIS_ASIC_STATE_COMMAND_BULK_CREATE)
-        return processBulkEvent(SAI_COMMON_API_BULK_CREATE, kco);
+        return processBulkQuadEvent(SAI_COMMON_API_BULK_CREATE, kco);
 
     if (op == REDIS_ASIC_STATE_COMMAND_BULK_REMOVE)
-        return processBulkEvent(SAI_COMMON_API_BULK_REMOVE, kco);
+        return processBulkQuadEvent(SAI_COMMON_API_BULK_REMOVE, kco);
 
     if (op == REDIS_ASIC_STATE_COMMAND_BULK_SET)
-        return processBulkEvent(SAI_COMMON_API_BULK_SET, kco);
+        return processBulkQuadEvent(SAI_COMMON_API_BULK_SET, kco);
 
     if (op == REDIS_ASIC_STATE_COMMAND_NOTIFY)
         return notifySyncd(key);
@@ -427,7 +434,7 @@ sai_status_t Syncd::processGetStatsEvent(
     return status;
 }
 
-sai_status_t Syncd::processBulkEvent(
+sai_status_t Syncd::processBulkQuadEvent(
         _In_ sai_common_api_t api,
         _In_ const swss::KeyOpFieldsValuesTuple &kco)
 {
@@ -578,7 +585,7 @@ sai_status_t Syncd::processBulkEntry(
         }
         else
         {
-            SWSS_LOG_THROW("api %d is not supported in bulk route", api);
+            SWSS_LOG_THROW("api %d is not supported in bulk mode", api);
         }
 
         if (api != SAI_COMMON_API_BULK_GET && status != SAI_STATUS_SUCCESS)
@@ -596,7 +603,7 @@ sai_status_t Syncd::processBulkEntry(
         statuses[idx] = status;
     }
 
-    internal_syncd_api_send_response(api, all, (uint32_t)objectIds.size(), statuses.data());
+    sendApiResponse(api, all, (uint32_t)objectIds.size(), statuses.data());
 
     return all;
 }
@@ -629,5 +636,72 @@ sai_status_t Syncd::processEntry(
 
             SWSS_LOG_THROW("api %s not supported", sai_serialize_common_api(api).c_str());
     }
+}
+
+sai_status_t Syncd::processBulkOid(
+        _In_ sai_object_type_t objectType,
+        _In_ const std::vector<std::string> &objectIds,
+        _In_ sai_common_api_t api,
+        _In_ const std::vector<std::shared_ptr<SaiAttributeList>> &attributes)
+{
+    SWSS_LOG_ENTER();
+
+    auto info = sai_metadata_get_object_type_info(objectType);
+
+    if (info->isnonobjectid)
+    {
+        SWSS_LOG_THROW("passing non object id to bulk oid obejct operation");
+    }
+
+    // vendor SAI don't bulk API yet, so execute one by one
+
+    std::vector<sai_status_t> statuses(objectIds.size());
+
+    sai_status_t all = SAI_STATUS_SUCCESS;
+
+    for (size_t idx = 0; idx < objectIds.size(); ++idx)
+    {
+        sai_status_t status = SAI_STATUS_FAILURE;
+
+        auto& list = attributes[idx];
+
+        sai_attribute_t *attr_list = list->get_attr_list();
+        uint32_t attr_count = list->get_attr_count();
+
+        if (api == SAI_COMMON_API_BULK_CREATE)
+        {
+            status = processOid(objectType, objectIds[idx], SAI_COMMON_API_CREATE, attr_count, attr_list);
+        }
+        else if (api == SAI_COMMON_API_BULK_REMOVE)
+        {
+            status = processOid(objectType, objectIds[idx], SAI_COMMON_API_REMOVE, attr_count, attr_list);
+        }
+        else if (api == SAI_COMMON_API_BULK_SET)
+        {
+            status = processOid(objectType, objectIds[idx], SAI_COMMON_API_SET, attr_count, attr_list);
+        }
+        else
+        {
+            SWSS_LOG_THROW("api %d is not supported in bulk mode", api);
+        }
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            if (!m_commandLineOptions->m_enableSyncMode)
+            {
+                SWSS_LOG_THROW("operation %s for %s failed in async mode!",
+                        sai_serialize_common_api(api).c_str(),
+                        sai_serialize_object_type(objectType).c_str());
+            }
+
+            all = SAI_STATUS_FAILURE; // all can be success if all has been success
+        }
+
+        statuses[idx] = status;
+    }
+
+    sendApiResponse(api, all, (uint32_t)objectIds.size(), statuses.data());
+
+    return all;
 }
 
