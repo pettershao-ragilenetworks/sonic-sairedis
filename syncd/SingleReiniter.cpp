@@ -2,6 +2,7 @@
 #include "VidManager.h"
 #include "CommandLineOptions.h"
 #include "NotificationHandler.h"
+#include "Workaround.h"
 
 #include "swss/logger.h"
 
@@ -346,7 +347,7 @@ void SingleReiniter::processSwitches()
 
             if (status != SAI_STATUS_SUCCESS)
             {
-                if (is_set_attribute_workaround(SAI_OBJECT_TYPE_SWITCH, attr->id, status))
+                if (Workaround::isSetAttributeWorkaround(SAI_OBJECT_TYPE_SWITCH, attr->id, status))
                 {
                     continue;
                 }

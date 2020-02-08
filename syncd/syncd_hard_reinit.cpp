@@ -91,13 +91,16 @@ void checkWarmBootDiscoveredRids(
         if (rid2vid.find(rid) != rid2vid.end())
             continue;
 
-        SWSS_LOG_ERROR("RID 0x%lx is missing from current RID2VID map after WARM boot!", rid);
+        SWSS_LOG_ERROR("RID %s is missing from current RID2VID map after WARM boot!",
+                sai_serialize_object_id(rid).c_str());
 
         success = false;
     }
 
     if (!success)
+    {
         SWSS_LOG_THROW("FATAL, some discovered RIDs are not present in current RID2VID map, bug");
+    }
 
     SWSS_LOG_NOTICE("all discovered RIDs are present in current RID2VID map");
 }
@@ -204,7 +207,7 @@ void performWarmRestart()
 
     if (gSwitchId != SAI_NULL_OBJECT_ID)
     {
-        SWSS_LOG_THROW("gSwitchId already contain switch!, SAI THRIFT don't support multiple switches yer, FIXME");
+        SWSS_LOG_THROW("gSwitchId already contain switch!, SAI THRIFT don't support multiple switches yet, FIXME");
     }
 
     gSwitchId = switch_rid; // TODO this is needed on warm boot
@@ -212,5 +215,5 @@ void performWarmRestart()
 
     checkWarmBootDiscoveredRids(sw);
 
-    startDiagShell();
+    startDiagShell(switch_rid);
 }

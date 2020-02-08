@@ -67,7 +67,8 @@ extern std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> switches;
 
 extern std::shared_ptr<syncd::VirtualOidTranslator> g_translator; // TODO move to syncd object
 
-void startDiagShell();
+void startDiagShell(
+        _In_ sai_object_id_t switchRid);
 
 void hardReinit();
 

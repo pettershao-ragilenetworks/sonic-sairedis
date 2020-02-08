@@ -4,6 +4,7 @@
 #include "NotificationHandler.h"
 #include "VirtualOidTranslator.h"
 #include "CommandLineOptions.h"
+#include "Workaround.h"
 
 #include "swss/logger.h"
 
@@ -13,11 +14,6 @@
 #include <inttypes.h>
 
 using namespace syncd;
-
-bool is_set_attribute_workaround(
-        _In_ sai_object_type_t objecttype,
-        _In_ sai_attr_id_t attrid,
-        _In_ sai_status_t status);
 
 extern bool enableRefernceCountLogs;
 extern std::shared_ptr<NotificationHandler> g_handler;
@@ -3006,7 +3002,7 @@ sai_status_t ComparisonLogic::asic_handle_generic(
 
                 sai_status_t status = m_vendorSai->set(meta_key, attr_list);
 
-                if (is_set_attribute_workaround(meta_key.objecttype, attr_list->id, status))
+                if (Workaround::isSetAttributeWorkaround(meta_key.objecttype, attr_list->id, status))
                 {
                     return SAI_STATUS_SUCCESS;
                 }

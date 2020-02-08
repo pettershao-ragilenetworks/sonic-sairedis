@@ -16,6 +16,7 @@ endif
 
 noinst_LIBRARIES = libsyncd.a
 libsyncd_a_SOURCES = \
+				Workaround.cpp \
 				Syncd.cpp \
 				ServiceMethodTable.cpp \
 				SwitchNotifications.cpp \
