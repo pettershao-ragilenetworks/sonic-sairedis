@@ -199,13 +199,16 @@ namespace syncd
                     _In_ sai_object_id_t port_vid);
 
             /**
-             * @brief On post port remove.
+             * @brief Post port remove.
              *
              * Performs actions after port remove. Will remove lanes associated
              * with port from redis lane map.
              */
-            void onPostPortRemove(
-                    _In_ sai_object_id_t port_rid);
+            void postPortRemove(
+                    _In_ sai_object_id_t portRid);
+
+            void collectPortRelatedObjects(
+                    _In_ sai_object_id_t portRid);
 
         private:
 
@@ -388,5 +391,7 @@ namespace syncd
             std::set<sai_object_id_t> m_warmBootDiscoveredVids;
 
             bool m_warmBoot;
+
+            std::map<sai_object_id_t, std::set<sai_object_id_t>> m_portRelatedObjects;
     };
 }

@@ -72,11 +72,6 @@ void get_port_related_objects(
         _In_ sai_object_id_t port_rid,
         _Out_ std::vector<sai_object_id_t>& related);
 
-void post_port_remove(
-        _In_ std::shared_ptr<syncd::SaiSwitch> sw,
-        _In_ sai_object_id_t port_rid,
-        _In_ const std::vector<sai_object_id_t>& relatedRids);
-
 using namespace syncd;
 
 Syncd::Syncd(
@@ -1407,23 +1402,21 @@ sai_status_t Syncd::processOidRemove(
 
     sai_object_id_t rid = g_translator->translateVidToRid(objectVid);
 
-    std::vector<sai_object_id_t> related;
-
     if (objectType == SAI_OBJECT_TYPE_PORT)
     {
-        // collect queues, ipgs, sg that belong to port
-        get_port_related_objects(rid, related);
+        sai_object_id_t switchVid = VidManager::switchIdQuery(objectVid);
+
+        switches.at(switchVid)->collectPortRelatedObjects(rid);
     }
 
     sai_status_t status = g_vendorSai->remove(objectType, rid);
 
     if (status == SAI_STATUS_SUCCESS)
     {
-        g_translator->eraseRidAndVid(rid, objectVid);
+        // remove all related objects from REDIS DB and also from existing
+        // object references since at this point they are no longer valid
 
-        // TODO remove all related objects from REDIS DB and also
-        // from existing object references since at this point
-        // they are no longer valid
+        g_translator->eraseRidAndVid(rid, objectVid);
 
         if (objectType == SAI_OBJECT_TYPE_SWITCH)
         {
@@ -1471,7 +1464,7 @@ sai_status_t Syncd::processOidRemove(
 
             if (objectType == SAI_OBJECT_TYPE_PORT)
             {
-                post_port_remove(switches.at(switchVid), rid, related);
+                switches.at(switchVid)->postPortRemove(rid);
             }
         }
     }

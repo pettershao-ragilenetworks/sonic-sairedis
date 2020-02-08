@@ -30,7 +30,6 @@
 #include <unordered_map>
 
 #define DEF_SAI_WARM_BOOT_DATA_FILE "/var/warmboot/sai-warmboot.bin"
-#define MAX_OBJLIST_LEN 128
 
 using namespace syncd;
 using namespace std::placeholders;
@@ -505,6 +504,7 @@ int profile_get_next_value(
     return 0;
 }
 
+// TODO combine all methods to 1
 void startDiagShell(
         _In_ sai_object_id_t switchRid)
 {
@@ -519,133 +519,6 @@ void startDiagShell(
         diag_shell_thread.detach();
     }
 }
-
-void get_port_related_objects(
-        _In_ sai_object_id_t port_rid,
-        _Out_ std::vector<sai_object_id_t>& related)
-{
-    SWSS_LOG_ENTER();
-
-    related.clear();
-
-    sai_object_meta_key_t meta_key;
-
-    meta_key.objecttype = SAI_OBJECT_TYPE_PORT;
-    meta_key.objectkey.key.object_id = port_rid;
-
-    sai_attr_id_t attrs[] = {
-        SAI_PORT_ATTR_QOS_QUEUE_LIST,
-        SAI_PORT_ATTR_QOS_SCHEDULER_GROUP_LIST,
-        SAI_PORT_ATTR_INGRESS_PRIORITY_GROUP_LIST
-    };
-
-    for (size_t i = 0; i < sizeof(attrs)/sizeof(sai_attr_id_t); i++)
-    {
-        std::vector<sai_object_id_t> objlist;
-
-        objlist.resize(MAX_OBJLIST_LEN);
-
-        sai_attribute_t attr;
-
-        attr.id = attrs[i];
-
-        attr.value.objlist.count = MAX_OBJLIST_LEN;
-        attr.value.objlist.list = objlist.data();
-
-        auto status = g_vendorSai->get(meta_key, 1, &attr);
-
-        if (status != SAI_STATUS_SUCCESS)
-        {
-            SWSS_LOG_THROW("failed to obtain related obejcts for port rid %s: %s, attr id: %d",
-                    sai_serialize_object_id(port_rid).c_str(),
-                    sai_serialize_status(status).c_str(),
-                    attr.id);
-        }
-
-        objlist.resize(attr.value.objlist.count);
-
-        related.insert(related.end(), objlist.begin(), objlist.end());
-    }
-
-    SWSS_LOG_NOTICE("obtained %zu port %s related RIDs",
-            related.size(),
-            sai_serialize_object_id(port_rid).c_str());
-}
-
-void post_port_remove(
-        _In_ std::shared_ptr<SaiSwitch> sw,
-        _In_ sai_object_id_t port_rid,
-        _In_ const std::vector<sai_object_id_t>& relatedRids)
-{
-    SWSS_LOG_ENTER();
-
-    /*
-     * Port was successfully removed from vendor SAI,
-     * we need to remove queues, ipgs and sg from:
-     *
-     * - redis ASIC DB
-     * - discovered existing objects in saiswitch class
-     * - local vid2rid map
-     * - redis RIDTOVID map
-     *
-     * - also remove LANES mapping
-     */
-
-    for (auto rid: relatedRids)
-    {
-        // remove from existing objects
-
-        if (sw->isDiscoveredRid(rid))
-        {
-            sw->removeExistingObjectReference(rid);
-        }
-
-        // remove from RID2VID and VID2RID map in redis
-
-        std::string str_rid = sai_serialize_object_id(rid);
-
-        auto pvid = g_redisClient->hget(RIDTOVID, str_rid);
-
-        if (pvid == nullptr)
-        {
-            SWSS_LOG_THROW("expected rid %s to be present in RIDTOVID", str_rid.c_str());
-        }
-
-        std::string str_vid = *pvid;
-
-        sai_object_id_t vid;
-        sai_deserialize_object_id(str_vid, vid);
-
-        // TODO should this remove rid,vid and object be as db op?
-
-        g_translator->eraseRidAndVid(rid, vid);
-
-        // remove from ASIC DB
-
-        sai_object_type_t ot = VidManager::objectTypeQuery(vid);
-
-        std::string key = ASIC_STATE_TABLE + std::string(":") + sai_serialize_object_type(ot) + ":" + str_vid;
-
-        SWSS_LOG_INFO("removing ASIC DB key: %s", key.c_str());
-
-        g_redisClient->del(key);
-    }
-
-    sw->onPostPortRemove(port_rid);
-
-    SWSS_LOG_NOTICE("post port remove actions succeeded");
-}
-
-void post_port_create(
-        _In_ std::shared_ptr<SaiSwitch> sw,
-        _In_ sai_object_id_t port_rid,
-        _In_ sai_object_id_t port_vid)
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_NOTICE("post port create actions succeeded");
-}
-
 
 void sendNotifyResponse(
         _In_ sai_status_t status)

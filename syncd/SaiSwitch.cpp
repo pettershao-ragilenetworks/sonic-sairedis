@@ -13,6 +13,8 @@
 
 using namespace syncd;
 
+#define MAX_OBJLIST_LEN 128
+
 const int maxLanesPerPort = 8;
 
 /*
@@ -1177,10 +1179,128 @@ void SaiSwitch::onPostPortCreate(
     redisUpdatePortLaneMap(port_rid);
 }
 
-void SaiSwitch::onPostPortRemove(
-        _In_ sai_object_id_t port_rid)
+bool SaiSwitch::isWarmBoot() const
 {
     SWSS_LOG_ENTER();
+
+    return m_warmBoot;
+}
+
+void SaiSwitch::collectPortRelatedObjects(
+        _In_ sai_object_id_t portRid)
+{
+    SWSS_LOG_ENTER();
+
+    std::set<sai_object_id_t> related;
+
+    sai_attr_id_t attrs[] = {
+        SAI_PORT_ATTR_QOS_QUEUE_LIST,
+        SAI_PORT_ATTR_QOS_SCHEDULER_GROUP_LIST,
+        SAI_PORT_ATTR_INGRESS_PRIORITY_GROUP_LIST
+    };
+
+    for (size_t i = 0; i < sizeof(attrs)/sizeof(sai_attr_id_t); i++)
+    {
+        std::vector<sai_object_id_t> objlist;
+
+        objlist.resize(MAX_OBJLIST_LEN);
+
+        sai_attribute_t attr;
+
+        attr.id = attrs[i];
+
+        attr.value.objlist.count = MAX_OBJLIST_LEN;
+        attr.value.objlist.list = objlist.data();
+
+        // since we have those objects already discovered we don't need to
+        // query SAI to get related objects, but lets do that since user could
+        // add/remove some of related objects (this should also be tracked in
+        // SaiSwitch class internally
+
+        auto status = g_vendorSai->get(SAI_OBJECT_TYPE_PORT, portRid, 1, &attr);
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_THROW("failed to obtain related obejcts for port rid %s: %s, attr id: %d",
+                    sai_serialize_object_id(portRid).c_str(),
+                    sai_serialize_status(status).c_str(),
+                    attr.id);
+        }
+
+        objlist.resize(attr.value.objlist.count);
+
+        related.insert(objlist.begin(), objlist.end());
+    }
+
+    SWSS_LOG_NOTICE("obtained %zu port %s related RIDs",
+            related.size(),
+            sai_serialize_object_id(portRid).c_str());
+
+    m_portRelatedObjects[portRid] = related;
+}
+
+void SaiSwitch::postPortRemove(
+        _In_ sai_object_id_t portRid)
+{
+    SWSS_LOG_ENTER();
+
+    if (m_portRelatedObjects.find(portRid) == m_portRelatedObjects.end())
+    {
+        SWSS_LOG_THROW("no port related objects populated for port RID %s",
+                sai_serialize_object_id(portRid).c_str());
+    }
+
+    /*
+     * Port was successfully removed from vendor SAI,
+     * we need to remove queues, ipgs and sg from:
+     *
+     * - redis ASIC DB
+     * - discovered existing objects in saiswitch class
+     * - local vid2rid map
+     * - redis RIDTOVID map
+     *
+     * - also remove LANES mapping
+     */
+
+    for (auto rid: m_portRelatedObjects.at(portRid))
+    {
+        // remove from existing objects
+
+        if (isDiscoveredRid(rid))
+        {
+            removeExistingObjectReference(rid);
+        }
+
+        // remove from RID2VID and VID2RID map in redis
+
+        std::string strRid = sai_serialize_object_id(rid);
+
+        auto pvid = g_redisClient->hget(RIDTOVID, strRid);
+
+        if (pvid == nullptr)
+        {
+            SWSS_LOG_THROW("expected rid %s to be present in RIDTOVID", strRid.c_str());
+        }
+
+        std::string str_vid = *pvid;
+
+        sai_object_id_t vid;
+        sai_deserialize_object_id(str_vid, vid);
+
+        // TODO should this remove rid,vid and object be as db op?
+
+        g_translator->eraseRidAndVid(rid, vid);
+
+        // remove from ASIC DB
+
+        sai_object_type_t ot = VidManager::objectTypeQuery(vid);
+
+        std::string key = ASIC_STATE_TABLE + std::string(":") + sai_serialize_object_type(ot) + ":" + str_vid;
+
+        SWSS_LOG_INFO("removing ASIC DB key: %s", key.c_str());
+
+        g_redisClient->del(key);
+    }
 
     int removed = 0;
 
@@ -1189,7 +1309,7 @@ void SaiSwitch::onPostPortRemove(
 
     for (auto& kv: map)
     {
-        if (kv.second == port_rid)
+        if (kv.second == portRid)
         {
             auto key = getRedisLanesKey();
 
@@ -1203,18 +1323,13 @@ void SaiSwitch::onPostPortRemove(
 
     SWSS_LOG_NOTICE("removed %u lanes from redis lane map for port RID %s",
             removed,
-            sai_serialize_object_id(port_rid).c_str());
+            sai_serialize_object_id(portRid).c_str());
 
     if (removed == 0)
     {
         SWSS_LOG_THROW("NO LANES found in redis lane map for given port RID %s",
-            sai_serialize_object_id(port_rid).c_str());
+            sai_serialize_object_id(portRid).c_str());
     }
-}
 
-bool SaiSwitch::isWarmBoot() const
-{
-    SWSS_LOG_ENTER();
-
-    return m_warmBoot;
+    SWSS_LOG_NOTICE("post port remove actions succeeded");
 }
