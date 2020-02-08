@@ -187,6 +187,17 @@ namespace syncd
                     _In_ sai_status_t status,
                     _In_ uint32_t object_count = 0,
                     _In_ sai_status_t * object_statuses = NULL);
+
+        private:
+
+            void sendGetResponse(
+                    _In_ sai_object_type_t objectType,
+                    _In_ const std::string& strObjectId,
+                    _In_ sai_object_id_t switchVid,
+                    _In_ sai_status_t status,
+                    _In_ uint32_t attr_count,
+                    _In_ sai_attribute_t *attr_list);
+
         private:
 
             std::shared_ptr<CommandLineOptions> m_commandLineOptions;

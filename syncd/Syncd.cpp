@@ -75,6 +75,12 @@ void get_port_related_objects(
         _In_ sai_object_id_t port_rid,
         _Out_ std::vector<sai_object_id_t>& related);
 
+void snoop_get_response(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::string &strObjectId,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list);
+
 using namespace syncd;
 
 Syncd::Syncd(
@@ -1689,4 +1695,82 @@ void Syncd::loadProfileMap()
         SWSS_LOG_INFO("insert: %s:%s", key.c_str(), value.c_str());
     }
 }
+
+void Syncd::sendGetResponse(
+        _In_ sai_object_type_t objectType,
+        _In_ const std::string& strObjectId,
+        _In_ sai_object_id_t switchVid,
+        _In_ sai_status_t status,
+        _In_ uint32_t attr_count,
+        _In_ sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    std::vector<swss::FieldValueTuple> entry;
+
+    if (status == SAI_STATUS_SUCCESS)
+    {
+        g_translator->translateRidToVid(objectType, switchVid, attr_count, attr_list);
+
+        /*
+         * Normal serialization + translate RID to VID.
+         */
+
+        entry = SaiAttributeList::serialize_attr_list(
+                objectType,
+                attr_count,
+                attr_list,
+                false);
+
+        /*
+         * All oid values here are VIDs.
+         */
+
+        snoop_get_response(objectType, strObjectId, attr_count, attr_list);
+    }
+    else if (status == SAI_STATUS_BUFFER_OVERFLOW)
+    {
+        /*
+         * In this case we got correct values for list, but list was too small
+         * so serialize only count without list itself, sairedis will need to
+         * take this into account when deserialize.
+         *
+         * If there was a list somewhere, count will be changed to actual value
+         * different attributes can have different lists, many of them may
+         * serialize only count, and will need to support that on the receiver.
+         */
+
+        entry = SaiAttributeList::serialize_attr_list(
+                objectType,
+                attr_count,
+                attr_list,
+                true);
+    }
+    else
+    {
+        /*
+         * Some other error, don't send attributes at all.
+         */
+    }
+
+    for (const auto &e: entry)
+    {
+        SWSS_LOG_DEBUG("attr: %s: %s", fvField(e).c_str(), fvValue(e).c_str());
+    }
+
+    std::string strStatus = sai_serialize_status(status);
+
+    SWSS_LOG_INFO("sending response for GET api with status: %s", strStatus.c_str());
+
+    /*
+     * Since we have only one get at a time, we don't have to serialize object
+     * type and object id, only get status is required to be returned.  Get
+     * response will not put any data to table, only queue is used.
+     */
+
+    m_getResponse->set(strStatus, entry, REDIS_ASIC_STATE_COMMAND_GETRESPONSE);
+
+    SWSS_LOG_INFO("response for GET api was send");
+}
+
 

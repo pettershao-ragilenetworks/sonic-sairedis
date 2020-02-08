@@ -160,14 +160,14 @@ void sai_diag_shell(
 
 void snoop_get_attr(
         _In_ sai_object_type_t object_type,
-        _In_ const std::string &str_object_id,
+        _In_ const std::string &strObjectId,
         _In_ const std::string &attr_id,
         _In_ const std::string &attr_value)
 {
     SWSS_LOG_ENTER();
 
     /*
-     * Note: str_object_type + ":" + str_object_id is meta_key we can us that
+     * Note: str_object_type + ":" + strObjectId is meta_key we can us that
      * here later on.
      */
 
@@ -180,7 +180,7 @@ void snoop_get_attr(
         prefix = TEMP_PREFIX;
     }
 
-    std::string key = prefix + (ASIC_STATE_TABLE + (":" + str_object_type + ":" + str_object_id));
+    std::string key = prefix + (ASIC_STATE_TABLE + (":" + str_object_type + ":" + strObjectId));
 
     SWSS_LOG_DEBUG("%s", key.c_str());
 
@@ -227,7 +227,7 @@ void snoop_get_oid_list(
 }
 
 void snoop_get_attr_value(
-        _In_ const std::string &str_object_id,
+        _In_ const std::string &strObjectId,
         _In_ const sai_attr_metadata_t *meta,
         _In_ const sai_attribute_t &attr)
 {
@@ -237,12 +237,12 @@ void snoop_get_attr_value(
 
     SWSS_LOG_DEBUG("%s:%s", meta->attridname, value.c_str());
 
-    snoop_get_attr(meta->objecttype, str_object_id, meta->attridname, value);
+    snoop_get_attr(meta->objecttype, strObjectId, meta->attridname, value);
 }
 
 void snoop_get_response(
         _In_ sai_object_type_t object_type,
-        _In_ const std::string &str_object_id,
+        _In_ const std::string &strObjectId,
         _In_ uint32_t attr_count,
         _In_ const sai_attribute_t *attr_list)
 {
@@ -336,7 +336,7 @@ void snoop_get_response(
              * Skip port lanes for now since we don't create ports.
              */
 
-            SWSS_LOG_INFO("skipping %s for %s", meta->attridname, str_object_id.c_str());
+            SWSS_LOG_INFO("skipping %s for %s", meta->attridname, strObjectId.c_str());
             continue;
         }
 
@@ -350,87 +350,9 @@ void snoop_get_response(
          * apply view.
          */
 
-        snoop_get_attr_value(str_object_id, meta, attr);
+        snoop_get_attr_value(strObjectId, meta, attr);
     }
 }
-
-void sendGetResponse(
-        _In_ sai_object_type_t object_type,
-        _In_ const std::string &str_object_id,
-        _In_ sai_object_id_t switch_id,
-        _In_ sai_status_t status,
-        _In_ uint32_t attr_count,
-        _In_ sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    std::vector<swss::FieldValueTuple> entry;
-
-    if (status == SAI_STATUS_SUCCESS)
-    {
-        g_translator->translateRidToVid(object_type, switch_id, attr_count, attr_list);
-
-        /*
-         * Normal serialization + translate RID to VID.
-         */
-
-        entry = SaiAttributeList::serialize_attr_list(
-                object_type,
-                attr_count,
-                attr_list,
-                false);
-
-        /*
-         * All oid values here are VIDs.
-         */
-
-        snoop_get_response(object_type, str_object_id, attr_count, attr_list);
-    }
-    else if (status == SAI_STATUS_BUFFER_OVERFLOW)
-    {
-        /*
-         * In this case we got correct values for list, but list was too small
-         * so serialize only count without list itself, sairedis will need to
-         * take this into account when deserialize.
-         *
-         * If there was a list somewhere, count will be changed to actual value
-         * different attributes can have different lists, many of them may
-         * serialize only count, and will need to support that on the receiver.
-         */
-
-        entry = SaiAttributeList::serialize_attr_list(
-                object_type,
-                attr_count,
-                attr_list,
-                true);
-    }
-    else
-    {
-        /*
-         * Some other error, don't send attributes at all.
-         */
-    }
-
-    for (const auto &e: entry)
-    {
-        SWSS_LOG_DEBUG("attr: %s: %s", fvField(e).c_str(), fvValue(e).c_str());
-    }
-
-    std::string str_status = sai_serialize_status(status);
-
-    SWSS_LOG_INFO("sending response for GET api with status: %s", str_status.c_str());
-
-    /*
-     * Since we have only one get at a time, we don't have to serialize object
-     * type and object id, only get status is required to be returned.  Get
-     * response will not put any data to table, only queue is used.
-     */
-
-    g_syncd->m_getResponse->set(str_status, entry, REDIS_ASIC_STATE_COMMAND_GETRESPONSE);
-
-    SWSS_LOG_INFO("response for GET api was send");
-}
-
 
 // TODO combine all methods to 1
 void startDiagShell(
@@ -453,13 +375,13 @@ void sendNotifyResponse(
 {
     SWSS_LOG_ENTER();
 
-    std::string str_status = sai_serialize_status(status);
+    std::string strStatus = sai_serialize_status(status);
 
     std::vector<swss::FieldValueTuple> entry;
 
-    SWSS_LOG_INFO("sending response: %s", str_status.c_str());
+    SWSS_LOG_INFO("sending response: %s", strStatus.c_str());
 
-    g_syncd->m_getResponse->set(str_status, entry, REDIS_ASIC_STATE_COMMAND_NOTIFY);
+    g_syncd->m_getResponse->set(strStatus, entry, REDIS_ASIC_STATE_COMMAND_NOTIFY);
 }
 
 void clearTempView()
