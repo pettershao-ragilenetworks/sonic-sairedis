@@ -13,6 +13,8 @@
 #include <iterator>
 #include <algorithm>
 
+#define DEF_SAI_WARM_BOOT_DATA_FILE "/var/warmboot/sai-warmboot.bin"
+
 // TODO mutex must be used in 3 places
 // - notification processing
 // - main event loop processing
@@ -21,6 +23,7 @@
 
 #include "syncd.h" // TODO to be removed
 
+extern bool g_veryFirstRun;
 extern sai_object_id_t gSwitchId; // TODO to be removed
 extern std::shared_ptr<syncd::NotificationHandler> g_handler;
 sai_status_t notifySyncd(
@@ -86,6 +89,64 @@ Syncd::Syncd(
     SWSS_LOG_ENTER();
 
     m_manager = std::make_shared<FlexCounterManager>();
+
+    m_profileIter = m_profileMap.begin();
+
+    loadProfileMap();
+}
+
+void Syncd::performStartupLogic()
+{
+    SWSS_LOG_ENTER();
+
+    // ignore warm logic here if syncd starts in Mellanox fastfast boot mode
+
+    if (m_isWarmStart && (m_commandLineOptions->m_startType != SAI_START_TYPE_FASTFAST_BOOT))
+    {
+        m_commandLineOptions->m_startType = SAI_START_TYPE_WARM_BOOT;
+    }
+
+    if (m_commandLineOptions->m_startType == SAI_START_TYPE_WARM_BOOT)
+    {
+        const char *warmBootReadFile = profileGetValue(0, SAI_KEY_WARM_BOOT_READ_FILE);
+
+        SWSS_LOG_NOTICE("using warmBootReadFile: '%s'", warmBootReadFile);
+
+        if (warmBootReadFile == NULL || access(warmBootReadFile, F_OK) == -1)
+        {
+            SWSS_LOG_WARN("user requested warmStart but warmBootReadFile is not specified or not accesible, forcing cold start");
+
+            m_commandLineOptions->m_startType = SAI_START_TYPE_COLD_BOOT;
+        }
+    }
+
+    if (m_commandLineOptions->m_startType == SAI_START_TYPE_WARM_BOOT && g_veryFirstRun)
+    {
+        SWSS_LOG_WARN("warm start requested, but this is very first syncd start, forcing cold start");
+
+        /*
+         * We force cold start since if it's first run then redis db is not
+         * complete so redis asic view will not reflect warm boot asic state,
+         * if this happen then orch agent needs to be restarted as well to
+         * repopulate asic view.
+         */
+
+        m_commandLineOptions->m_startType = SAI_START_TYPE_COLD_BOOT;
+    }
+
+    if (m_commandLineOptions->m_startType == SAI_START_TYPE_FASTFAST_BOOT)
+    {
+        /*
+         * Mellanox SAI requires to pass SAI_WARM_BOOT as SAI_BOOT_KEY
+         * to start 'fastfast'
+         */
+
+        m_profileMap[SAI_KEY_BOOT_TYPE] = std::to_string(SAI_START_TYPE_WARM_BOOT);
+    }
+    else
+    {
+        m_profileMap[SAI_KEY_BOOT_TYPE] = std::to_string(m_commandLineOptions->m_startType); // number value is needed
+    }
 }
 
 Syncd::~Syncd()
@@ -1510,5 +1571,122 @@ sai_status_t Syncd::processOidGet(
     sai_object_id_t rid = g_translator->translateVidToRid(objectVid);
 
     return m_vendorSai->get(objectType, rid, attr_count, attr_list);
+}
+
+const char* Syncd::profileGetValue(
+        _In_ sai_switch_profile_id_t profile_id,
+        _In_ const char* variable)
+{
+    SWSS_LOG_ENTER();
+
+    if (variable == NULL)
+    {
+        SWSS_LOG_WARN("variable is null");
+        return NULL;
+    }
+
+    auto it = m_profileMap.find(variable);
+
+    if (it == m_profileMap.end())
+    {
+        SWSS_LOG_NOTICE("%s: NULL", variable);
+        return NULL;
+    }
+
+    SWSS_LOG_NOTICE("%s: %s", variable, it->second.c_str());
+
+    return it->second.c_str();
+}
+
+int Syncd::profileGetNextValue(
+        _In_ sai_switch_profile_id_t profile_id,
+        _Out_ const char** variable,
+        _Out_ const char** value)
+{
+    SWSS_LOG_ENTER();
+
+    if (value == NULL)
+    {
+        SWSS_LOG_INFO("resetting profile map iterator");
+
+        m_profileIter = m_profileMap.begin();
+        return 0;
+    }
+
+    if (variable == NULL)
+    {
+        SWSS_LOG_WARN("variable is null");
+        return -1;
+    }
+
+    if (m_profileIter == m_profileMap.end())
+    {
+        SWSS_LOG_INFO("iterator reached end");
+        return -1;
+    }
+
+    *variable = m_profileIter->first.c_str();
+    *value = m_profileIter->second.c_str();
+
+    SWSS_LOG_INFO("key: %s:%s", *variable, *value);
+
+    m_profileIter++;
+
+    return 0;
+}
+
+void Syncd::loadProfileMap()
+{
+    SWSS_LOG_ENTER();
+
+    if (m_commandLineOptions->m_profileMapFile.size() == 0)
+    {
+        SWSS_LOG_NOTICE("profile map file not specified");
+        return;
+    }
+
+    std::ifstream profile(m_commandLineOptions->m_profileMapFile);
+
+    if (!profile.is_open())
+    {
+        SWSS_LOG_ERROR("failed to open profile map file: %s: %s",
+                m_commandLineOptions->m_profileMapFile.c_str(),
+                strerror(errno));
+
+        exit(EXIT_FAILURE);
+    }
+
+    // Provide default value at boot up time and let sai profile value
+    // Override following values if existing.
+    // SAI reads these values at start up time. It would be too late to
+    // set these values later when WARM BOOT is detected.
+
+    m_profileMap[SAI_KEY_WARM_BOOT_WRITE_FILE] = DEF_SAI_WARM_BOOT_DATA_FILE;
+    m_profileMap[SAI_KEY_WARM_BOOT_READ_FILE]  = DEF_SAI_WARM_BOOT_DATA_FILE;
+
+    std::string line;
+
+    while (getline(profile, line))
+    {
+        if (line.size() > 0 && (line[0] == '#' || line[0] == ';'))
+        {
+            continue;
+        }
+
+        size_t pos = line.find("=");
+
+        if (pos == std::string::npos)
+        {
+            SWSS_LOG_WARN("not found '=' in line %s", line.c_str());
+            continue;
+        }
+
+        std::string key = line.substr(0, pos);
+        std::string value = line.substr(pos + 1);
+
+        m_profileMap[key] = value;
+
+        SWSS_LOG_INFO("insert: %s:%s", key.c_str(), value.c_str());
+    }
 }
 

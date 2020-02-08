@@ -29,8 +29,6 @@
 #include <map>
 #include <unordered_map>
 
-#define DEF_SAI_WARM_BOOT_DATA_FILE "/var/warmboot/sai-warmboot.bin"
-
 using namespace syncd;
 using namespace std::placeholders;
 
@@ -67,14 +65,6 @@ std::mutex g_mutex;
 std::shared_ptr<swss::DBConnector>          dbAsic;
 std::shared_ptr<swss::RedisClient>          g_redisClient;
 std::shared_ptr<swss::NotificationProducer> notifications;
-
-/*
- * TODO: Those are hard coded values for mlnx integration for v1.0.1 they need
- * to be updated.
- *
- * Also DEVICE_MAC_ADDRESS is not present in saiswitch.h
- */
-std::map<std::string, std::string> gProfileMap;
 
 /**
  * @brief Contains map of all created switches.
@@ -440,69 +430,6 @@ void sendGetResponse(
     SWSS_LOG_INFO("response for GET api was send");
 }
 
-const char* profile_get_value(
-        _In_ sai_switch_profile_id_t profile_id,
-        _In_ const char* variable)
-{
-    SWSS_LOG_ENTER();
-
-    if (variable == NULL)
-    {
-        SWSS_LOG_WARN("variable is null");
-        return NULL;
-    }
-
-    auto it = gProfileMap.find(variable);
-
-    if (it == gProfileMap.end())
-    {
-        SWSS_LOG_NOTICE("%s: NULL", variable);
-        return NULL;
-    }
-
-    SWSS_LOG_NOTICE("%s: %s", variable, it->second.c_str());
-
-    return it->second.c_str();
-}
-
-std::map<std::string, std::string>::iterator gProfileIter = gProfileMap.begin();
-
-int profile_get_next_value(
-        _In_ sai_switch_profile_id_t profile_id,
-        _Out_ const char** variable,
-        _Out_ const char** value)
-{
-    SWSS_LOG_ENTER();
-
-    if (value == NULL)
-    {
-        SWSS_LOG_INFO("resetting profile map iterator");
-
-        gProfileIter = gProfileMap.begin();
-        return 0;
-    }
-
-    if (variable == NULL)
-    {
-        SWSS_LOG_WARN("variable is null");
-        return -1;
-    }
-
-    if (gProfileIter == gProfileMap.end())
-    {
-        SWSS_LOG_INFO("iterator reached end");
-        return -1;
-    }
-
-    *variable = gProfileIter->first.c_str();
-    *value = gProfileIter->second.c_str();
-
-    SWSS_LOG_INFO("key: %s:%s", *variable, *value);
-
-    gProfileIter++;
-
-    return 0;
-}
 
 // TODO combine all methods to 1
 void startDiagShell(
@@ -1074,57 +1001,6 @@ void on_switch_create_in_init_view(
     }
 }
 
-void handleProfileMap(
-        _In_ const std::string& profileMapFile)
-{
-    SWSS_LOG_ENTER();
-
-    if (profileMapFile.size() == 0)
-    {
-        return;
-    }
-
-    std::ifstream profile(profileMapFile);
-
-    if (!profile.is_open())
-    {
-        SWSS_LOG_ERROR("failed to open profile map file: %s : %s", profileMapFile.c_str(), strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-
-    // Provide default value at boot up time and let sai profile value
-    // Override following values if existing.
-    // SAI reads these values at start up time. It would be too late to
-    // set these values later when WARM BOOT is detected.
-    gProfileMap[SAI_KEY_WARM_BOOT_WRITE_FILE] = DEF_SAI_WARM_BOOT_DATA_FILE;
-    gProfileMap[SAI_KEY_WARM_BOOT_READ_FILE]  = DEF_SAI_WARM_BOOT_DATA_FILE;
-
-    std::string line;
-
-    while(getline(profile, line))
-    {
-        if (line.size() > 0 && (line[0] == '#' || line[0] == ';'))
-        {
-            continue;
-        }
-
-        size_t pos = line.find("=");
-
-        if (pos == std::string::npos)
-        {
-            SWSS_LOG_WARN("not found '=' in line %s", line.c_str());
-            continue;
-        }
-
-        std::string key = line.substr(0, pos);
-        std::string value = line.substr(pos + 1);
-
-        gProfileMap[key] = value;
-
-        SWSS_LOG_INFO("insert: %s:%s", key.c_str(), value.c_str());
-    }
-}
-
 typedef enum _syncd_restart_type_t
 {
     SYNCD_RESTART_TYPE_COLD,
@@ -1412,11 +1288,11 @@ int syncd_main(int argc, char **argv)
 
     SwitchNotifications sn;
 
-    sn.onFdbEvent = std::bind(&NotificationHandler::onFdbEvent, *g_handler, _1, _2);
-    sn.onPortStateChange = std::bind(&NotificationHandler::onPortStateChange, *g_handler, _1, _2);
-    sn.onQueuePfcDeadlock = std::bind(&NotificationHandler::onQueuePfcDeadlock, *g_handler, _1, _2);
-    sn.onSwitchShutdownRequest = std::bind(&NotificationHandler::onSwitchShutdownRequest, *g_handler, _1);
-    sn.onSwitchStateChange = std::bind(&NotificationHandler::onSwitchStateChange, *g_handler, _1, _2);
+    sn.onFdbEvent = std::bind(&NotificationHandler::onFdbEvent, g_handler.get(), _1, _2);
+    sn.onPortStateChange = std::bind(&NotificationHandler::onPortStateChange, g_handler.get(), _1, _2);
+    sn.onQueuePfcDeadlock = std::bind(&NotificationHandler::onQueuePfcDeadlock, g_handler.get(), _1, _2);
+    sn.onSwitchShutdownRequest = std::bind(&NotificationHandler::onSwitchShutdownRequest, g_handler.get(), _1);
+    sn.onSwitchStateChange = std::bind(&NotificationHandler::onSwitchStateChange, g_handler.get(), _1, _2);
 
     g_handler->setSwitchNotifications(sn.getSwitchNotifications());
 
@@ -1431,8 +1307,6 @@ int syncd_main(int argc, char **argv)
     g_syncd = std::make_shared<Syncd>(g_vendorSai, g_commandLineOptions, isWarmStart);
 
     SWSS_LOG_NOTICE("command line: %s", g_commandLineOptions->getCommandLineString().c_str());
-
-    handleProfileMap(g_commandLineOptions->m_profileMapFile);
 
 #ifdef SAITHRIFT
     if (g_commandLineOptions->m_portMapFile.size() > 0)
@@ -1486,55 +1360,12 @@ int syncd_main(int argc, char **argv)
 
     g_veryFirstRun = isVeryFirstRun();
 
-    /* ignore warm logic here if syncd starts in Mellanox fastfast boot mode */
-    if (isWarmStart && (g_commandLineOptions->m_startType != SAI_START_TYPE_FASTFAST_BOOT))
-    {
-        g_commandLineOptions->m_startType = SAI_START_TYPE_WARM_BOOT;
-    }
-
-    if (g_commandLineOptions->m_startType == SAI_START_TYPE_WARM_BOOT)
-    {
-        const char *warmBootReadFile = profile_get_value(0, SAI_KEY_WARM_BOOT_READ_FILE);
-
-        SWSS_LOG_NOTICE("using warmBootReadFile: '%s'", warmBootReadFile);
-
-        if (warmBootReadFile == NULL || access(warmBootReadFile, F_OK) == -1)
-        {
-            SWSS_LOG_WARN("user requested warmStart but warmBootReadFile is not specified or not accesible, forcing cold start");
-
-            g_commandLineOptions->m_startType = SAI_START_TYPE_COLD_BOOT;
-        }
-    }
-
-    if (g_commandLineOptions->m_startType == SAI_START_TYPE_WARM_BOOT && g_veryFirstRun)
-    {
-        SWSS_LOG_WARN("warm start requested, but this is very first syncd start, forcing cold start");
-
-        /*
-         * We force cold start since if it's first run then redis db is not
-         * complete so redis asic view will not reflect warm boot asic state,
-         * if this happen then orch agent needs to be restarted as well to
-         * repopulate asic view.
-         */
-
-        g_commandLineOptions->m_startType = SAI_START_TYPE_COLD_BOOT;
-    }
-
-    if (g_commandLineOptions->m_startType == SAI_START_TYPE_FASTFAST_BOOT)
-    {
-        /*
-         * Mellanox SAI requires to pass SAI_WARM_BOOT as SAI_BOOT_KEY
-         * to start 'fastfast'
-         */
-        gProfileMap[SAI_KEY_BOOT_TYPE] = std::to_string(SAI_START_TYPE_WARM_BOOT);
-    } else {
-        gProfileMap[SAI_KEY_BOOT_TYPE] = std::to_string(g_commandLineOptions->m_startType); // number value is needed
-    }
+    g_syncd->performStartupLogic();
 
     ServiceMethodTable smt;
 
-    smt.profileGetValue = &profile_get_value;
-    smt.profileGetNextValue = &profile_get_next_value;
+    smt.profileGetValue = std::bind(&Syncd::profileGetValue, g_syncd.get(), _1, _2);
+    smt.profileGetNextValue = std::bind(&Syncd::profileGetNextValue, g_syncd.get(), _1, _2, _3);
 
     auto test_services = smt.getServiceMethodTable();
 
@@ -1732,7 +1563,7 @@ int syncd_main(int argc, char **argv)
 
     if (shutdownType == SYNCD_RESTART_TYPE_WARM)
     {
-        const char *warmBootWriteFile = profile_get_value(0, SAI_KEY_WARM_BOOT_WRITE_FILE);
+        const char *warmBootWriteFile = g_syncd->profileGetValue(0, SAI_KEY_WARM_BOOT_WRITE_FILE);
 
         SWSS_LOG_NOTICE("using warmBootWriteFile: '%s'", warmBootWriteFile);
 

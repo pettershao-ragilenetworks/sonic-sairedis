@@ -56,6 +56,21 @@ namespace syncd
             void processFlexCounterEvent(
                     _In_ swss::ConsumerTable &consumer);
 
+            const char* profileGetValue(
+                    _In_ sai_switch_profile_id_t profile_id,
+                    _In_ const char* variable);
+
+            int profileGetNextValue(
+                    _In_ sai_switch_profile_id_t profile_id,
+                    _Out_ const char** variable,
+                    _Out_ const char** value);
+
+            void performStartupLogic();
+
+        private:
+
+            void loadProfileMap();
+
         private:
 
             sai_status_t processSingleEvent(
@@ -198,5 +213,16 @@ namespace syncd
             std::set<sai_object_id_t> m_initViewRemovedVidSet;
 
             std::shared_ptr<sairedis::SaiInterface> m_vendorSai;
+
+            /*
+             * TODO: Those are hard coded values for mlnx integration for v1.0.1 they need
+             * to be updated.
+             *
+             * Also DEVICE_MAC_ADDRESS is not present in saiswitch.h
+             */
+            std::map<std::string, std::string> m_profileMap;
+
+            std::map<std::string, std::string>::iterator m_profileIter;
+
     };
 }
