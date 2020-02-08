@@ -22,7 +22,7 @@ NotificationProcessor::~NotificationProcessor()
 {
     SWSS_LOG_ENTER();
 
-    //empty
+    stopNotificationsProcessingThread();
 }
 
 void NotificationProcessor::sendNotification(
