@@ -2,6 +2,7 @@
 
 #include "CommandLineOptions.h"
 #include "FlexCounterManager.h"
+#include "VendorSai.h"
 
 #include "meta/saiattributelist.h"
 
@@ -22,6 +23,7 @@ namespace syncd
             public:
 
             Syncd(
+                    _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,
                     _In_ std::shared_ptr<CommandLineOptions> cmd,
                     _In_ bool isWarmStart);
 
@@ -194,5 +196,7 @@ namespace syncd
              * Object ids here a VIDs.
              */
             std::set<sai_object_id_t> m_initViewRemovedVidSet;
+
+            std::shared_ptr<sairedis::SaiInterface> m_vendorSai;
     };
 }

@@ -75,11 +75,13 @@ void get_port_related_objects(
 using namespace syncd;
 
 Syncd::Syncd(
+        _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,
         _In_ std::shared_ptr<CommandLineOptions> cmd,
         _In_ bool isWarmStart):
     m_commandLineOptions(cmd),
     m_isWarmStart(isWarmStart),
-    m_asicInitViewMode(false) // by default we are in APPLY view mode
+    m_asicInitViewMode(false), // by default we are in APPLY view mode
+    m_vendorSai(vendorSai)
 {
     SWSS_LOG_ENTER();
 
@@ -243,7 +245,7 @@ sai_status_t Syncd::processAttrEnumValuesCapabilityQuery(
     enumCapList.count = list_size;
     enumCapList.list = enum_capabilities_list.data();
 
-    sai_status_t status = g_vendorSai->queryAattributeEnumValuesCapability(switchRid, objectType, attr_id, &enumCapList);
+    sai_status_t status = m_vendorSai->queryAattributeEnumValuesCapability(switchRid, objectType, attr_id, &enumCapList);
 
     std::vector<swss::FieldValueTuple> entry;
 
@@ -304,7 +306,7 @@ sai_status_t Syncd::processObjectTypeGetAvailabilityQuery(
 
     uint64_t count;
 
-    sai_status_t status = g_vendorSai->objectTypeGetAvailability(
+    sai_status_t status = m_vendorSai->objectTypeGetAvailability(
             switchRid,
             objectType,
             attr_count,
@@ -357,7 +359,7 @@ sai_status_t Syncd::processFdbFlush(
 
     g_translator->translateVidToRid(SAI_OBJECT_TYPE_FDB_FLUSH, attr_count, attr_list);
 
-    sai_status_t status = g_vendorSai->flushFdbEntries(switchRid, attr_count, attr_list);
+    sai_status_t status = m_vendorSai->flushFdbEntries(switchRid, attr_count, attr_list);
 
     m_getResponse->set(sai_serialize_status(status), {} , REDIS_ASIC_STATE_COMMAND_FLUSHRESPONSE);
 
@@ -393,7 +395,7 @@ sai_status_t Syncd::processClearStatsEvent(
         counter_ids.push_back(val);
     }
 
-    auto status = g_vendorSai->clearStats(
+    auto status = m_vendorSai->clearStats(
             metaKey.objecttype,
             metaKey.objectkey.key.object_id,
             (uint32_t)counter_ids.size(),
@@ -437,7 +439,7 @@ sai_status_t Syncd::processGetStatsEvent(
 
     std::vector<uint64_t> result;
 
-    auto status = g_vendorSai->getStats(
+    auto status = m_vendorSai->getStats(
             metaKey.objecttype,
             metaKey.objectkey.key.object_id,
             (uint32_t)counter_ids.size(),
@@ -652,16 +654,16 @@ sai_status_t Syncd::processEntry(
     switch (api)
     {
         case SAI_COMMON_API_CREATE:
-            return g_vendorSai->create(metaKey, SAI_NULL_OBJECT_ID, attr_count, attr_list);
+            return m_vendorSai->create(metaKey, SAI_NULL_OBJECT_ID, attr_count, attr_list);
 
         case SAI_COMMON_API_REMOVE:
-            return g_vendorSai->remove(metaKey);
+            return m_vendorSai->remove(metaKey);
 
         case SAI_COMMON_API_SET:
-            return g_vendorSai->set(metaKey, attr_list);
+            return m_vendorSai->set(metaKey, attr_list);
 
         case SAI_COMMON_API_GET:
-            return g_vendorSai->get(metaKey, attr_count, attr_list);
+            return m_vendorSai->get(metaKey, attr_count, attr_list);
 
         default:
 
@@ -958,7 +960,7 @@ sai_status_t Syncd::processQuadInInitViewModeGet(
         metaKey.objecttype = objectType;
         metaKey.objectkey.key.object_id = rid;
 
-        status = g_vendorSai->get(metaKey, attr_count, attr_list);
+        status = m_vendorSai->get(metaKey, attr_count, attr_list);
     }
 
     /*
@@ -1350,7 +1352,7 @@ sai_status_t Syncd::processOidCreate(
 
     sai_object_id_t objectRid;
 
-    sai_status_t status = g_vendorSai->create(objectType, &objectRid, switchRid, attr_count, attr_list);
+    sai_status_t status = m_vendorSai->create(objectType, &objectRid, switchRid, attr_count, attr_list);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1409,7 +1411,7 @@ sai_status_t Syncd::processOidRemove(
         switches.at(switchVid)->collectPortRelatedObjects(rid);
     }
 
-    sai_status_t status = g_vendorSai->remove(objectType, rid);
+    sai_status_t status = m_vendorSai->remove(objectType, rid);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -1484,7 +1486,7 @@ sai_status_t Syncd::processOidSet(
 
     sai_object_id_t rid = g_translator->translateVidToRid(objectVid);
 
-    sai_status_t status = g_vendorSai->set(objectType, rid, attr);
+    sai_status_t status = m_vendorSai->set(objectType, rid, attr);
 
     if (Workaround::isSetAttributeWorkaround(objectType, attr->id, status))
     {
@@ -1507,6 +1509,6 @@ sai_status_t Syncd::processOidGet(
 
     sai_object_id_t rid = g_translator->translateVidToRid(objectVid);
 
-    return g_vendorSai->get(objectType, rid, attr_count, attr_list);
+    return m_vendorSai->get(objectType, rid, attr_count, attr_list);
 }
 

@@ -1428,7 +1428,7 @@ int syncd_main(int argc, char **argv)
     // TODO move to syncd object
     g_commandLineOptions = CommandLineOptionsParser::parseCommandLine(argc, argv);
 
-    g_syncd = std::make_shared<Syncd>(g_commandLineOptions, isWarmStart);
+    g_syncd = std::make_shared<Syncd>(g_vendorSai, g_commandLineOptions, isWarmStart);
 
     SWSS_LOG_NOTICE("command line: %s", g_commandLineOptions->getCommandLineString().c_str());
 
