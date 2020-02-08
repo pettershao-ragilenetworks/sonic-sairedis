@@ -4,6 +4,8 @@
 
 #include <sstream>
 
+using namespace syncd;
+
 CommandLineOptions::CommandLineOptions()
 {
     SWSS_LOG_ENTER();

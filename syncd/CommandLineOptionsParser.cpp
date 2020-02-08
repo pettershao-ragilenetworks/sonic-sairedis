@@ -6,6 +6,8 @@
 
 #include <iostream>
 
+using namespace syncd;
+
 std::shared_ptr<CommandLineOptions> CommandLineOptionsParser::parseCommandLine(
         _In_ int argc,
         _In_ char **argv)
