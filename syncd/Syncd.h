@@ -48,6 +48,12 @@ namespace syncd
                     _In_ uint32_t attr_count,
                     _In_ sai_attribute_t *attr_list);
 
+            void processFlexCounterGroupEvent(
+                    _In_ swss::ConsumerTable &consumer);
+
+            void processFlexCounterEvent(
+                    _In_ swss::ConsumerTable &consumer);
+
         private:
 
             sai_status_t processSingleEvent(

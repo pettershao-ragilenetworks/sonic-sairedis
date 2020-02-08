@@ -11,6 +11,12 @@
 #include <iterator>
 #include <algorithm>
 
+// TODO mutex must be used in 3 places
+// - notification processing
+// - main event loop processing
+// - syncd hard init when switches are created
+//   (notifications could be sent during that)
+
 #include "syncd.h" // TODO to be removed
 
 sai_status_t notifySyncd(
@@ -106,7 +112,7 @@ void Syncd::processEvent(
 {
     SWSS_LOG_ENTER();
 
-    std::lock_guard<std::mutex> lock(g_mutex);
+    std::lock_guard<std::mutex> lock(g_mutex); // TODO
 
     do
     {
@@ -1030,6 +1036,90 @@ void Syncd::sendApiResponse(
 
     SWSS_LOG_INFO("response for %s api was send",
             sai_serialize_common_api(api).c_str());
+}
+
+void Syncd::processFlexCounterGroupEvent( // TODO must be moved to go via ASIC channel queue
+        _In_ swss::ConsumerTable& consumer)
+{
+    SWSS_LOG_ENTER();
+
+    std::lock_guard<std::mutex> lock(g_mutex); // TODO
+
+    swss::KeyOpFieldsValuesTuple kco;
+
+    consumer.pop(kco);
+
+    auto& groupName = kfvKey(kco);
+    auto& op = kfvOp(kco);
+    auto& values = kfvFieldsValues(kco);
+
+    if (op == SET_COMMAND)
+    {
+        m_manager->addCounterPlugin(groupName, values);
+    }
+    else if (op == DEL_COMMAND)
+    {
+        m_manager->removeCounterPlugins(groupName);
+    }
+    else
+    {
+        SWSS_LOG_ERROR("unknown command: %s", op.c_str());
+    }
+}
+
+void Syncd::processFlexCounterEvent( // TODO must be moved to go via ASIC channel queue
+        _In_ swss::ConsumerTable& consumer)
+{
+    SWSS_LOG_ENTER();
+
+    std::lock_guard<std::mutex> lock(g_mutex); // TODO
+
+    swss::KeyOpFieldsValuesTuple kco;
+
+    consumer.pop(kco);
+
+    auto& key = kfvKey(kco);
+    auto& op = kfvOp(kco);
+
+    auto delimiter = key.find_first_of(":");
+
+    if (delimiter == std::string::npos)
+    {
+        SWSS_LOG_ERROR("Failed to parse the key %s", key.c_str());
+
+        return; // if key is invalid there is no need to process this event again
+    }
+
+    auto groupName = key.substr(0, delimiter);
+    auto strVid = key.substr(delimiter + 1);
+
+    sai_object_id_t vid;
+    sai_deserialize_object_id(strVid, vid);
+
+    sai_object_id_t rid;
+
+    if (!g_translator->tryTranslateVidToRid(vid, rid))
+    {
+        SWSS_LOG_WARN("port VID %s, was not found (probably port was removed/splitted) and will remove from counters now",
+                sai_serialize_object_id(vid).c_str());
+
+        op = DEL_COMMAND;
+    }
+
+    const auto values = kfvFieldsValues(kco);
+
+    if (op == SET_COMMAND)
+    {
+        m_manager->addCounter(vid, rid, groupName, values);
+    }
+    else if (op == DEL_COMMAND)
+    {
+        m_manager->removeCounter(vid, groupName);
+    }
+    else
+    {
+        SWSS_LOG_ERROR("unknown command: %s", op.c_str());
+    }
 }
 
 

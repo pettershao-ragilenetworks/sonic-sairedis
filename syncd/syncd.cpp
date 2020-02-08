@@ -1724,88 +1724,6 @@ sai_status_t processQuadEvent(
     return status;
 }
 
-void processFlexCounterGroupEvent(
-        _In_ swss::ConsumerTable &consumer)
-{
-    SWSS_LOG_ENTER();
-
-    swss::KeyOpFieldsValuesTuple kco;
-    {
-        std::lock_guard<std::mutex> lock(g_mutex);
-        consumer.pop(kco);
-    }
-
-    auto& groupName = kfvKey(kco);
-    auto& op = kfvOp(kco);
-    auto& values = kfvFieldsValues(kco);
-
-    if (op == SET_COMMAND)
-    {
-        g_syncd->m_manager->addCounterPlugin(groupName, values);
-    }
-    else if (op == DEL_COMMAND)
-    {
-        g_syncd->m_manager->removeCounterPlugins(groupName);
-    }
-    else
-    {
-        SWSS_LOG_ERROR("unknown command: %s", op.c_str());
-    }
-}
-
-void processFlexCounterEvent(
-        _In_ swss::ConsumerTable &consumer)
-{
-    SWSS_LOG_ENTER();
-
-    swss::KeyOpFieldsValuesTuple kco;
-
-    {
-        std::lock_guard<std::mutex> lock(g_mutex);
-        consumer.pop(kco);
-    }
-
-    const auto &key = kfvKey(kco);
-    std::string op = kfvOp(kco);
-
-    std::size_t delimiter = key.find_first_of(":");
-    if (delimiter == std::string::npos)
-    {
-        SWSS_LOG_ERROR("Failed to parse the key %s", key.c_str());
-
-        return; // if key is invalid there is no need to process this event again
-    }
-
-    const auto groupName = key.substr(0, delimiter);
-    const auto vidStr = key.substr(delimiter+1);
-
-    sai_object_id_t vid;
-    sai_deserialize_object_id(vidStr, vid);
-
-    sai_object_id_t rid;
-    {
-        std::lock_guard<std::mutex> lock(g_mutex);
-        if (!g_translator->tryTranslateVidToRid(vid, rid))
-        {
-            SWSS_LOG_WARN("port VID %s, was not found (probably port was removed/splitted) and will remove from counters now",
-              sai_serialize_object_id(vid).c_str());
-
-            op = DEL_COMMAND;
-        }
-    }
-
-    const auto values = kfvFieldsValues(kco);
-
-    if (op == SET_COMMAND)
-    {
-        g_syncd->m_manager->addCounter(vid, rid, groupName, values);
-    }
-    else if (op == DEL_COMMAND)
-    {
-        g_syncd->m_manager->removeCounter(vid, groupName);
-    }
-}
-
 void handleProfileMap(const std::string& profileMapFile)
 {
     SWSS_LOG_ENTER();
@@ -2428,11 +2346,11 @@ int syncd_main(int argc, char **argv)
             }
             else if (sel == flexCounter.get())
             {
-                processFlexCounterEvent(*(swss::ConsumerTable*)sel);
+                g_syncd->processFlexCounterEvent(*(swss::ConsumerTable*)sel);
             }
             else if (sel == flexCounterGroup.get())
             {
-                processFlexCounterGroupEvent(*(swss::ConsumerTable*)sel);
+                g_syncd->processFlexCounterGroupEvent(*(swss::ConsumerTable*)sel);
             }
             else if (result == swss::Select::OBJECT)
             {
