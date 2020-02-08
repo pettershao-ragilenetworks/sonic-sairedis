@@ -67,7 +67,6 @@ std::mutex g_mutex;
 
 std::shared_ptr<swss::DBConnector>          dbAsic;
 std::shared_ptr<swss::RedisClient>          g_redisClient;
-std::shared_ptr<swss::ProducerTable>        getResponse;
 std::shared_ptr<swss::NotificationProducer> notifications;
 
 /*
@@ -437,7 +436,7 @@ void sendGetResponse(
      * response will not put any data to table, only queue is used.
      */
 
-    getResponse->set(str_status, entry, REDIS_ASIC_STATE_COMMAND_GETRESPONSE);
+    g_syncd->m_getResponse->set(str_status, entry, REDIS_ASIC_STATE_COMMAND_GETRESPONSE);
 
     SWSS_LOG_INFO("response for GET api was send");
 }
@@ -1045,7 +1044,7 @@ void sendNotifyResponse(
 
     SWSS_LOG_INFO("sending response: %s", str_status.c_str());
 
-    getResponse->set(str_status, entry, "notify");
+    g_syncd->m_getResponse->set(str_status, entry, "notify");
 }
 
 void clearTempView()
@@ -1594,10 +1593,10 @@ sai_status_t processQuadEvent(
 {
     SWSS_LOG_ENTER();
 
-    const std::string &key = kfvKey(kco);
-    const std::string &op = kfvOp(kco);
+    const std::string& key = kfvKey(kco);
+    const std::string& op = kfvOp(kco);
 
-    const std::string &str_object_id = key.substr(key.find(":") + 1);
+    const std::string& strObjectId = key.substr(key.find(":") + 1);
 
     sai_object_meta_key_t metaKey;
     sai_deserialize_object_meta_key(key, metaKey);
@@ -1607,9 +1606,9 @@ sai_status_t processQuadEvent(
         SWSS_LOG_THROW("undefined object type %s", key.c_str());
     }
 
-    const std::vector<swss::FieldValueTuple> &values = kfvFieldsValues(kco);
+    auto& values = kfvFieldsValues(kco);
 
-    for (const auto &v: values)
+    for (auto& v: values)
     {
         SWSS_LOG_DEBUG("attr: %s: %s", fvField(v).c_str(), fvValue(v).c_str());
     }
@@ -1637,6 +1636,8 @@ sai_status_t processQuadEvent(
          * since those pointers will reside inside attributes, also sairedis
          * will internally check whether pointer is null or not, so we here
          * will receive all notifications, but redis only those that were set.
+         *
+         * TODO: must be done per switch
          */
 
         g_handler->updateNotificationsPointers(attr_count, attr_list);
@@ -1644,7 +1645,7 @@ sai_status_t processQuadEvent(
 
     if (g_syncd->isInitViewMode())
     {
-        return g_syncd->processQuadEventInInitViewMode(metaKey.objecttype, str_object_id, api, attr_count, attr_list);
+        return g_syncd->processQuadEventInInitViewMode(metaKey.objecttype, strObjectId, api, attr_count, attr_list);
     }
 
     if (api != SAI_COMMON_API_GET)
@@ -1670,7 +1671,7 @@ sai_status_t processQuadEvent(
     }
     else
     {
-        status = processOid(metaKey.objecttype, str_object_id, api, attr_count, attr_list);
+        status = processOid(metaKey.objecttype, strObjectId, api, attr_count, attr_list);
     }
 
     if (api == SAI_COMMON_API_GET)
@@ -1687,7 +1688,7 @@ sai_status_t processQuadEvent(
 
         sai_object_id_t switch_vid = VidManager::switchIdQuery(metaKey.objectkey.key.object_id);
 
-        sendGetResponse(metaKey.objecttype, str_object_id, switch_vid, status, attr_count, attr_list);
+        sendGetResponse(metaKey.objecttype, strObjectId, switch_vid, status, attr_count, attr_list);
     }
     else if (status != SAI_STATUS_SUCCESS)
     {
@@ -1696,7 +1697,7 @@ sai_status_t processQuadEvent(
         if (info->isobjectid && api == SAI_COMMON_API_SET)
         {
             sai_object_id_t vid;
-            sai_deserialize_object_id(str_object_id, vid);
+            sai_deserialize_object_id(strObjectId, vid);
 
             sai_object_id_t rid = g_translator->translateVidToRid(vid);
 
@@ -2208,7 +2209,7 @@ int syncd_main(int argc, char **argv)
      * response queue will also trigger another "response".
      */
 
-    getResponse  = std::make_shared<swss::ProducerTable>(dbAsic.get(), "GETRESPONSE");
+    g_syncd->m_getResponse  = std::make_shared<swss::ProducerTable>(dbAsic.get(), "GETRESPONSE");
     notifications = std::make_shared<swss::NotificationProducer>(dbNtf.get(), "NOTIFICATIONS");
 
     std::string fdbFlushLuaScript = swss::loadLuaScript(fdbFlushLuaScriptName);
