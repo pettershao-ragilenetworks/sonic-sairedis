@@ -104,10 +104,6 @@ void NotificationHandler::updateNotificationsPointers(
                 attr.value.ptr = (void*)m_switchNotifications.on_port_state_change;
                 break;
 
-            case SAI_SWITCH_ATTR_PACKET_EVENT_NOTIFY:
-                attr.value.ptr = (void*)m_switchNotifications.on_packet_event;
-                break;
-
             case SAI_SWITCH_ATTR_QUEUE_PFC_DEADLOCK_NOTIFY:
                 attr.value.ptr = (void*)m_switchNotifications.on_queue_pfc_deadlock;
                 break;
