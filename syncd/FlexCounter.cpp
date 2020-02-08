@@ -541,7 +541,8 @@ void FlexCounter::removePort(
 
     if (it == m_portCounterIdsMap.end())
     {
-        SWSS_LOG_NOTICE("Trying to remove nonexisting port counter Ids 0x%" PRIx64, portVid);
+        SWSS_LOG_NOTICE("Trying to remove nonexisting port %s",
+                sai_serialize_object_id(portVid).c_str());
         return;
     }
 
@@ -562,7 +563,8 @@ void FlexCounter::removePortDebugCounters(
 
     if (it == m_portDebugCounterIdsMap.end())
     {
-        SWSS_LOG_NOTICE("Trying to remove nonexisting port debug counter Ids 0x%" PRIx64, portVid);
+        SWSS_LOG_NOTICE("Trying to remove nonexisting port debug counter %s",
+                sai_serialize_object_id(portVid).c_str());
         return;
     }
 
@@ -611,7 +613,8 @@ void FlexCounter::removeQueue(
 
     if (!found)
     {
-        SWSS_LOG_NOTICE("Trying to remove nonexisting queue from flex counter 0x%" PRIx64, queueVid);
+        SWSS_LOG_NOTICE("Trying to remove nonexisting queue %s",
+                sai_serialize_object_id(queueVid).c_str());
     }
 }
 
@@ -652,7 +655,8 @@ void FlexCounter::removePriorityGroup(
 
     if (!found)
     {
-        SWSS_LOG_NOTICE("Trying to remove nonexisting PG from flex counter 0x%" PRIx64, priorityGroupVid);
+        SWSS_LOG_NOTICE("Trying to remove nonexisting PG %s",
+                sai_serialize_object_id(priorityGroupVid).c_str());
         return;
     }
 }
