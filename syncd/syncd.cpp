@@ -21,6 +21,7 @@
 #include "VirtualObjectIdManager.h"
 #include "RedisVidIndexGenerator.h"
 #include "Syncd.h"
+#include "RequestShutdown.h"
 
 #include <inttypes.h>
 #include <limits.h>
@@ -1327,7 +1328,7 @@ int syncd_main(int argc, char **argv)
     g_redisClient = std::make_shared<swss::RedisClient>(dbAsic.get());
 
     std::shared_ptr<swss::ConsumerTable> asicState = std::make_shared<swss::ConsumerTable>(dbAsic.get(), ASIC_STATE_TABLE);
-    std::shared_ptr<swss::NotificationConsumer> restartQuery = std::make_shared<swss::NotificationConsumer>(dbAsic.get(), "RESTARTQUERY");
+    std::shared_ptr<swss::NotificationConsumer> restartQuery = std::make_shared<swss::NotificationConsumer>(dbAsic.get(), SYNCD_NOTIFICATION_CHANNEL_RESTARTQUERY);
 
     // TODO to be moved to ASIC_DB
     std::shared_ptr<swss::DBConnector> dbFlexCounter = std::make_shared<swss::DBConnector>("FLEX_COUNTER_DB", 0);

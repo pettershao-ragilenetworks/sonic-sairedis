@@ -70,7 +70,12 @@ syncd_CPPFLAGS += -DSAI_SUPPORT_UNINIT_DATA_PLANE_ON_REMOVAL
 libsyncd_a_CPPFLAGS += -DSAI_SUPPORT_UNINIT_DATA_PLANE_ON_REMOVAL
 endif
 
-syncd_request_shutdown_SOURCES = syncd_request_shutdown.cpp
+syncd_request_shutdown_SOURCES = \
+								 RequestShutdown.cpp \
+								 RequestShutdownCommandLineOptions.cpp \
+								 RequestShutdownCommandLineOptionsParser.cpp \
+								 syncd_request_shutdown.cpp
+
 syncd_request_shutdown_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON)
 syncd_request_shutdown_LDADD = -lhiredis -lswsscommon -lpthread
 

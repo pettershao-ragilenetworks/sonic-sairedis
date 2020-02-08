@@ -54,7 +54,6 @@ extern "C" {
 #define HIDDEN                      "HIDDEN"
 #define COLDVIDS                    "COLDVIDS"
 
-
 #ifdef SAITHRIFT
 #define SWITCH_SAI_THRIFT_RPC_SERVER_PORT 9092
 #endif // SAITHRIFT
