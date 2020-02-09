@@ -3,6 +3,7 @@
 #include "CommandLineOptions.h"
 #include "FlexCounterManager.h"
 #include "VendorSai.h"
+#include "AsicView.h"
 
 #include "meta/saiattributelist.h"
 
@@ -182,6 +183,17 @@ namespace syncd
             void clearTempView();
 
             sai_status_t onApplyViewInFastFastBoot();
+
+            sai_status_t applyView();
+
+            void dumpComparisonLogicOutput(
+                    _In_ const std::vector<std::shared_ptr<AsicView>>& currentViews);
+
+            void updateRedisDatabase(
+                    _In_ const std::vector<std::shared_ptr<AsicView>>& temporaryViews);
+
+            std::map<sai_object_id_t, swss::TableDump> redisGetAsicView(
+                    _In_ const std::string &tableName);
 
         private:
 
