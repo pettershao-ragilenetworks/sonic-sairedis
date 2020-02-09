@@ -26,8 +26,6 @@
 extern bool g_veryFirstRun;
 extern sai_object_id_t gSwitchId; // TODO to be removed
 extern std::shared_ptr<syncd::NotificationHandler> g_handler;
-sai_status_t notifySyncd(
-        _In_ const std::string& op);
 
 sai_status_t processQuadEvent(
         _In_ sai_common_api_t api,
@@ -83,6 +81,7 @@ Syncd::Syncd(
         _In_ bool isWarmStart):
     m_commandLineOptions(cmd),
     m_isWarmStart(isWarmStart),
+    m_firstInitWasPerformed(false),
     m_asicInitViewMode(false), // by default we are in APPLY view mode
     m_vendorSai(vendorSai)
 {
@@ -248,7 +247,7 @@ sai_status_t Syncd::processSingleEvent(
         return processBulkQuadEvent(SAI_COMMON_API_BULK_SET, kco);
 
     if (op == REDIS_ASIC_STATE_COMMAND_NOTIFY)
-        return notifySyncd(key);
+        return processNotifySyncd(kco);
 
     if (op == REDIS_ASIC_STATE_COMMAND_GET_STATS)
         return processGetStatsEvent(kco);
@@ -2064,5 +2063,230 @@ void Syncd::inspectAsic()
             }
         }
     }
+}
+
+sai_status_t Syncd::processNotifySyncd(
+        _In_ const swss::KeyOpFieldsValuesTuple &kco)
+{
+    SWSS_LOG_ENTER();
+
+    auto& key = kfvKey(kco);
+
+    if (!m_commandLineOptions->m_enableTempView)
+    {
+        SWSS_LOG_NOTICE("received %s, ignored since TEMP VIEW is not used, returning success", key.c_str());
+
+        sendNotifyResponse(SAI_STATUS_SUCCESS);
+
+        return SAI_STATUS_SUCCESS;
+    }
+
+    auto redisNotifySyncd = sai_deserialize_redis_notify_syncd(key);
+
+    if (g_veryFirstRun && m_firstInitWasPerformed && redisNotifySyncd == SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW)
+    {
+        /*
+         * Make sure that when second INIT view arrives, then we will jump to
+         * next section, since second init view may create switch that already
+         * exists and will fail with creating multiple switches error.
+         */
+
+        g_veryFirstRun = false;
+    }
+    else if (g_veryFirstRun)
+    {
+        SWSS_LOG_NOTICE("very first run is TRUE, op = %s", key.c_str());
+
+        sai_status_t status = SAI_STATUS_SUCCESS;
+
+        /*
+         * On the very first start of syncd, "compile" view is directly applied
+         * on device, since it will make it easier to switch to new asic state
+         * later on when we restart orch agent.
+         */
+
+        if (redisNotifySyncd == SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW)
+        {
+            /*
+             * On first start we just do "apply" directly on asic so we set
+             * init to false instead of true.
+             */
+
+            m_asicInitViewMode = false;
+
+            m_firstInitWasPerformed = true;
+
+            // we need to clear current temp view to make space for new one
+
+            clearTempView();
+        }
+        else if (redisNotifySyncd == SAI_REDIS_NOTIFY_SYNCD_APPLY_VIEW)
+        {
+            g_veryFirstRun = false;
+
+            m_asicInitViewMode = false;
+
+            if (m_commandLineOptions->m_startType == SAI_START_TYPE_FASTFAST_BOOT)
+            {
+                // fastfast boot configuration end
+
+                status = onApplyViewInFastFastBoot();
+            }
+
+            SWSS_LOG_NOTICE("setting very first run to FALSE, op = %s", key.c_str());
+        }
+        else
+        {
+            SWSS_LOG_THROW("unknown operation: %s", key.c_str());
+        }
+
+        sendNotifyResponse(status);
+
+        return status;
+    }
+
+    if (redisNotifySyncd == SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW)
+    {
+        if (m_asicInitViewMode)
+        {
+            SWSS_LOG_WARN("syncd is already in asic INIT VIEW mode, but received init again, orchagent restarted before apply?");
+        }
+
+        m_asicInitViewMode = true;
+
+        clearTempView();
+
+        // NOTE: Currently as WARN to be easier to spot, later should be NOTICE.
+
+        SWSS_LOG_WARN("syncd switched to INIT VIEW mode, all op will be saved to TEMP view");
+
+        sendNotifyResponse(SAI_STATUS_SUCCESS);
+    }
+    else if (redisNotifySyncd == SAI_REDIS_NOTIFY_SYNCD_APPLY_VIEW)
+    {
+        m_asicInitViewMode = false;
+
+        // NOTE: Currently as WARN to be easier to spot, later should be NOTICE.
+
+        SWSS_LOG_WARN("syncd received APPLY VIEW, will translate");
+
+        sai_status_t status = syncdApplyView();
+
+        sendNotifyResponse(status);
+
+        if (status == SAI_STATUS_SUCCESS)
+        {
+            /*
+             * We successfully applied new view, VID mapping could change, so
+             * we need to clear local db, and all new VIDs will be queried
+             * using redis.
+             *
+             * TODO possible race condition - get notification when new view is
+             * applied and cache have old values, and notification start's
+             * translating vid/rid, we need to stop processing notifications
+             * for transition (queue can still grow), possible fdb
+             * notifications but fdb learning was disabled on warm boot, so
+             * there should be no issue.
+             */
+
+            g_translator->clearLocalCache();
+        }
+        else
+        {
+            /*
+             * Apply view failed. It can fail in 2 ways, ether nothing was
+             * executed, on asic, or asic is inconsistent state then we should
+             * die or hang.
+             */
+
+            return status;
+        }
+    }
+    else if (redisNotifySyncd == SAI_REDIS_NOTIFY_SYNCD_INSPECT_ASIC)
+    {
+        SWSS_LOG_NOTICE("syncd switched to INSPECT ASIC mode");
+
+        inspectAsic();
+
+        sendNotifyResponse(SAI_STATUS_SUCCESS);
+    }
+    else
+    {
+        SWSS_LOG_ERROR("unknown operation: %s", key.c_str());
+
+        sendNotifyResponse(SAI_STATUS_NOT_IMPLEMENTED);
+
+        SWSS_LOG_THROW("notify syncd %s operation failed", key.c_str());
+    }
+
+    return SAI_STATUS_SUCCESS;
+}
+
+void Syncd::sendNotifyResponse(
+        _In_ sai_status_t status)
+{
+    SWSS_LOG_ENTER();
+
+    std::string strStatus = sai_serialize_status(status);
+
+    std::vector<swss::FieldValueTuple> entry;
+
+    SWSS_LOG_INFO("sending response: %s", strStatus.c_str());
+
+    m_getResponse->set(strStatus, entry, REDIS_ASIC_STATE_COMMAND_NOTIFY);
+}
+
+void Syncd::clearTempView()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_NOTICE("clearing current TEMP VIEW");
+
+    SWSS_LOG_TIMER("clear temp view");
+
+    std::string pattern = TEMP_PREFIX + (ASIC_STATE_TABLE + std::string(":*"));
+
+    /*
+     * NOTE: this must be ATOMIC, and could use lua script.
+     *
+     * We need to expose api to execute user lua script not only predefined.
+     */
+
+    // TODO move to db access
+
+    for (const auto &key: g_redisClient->keys(pattern))
+    {
+        g_redisClient->del(key);
+    }
+
+    // Also clear list of objects removed in init view mode.
+
+    m_initViewRemovedVidSet.clear();
+}
+
+sai_status_t Syncd::onApplyViewInFastFastBoot()
+{
+    SWSS_LOG_ENTER();
+
+    sai_status_t all = SAI_STATUS_SUCCESS;
+
+    for (auto& kvp: switches)
+    {
+        sai_attribute_t attr;
+
+        attr.id = SAI_SWITCH_ATTR_FAST_API_ENABLE;
+        attr.value.booldata = false;
+
+        sai_status_t status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, kvp.second->getRid(), &attr);
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_FAST_API_ENABLE=false: %s", sai_serialize_status(status).c_str());
+
+            all = status;
+        }
+    }
+
+    return all;
 }
 

@@ -73,6 +73,9 @@ namespace syncd
 
         private:
 
+            sai_status_t processNotifySyncd(
+                    _In_ const swss::KeyOpFieldsValuesTuple &kco);
+
             sai_status_t processSingleEvent(
                     _In_ const swss::KeyOpFieldsValuesTuple &kco);
 
@@ -172,9 +175,13 @@ namespace syncd
                     _In_ uint32_t attr_count,
                     _In_ sai_attribute_t *attr_list);
 
-        public: // TODO private
+        private:
 
             void inspectAsic();
+
+            void clearTempView();
+
+            sai_status_t onApplyViewInFastFastBoot();
 
         private:
 
@@ -199,6 +206,9 @@ namespace syncd
                     _In_ sai_status_t status,
                     _In_ uint32_t attr_count,
                     _In_ sai_attribute_t *attr_list);
+
+            void sendNotifyResponse(
+                    _In_ sai_status_t status);
 
         private: // snoop get response oids
 
@@ -230,6 +240,8 @@ namespace syncd
             std::shared_ptr<CommandLineOptions> m_commandLineOptions;
 
             bool m_isWarmStart;
+
+            bool m_firstInitWasPerformed;
 
         public: // TODO to private
 
