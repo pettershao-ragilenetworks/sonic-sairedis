@@ -68,11 +68,6 @@ void sendGetResponse(
         _In_ uint32_t attr_count,
         _In_ sai_attribute_t *attr_list);
 
-void on_switch_create_in_init_view(
-        _In_ sai_object_id_t switch_vid,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list);
-
 void get_port_related_objects(
         _In_ sai_object_id_t port_rid,
         _Out_ std::vector<sai_object_id_t>& related);
@@ -879,7 +874,7 @@ sai_status_t Syncd::processQuadInInitViewModeCreate(
 
         if (objectType == SAI_OBJECT_TYPE_SWITCH)
         {
-            on_switch_create_in_init_view(objectVid, attr_count, attr_list);
+            onSwitchCreateInInitViewMode(objectVid, attr_count, attr_list);
         }
     }
 
@@ -2693,4 +2688,160 @@ void Syncd::onSyncdStart(
 
     hr.hardReinit();
 }
+
+void Syncd::onSwitchCreateInInitViewMode(
+        _In_ sai_object_id_t switchVid,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    /*
+     * We can have multiple switches here, but each switch is identified by
+     * SAI_SWITCH_ATTR_SWITCH_HARDWARE_INFO. This attribute is treated as key,
+     * so each switch will have different hardware info.
+     *
+     * Currently we assume that we have only one switch.
+     *
+     * We can have 2 scenarios here:
+     *
+     * - we have multiple switches already existing, and in init view mode user
+     *   will create the same switches, then since switch id are deterministic
+     *   we can match them by hardware info and by switch id, it may happen
+     *   that switch id will be different if user will create switches in
+     *   different order, this case will be not supported unless special logic
+     *   will be written to handle that case. This case is solved by bounding
+     *   hardware info to switch index in context config file.
+     *
+     * - if user created switches but non of switch has the same hardware info
+     *   then it means we need to create actual switch here, since user will
+     *   want to query switch ports etc values, that's why on create switch is
+     *   special case, and that's why we need to keep track of all switches.
+     *   This case is also solved bu allowing creation of only switches defined
+     *   in context config which bounds hardware info and switch index making
+     *   switch VID deterministic.
+     *
+     * Since we are creating switch here, we are sure that this switch don't
+     * have any oid attributes set, so we can pass all attributes.
+     *
+     * Hardware info attribute must be passed and all non OID attributes
+     * including create only and conditionals.
+     */
+
+    /*
+     * Multiple switches scenario with changed order:
+     *
+     * If orchagent will create the same switch with the same hardware info but
+     * with different order since switch id is deterministic, then VID of both
+     * switches will always match since they are bound to hardware info using
+     * context config file.
+     */
+
+    if (switches.find(switchVid) == switches.end())
+    {
+        /*
+         * Switch with particular VID don't exists yet, so lets create it.  We
+         * need to create this switch so user in init mode could query switch
+         * properties using GET api.
+         *
+         * We assume that none of attributes is object id attribute.
+         *
+         * This scenario can happen when you start syncd on empty database and
+         * then you quit and restart it again.
+         */
+
+        sai_object_id_t switchRid;
+
+        sai_status_t status;
+
+        {
+            SWSS_LOG_TIMER("cold boot: create switch");
+
+            status = g_vendorSai->create(SAI_OBJECT_TYPE_SWITCH, &switchRid, 0, attr_count, attr_list);
+        }
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_THROW("failed to create switch in init view mode: %s",
+                    sai_serialize_status(status).c_str());
+        }
+
+        // TODO move inside SaiSwitch
+#ifdef SAITHRIFT
+        gSwitchId = switchRid;
+        SWSS_LOG_NOTICE("Initialize gSwitchId with ID = 0x%" PRIx64, gSwitchId);
+#endif
+
+        /*
+         * Object was created so new RID was generated we need to save virtual
+         * id's to redis db.
+         */
+
+        SWSS_LOG_NOTICE("created switch VID %s to RID %s in init view mode",
+                sai_serialize_object_id(switchVid).c_str(),
+                sai_serialize_object_id(switchRid).c_str());
+
+        g_translator->insertRidAndVid(switchRid, switchVid);
+
+        // make switch initialization and get all default data
+
+        switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid);
+    }
+    else
+    {
+        /*
+         * There is already switch defined, we need to match it by hardware
+         * info and we need to know that current switch VID also should match
+         * since it's deterministic created.
+         */
+
+        auto sw = switches.at(switchVid);
+
+        // switches VID must match, since it's deterministic
+
+        if (switchVid != sw->getVid())
+        {
+            SWSS_LOG_THROW("created switch VID don't match: previous %s, current: %s",
+                    sai_serialize_object_id(switchVid).c_str(),
+                    sai_serialize_object_id(sw->getVid()).c_str());
+        }
+
+        // also hardware info also must match
+
+        std::string currentHw = sw->getHardwareInfo();
+        std::string newHw;
+
+        auto attr = sai_metadata_get_attr_by_id(SAI_SWITCH_ATTR_SWITCH_HARDWARE_INFO, attr_count, attr_list);
+
+        if (attr == NULL)
+        {
+            // this is ok, attribute doesn't exist, so assumption is empty string
+        }
+        else
+        {
+            newHw = std::string((char*)attr->value.s8list.list, attr->value.s8list.count);
+        }
+
+        SWSS_LOG_NOTICE("new switch %s contains hardware info: '%s'",
+                sai_serialize_object_id(switchVid).c_str(),
+                newHw.c_str());
+
+        if (currentHw != newHw)
+        {
+            SWSS_LOG_THROW("hardware info missmatch: current '%s' vs new '%s'", currentHw.c_str(), newHw.c_str());
+        }
+
+        SWSS_LOG_NOTICE("current %s switch hardware info: '%s'",
+                sai_serialize_object_id(switchVid).c_str(),
+                currentHw.c_str());
+
+        /*
+         * Some attributes on new switch could be different then on existing
+         * one, but we are in init view mode so comparison logic will be
+         * executed on apply view and those attributes will be compared and
+         * actions will be generated if any of them are different.
+         */
+    }
+}
+
 

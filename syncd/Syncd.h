@@ -198,6 +198,11 @@ namespace syncd
             std::map<sai_object_id_t, swss::TableDump> redisGetAsicView(
                     _In_ const std::string &tableName);
 
+            void onSwitchCreateInInitViewMode(
+                    _In_ sai_object_id_t switch_vid,
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
+
         private:
 
             /**

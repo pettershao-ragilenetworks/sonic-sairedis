@@ -178,162 +178,6 @@ void startDiagShell(
     }
 }
 
-void on_switch_create_in_init_view(
-        _In_ sai_object_id_t switch_vid,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list)
-{
-    SWSS_LOG_ENTER();
-
-    /*
-     * This needs to be refactored if we need multiple switch support.
-     */
-
-    /*
-     * We can have multiple switches here, but each switch is identified by
-     * SAI_SWITCH_ATTR_SWITCH_HARDWARE_INFO. This attribute is treated as key,
-     * so each switch will have different hardware info.
-     *
-     * Currently we assume that we have only one switch.
-     *
-     * We can have 2 scenarios here:
-     *
-     * - we have multiple switches already existing, and in init view mode user
-     *   will create the same switches, then since switch id are deterministic
-     *   we can match them by hardware info and by switch id, it may happen
-     *   that switch id will be different if user will create switches in
-     *   different order, this case will be not supported unless special logic
-     *   will be written to handle that case.
-     *
-     * - if user created switches but non of switch has the same hardware info
-     *   then it means we need to create actual switch here, since user will
-     *   want to query switch ports etc values, that's why on create switch is
-     *   special case, and that's why we need to keep track of all switches
-     *
-     * Since we are creating switch here, we are sure that this switch don't
-     * have any oid attributes set, so we can pass all attributes
-     */
-
-    /*
-     * Multiple switches scenario with changed order:
-     *
-     * If orchagent will create the same switch with the same hardware info but
-     * with different order since switch id is deterministic, then VID of both
-     * switches will not match:
-     *
-     * First we can have INFO = "A" swid 0x00170000, INFO = "B" swid 0x01170001
-     *
-     * Then we can have INFO = "B" swid 0x00170000, INFO = "A" swid 0x01170001
-     *
-     * Currently we don't have good solution for that so we will throw in that case.
-     */
-
-    if (switches.size() == 0)
-    {
-        /*
-         * There are no switches currently, so we need to create this switch so
-         * user in init mode could query switch properties using GET api.
-         *
-         * We assume that none of attributes is object id attribute.
-         *
-         * This scenario can happen when you start syncd on empty database and
-         * then you quit and restart it again.
-         */
-
-        sai_object_id_t switch_rid;
-
-        sai_status_t status;
-
-        {
-            SWSS_LOG_TIMER("cold boot: create switch");
-            status = g_vendorSai->create(SAI_OBJECT_TYPE_SWITCH, &switch_rid, 0, attr_count, attr_list);
-        }
-
-        if (status != SAI_STATUS_SUCCESS)
-        {
-            SWSS_LOG_THROW("failed to create switch in init view mode: %s",
-                    sai_serialize_status(status).c_str());
-        }
-
-#ifdef SAITHRIFT
-        gSwitchId = switch_rid;
-        SWSS_LOG_NOTICE("Initialize gSwitchId with ID = 0x%" PRIx64, gSwitchId);
-#endif
-
-        /*
-         * Object was created so new object id was generated we
-         * need to save virtual id's to redis db.
-         */
-
-        std::string str_vid = sai_serialize_object_id(switch_vid);
-        std::string str_rid = sai_serialize_object_id(switch_rid);
-
-        SWSS_LOG_NOTICE("created real switch VID %s to RID %s in init view mode", str_vid.c_str(), str_rid.c_str());
-
-        g_translator->insertRidAndVid(switch_rid, switch_vid);
-
-        /*
-         * Make switch initialization and get all default data.
-         */
-
-        switches[switch_vid] = std::make_shared<SaiSwitch>(switch_vid, switch_rid);
-    }
-    else if (switches.size() == 1)
-    {
-        /*
-         * There is already switch defined, we need to match it by hardware
-         * info and we need to know that current switch VID also should match
-         * since it's deterministic created.
-         */
-
-        auto sw = switches.begin()->second;
-
-        /*
-         * Switches VID must match, since it's deterministic.
-         */
-
-        if (switch_vid != sw->getVid())
-        {
-            SWSS_LOG_THROW("created switch VID don't match: previous %s, current: %s",
-                    sai_serialize_object_id(switch_vid).c_str(),
-                    sai_serialize_object_id(sw->getVid()).c_str());
-        }
-
-        /*
-         * Also hardware info also must match.
-         */
-
-        std::string currentHw = sw->getHardwareInfo();
-        std::string newHw;
-
-        auto attr = sai_metadata_get_attr_by_id(SAI_SWITCH_ATTR_SWITCH_HARDWARE_INFO, attr_count, attr_list);
-
-        if (attr == NULL)
-        {
-            /*
-             * This is ok, attribute doesn't exist, so assumption is empty string.
-             */
-        }
-        else
-        {
-            SWSS_LOG_DEBUG("new switch contains hardware info of length %u", attr->value.s8list.count);
-
-            newHw = std::string((char*)attr->value.s8list.list, attr->value.s8list.count);
-        }
-
-        if (currentHw != newHw)
-        {
-            SWSS_LOG_THROW("hardware info missmatch: current '%s' vs new '%s'", currentHw.c_str(), newHw.c_str());
-        }
-
-        SWSS_LOG_NOTICE("current switch hardware info: '%s'", currentHw.c_str());
-    }
-    else
-    {
-        SWSS_LOG_THROW("number of switches is %zu in init view mode, this is not supported yet, FIXME", switches.size());
-    }
-}
-
 typedef enum _syncd_restart_type_t
 {
     SYNCD_RESTART_TYPE_COLD,
@@ -676,13 +520,13 @@ void performWarmRestart()
 
     std::string strSwitchVid = key.substr(end + 1);
 
-    sai_object_id_t switch_vid;
+    sai_object_id_t switchVid;
 
-    sai_deserialize_object_id(strSwitchVid, switch_vid);
+    sai_deserialize_object_id(strSwitchVid, switchVid);
 
-    sai_object_id_t orig_rid = g_translator->translateVidToRid(switch_vid);
+    sai_object_id_t orig_rid = g_translator->translateVidToRid(switchVid);
 
-    sai_object_id_t switch_rid;
+    sai_object_id_t switchRid;
     sai_attr_id_t   notifs[] = {
         SAI_SWITCH_ATTR_SWITCH_STATE_CHANGE_NOTIFY,
         SAI_SWITCH_ATTR_SHUTDOWN_REQUEST_NOTIFY,
@@ -705,7 +549,7 @@ void performWarmRestart()
     // TODO pass all non oid attributes needed for conditionals and for hardware info
     {
         SWSS_LOG_TIMER("Warm boot: create switch");
-        status = g_vendorSai->create(SAI_OBJECT_TYPE_SWITCH, &switch_rid, 0, (uint32_t)NELMS(switch_attrs), &switch_attrs[0]);
+        status = g_vendorSai->create(SAI_OBJECT_TYPE_SWITCH, &switchRid, 0, (uint32_t)NELMS(switch_attrs), &switch_attrs[0]);
     }
 
     if (status != SAI_STATUS_SUCCESS)
@@ -713,17 +557,17 @@ void performWarmRestart()
         SWSS_LOG_THROW("failed to create switch RID: %s",
                        sai_serialize_status(status).c_str());
     }
-    if (orig_rid != switch_rid)
+    if (orig_rid != switchRid)
     {
         SWSS_LOG_THROW("Unexpected RID 0x%lx (expected 0x%lx)",
-                       switch_rid, orig_rid);
+                       switchRid, orig_rid);
     }
 
     /*
      * Perform all get operations on existing switch.
      */
 
-    auto sw = switches[switch_vid] = std::make_shared<SaiSwitch>(switch_vid, switch_rid, true);
+    auto sw = switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid, true);
 
     /*
      * Populate gSwitchId since it's needed if we want to make multiple warm
@@ -737,12 +581,12 @@ void performWarmRestart()
         SWSS_LOG_THROW("gSwitchId already contain switch!, SAI THRIFT don't support multiple switches yet, FIXME");
     }
 
-    gSwitchId = switch_rid; // TODO this is needed on warm boot
+    gSwitchId = switchRid; // TODO this is needed on warm boot
 //#endif
 
     checkWarmBootDiscoveredRids(sw);
 
-    startDiagShell(switch_rid);
+    startDiagShell(switchRid);
 }
 
 /**
