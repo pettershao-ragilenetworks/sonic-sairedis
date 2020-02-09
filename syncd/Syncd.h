@@ -174,6 +174,10 @@ namespace syncd
 
         public: // TODO private
 
+            void inspectAsic();
+
+        private:
+
             /**
              * @brief Send api response.
              *
@@ -187,8 +191,6 @@ namespace syncd
                     _In_ sai_status_t status,
                     _In_ uint32_t object_count = 0,
                     _In_ sai_status_t * object_statuses = NULL);
-
-        private:
 
             void sendGetResponse(
                     _In_ sai_object_type_t objectType,

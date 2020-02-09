@@ -1956,3 +1956,113 @@ void Syncd::snoopGetAttrValue(
     snoopGetAttr(meta->objecttype, strObjectId, meta->attridname, value);
 }
 
+void Syncd::inspectAsic()
+{
+    SWSS_LOG_ENTER();
+
+    // Fetch all the keys from ASIC DB
+    // Loop through all the keys in ASIC DB
+
+    std::string pattern = ASIC_STATE_TABLE + std::string(":*");
+
+    // TODO move to database access
+
+    for (const auto &key: g_redisClient->keys(pattern))
+    {
+        // ASIC_STATE:objecttype:objectid (object id may contain ':')
+
+        auto start = key.find_first_of(":");
+
+        if (start == std::string::npos)
+        {
+            SWSS_LOG_ERROR("invalid ASIC_STATE_TABLE %s: no start :", key.c_str());
+            break;
+        }
+
+        auto mk = key.substr(start + 1);
+
+        sai_object_meta_key_t metaKey;
+        sai_deserialize_object_meta_key(mk, metaKey);
+
+        // Find all the attrid from ASIC DB, and use them to query ASIC
+
+        auto hash = g_redisClient->hgetall(key);
+
+        std::vector<swss::FieldValueTuple> values;
+
+        for (auto &kv: hash)
+        {
+            const std::string &skey = kv.first;
+            const std::string &svalue = kv.second;
+
+            swss::FieldValueTuple fvt(skey, svalue);
+
+            values.push_back(fvt);
+        }
+
+        SaiAttributeList list(metaKey.objecttype, values, false);
+
+        sai_attribute_t *attr_list = list.get_attr_list();
+
+        uint32_t attr_count = list.get_attr_count();
+
+        SWSS_LOG_DEBUG("attr count: %u", list.get_attr_count());
+
+        if (attr_count == 0)
+        {
+            // TODO: how to check ASIC on ASIC DB key with NULL:NULL hash
+            // just ignore for now
+            continue;
+        }
+
+        g_translator->translateVidToRid(metaKey);
+
+        sai_status_t status = g_vendorSai->get(metaKey, attr_count, attr_list);
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_ERROR("failed to execute get api on %s: %s",
+                    sai_serialize_object_meta_key(metaKey).c_str(),
+                    sai_serialize_status(status).c_str());
+            continue;
+        }
+
+        // compare fields and values from ASIC_DB and SAI response and log the difference
+
+        for (uint32_t index = 0; index < attr_count; ++index)
+        {
+            const sai_attribute_t& attr = attr_list[index];
+
+            auto meta = sai_metadata_get_attr_metadata(metaKey.objecttype, attr.id);
+
+            if (meta == NULL)
+            {
+                SWSS_LOG_ERROR("FATAL: failed to find metadata for object type %s and attr id %d",
+                        sai_serialize_object_type(metaKey.objecttype).c_str(),
+                        attr.id);
+                break;
+            }
+
+            std::string strSaiAttrValue = sai_serialize_attr_value(*meta, attr, false);
+
+            std::string strRedisAttrValue = hash[meta->attridname];
+
+            if (strRedisAttrValue == strSaiAttrValue)
+            {
+                SWSS_LOG_INFO("matched %s REDIS and ASIC attr value '%s' with on %s",
+                        meta->attridname,
+                        strRedisAttrValue.c_str(),
+                        sai_serialize_object_meta_key(metaKey).c_str());
+            }
+            else
+            {
+                SWSS_LOG_ERROR("failed to match %s REDIS attr '%s' with ASIC attr '%s' for %s",
+                        meta->attridname,
+                        strRedisAttrValue.c_str(),
+                        strSaiAttrValue.c_str(),
+                        sai_serialize_object_meta_key(metaKey).c_str());
+            }
+        }
+    }
+}
+
