@@ -3,6 +3,7 @@
 #include "NotificationHandler.h"
 #include "Workaround.h"
 #include "ComparisonLogic.h"
+#include "HardReiniter.h"
 
 #include "lib/inc/sairediscommon.h"
 
@@ -2603,6 +2604,8 @@ std::map<sai_object_id_t, swss::TableDump> Syncd::redisGetAsicView(
 
     SWSS_LOG_TIMER("get asic view from %s", tableName.c_str());
 
+    // TODO to db access class
+
     swss::DBConnector db("ASIC_DB", 0);
 
     swss::Table table(&db, tableName);
@@ -2633,5 +2636,59 @@ std::map<sai_object_id_t, swss::TableDump> Syncd::redisGetAsicView(
     }
 
     return map;
+}
+
+void Syncd::onSyncdStart(
+        _In_ bool warmStart)
+{
+    SWSS_LOG_ENTER();
+
+    std::lock_guard<std::mutex> lock(g_mutex); // TODO
+
+    /*
+     * It may happen that after initialize we will receive some port
+     * notifications with port'ids that are not in redis db yet, so after
+     * checking VIDTORID map there will be entries and translate_vid_to_rid
+     * will generate new id's for ports, this may cause race condition so we
+     * need to use a lock here to prevent that.
+     */
+
+    SWSS_LOG_TIMER("on syncd start");
+
+    if (warmStart)
+    {
+        /*
+         * Switch was warm started, so switches map is empty, we need to
+         * recreate it based on existing entries inside database.
+         *
+         * Currently we expect only one switch, then we need to call it.
+         *
+         * Also this will make sure that current switch id is the same as
+         * before restart.
+         *
+         * If we want to support multiple switches, this needs to be adjusted.
+         */
+
+        performWarmRestart();
+
+        SWSS_LOG_NOTICE("skipping hard reinit since WARM start was performed");
+        return;
+    }
+
+    SWSS_LOG_NOTICE("performing hard reinit since COLD start was performed");
+
+    /*
+     * Switch was restarted in hard way, we need to perform hard reinit and
+     * recreate switches map.
+     */
+
+    if (switches.size())
+    {
+        SWSS_LOG_THROW("performing hard reinit, but there are %zu switches defined, bug!", switches.size());
+    }
+
+    HardReiniter hr(m_vendorSai);
+
+    hr.hardReinit();
 }
 

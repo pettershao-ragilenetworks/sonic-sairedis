@@ -475,58 +475,6 @@ void set_sai_api_log_min_prio(const std::string &prioStr)
     }
 }
 
-void onSyncdStart(bool warmStart)
-{
-    SWSS_LOG_ENTER();
-    std::lock_guard<std::mutex> lock(g_mutex);
-
-    /*
-     * It may happen that after initialize we will receive some port
-     * notifications with port'ids that are not in redis db yet, so after
-     * checking VIDTORID map there will be entries and translate_vid_to_rid
-     * will generate new id's for ports, this may cause race condition so we
-     * need to use a lock here to prevent that.
-     */
-
-    SWSS_LOG_TIMER("on syncd start");
-
-    if (warmStart)
-    {
-        /*
-         * Switch was warm started, so switches map is empty, we need to
-         * recreate it based on existing entries inside database.
-         *
-         * Currently we expect only one switch, then we need to call it.
-         *
-         * Also this will make sure that current switch id is the same as
-         * before restart.
-         *
-         * If we want to support multiple switches, this needs to be adjusted.
-         */
-
-        performWarmRestart();
-
-        SWSS_LOG_NOTICE("skipping hard reinit since WARM start was performed");
-        return;
-    }
-
-    SWSS_LOG_NOTICE("performing hard reinit since COLD start was performed");
-
-    /*
-     * Switch was restarted in hard way, we need to perform hard reinit and
-     * recreate switches map.
-     */
-
-    if (switches.size())
-    {
-        SWSS_LOG_THROW("performing hard reinit, but there are %zu switches defined, bug!", switches.size());
-    }
-
-    HardReiniter hr(g_vendorSai);
-
-    hr.hardReinit();
-}
-
 void sai_meta_log_syncd(
         _In_ sai_log_level_t log_level,
         _In_ const char *file,
@@ -933,7 +881,7 @@ int syncd_main(int argc, char **argv)
     try
     {
         SWSS_LOG_NOTICE("before onSyncdStart");
-        onSyncdStart(g_commandLineOptions->m_startType == SAI_START_TYPE_WARM_BOOT);
+        g_syncd->onSyncdStart(g_commandLineOptions->m_startType == SAI_START_TYPE_WARM_BOOT);
         SWSS_LOG_NOTICE("after onSyncdStart");
 
         // create notifications processing thread after we create_switch to

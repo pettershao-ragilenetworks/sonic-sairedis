@@ -39,6 +39,9 @@ namespace syncd
 
             bool isInitViewMode() const;
 
+            void onSyncdStart(
+                    _In_ bool warmStart);
+
         public: // TODO private
 
             void processEvent(
