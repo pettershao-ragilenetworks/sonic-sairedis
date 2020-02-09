@@ -2687,6 +2687,11 @@ void Syncd::onSyncdStart(
     HardReiniter hr(m_vendorSai);
 
     hr.hardReinit();
+
+    for (auto& sw: switches)
+    {
+        startDiagShell(sw.second->getRid());
+    }
 }
 
 void Syncd::onSwitchCreateInInitViewMode(
@@ -2786,6 +2791,8 @@ void Syncd::onSwitchCreateInInitViewMode(
         // make switch initialization and get all default data
 
         switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid);
+
+        startDiagShell(switchRid); // TODO
     }
     else
     {
@@ -3019,6 +3026,53 @@ void Syncd::performWarmRestart()
     for (auto& entry: entries)
     {
         performWarmRestartSingleSwitch(entry);
+    }
+}
+
+void Syncd::startDiagShell(
+        _In_ sai_object_id_t switchRid)
+{
+    SWSS_LOG_ENTER();
+
+    if (m_commandLineOptions->m_enableDiagShell)
+    {
+        SWSS_LOG_NOTICE("starting diag shell thread for switch RID %s",
+                sai_serialize_object_id(switchRid).c_str());
+
+        std::thread thread = std::thread(&Syncd::diagShellThreadProc, this, switchRid);
+
+        thread.detach();
+    }
+}
+
+void Syncd::diagShellThreadProc(
+        _In_ sai_object_id_t switchRid)
+{
+    SWSS_LOG_ENTER();
+
+    sai_status_t status;
+
+    /*
+     * This is currently blocking API on broadcom, it will block until we exit
+     * shell.
+     */
+
+    while (true)
+    {
+        sai_attribute_t attr;
+        attr.id = SAI_SWITCH_ATTR_SWITCH_SHELL_ENABLE;
+        attr.value.booldata = true;
+
+        status = m_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, switchRid, &attr);
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_ERROR("Failed to enable switch shell: %s",
+                    sai_serialize_status(status).c_str());
+            return;
+        }
+
+        sleep(1);
     }
 }
 

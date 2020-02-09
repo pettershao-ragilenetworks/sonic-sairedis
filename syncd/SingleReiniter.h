@@ -66,9 +66,6 @@ namespace syncd
             std::shared_ptr<SaiAttributeList> redisGetAttributesFromAsicKey(
                     _In_ const std::string &key);
 
-            void startDiagShell(
-                    _In_ sai_object_id_t switchRid);
-
             void processAttributesForOids(
                     _In_ sai_object_type_t objectType,
                     _In_ uint32_t attr_count,
@@ -97,12 +94,6 @@ namespace syncd
             static std::string getObjectIdFromAsicKey(
                     _In_ const std::string &key);
 
-        private:
-
-            // TODO move this to Switch class and call after hard reinit?
-            static void diagShellThreadProc(
-                    _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,
-                    _In_ sai_object_id_t switchRid);
         private:
 
             std::shared_ptr<sairedis::SaiInterface> m_vendorSai;

@@ -208,6 +208,12 @@ namespace syncd
             void performWarmRestartSingleSwitch(
                     _In_ const std::string& key);
 
+            void startDiagShell(
+                    _In_ sai_object_id_t switchRid);
+
+            void diagShellThreadProc(
+                    _In_ sai_object_id_t switchRid);
+
         private:
 
             /**

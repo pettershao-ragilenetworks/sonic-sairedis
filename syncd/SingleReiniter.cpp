@@ -328,8 +328,6 @@ void SingleReiniter::processSwitches()
 
         m_sw = std::make_shared<SaiSwitch>(m_switch_vid, m_switch_rid);
 
-        startDiagShell(m_switch_rid);
-
         /*
          * We processed switch. We have switch vid/rid so we can process all
          * other attributes of switches that are not mandatory on create and are
@@ -1125,55 +1123,6 @@ std::shared_ptr<SaiAttributeList> SingleReiniter::redisGetAttributesFromAsicKey(
     }
 
     return std::make_shared<SaiAttributeList>(objectType, values, false);
-}
-
-
-void SingleReiniter::startDiagShell(
-        _In_ sai_object_id_t switchRid)
-{
-    SWSS_LOG_ENTER();
-
-    if (g_commandLineOptions->m_enableDiagShell)
-    {
-        SWSS_LOG_NOTICE("starting diag shell thread for switch %s",
-                sai_serialize_object_id(switchRid).c_str());
-
-        std::thread diag_shell_thread = std::thread(&SingleReiniter::diagShellThreadProc, m_vendorSai, switchRid);
-
-        diag_shell_thread.detach();
-    }
-}
-
-void SingleReiniter::diagShellThreadProc(
-        _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,
-        _In_ sai_object_id_t switchRid)
-{
-    SWSS_LOG_ENTER();
-
-    sai_status_t status;
-
-    /*
-     * This is currently blocking API on broadcom, it will block until we exit
-     * shell.
-     */
-
-    while (true)
-    {
-        sai_attribute_t attr;
-        attr.id = SAI_SWITCH_ATTR_SWITCH_SHELL_ENABLE;
-        attr.value.booldata = true;
-
-        status = vendorSai->set(SAI_OBJECT_TYPE_SWITCH, switchRid, &attr);
-
-        if (status != SAI_STATUS_SUCCESS)
-        {
-            SWSS_LOG_ERROR("Failed to enable switch shell: %s",
-                    sai_serialize_status(status).c_str());
-            return;
-        }
-
-        sleep(1);
-    }
 }
 
 std::shared_ptr<SaiSwitch> SingleReiniter::getSwitch() const

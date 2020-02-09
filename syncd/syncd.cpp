@@ -130,54 +130,6 @@ void notify_OA_about_syncd_exception()
     }
 }
 
-void sai_diag_shell(
-        _In_ sai_object_id_t switch_id)
-{
-    SWSS_LOG_ENTER();
-
-    sai_status_t status;
-
-    /*
-     * This is currently blocking API on broadcom, it will block until we exit
-     * shell.
-     */
-
-    while (true)
-    {
-        sai_attribute_t attr;
-        attr.id = SAI_SWITCH_ATTR_SWITCH_SHELL_ENABLE;
-        attr.value.booldata = true;
-
-        status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr);
-
-        if (status != SAI_STATUS_SUCCESS)
-        {
-            SWSS_LOG_ERROR("Failed to enable switch shell: %s",
-                    sai_serialize_status(status).c_str());
-            return;
-        }
-
-        sleep(1);
-    }
-}
-
-
-// TODO combine all methods to 1
-void startDiagShell(
-        _In_ sai_object_id_t switchRid)
-{
-    SWSS_LOG_ENTER();
-
-    if (g_commandLineOptions->m_enableDiagShell)
-    {
-        SWSS_LOG_NOTICE("starting diag shell thread");
-
-        std::thread diag_shell_thread = std::thread(sai_diag_shell, switchRid);
-
-        diag_shell_thread.detach();
-    }
-}
-
 typedef enum _syncd_restart_type_t
 {
     SYNCD_RESTART_TYPE_COLD,
