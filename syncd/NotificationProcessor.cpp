@@ -3,6 +3,9 @@
 
 #include "swss/logger.h"
 
+#include "meta/sai_serialize.h"
+#include "meta/saiattributelist.h"
+
 #include "syncd.h" // TODO to be removed
 
 #include <inttypes.h>

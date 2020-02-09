@@ -24,6 +24,9 @@
 #include "RequestShutdown.h"
 #include "ComparisonLogic.h"
 
+#include "swss/notificationconsumer.h"
+#include "swss/select.h"
+
 #include <inttypes.h>
 #include <limits.h>
 
@@ -33,6 +36,8 @@
 
 using namespace syncd;
 using namespace std::placeholders;
+
+std::string fdbFlushSha;
 
 /*
  * Make sure that notification queue pointer is populated before we start
@@ -88,9 +93,6 @@ std::map<sai_object_id_t, std::shared_ptr<SaiSwitch>> switches;
  * SAI switch global needed for RPC server and for remove_switch
  */
 sai_object_id_t gSwitchId = SAI_NULL_OBJECT_ID;
-
-std::string fdbFlushSha;
-std::string fdbFlushLuaScriptName = "fdb_flush.lua";
 
 // TODO we must be sure that all threads and notifications will be stopped
 // before destructor will be called on those objects
@@ -838,7 +840,7 @@ int syncd_main(int argc, char **argv)
     g_syncd->m_getResponse  = std::make_shared<swss::ProducerTable>(dbAsic.get(), "GETRESPONSE");
     notifications = std::make_shared<swss::NotificationProducer>(dbNtf.get(), "NOTIFICATIONS");
 
-    std::string fdbFlushLuaScript = swss::loadLuaScript(fdbFlushLuaScriptName);
+    std::string fdbFlushLuaScript = swss::loadLuaScript("fdb_flush.lua");
     fdbFlushSha = swss::loadRedisScript(dbAsic.get(), fdbFlushLuaScript);
 
     g_veryFirstRun = isVeryFirstRun();

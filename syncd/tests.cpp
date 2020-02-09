@@ -4,18 +4,21 @@ extern "C" {
 #include <sai.h>
 }
 
+#include "sairedis.h"
+#include "sairediscommon.h"
+
+#include "meta/sai_serialize.h"
+#include "meta/OidRefCounter.h"
+#include "meta/SaiAttrWrapper.h"
+#include "meta/SaiObjectCollection.h"
+
 #include "swss/logger.h"
 #include "swss/dbconnector.h"
 #include "swss/schema.h"
 #include "swss/redisreply.h"
-#include "sairedis.h"
-#include "meta/sai_serialize.h"
-#include "syncd.h"
-#include "sairediscommon.h"
-
-#include "meta/OidRefCounter.h"
-#include "meta/SaiAttrWrapper.h"
-#include "meta/SaiObjectCollection.h"
+#include "swss/consumertable.h"
+#include "swss/select.h"
+#include "swss/redisclient.h"
 
 #include <map>
 #include <unordered_map>

@@ -8,6 +8,8 @@
 
 #include "meta/sai_serialize.h"
 
+#include <unistd.h>
+
 #include "syncd.h" // TODO to be removed
 
 using namespace syncd;
