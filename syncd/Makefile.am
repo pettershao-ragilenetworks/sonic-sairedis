@@ -43,8 +43,6 @@ libsyncd_a_SOURCES = \
 				SaiAttr.cpp \
 				VendorSai.cpp \
 				syncd.cpp \
-				syncd_hard_reinit.cpp \
-				syncd_applyview.cpp \
 				TimerWatchdog.cpp \
 				NotificationQueue.cpp \
 				CommandLineOptions.cpp \
