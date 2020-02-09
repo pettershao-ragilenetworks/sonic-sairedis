@@ -198,6 +198,31 @@ namespace syncd
                     _In_ uint32_t attr_count,
                     _In_ sai_attribute_t *attr_list);
 
+        private: // snoop get response oids
+
+            void snoopGetResponse(
+                    _In_ sai_object_type_t object_type,
+                    _In_ const std::string &strObjectId,
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
+
+            void snoopGetAttr(
+                    _In_ sai_object_type_t objectType,
+                    _In_ const std::string& strObjectId,
+                    _In_ const std::string& attrId,
+                    _In_ const std::string& attrValue);
+
+            void snoopGetOid(
+                    _In_ sai_object_id_t vid);
+
+            void snoopGetOidList(
+                    _In_ const sai_object_list_t& list);
+
+            void snoopGetAttrValue(
+                    _In_ const std::string& strObjectId,
+                    _In_ const sai_attr_metadata_t *meta,
+                    _In_ const sai_attribute_t& attr);
+
         private:
 
             std::shared_ptr<CommandLineOptions> m_commandLineOptions;

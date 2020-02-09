@@ -75,12 +75,6 @@ void get_port_related_objects(
         _In_ sai_object_id_t port_rid,
         _Out_ std::vector<sai_object_id_t>& related);
 
-void snoop_get_response(
-        _In_ sai_object_type_t object_type,
-        _In_ const std::string &strObjectId,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t *attr_list);
-
 using namespace syncd;
 
 Syncd::Syncd(
@@ -300,8 +294,8 @@ sai_status_t Syncd::processAttrEnumValuesCapabilityQuery(
     sai_object_type_t objectType;
     sai_deserialize_object_type(fvValue(values[0]), objectType);
 
-    sai_attr_id_t attr_id;
-    sai_deserialize_attr_id(fvValue(values[1]), attr_id);
+    sai_attr_id_t attrId;
+    sai_deserialize_attr_id(fvValue(values[1]), attrId);
 
     uint32_t list_size = std::stoi(fvValue(values[2]));
 
@@ -312,7 +306,7 @@ sai_status_t Syncd::processAttrEnumValuesCapabilityQuery(
     enumCapList.count = list_size;
     enumCapList.list = enum_capabilities_list.data();
 
-    sai_status_t status = m_vendorSai->queryAattributeEnumValuesCapability(switchRid, objectType, attr_id, &enumCapList);
+    sai_status_t status = m_vendorSai->queryAattributeEnumValuesCapability(switchRid, objectType, attrId, &enumCapList);
 
     std::vector<swss::FieldValueTuple> entry;
 
@@ -1726,7 +1720,7 @@ void Syncd::sendGetResponse(
          * All oid values here are VIDs.
          */
 
-        snoop_get_response(objectType, strObjectId, attr_count, attr_list);
+        snoopGetResponse(objectType, strObjectId, attr_count, attr_list);
     }
     else if (status == SAI_STATUS_BUFFER_OVERFLOW)
     {
@@ -1773,4 +1767,192 @@ void Syncd::sendGetResponse(
     SWSS_LOG_INFO("response for GET api was send");
 }
 
+void Syncd::snoopGetResponse(
+        _In_ sai_object_type_t object_type,
+        _In_ const std::string& strObjectId, // can be non object id
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    /*
+     * NOTE: this method is operating on VIDs, all RIDs were translated outside
+     * this method.
+     */
+
+    /*
+     * Vlan (including vlan 1) will need to be put into TEMP view this should
+     * also be valid for all objects that were queried.
+     */
+
+    for (uint32_t idx = 0; idx < attr_count; ++idx)
+    {
+        const sai_attribute_t &attr = attr_list[idx];
+
+        auto meta = sai_metadata_get_attr_metadata(object_type, attr.id);
+
+        if (meta == NULL)
+        {
+            SWSS_LOG_THROW("unable to get metadata for object type %d, attribute %d", object_type, attr.id);
+        }
+
+        /*
+         * We should snoop oid values even if they are readonly we just note in
+         * temp view that those objects exist on switch.
+         */
+
+        switch (meta->attrvaluetype)
+        {
+            case SAI_ATTR_VALUE_TYPE_OBJECT_ID:
+                snoopGetOid(attr.value.oid);
+                break;
+
+            case SAI_ATTR_VALUE_TYPE_OBJECT_LIST:
+                snoopGetOidList(attr.value.objlist);
+                break;
+
+            case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_OBJECT_ID:
+                if (attr.value.aclfield.enable)
+                    snoopGetOid(attr.value.aclfield.data.oid);
+                break;
+
+            case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_OBJECT_LIST:
+                if (attr.value.aclfield.enable)
+                    snoopGetOidList(attr.value.aclfield.data.objlist);
+                break;
+
+            case SAI_ATTR_VALUE_TYPE_ACL_ACTION_DATA_OBJECT_ID:
+                if (attr.value.aclaction.enable)
+                    snoopGetOid(attr.value.aclaction.parameter.oid);
+                break;
+
+            case SAI_ATTR_VALUE_TYPE_ACL_ACTION_DATA_OBJECT_LIST:
+                if (attr.value.aclaction.enable)
+                    snoopGetOidList(attr.value.aclaction.parameter.objlist);
+                break;
+
+            default:
+
+                /*
+                 * If in future new attribute with object id will be added this
+                 * will make sure that we will need to add handler here.
+                 */
+
+                if (meta->isoidattribute)
+                {
+                    SWSS_LOG_THROW("attribute %s is object id, but not processed, FIXME", meta->attridname);
+                }
+
+                break;
+        }
+
+        if (SAI_HAS_FLAG_READ_ONLY(meta->flags))
+        {
+            /*
+             * If value is read only, we skip it, since after syncd restart we
+             * won't be able to set/create it anyway.
+             */
+
+            continue;
+        }
+
+        if (meta->objecttype == SAI_OBJECT_TYPE_PORT &&
+                meta->attrid == SAI_PORT_ATTR_HW_LANE_LIST)
+        {
+            /*
+             * Skip port lanes for now since we don't create ports.
+             */
+
+            SWSS_LOG_INFO("skipping %s for %s", meta->attridname, strObjectId.c_str());
+            continue;
+        }
+
+        /*
+         * Put non readonly, and non oid attribute value to temp view.
+         *
+         * NOTE: This will also put create-only attributes to view, and after
+         * syncd hard reinit we will not be able to do "SET" on that attribute.
+         *
+         * Similar action can happen when we will do this on asicSet during
+         * apply view.
+         */
+
+        snoopGetAttrValue(strObjectId, meta, attr);
+    }
+}
+
+void Syncd::snoopGetAttr(
+        _In_ sai_object_type_t objectType,
+        _In_ const std::string& strObjectId,
+        _In_ const std::string& attrId,
+        _In_ const std::string& attrValue)
+{
+    SWSS_LOG_ENTER();
+
+    /*
+     * Note: strObjectType + ":" + strObjectId is meta_key we can us that
+     * here later on.
+     */
+
+    std::string strObjectType = sai_serialize_object_type(objectType);
+
+    // TODO move to database access
+
+    std::string prefix = isInitViewMode() ? TEMP_PREFIX : "";
+
+    std::string key = prefix + (ASIC_STATE_TABLE + (":" + strObjectType + ":" + strObjectId));
+
+    SWSS_LOG_DEBUG("%s", key.c_str());
+
+    g_redisClient->hset(key, attrId, attrValue);
+}
+
+void Syncd::snoopGetOid(
+        _In_ sai_object_id_t vid)
+{
+    SWSS_LOG_ENTER();
+
+    if (vid == SAI_NULL_OBJECT_ID)
+    {
+        // if snooped oid is NULL then we don't need take any action
+        return;
+    }
+
+    /*
+     * We need use redis version of object type query here since we are
+     * operating on VID value, and syncd is compiled against real SAI
+     * implementation which has different function g_vendorSai->objectTypeQuery.
+     */
+
+    sai_object_type_t objectType = VidManager::objectTypeQuery(vid);
+
+    std::string strVid = sai_serialize_object_id(vid);
+
+    snoopGetAttr(objectType, strVid, "NULL", "NULL");
+}
+
+void Syncd::snoopGetOidList(
+        _In_ const sai_object_list_t& list)
+{
+    SWSS_LOG_ENTER();
+
+    for (uint32_t i = 0; i < list.count; i++)
+    {
+        snoopGetOid(list.list[i]);
+    }
+}
+
+void Syncd::snoopGetAttrValue(
+        _In_ const std::string& strObjectId,
+        _In_ const sai_attr_metadata_t *meta,
+        _In_ const sai_attribute_t& attr)
+{
+    SWSS_LOG_ENTER();
+
+    std::string value = sai_serialize_attr_value(*meta, attr);
+
+    SWSS_LOG_DEBUG("%s:%s", meta->attridname, value.c_str());
+
+    snoopGetAttr(meta->objecttype, strObjectId, meta->attridname, value);
+}
 
