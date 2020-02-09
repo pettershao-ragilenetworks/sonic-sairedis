@@ -319,6 +319,8 @@ namespace syncd
 
             bool isWarmBoot() const;
 
+            void checkWarmBootDiscoveredRids();
+
         private:
 
             /**

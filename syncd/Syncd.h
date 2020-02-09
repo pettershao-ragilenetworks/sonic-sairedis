@@ -203,6 +203,11 @@ namespace syncd
                     _In_ uint32_t attr_count,
                     _In_ const sai_attribute_t *attr_list);
 
+            void performWarmRestart();
+
+            void performWarmRestartSingleSwitch(
+                    _In_ const std::string& key);
+
         private:
 
             /**

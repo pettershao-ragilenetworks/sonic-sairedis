@@ -2757,7 +2757,7 @@ void Syncd::onSwitchCreateInInitViewMode(
         {
             SWSS_LOG_TIMER("cold boot: create switch");
 
-            status = g_vendorSai->create(SAI_OBJECT_TYPE_SWITCH, &switchRid, 0, attr_count, attr_list);
+            status = m_vendorSai->create(SAI_OBJECT_TYPE_SWITCH, &switchRid, 0, attr_count, attr_list);
         }
 
         if (status != SAI_STATUS_SUCCESS)
@@ -2844,4 +2844,181 @@ void Syncd::onSwitchCreateInInitViewMode(
     }
 }
 
+void Syncd::performWarmRestartSingleSwitch(
+        _In_ const std::string& key)
+{
+    SWSS_LOG_ENTER();
+
+    // key should be in format ASIC_STATE:SAI_OBJECT_TYPE_SWITCH:oid:0xYYYY
+
+    /*
+     * Since multiple switches can be defined on warm boot, then we need to
+     * correctly identify each switch by passing hardware info.
+     *
+     * TODO: do we also need to pass any other attributes, like create only etc?
+     */
+
+    auto start = key.find_first_of(":") + 1;
+    auto end = key.find(":", start);
+
+    std::string strSwitchVid = key.substr(end + 1);
+
+    std::vector<swss::FieldValueTuple> values;
+
+    auto hash = g_redisClient->hgetall(key);
+
+    SWSS_LOG_NOTICE("switch %s", strSwitchVid.c_str());
+
+    for (auto &kv: hash)
+    {
+        const std::string& skey = kv.first;
+        const std::string& svalue = kv.second;
+
+        if (skey == "NULL")
+            continue;
+
+        SWSS_LOG_NOTICE(" - attr: %s:%s", skey.c_str(), svalue.c_str());
+
+        swss::FieldValueTuple fvt(skey, svalue);
+
+        values.push_back(fvt);
+    }
+
+    SaiAttributeList list(SAI_OBJECT_TYPE_SWITCH, values, false);
+
+    sai_object_id_t switchVid;
+
+    sai_deserialize_object_id(strSwitchVid, switchVid);
+
+    sai_object_id_t originalSwitchRid = g_translator->translateVidToRid(switchVid);
+
+    sai_object_id_t switchRid;
+
+    sai_attr_id_t notifs[] = {
+        SAI_SWITCH_ATTR_SWITCH_STATE_CHANGE_NOTIFY,
+        SAI_SWITCH_ATTR_SHUTDOWN_REQUEST_NOTIFY,
+        SAI_SWITCH_ATTR_FDB_EVENT_NOTIFY,
+        SAI_SWITCH_ATTR_PORT_STATE_CHANGE_NOTIFY,
+        SAI_SWITCH_ATTR_QUEUE_PFC_DEADLOCK_NOTIFY
+    };
+
+    std::vector<sai_attribute_t> attrs;
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
+    attr.value.booldata = true;
+
+    attrs.push_back(attr);
+
+    for (size_t idx = 0; idx < (sizeof(notifs) / sizeof(notifs[0])); idx++)
+    {
+        attr.id = notifs[idx];
+        attr.value.ptr = (void*)1; // any non-null pointer
+    }
+
+    sai_attribute_t *attrList = list.get_attr_list();
+
+    uint32_t attrCount = list.get_attr_count();
+
+    for (uint32_t idx = 0; idx < attrCount; idx++)
+    {
+        auto id = attrList[idx].id;
+
+        if (id == SAI_SWITCH_ATTR_INIT_SWITCH)
+            continue;
+
+        auto meta = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_SWITCH, id);
+
+        /*
+         * If we want to handle multiple switches, then during warm boot switch
+         * create we need to pass hardware info so vendor sai could know which
+         * switch to initialize.
+         */
+
+        if (id != SAI_SWITCH_ATTR_SWITCH_HARDWARE_INFO)
+        {
+            SWSS_LOG_NOTICE("skiping warm boot: %s", meta->attridname);
+            continue;
+        }
+
+        attrs.push_back(attrList[idx]);
+    }
+
+    // TODO support multiple notification handlers
+    g_handler->updateNotificationsPointers((uint32_t)attrs.size(), attrs.data());
+
+    sai_status_t status;
+
+    {
+        SWSS_LOG_TIMER("Warm boot: create switch VID: %s", sai_serialize_object_id(switchVid).c_str());
+
+        status = g_vendorSai->create(SAI_OBJECT_TYPE_SWITCH, &switchRid, 0, (uint32_t)attrs.size(), attrs.data());
+    }
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_THROW("failed to create switch RID: %s for VID %s",
+                       sai_serialize_status(status).c_str(),
+                       sai_serialize_object_id(switchVid).c_str());
+    }
+
+    if (originalSwitchRid != switchRid)
+    {
+        SWSS_LOG_THROW("Unexpected RID 0x%lx (expected 0x%lx)",
+                       switchRid, originalSwitchRid);
+    }
+
+    // perform all get operations on existing switch
+
+    auto sw = switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid, true);
+
+    startDiagShell(switchRid); // TODO
+
+//#ifdef SAITHRIFT
+
+    /*
+     * Populate gSwitchId since it's needed if we want to make multiple warm
+     * starts in a row.
+     */
+
+    if (gSwitchId != SAI_NULL_OBJECT_ID)
+    {
+        SWSS_LOG_THROW("gSwitchId already contain switch!, SAI THRIFT don't support multiple switches yet, FIXME");
+    }
+
+    gSwitchId = switchRid; // TODO this is needed on warm boot
+
+//#endif
+}
+
+void Syncd::performWarmRestart()
+{
+    SWSS_LOG_ENTER();
+
+    /*
+     * There should be no case when we are doing warm restart and there is no
+     * switch defined, we will throw at such a case.
+     *
+     * This case could be possible when no switches were created and only api
+     * was initialized, but we will skip this scenario and address is when we
+     * will have need for it.
+     */
+
+    auto entries = g_redisClient->keys(ASIC_STATE_TABLE + std::string(":SAI_OBJECT_TYPE_SWITCH:*"));
+
+    if (entries.size() == 0)
+    {
+        SWSS_LOG_THROW("on warm restart there is no switches defined in DB, not supported yet, FIXME");
+    }
+
+    SWSS_LOG_NOTICE("switches defined in warm restat: %zu", entries.size());
+
+    // here we could have multiple switches defined, let's process them one by one
+
+    for (auto& entry: entries)
+    {
+        performWarmRestartSingleSwitch(entry);
+    }
+}
 
