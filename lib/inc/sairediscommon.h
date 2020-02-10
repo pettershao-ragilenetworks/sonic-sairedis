@@ -68,5 +68,19 @@
 /**
  * @brief Table which will be used to forward notifications from syncd.
  */
-#define REDIS_TABLE_NOTIFICATIONS "NOTIFICATIONS"
+#define REDIS_TABLE_NOTIFICATIONS   "NOTIFICATIONS"
+
+/**
+ * @brief Table which will be used to send API response from syncd.
+ */
+#define REDIS_TABLE_GETRESPONSE     "GETRESPONSE"
+
+// REDIS default database defines
+
+#define REDIS_DEFAULT_DATABASE_ASIC         "ASIC_DB"
+#define REDIS_DEFAULT_DATABASE_STATE        "STATE_DB"
+#define REDIS_DEFAULT_DATABASE_COUNTERS     "COUNTERS_DB"
+
+// TODO to be removed (used only for plugin register)
+#define REDIS_DEFAULT_DATABASE_FLEX_COUNTER "FLEX_COUNTER_DB"
 

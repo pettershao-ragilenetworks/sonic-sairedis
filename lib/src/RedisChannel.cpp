@@ -25,7 +25,7 @@ RedisChannel::RedisChannel(
     m_db                    = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
     m_redisPipeline         = std::make_shared<swss::RedisPipeline>(m_db.get()); //enable default pipeline 128
     m_asicState             = std::make_shared<swss::ProducerTable>(m_redisPipeline.get(), ASIC_STATE_TABLE, true);
-    m_getConsumer           = std::make_shared<swss::ConsumerTable>(m_db.get(), "GETRESPONSE");
+    m_getConsumer           = std::make_shared<swss::ConsumerTable>(m_db.get(), REDIS_TABLE_GETRESPONSE);
 
     m_dbNtf                 = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
     m_notificationConsumer  = std::make_shared<swss::NotificationConsumer>(m_dbNtf.get(), REDIS_TABLE_NOTIFICATIONS);
