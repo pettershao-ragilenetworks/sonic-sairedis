@@ -1,23 +1,27 @@
-#include <inttypes.h>
-#include <getopt.h>
-#include <unistd.h>
-
-#include "string.h"
 extern "C" {
 #include "sai.h"
 }
 
-#include "meta/sai_serialize.h"
-#include "meta/saiattributelist.h"
-#include "swss/logger.h"
-#include "swss/tokenize.h"
 #include "sairedis.h"
 #include "sairediscommon.h"
+
+#include "meta/sai_serialize.h"
+#include "meta/SaiAttributeList.h"
+
+#include "swss/logger.h"
+#include "swss/tokenize.h"
+
+#include <inttypes.h>
+#include <getopt.h>
+#include <unistd.h>
+#include <string.h>
 
 #include <iostream>
 #include <stdexcept>
 #include <sstream>
 #include <string>
+
+using namespace saimeta;
 
 /*
  * Since this is player, we record actions from orchagent.  No special case
