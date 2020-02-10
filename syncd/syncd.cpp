@@ -184,68 +184,6 @@ bool isVeryFirstRun()
     return firstRun;
 }
 
-static void saiLoglevelNotify(
-        _In_ std::string strApi,
-        _In_ std::string strLogLevel)
-{
-    SWSS_LOG_ENTER();
-
-    try
-    {
-        sai_log_level_t logLevel;
-        sai_deserialize_log_level(strLogLevel, logLevel);
-
-        sai_api_t api;
-        sai_deserialize_api(strApi, api);
-
-        sai_status_t status = g_vendorSai->logSet(api, logLevel);
-
-        if (status == SAI_STATUS_SUCCESS)
-        {
-            SWSS_LOG_NOTICE("Setting SAI loglevel %s on %s", strLogLevel.c_str(), strApi.c_str());
-        }
-        else
-        {
-            SWSS_LOG_INFO("set loglevel failed: %s", sai_serialize_status(status).c_str());
-        }
-    }
-    catch (const std::exception& e)
-    {
-        SWSS_LOG_ERROR("Failed to set loglevel to %s on %s: %s",
-                strLogLevel.c_str(),
-                strApi.c_str(),
-                e.what());
-    }
-}
-
-void set_sai_api_loglevel()
-{
-    SWSS_LOG_ENTER();
-
-    // We start from 1 since 0 is SAI_API_UNSPECIFIED.
-
-    for (uint32_t idx = 1; idx < sai_metadata_enum_sai_api_t.valuescount; ++idx)
-    {
-        // TODO std::function<void(void)> f = std::bind(&Foo::doSomething, this);
-        swss::Logger::linkToDb(
-                sai_metadata_enum_sai_api_t.valuesnames[idx],
-                saiLoglevelNotify,
-                sai_serialize_log_level(SAI_LOG_LEVEL_NOTICE));
-    }
-}
-
-void set_sai_api_log_min_prio(const std::string &prioStr)
-{
-    SWSS_LOG_ENTER();
-
-    // We start from 1 since 0 is SAI_API_UNSPECIFIED.
-
-    for (uint32_t idx = 1; idx < sai_metadata_enum_sai_api_t.valuescount; ++idx)
-    {
-        const auto& api_name = sai_metadata_enum_sai_api_t.valuesnames[idx];
-        saiLoglevelNotify(api_name, prioStr);
-    }
-}
 
 void timerWatchdogCallback(
         _In_ int64_t span)
@@ -276,8 +214,6 @@ void redisClearRidToVidMap()
  */
 bool enableRefernceCountLogs = false;
 
-extern std::shared_ptr<Syncd> g_syncd;
-
 int syncd_main(int argc, char **argv)
 {
     swss::Logger::getInstance().setMinPrio(swss::Logger::SWSS_DEBUG);
@@ -285,8 +221,6 @@ int syncd_main(int argc, char **argv)
     SWSS_LOG_ENTER();
 
     swss::Logger::getInstance().setMinPrio(swss::Logger::SWSS_NOTICE);
-
-    set_sai_api_loglevel();
 
     swss::Logger::linkToDbNative("syncd"); // TODO fix also in discovery
 

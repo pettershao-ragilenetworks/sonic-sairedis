@@ -80,6 +80,12 @@ namespace syncd
 
             void loadProfileMap();
 
+            void saiLoglevelNotify(
+                    _In_ std::string strApi,
+                    _In_ std::string strLogLevel);
+
+            void setSaiApiLogLevel();
+
         private:
 
             sai_status_t processNotifySyncd(

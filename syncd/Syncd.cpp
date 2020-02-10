@@ -76,6 +76,7 @@ void get_port_related_objects(
 
 using namespace syncd;
 using namespace saimeta;
+using namespace std::placeholders;
 
 Syncd::Syncd(
         _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,
@@ -88,6 +89,8 @@ Syncd::Syncd(
     m_vendorSai(vendorSai)
 {
     SWSS_LOG_ENTER();
+
+    setSaiApiLogLevel();
 
     m_manager = std::make_shared<FlexCounterManager>();
 
@@ -3131,3 +3134,55 @@ void Syncd::sendShutdownRequestAfterException()
     }
 }
 
+void Syncd::saiLoglevelNotify(
+        _In_ std::string strApi,
+        _In_ std::string strLogLevel)
+{
+    SWSS_LOG_ENTER();
+
+    try
+    {
+        sai_log_level_t logLevel;
+        sai_deserialize_log_level(strLogLevel, logLevel);
+
+        sai_api_t api;
+        sai_deserialize_api(strApi, api);
+
+        sai_status_t status = m_vendorSai->logSet(api, logLevel);
+
+        if (status == SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_NOTICE("Setting SAI loglevel %s on %s", strLogLevel.c_str(), strApi.c_str());
+        }
+        else
+        {
+            SWSS_LOG_INFO("set loglevel failed: %s", sai_serialize_status(status).c_str());
+        }
+    }
+    catch (const std::exception& e)
+    {
+        SWSS_LOG_ERROR("Failed to set loglevel to %s on %s: %s",
+                strLogLevel.c_str(),
+                strApi.c_str(),
+                e.what());
+    }
+}
+
+void Syncd::setSaiApiLogLevel()
+{
+    SWSS_LOG_ENTER();
+
+    // We start from 1 since 0 is SAI_API_UNSPECIFIED.
+
+    for (uint32_t idx = 1; idx < sai_metadata_enum_sai_api_t.valuescount; ++idx)
+    {
+        // NOTE: link to db is singleton, so if we would want multiple Syncd
+        // instances running at the same process, we need to have logger
+        // registrar similar to net link messages
+
+        swss::Logger::linkToDb(
+                sai_metadata_enum_sai_api_t.valuesnames[idx],
+                std::bind(&Syncd::saiLoglevelNotify, this, _1, _2),
+                sai_serialize_log_level(SAI_LOG_LEVEL_NOTICE));
+    }
+}
