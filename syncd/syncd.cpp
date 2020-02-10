@@ -1,10 +1,5 @@
 #include "syncd.h"
 #include "sairediscommon.h"
-#include "swss/tokenize.h"
-
-#include "swss/warm_restart.h"
-#include "swss/table.h"
-#include "swss/redisapi.h"
 
 #include "TimerWatchdog.h"
 #include "CommandLineOptionsParser.h"
@@ -17,15 +12,21 @@
 #include "VirtualOidTranslator.h"
 #include "ServiceMethodTable.h"
 #include "SwitchNotifications.h"
-
 #include "VirtualObjectIdManager.h"
 #include "RedisVidIndexGenerator.h"
 #include "Syncd.h"
 #include "RequestShutdown.h"
 #include "ComparisonLogic.h"
 
+#include "meta/sai_serialize.h"
+
 #include "swss/notificationconsumer.h"
 #include "swss/select.h"
+#include "swss/tokenize.h"
+#include "swss/warm_restart.h"
+#include "swss/table.h"
+#include "swss/redisapi.h"
+
 
 #include <inttypes.h>
 #include <limits.h>
@@ -341,10 +342,6 @@ void redisClearVidToRidMap()
 {
     SWSS_LOG_ENTER();
 
-    /*
-     * NOTE: needs to be done per switch.
-     */
-
     g_redisClient->del(VIDTORID);
 }
 
@@ -352,30 +349,7 @@ void redisClearRidToVidMap()
 {
     SWSS_LOG_ENTER();
 
-    /*
-     * NOTE: needs to be done per switch.
-     */
-
     g_redisClient->del(RIDTOVID);
-}
-
-
-std::unordered_map<sai_object_id_t, sai_object_id_t> redisGetVidToRidMap()
-{
-    SWSS_LOG_ENTER();
-
-    /*
-     * NOTE: To support multiple switches VIDTORID must be per switch.
-     */
-
-    return SaiSwitch::redisGetObjectMap(VIDTORID);
-}
-
-std::vector<std::string> redisGetAsicStateKeys()
-{
-    SWSS_LOG_ENTER();
-
-    return g_redisClient->keys(ASIC_STATE_TABLE + std::string(":*"));
 }
 
 /**

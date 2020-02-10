@@ -39,13 +39,13 @@ sai_status_t processBulkEntry(
         _In_ sai_object_type_t objectType,
         _In_ const std::vector<std::string> &objectIds,
         _In_ sai_common_api_t api,
-        _In_ const std::vector<std::shared_ptr<SaiAttributeList>> &attributes);
+        _In_ const std::vector<std::shared_ptr<saimeta::SaiAttributeList>> &attributes);
 
 sai_status_t processBulkOid(
         _In_ sai_object_type_t objectType,
         _In_ const std::vector<std::string> &objectIds,
         _In_ sai_common_api_t api,
-        _In_ const std::vector<std::shared_ptr<SaiAttributeList>> &attributes);
+        _In_ const std::vector<std::shared_ptr<saimeta::SaiAttributeList>> &attributes);
 
 void sendApiResponse(
         _In_ sai_common_api_t api,
@@ -73,6 +73,7 @@ void get_port_related_objects(
         _Out_ std::vector<sai_object_id_t>& related);
 
 using namespace syncd;
+using namespace saimeta;
 
 Syncd::Syncd(
         _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,

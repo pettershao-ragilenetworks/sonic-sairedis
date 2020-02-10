@@ -13,10 +13,10 @@
 #include "syncd.h" // TODO to be removed
 
 using namespace syncd;
+using namespace saimeta;
 
 extern std::shared_ptr<NotificationHandler> g_handler;
 extern sai_object_id_t gSwitchId;
-extern std::shared_ptr<CommandLineOptions> g_commandLineOptions; // TODO to be removed
 
 SingleReiniter::SingleReiniter(
         _In_ std::shared_ptr<sairedis::SaiInterface> sai,

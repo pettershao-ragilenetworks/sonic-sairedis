@@ -4,7 +4,7 @@
 
 #include "lib/inc/SaiInterface.h"
 
-#include "meta/saiattributelist.h"
+#include "meta/SaiAttributeList.h"
 
 #include <string>
 #include <unordered_map>
@@ -63,7 +63,7 @@ namespace syncd
             sai_object_id_t processSingleVid(
                     _In_ sai_object_id_t vid);
 
-            std::shared_ptr<SaiAttributeList> redisGetAttributesFromAsicKey(
+            std::shared_ptr<saimeta::SaiAttributeList> redisGetAttributesFromAsicKey(
                     _In_ const std::string &key);
 
             void processAttributesForOids(
@@ -113,7 +113,7 @@ namespace syncd
 
             std::vector<std::string> m_asicKeys;
 
-            std::unordered_map<std::string, std::shared_ptr<SaiAttributeList>> m_attributesLists;
+            std::unordered_map<std::string, std::shared_ptr<saimeta::SaiAttributeList>> m_attributesLists;
 
             std::map<sai_object_type_t, std::tuple<int,double>> m_perf_create;
             std::map<sai_object_type_t, std::tuple<int,double>> m_perf_set;

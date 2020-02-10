@@ -4,13 +4,14 @@
 #include "swss/logger.h"
 
 #include "meta/sai_serialize.h"
-#include "meta/saiattributelist.h"
+#include "meta/SaiAttributeList.h"
 
 #include "syncd.h" // TODO to be removed
 
 #include <inttypes.h>
 
 using namespace syncd;
+using namespace saimeta;
 
 NotificationProcessor::NotificationProcessor()
 {

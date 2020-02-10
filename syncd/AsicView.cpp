@@ -3,7 +3,7 @@
 #include "swss/logger.h"
 
 #include "meta/sai_serialize.h"
-#include "meta/saiattributelist.h"
+#include "meta/SaiAttributeList.h"
 
 #include "VidManager.h"
 
@@ -12,6 +12,7 @@
 #include <algorithm>
 
 using namespace syncd;
+using namespace saimeta;
 
 extern bool enableRefernceCountLogs; // TODO to be removed
 

@@ -9,11 +9,12 @@
 #include "swss/logger.h"
 
 #include "meta/sai_serialize.h"
-#include "meta/saiattributelist.h"
+#include "meta/SaiAttributeList.h"
 
 #include <inttypes.h>
 
 using namespace syncd;
+using namespace saimeta;
 
 extern bool enableRefernceCountLogs;
 extern std::shared_ptr<NotificationHandler> g_handler;
