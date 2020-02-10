@@ -3,11 +3,12 @@
 #include "swss/logger.h"
 
 #include "meta/sai_serialize.h"
-#include "meta/saiattributelist.h"
+#include "meta/SaiAttributeList.h"
 
 #include <inttypes.h>
 
 using namespace saivs;
+using namespace saimeta;
 
 sai_status_t VirtualSwitchSaiInterface::preSetPort(
         _In_ sai_object_id_t port_id,

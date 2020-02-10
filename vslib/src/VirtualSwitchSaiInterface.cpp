@@ -3,7 +3,7 @@
 #include "swss/logger.h"
 
 #include "meta/sai_serialize.h"
-#include "meta/saiattributelist.h"
+#include "meta/SaiAttributeList.h"
 
 #include <inttypes.h>
 
@@ -21,6 +21,7 @@
 #define MAX_HARDWARE_INFO_LENGTH 0x1000
 
 using namespace saivs;
+using namespace saimeta;
 
 VirtualSwitchSaiInterface::VirtualSwitchSaiInterface(
         _In_ const std::shared_ptr<SwitchConfigContainer> scc)
