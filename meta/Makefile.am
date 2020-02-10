@@ -75,7 +75,7 @@ clean-local:
 
 libsaimetadata_la_SOURCES = \
 							../lib/src/SaiInterface.cpp \
-							saiattributelist.cpp \
+							SaiAttributeList.cpp \
 							saiserialize.cpp \
 							SaiAttrWrapper.cpp \
 							OidRefCounter.cpp \
