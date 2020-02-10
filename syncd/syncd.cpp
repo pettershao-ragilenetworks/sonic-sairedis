@@ -116,7 +116,9 @@ void notify_OA_about_syncd_exception()
 
             SWSS_LOG_NOTICE("sending switch_shutdown_request notification to OA");
 
-            notifications->send("switch_shutdown_request", "", entry);
+            // TODO add null object as switch ID
+
+            notifications->send(SAI_SWITCH_NOTIFICATION_NAME_SWITCH_SHUTDOWN_REQUEST, "", entry);
 
             SWSS_LOG_NOTICE("notification send successfull");
         }
@@ -444,8 +446,8 @@ int syncd_main(int argc, char **argv)
      * response queue will also trigger another "response".
      */
 
-    g_syncd->m_getResponse  = std::make_shared<swss::ProducerTable>(dbAsic.get(), "GETRESPONSE");
-    notifications = std::make_shared<swss::NotificationProducer>(dbNtf.get(), "NOTIFICATIONS");
+    g_syncd->m_getResponse  = std::make_shared<swss::ProducerTable>(dbAsic.get(), REDIS_TABLE_GETRESPONSE);
+    notifications = std::make_shared<swss::NotificationProducer>(dbNtf.get(), REDIS_TABLE_NOTIFICATIONS);
 
     std::string fdbFlushLuaScript = swss::loadLuaScript("fdb_flush.lua");
     fdbFlushSha = swss::loadRedisScript(dbAsic.get(), fdbFlushLuaScript);
