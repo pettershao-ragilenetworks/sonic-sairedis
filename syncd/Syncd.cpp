@@ -3077,3 +3077,55 @@ void Syncd::diagShellThreadProc(
     }
 }
 
+void Syncd::sendShutdownRequest(
+        _In_ sai_object_id_t switchVid)
+{
+    SWSS_LOG_ENTER();
+
+    auto s = sai_serialize_object_id(switchVid);
+
+    SWSS_LOG_NOTICE("sending switch_shutdown_request notification to OA for switch: %s", s.c_str());
+
+    std::vector<swss::FieldValueTuple> entry;
+
+    notifications->send(SAI_SWITCH_NOTIFICATION_NAME_SWITCH_SHUTDOWN_REQUEST, s, entry);
+}
+
+void Syncd::sendShutdownRequestAfterException()
+{
+    SWSS_LOG_ENTER();
+
+    std::lock_guard<std::mutex> lock(g_mutex); // TODO
+
+    if (notifications == nullptr)
+    {
+        SWSS_LOG_WARN("notifications pointer is NULL");
+        return;
+    }
+
+    try
+    {
+        if (switches.size())
+        {
+            for (auto& kvp: switches)
+            {
+                sendShutdownRequest(kvp.second->getVid());
+            }
+        }
+        else
+        {
+            sendShutdownRequest(SAI_NULL_OBJECT_ID);
+        }
+
+        SWSS_LOG_NOTICE("notification send successfull");
+    }
+    catch(const std::exception &e)
+    {
+        SWSS_LOG_ERROR("Runtime error: %s", e.what());
+    }
+    catch(...)
+    {
+        SWSS_LOG_ERROR("Unknown runtime error");
+    }
+}
+

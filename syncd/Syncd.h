@@ -71,6 +71,11 @@ namespace syncd
 
             void performStartupLogic();
 
+            void sendShutdownRequest(
+                    _In_ sai_object_id_t switchVid);
+
+            void sendShutdownRequestAfterException();
+
         private:
 
             void loadProfileMap();

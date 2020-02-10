@@ -104,35 +104,6 @@ std::shared_ptr<CommandLineOptions> g_commandLineOptions; // TODO move to syncd 
 
 bool g_veryFirstRun = false;
 
-void notify_OA_about_syncd_exception()
-{
-    SWSS_LOG_ENTER();
-
-    try
-    {
-        if (notifications != NULL)
-        {
-            std::vector<swss::FieldValueTuple> entry;
-
-            SWSS_LOG_NOTICE("sending switch_shutdown_request notification to OA");
-
-            // TODO add null object as switch ID
-
-            notifications->send(SAI_SWITCH_NOTIFICATION_NAME_SWITCH_SHUTDOWN_REQUEST, "", entry);
-
-            SWSS_LOG_NOTICE("notification send successfull");
-        }
-    }
-    catch(const std::exception &e)
-    {
-        SWSS_LOG_ERROR("Runtime error: %s", e.what());
-    }
-    catch(...)
-    {
-        SWSS_LOG_ERROR("Unknown runtime error");
-    }
-}
-
 typedef enum _syncd_restart_type_t
 {
     SYNCD_RESTART_TYPE_COLD,
@@ -514,7 +485,7 @@ int syncd_main(int argc, char **argv)
     {
         SWSS_LOG_ERROR("Runtime error during syncd init: %s", e.what());
 
-        notify_OA_about_syncd_exception();
+        g_syncd->sendShutdownRequestAfterException();
 
         s = std::make_shared<swss::Select>();
 
@@ -639,7 +610,7 @@ int syncd_main(int argc, char **argv)
         {
             SWSS_LOG_ERROR("Runtime error: %s", e.what());
 
-            notify_OA_about_syncd_exception();
+            g_syncd->sendShutdownRequestAfterException();
 
             s = std::make_shared<swss::Select>();
 
