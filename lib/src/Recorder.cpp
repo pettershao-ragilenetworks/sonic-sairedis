@@ -5,7 +5,7 @@
 #include "Recorder.h"
 
 #include "meta/sai_serialize.h"
-#include "meta/saiattributelist.h"
+#include "meta/SaiAttributeList.h"
 
 #include <unistd.h>
 #include <inttypes.h>
@@ -13,6 +13,7 @@
 #include <cstring>
 
 using namespace sairedis;
+using namespace saimeta;
 
 std::string joinFieldValues(
         _In_ const std::vector<swss::FieldValueTuple> &values);

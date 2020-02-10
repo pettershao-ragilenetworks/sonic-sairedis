@@ -6,13 +6,15 @@ extern "C" {
 #include "swss/table.h"
 
 #include "meta/sai_serialize.h"
-#include "meta/saiattributelist.h"
+#include "meta/SaiAttributeList.h"
 
 #include <unistd.h>
 
 #include <iostream>
 #include <chrono>
 #include <vector>
+
+using namespace saimeta;
 
 sai_object_type_t sai_object_type_query(
         _In_ sai_object_id_t objectId)

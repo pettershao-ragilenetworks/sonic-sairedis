@@ -9,11 +9,12 @@
 #include "sairediscommon.h"
 
 #include "meta/sai_serialize.h"
-#include "meta/saiattributelist.h"
+#include "meta/SaiAttributeList.h"
 
 #include <inttypes.h>
 
 using namespace sairedis;
+using namespace saimeta;
 using namespace std::placeholders;
 
 std::string joinFieldValues(
