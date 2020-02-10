@@ -19,11 +19,13 @@
 
 #define DEF_SAI_WARM_BOOT_DATA_FILE "/var/warmboot/sai-warmboot.bin"
 
-// TODO mutex must be used in 3 places
+// TODO mutex must be used in 4 places
 // - notification processing
 // - main event loop processing
 // - syncd hard init when switches are created
 //   (notifications could be sent during that)
+// - in case of exception when sending shutdown request
+//   (other notifications can still arrive at this point)
 
 #include "syncd.h" // TODO to be removed
 

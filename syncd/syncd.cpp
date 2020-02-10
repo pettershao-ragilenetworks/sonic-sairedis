@@ -17,6 +17,7 @@
 #include "Syncd.h"
 #include "RequestShutdown.h"
 #include "ComparisonLogic.h"
+#include "MetadataLogger.h"
 
 #include "meta/sai_serialize.h"
 
@@ -26,7 +27,6 @@
 #include "swss/warm_restart.h"
 #include "swss/table.h"
 #include "swss/redisapi.h"
-
 
 #include <inttypes.h>
 #include <limits.h>
@@ -247,62 +247,6 @@ void set_sai_api_log_min_prio(const std::string &prioStr)
     }
 }
 
-void sai_meta_log_syncd(
-        _In_ sai_log_level_t log_level,
-        _In_ const char *file,
-        _In_ int line,
-        _In_ const char *func,
-        _In_ const char *format,
-        ...)
-    __attribute__ ((format (printf, 5, 6)));
-
-void sai_meta_log_syncd(
-        _In_ sai_log_level_t log_level,
-        _In_ const char *file,
-        _In_ int line,
-        _In_ const char *func,
-        _In_ const char *format,
-        ...)
-{
-    // SWSS_LOG_ENTER() is omitted since this is logging for metadata
-
-    char buffer[0x1000];
-
-    va_list ap;
-    va_start(ap, format);
-    vsnprintf(buffer, 0x1000, format, ap);
-    va_end(ap);
-
-    swss::Logger::Priority p = swss::Logger::SWSS_NOTICE;
-
-    switch (log_level)
-    {
-        case SAI_LOG_LEVEL_DEBUG:
-            p = swss::Logger::SWSS_DEBUG;
-            break;
-        case SAI_LOG_LEVEL_INFO:
-            p = swss::Logger::SWSS_INFO;
-            break;
-        case SAI_LOG_LEVEL_ERROR:
-            p = swss::Logger::SWSS_ERROR;
-            fprintf(stderr, "ERROR: %s: %s", func, buffer);
-            break;
-        case SAI_LOG_LEVEL_WARN:
-            p = swss::Logger::SWSS_WARN;
-            fprintf(stderr, "WARN: %s: %s", func, buffer);
-            break;
-        case SAI_LOG_LEVEL_CRITICAL:
-            p = swss::Logger::SWSS_CRIT;
-            break;
-
-        default:
-            p = swss::Logger::SWSS_NOTICE;
-            break;
-    }
-
-    swss::Logger::getInstance().write(p, ":- %s: %s", func, buffer);
-}
-
 void timerWatchdogCallback(
         _In_ int64_t span)
 {
@@ -361,10 +305,7 @@ int syncd_main(int argc, char **argv)
 
     g_handler->setSwitchNotifications(sn.getSwitchNotifications());
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsuggest-attribute=format"
-    sai_metadata_log = &sai_meta_log_syncd;
-#pragma GCC diagnostic pop
+    MetadataLogger::initialize();
 
     // TODO move to syncd object
     g_commandLineOptions = CommandLineOptionsParser::parseCommandLine(argc, argv);

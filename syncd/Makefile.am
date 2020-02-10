@@ -16,6 +16,7 @@ endif
 
 noinst_LIBRARIES = libsyncd.a
 libsyncd_a_SOURCES = \
+				MetadataLogger.cpp \
 				Workaround.cpp \
 				Syncd.cpp \
 				ServiceMethodTable.cpp \
