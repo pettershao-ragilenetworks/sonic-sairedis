@@ -96,7 +96,7 @@ syncd_restart_type_t handleRestartQuery(
 
     restartQuery.pop(op, data, values);
 
-    SWSS_LOG_DEBUG("op = %s", op.c_str());
+    SWSS_LOG_NOTICE("received %s switch shutdown event", op.c_str());
 
     return RequestShutdownCommandLineOptions::stringToRestartType(op);
 }
@@ -326,7 +326,7 @@ int syncd_main(int argc, char **argv)
         {
             swss::Selectable *sel = NULL;
 
-            int result = s->select(&sel);
+            s->select(&sel);
 
             twd.setStartTime();
 
@@ -410,7 +410,7 @@ int syncd_main(int argc, char **argv)
             {
                 g_syncd->processFlexCounterGroupEvent(*(swss::ConsumerTable*)sel);
             }
-            else if (result == swss::Select::OBJECT)
+            else if (sel == asicState.get())
             {
                 g_syncd->processEvent(*(swss::ConsumerTable*)sel);
             }
