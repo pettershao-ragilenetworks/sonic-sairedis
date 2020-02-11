@@ -40,22 +40,22 @@ std::shared_ptr<RequestShutdownCommandLineOptions> RequestShutdownCommandLineOpt
         switch (c)
         {
             case 'c':
-                options->m_op = "COLD";
+                options->setRestartType(SYNCD_RESTART_TYPE_COLD);
                 optionSpecified = true;
                 break;
 
             case 'w':
-                options->m_op = "WARM";
+                options->setRestartType(SYNCD_RESTART_TYPE_WARM);
                 optionSpecified = true;
                 break;
 
             case 'f':
-                options->m_op = "FAST";
+                options->setRestartType(SYNCD_RESTART_TYPE_FAST);
                 optionSpecified = true;
                 break;
 
             case 'p':
-                options->m_op = "PRE-SHUTDOWN";
+                options->setRestartType(SYNCD_RESTART_TYPE_PRE_SHUTDOWN);
                 optionSpecified = true;
                 break;
 

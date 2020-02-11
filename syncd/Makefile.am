@@ -16,6 +16,7 @@ endif
 
 noinst_LIBRARIES = libsyncd.a
 libsyncd_a_SOURCES = \
+				RequestShutdownCommandLineOptions.cpp \
 				GlobalSwitchId.cpp \
 				MetadataLogger.cpp \
 				Workaround.cpp \

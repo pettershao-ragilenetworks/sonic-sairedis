@@ -85,18 +85,6 @@ std::shared_ptr<CommandLineOptions> g_commandLineOptions; // TODO move to syncd 
 
 bool g_veryFirstRun = false;
 
-typedef enum _syncd_restart_type_t
-{
-    SYNCD_RESTART_TYPE_COLD,
-
-    SYNCD_RESTART_TYPE_WARM,
-
-    SYNCD_RESTART_TYPE_FAST,
-
-    SYNCD_RESTART_TYPE_PRE_SHUTDOWN,
-
-} syncd_restart_type_t;
-
 syncd_restart_type_t handleRestartQuery(
         _In_ swss::NotificationConsumer &restartQuery)
 {
@@ -110,32 +98,7 @@ syncd_restart_type_t handleRestartQuery(
 
     SWSS_LOG_DEBUG("op = %s", op.c_str());
 
-    if (op == "COLD")
-    {
-        SWSS_LOG_NOTICE("received COLD switch shutdown event");
-        return SYNCD_RESTART_TYPE_COLD;
-    }
-
-    if (op == "WARM")
-    {
-        SWSS_LOG_NOTICE("received WARM switch shutdown event");
-        return SYNCD_RESTART_TYPE_WARM;
-    }
-
-    if (op == "FAST")
-    {
-        SWSS_LOG_NOTICE("received FAST switch shutdown event");
-        return SYNCD_RESTART_TYPE_FAST;
-    }
-
-    if (op == "PRE-SHUTDOWN")
-    {
-        SWSS_LOG_NOTICE("received PRE_SHUTDOWN switch event");
-        return SYNCD_RESTART_TYPE_PRE_SHUTDOWN;
-    }
-
-    SWSS_LOG_WARN("received '%s' unknown switch shutdown event, assuming COLD", op.c_str());
-    return SYNCD_RESTART_TYPE_COLD;
+    return RequestShutdownCommandLineOptions::stringToRestartType(op);
 }
 
 bool isVeryFirstRun()

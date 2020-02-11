@@ -34,7 +34,7 @@ void RequestShutdown::send()
 
     std::vector<swss::FieldValueTuple> values;
 
-    auto op = m_options->m_op;
+    auto op = RequestShutdownCommandLineOptions::restartTypeToString(m_options->getRestartType());
 
     SWSS_LOG_NOTICE("requested %s shutdown", op.c_str());
 
