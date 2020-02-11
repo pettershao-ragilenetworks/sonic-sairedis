@@ -2692,6 +2692,8 @@ void Syncd::onSyncdStart(
     {
         startDiagShell(sw.second->getRid());
     }
+
+    SWSS_LOG_NOTICE("hard reinit succeeded");
 }
 
 void Syncd::onSwitchCreateInInitViewMode(

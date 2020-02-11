@@ -12,6 +12,7 @@
 #include "Syncd.h"
 #include "RequestShutdown.h"
 #include "MetadataLogger.h"
+#include "WarmRestartTable.h"
 
 #include "meta/sai_serialize.h"
 
@@ -205,8 +206,8 @@ int syncd_main(int argc, char **argv)
 
     dbAsic = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
     std::shared_ptr<swss::DBConnector> dbNtf = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
-    std::shared_ptr<swss::DBConnector> dbState = std::make_shared<swss::DBConnector>("STATE_DB", 0);
-    std::shared_ptr<swss::Table> warmRestartTable = std::make_shared<swss::Table>(dbState.get(), STATE_WARM_RESTART_TABLE_NAME);
+
+    WarmRestartTable warmRestartTable("STATE_DB");
 
     g_redisClient = std::make_shared<swss::RedisClient>(dbAsic.get());
 
@@ -281,9 +282,7 @@ int syncd_main(int argc, char **argv)
 
     try
     {
-        SWSS_LOG_NOTICE("before onSyncdStart");
         g_syncd->onSyncdStart(g_commandLineOptions->m_startType == SAI_START_TYPE_WARM_BOOT);
-        SWSS_LOG_NOTICE("after onSyncdStart");
 
         // create notifications processing thread after we create_switch to
         // make sure, we have switch_id translated to VID before we start
@@ -374,7 +373,7 @@ int syncd_main(int argc, char **argv)
 
                     shutdownType = SYNCD_RESTART_TYPE_COLD;
 
-                    warmRestartTable->hset("warm-shutdown", "state", "set-flag-failed");
+                    warmRestartTable.setFlagFailed();
                     continue;
                 }
 
@@ -382,7 +381,7 @@ int syncd_main(int argc, char **argv)
 
                 if (status == SAI_STATUS_SUCCESS)
                 {
-                    warmRestartTable->hset("warm-shutdown", "state", "pre-shutdown-succeeded");
+                    warmRestartTable.setPreShutdown(true);
 
                     s = std::make_shared<swss::Select>(); // make sure previous select is destroyed
 
@@ -395,7 +394,7 @@ int syncd_main(int argc, char **argv)
                     SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_PRE_SHUTDOWN=true: %s",
                             sai_serialize_status(status).c_str());
 
-                    warmRestartTable->hset("warm-shutdown", "state", "pre-shutdown-failed");
+                    warmRestartTable.setPreShutdown(false);
 
                     // Restore cold shutdown.
 
@@ -452,7 +451,7 @@ int syncd_main(int argc, char **argv)
             SWSS_LOG_WARN("user requested warm shutdown but warmBootWriteFile is not specified, forcing cold shutdown");
 
             shutdownType = SYNCD_RESTART_TYPE_COLD;
-            warmRestartTable->hset("warm-shutdown", "state", "warm-shutdown-failed");
+            warmRestartTable.setWarmShutdown(false);
         }
         else
         {
@@ -467,7 +466,7 @@ int syncd_main(int argc, char **argv)
 
                 shutdownType = SYNCD_RESTART_TYPE_COLD;
 
-                warmRestartTable->hset("warm-shutdown", "state", "set-flag-failed");
+                warmRestartTable.setFlagFailed();
             }
         }
     }
@@ -490,10 +489,7 @@ int syncd_main(int argc, char **argv)
 
     if (shutdownType == SYNCD_RESTART_TYPE_WARM)
     {
-        warmRestartTable->hset("warm-shutdown", "state",
-                              (status == SAI_STATUS_SUCCESS) ?
-                              "warm-shutdown-succeeded":
-                              "warm-shutdown-failed");
+        warmRestartTable.setWarmShutdown(status == SAI_STATUS_SUCCESS);
     }
 
     SWSS_LOG_NOTICE("calling api uninitialize");
