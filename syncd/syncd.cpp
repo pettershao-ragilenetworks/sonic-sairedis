@@ -326,7 +326,7 @@ int syncd_main(int argc, char **argv)
         {
             swss::Selectable *sel = NULL;
 
-            s->select(&sel);
+            int result = s->select(&sel);
 
             twd.setStartTime();
 
@@ -413,6 +413,10 @@ int syncd_main(int argc, char **argv)
             else if (sel == asicState.get())
             {
                 g_syncd->processEvent(*(swss::ConsumerTable*)sel);
+            }
+            else
+            {
+                SWSS_LOG_ERROR("select failed: %d", result);
             }
 
             twd.setEndTime();
