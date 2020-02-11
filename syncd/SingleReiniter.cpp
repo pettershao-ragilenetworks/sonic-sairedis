@@ -16,7 +16,6 @@ using namespace syncd;
 using namespace saimeta;
 
 extern std::shared_ptr<NotificationHandler> g_handler;
-extern sai_object_id_t gSwitchId;
 
 SingleReiniter::SingleReiniter(
         _In_ std::shared_ptr<sairedis::SaiInterface> sai,
@@ -292,19 +291,6 @@ void SingleReiniter::processSwitches()
             SWSS_LOG_TIMER("Cold boot: create switch");
             status = m_vendorSai->create(SAI_OBJECT_TYPE_SWITCH, &m_switch_rid, 0, attr_count, attr_list);
         }
-
-//#ifdef SAITHRIFT
-
-        if (gSwitchId != SAI_NULL_OBJECT_ID)
-        {
-            SWSS_LOG_THROW("gSwitchId already contain switch!, SAI THRIFT don't support multiple switches yer, FIXME");
-        }
-
-        gSwitchId = m_switch_rid;
-
-        SWSS_LOG_NOTICE("Initialize gSwitchId with ID = %s",
-                sai_serialize_object_id(gSwitchId).c_str());
-//#endif
 
         if (status != SAI_STATUS_SUCCESS)
         {

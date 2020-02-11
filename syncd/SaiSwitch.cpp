@@ -2,6 +2,7 @@
 #include "VendorSai.h"
 #include "SaiDiscovery.h"
 #include "VidManager.h"
+#include "GlobalSwitchId.h"
 
 #include "sairediscommon.h"
 
@@ -1047,6 +1048,8 @@ SaiSwitch::SaiSwitch(
 
     m_switch_rid = switch_rid;
     m_switch_vid = switch_vid;
+
+    GlobalSwitchId::setSwitchId(m_switch_rid);
 
     m_hardware_info = saiGetHardwareInfo();
 

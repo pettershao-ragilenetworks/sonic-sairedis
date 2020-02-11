@@ -3,37 +3,24 @@
 
 #include "TimerWatchdog.h"
 #include "CommandLineOptionsParser.h"
-#include "PortMapParser.h"
-#include "VidManager.h"
-#include "FlexCounterManager.h"
-#include "HardReiniter.h"
 #include "NotificationProcessor.h"
 #include "NotificationHandler.h"
-#include "VirtualOidTranslator.h"
 #include "ServiceMethodTable.h"
 #include "SwitchNotifications.h"
 #include "VirtualObjectIdManager.h"
 #include "RedisVidIndexGenerator.h"
 #include "Syncd.h"
 #include "RequestShutdown.h"
-#include "ComparisonLogic.h"
 #include "MetadataLogger.h"
 
 #include "meta/sai_serialize.h"
 
 #include "swss/notificationconsumer.h"
 #include "swss/select.h"
-#include "swss/tokenize.h"
 #include "swss/warm_restart.h"
-#include "swss/table.h"
 #include "swss/redisapi.h"
 
 #include <inttypes.h>
-#include <limits.h>
-
-#include <iostream>
-#include <map>
-#include <unordered_map>
 
 using namespace syncd;
 using namespace std::placeholders;
@@ -88,12 +75,6 @@ std::shared_ptr<swss::NotificationProducer> notifications;
  * Key is switch VID.
  */
 std::map<sai_object_id_t, std::shared_ptr<SaiSwitch>> switches;
-
-
-/*
- * SAI switch global needed for RPC server and for remove_switch
- */
-sai_object_id_t gSwitchId = SAI_NULL_OBJECT_ID;
 
 // TODO we must be sure that all threads and notifications will be stopped
 // before destructor will be called on those objects
@@ -205,6 +186,139 @@ void redisClearRidToVidMap()
     SWSS_LOG_ENTER();
 
     g_redisClient->del(RIDTOVID);
+}
+
+sai_status_t removeAllSwitches()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_NOTICE("Removing all switches");
+
+    // TODO mutex ?
+
+    sai_status_t result = SAI_STATUS_SUCCESS;
+
+    for (auto& sw: switches)
+    {
+        auto rid = sw.second->getRid();
+
+        auto strRid = sai_serialize_object_id(rid);
+
+        SWSS_LOG_TIMER("removing switch RID %s", strRid.c_str());
+
+        auto status = g_vendorSai->remove(SAI_OBJECT_TYPE_SWITCH, rid);
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_NOTICE("Can't delete a switch RID %s: %s",
+                    strRid.c_str(),
+                    sai_serialize_status(status).c_str());
+
+            result = status;
+        }
+    }
+
+    return result;
+}
+
+sai_status_t setRestartWarmOnAllSwitches(
+        _In_ bool flag)
+{
+    SWSS_LOG_ENTER();
+
+    sai_status_t result = SAI_STATUS_SUCCESS;
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_SWITCH_ATTR_RESTART_WARM;
+    attr.value.booldata = flag;
+
+    for (auto& sw: switches)
+    {
+        auto rid = sw.second->getRid();
+
+        auto strRid = sai_serialize_object_id(rid);
+
+        auto status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, rid, &attr);
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_RESTART_WARM=%s: %s:%s",
+                    (flag ? "true" : "false"),
+                    strRid.c_str(),
+                    sai_serialize_status(status).c_str());
+
+            result = status;
+        }
+    }
+
+    return result;
+}
+
+sai_status_t setPreShutdownOnAllSwitches()
+{
+    SWSS_LOG_ENTER();
+
+    sai_status_t result = SAI_STATUS_SUCCESS;
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_SWITCH_ATTR_PRE_SHUTDOWN;
+    attr.value.booldata = true;
+
+    for (auto& sw: switches)
+    {
+        auto rid = sw.second->getRid();
+
+        auto strRid = sai_serialize_object_id(rid);
+
+        auto status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, rid, &attr);
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_PRE_SHUTDOWN=true: %s:%s",
+                    strRid.c_str(),
+                    sai_serialize_status(status).c_str());
+
+            result = status;
+        }
+    }
+
+    return result;
+}
+
+sai_status_t setUninitDataPlaneOnRemovalOnAllSwitches()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_NOTICE("Fast/warm reboot requested, keeping data plane running");
+
+    sai_status_t result = SAI_STATUS_SUCCESS;
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_SWITCH_ATTR_UNINIT_DATA_PLANE_ON_REMOVAL;
+    attr.value.booldata = false;
+
+    for (auto& sw: switches)
+    {
+        auto rid = sw.second->getRid();
+
+        auto strRid = sai_serialize_object_id(rid);
+
+        auto status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, rid, &attr);
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_UNINIT_DATA_PLANE_ON_REMOVAL=false: %s:%s",
+                    strRid.c_str(),
+                    sai_serialize_status(status).c_str());
+
+            result = status;
+        }
+    }
+
+    return result;
 }
 
 /**
@@ -406,6 +520,7 @@ int syncd_main(int argc, char **argv)
                 SWSS_LOG_NOTICE("drained queue");
 
                 shutdownType = handleRestartQuery(*restartQuery);
+
                 if (shutdownType != SYNCD_RESTART_TYPE_PRE_SHUTDOWN)
                 {
                     // break out the event handling loop to shutdown syncd
@@ -420,12 +535,7 @@ int syncd_main(int argc, char **argv)
 
                 g_syncd->m_manager->removeAllCounters();
 
-                sai_attribute_t attr;
-
-                attr.id = SAI_SWITCH_ATTR_RESTART_WARM;
-                attr.value.booldata = true;
-
-                status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, gSwitchId, &attr);
+                status = setRestartWarmOnAllSwitches(true);
 
                 if (status != SAI_STATUS_SUCCESS)
                 {
@@ -438,10 +548,7 @@ int syncd_main(int argc, char **argv)
                     continue;
                 }
 
-                attr.id = SAI_SWITCH_ATTR_PRE_SHUTDOWN;
-                attr.value.booldata = true;
-
-                status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, gSwitchId, &attr);
+                status = setPreShutdownOnAllSwitches();
 
                 if (status == SAI_STATUS_SUCCESS)
                 {
@@ -461,9 +568,8 @@ int syncd_main(int argc, char **argv)
                     warmRestartTable->hset("warm-shutdown", "state", "pre-shutdown-failed");
 
                     // Restore cold shutdown.
-                    attr.id = SAI_SWITCH_ATTR_RESTART_WARM;
-                    attr.value.booldata = false;
-                    status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, gSwitchId, &attr);
+
+                    setRestartWarmOnAllSwitches(false);
                 }
             }
             else if (sel == flexCounter.get())
@@ -518,62 +624,35 @@ int syncd_main(int argc, char **argv)
         {
             SWSS_LOG_NOTICE("Warm Reboot requested, keeping data plane running");
 
-            sai_attribute_t attr;
-
-            attr.id = SAI_SWITCH_ATTR_RESTART_WARM;
-            attr.value.booldata = true;
-
-            status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, gSwitchId, &attr);
+            status = setRestartWarmOnAllSwitches(true);
 
             if (status != SAI_STATUS_SUCCESS)
             {
                 SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_RESTART_WARM=true: %s, fall back to cold restart",
                         sai_serialize_status(status).c_str());
+
                 shutdownType = SYNCD_RESTART_TYPE_COLD;
+
                 warmRestartTable->hset("warm-shutdown", "state", "set-flag-failed");
             }
         }
     }
 
-    SWSS_LOG_NOTICE("Removing the switch gSwitchId=0x%" PRIx64, gSwitchId);
-
 #ifdef SAI_SUPPORT_UNINIT_DATA_PLANE_ON_REMOVAL
 
     if (shutdownType == SYNCD_RESTART_TYPE_FAST || shutdownType == SYNCD_RESTART_TYPE_WARM)
     {
-        SWSS_LOG_NOTICE("Fast/warm reboot requested, keeping data plane running");
-
-        sai_attribute_t attr;
-
-        attr.id = SAI_SWITCH_ATTR_UNINIT_DATA_PLANE_ON_REMOVAL;
-        attr.value.booldata = false;
-
-        status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, gSwitchId, &attr);
-
-        if (status != SAI_STATUS_SUCCESS)
-        {
-            SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_UNINIT_DATA_PLANE_ON_REMOVAL=false: %s",
-                    sai_serialize_status(status).c_str());
-        }
+        setUninitDataPlaneOnRemovalOnAllSwitches();
     }
 
 #endif
 
     g_syncd->m_manager->removeAllCounters();
 
-    {
-        SWSS_LOG_TIMER("remove switch");
-        status = g_vendorSai->remove(SAI_OBJECT_TYPE_SWITCH, gSwitchId);
-    }
+    status = removeAllSwitches();
 
     // Stop notification thread after removing switch
     g_processor->stopNotificationsProcessingThread();
-
-    if (status != SAI_STATUS_SUCCESS)
-    {
-        SWSS_LOG_NOTICE("Can't delete a switch. gSwitchId=0x%" PRIx64 " status=%s", gSwitchId,
-                sai_serialize_status(status).c_str());
-    }
 
     if (shutdownType == SYNCD_RESTART_TYPE_WARM)
     {

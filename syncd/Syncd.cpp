@@ -30,7 +30,6 @@
 #include "syncd.h" // TODO to be removed
 
 extern bool g_veryFirstRun;
-extern sai_object_id_t gSwitchId; // TODO to be removed
 extern std::shared_ptr<syncd::NotificationHandler> g_handler;
 
 sai_status_t processQuadEvent(
@@ -1441,12 +1440,7 @@ sai_status_t Syncd::processOidCreate(
 
             switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, objectRid);
 
-            startDiagShell(switchRid); // TODO move inside SaiSwitch ?
-
-            gSwitchId = objectRid; // TODO remove
-
-            SWSS_LOG_NOTICE("Initialize gSwitchId with ID = %s",
-                    sai_serialize_object_id(gSwitchId).c_str());
+            startDiagShell(switchRid);
         }
 
         if (objectType == SAI_OBJECT_TYPE_PORT)
@@ -2777,12 +2771,6 @@ void Syncd::onSwitchCreateInInitViewMode(
                     sai_serialize_status(status).c_str());
         }
 
-        // TODO move inside SaiSwitch
-#ifdef SAITHRIFT
-        gSwitchId = switchRid;
-        SWSS_LOG_NOTICE("Initialize gSwitchId with ID = 0x%" PRIx64, gSwitchId);
-#endif
-
         /*
          * Object was created so new RID was generated we need to save virtual
          * id's to redis db.
@@ -2798,7 +2786,7 @@ void Syncd::onSwitchCreateInInitViewMode(
 
         switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid);
 
-        startDiagShell(switchRid); // TODO
+        startDiagShell(switchRid);
     }
     else
     {
@@ -2986,23 +2974,7 @@ void Syncd::performWarmRestartSingleSwitch(
 
     auto sw = switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid, true);
 
-    startDiagShell(switchRid); // TODO
-
-//#ifdef SAITHRIFT
-
-    /*
-     * Populate gSwitchId since it's needed if we want to make multiple warm
-     * starts in a row.
-     */
-
-    if (gSwitchId != SAI_NULL_OBJECT_ID)
-    {
-        SWSS_LOG_THROW("gSwitchId already contain switch!, SAI THRIFT don't support multiple switches yet, FIXME");
-    }
-
-    gSwitchId = switchRid; // TODO this is needed on warm boot
-
-//#endif
+    startDiagShell(switchRid);
 }
 
 void Syncd::performWarmRestart()
