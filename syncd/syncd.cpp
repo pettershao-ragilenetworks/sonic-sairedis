@@ -188,139 +188,6 @@ void redisClearRidToVidMap()
     g_redisClient->del(RIDTOVID);
 }
 
-sai_status_t removeAllSwitches()
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_NOTICE("Removing all switches");
-
-    // TODO mutex ?
-
-    sai_status_t result = SAI_STATUS_SUCCESS;
-
-    for (auto& sw: switches)
-    {
-        auto rid = sw.second->getRid();
-
-        auto strRid = sai_serialize_object_id(rid);
-
-        SWSS_LOG_TIMER("removing switch RID %s", strRid.c_str());
-
-        auto status = g_vendorSai->remove(SAI_OBJECT_TYPE_SWITCH, rid);
-
-        if (status != SAI_STATUS_SUCCESS)
-        {
-            SWSS_LOG_NOTICE("Can't delete a switch RID %s: %s",
-                    strRid.c_str(),
-                    sai_serialize_status(status).c_str());
-
-            result = status;
-        }
-    }
-
-    return result;
-}
-
-sai_status_t setRestartWarmOnAllSwitches(
-        _In_ bool flag)
-{
-    SWSS_LOG_ENTER();
-
-    sai_status_t result = SAI_STATUS_SUCCESS;
-
-    sai_attribute_t attr;
-
-    attr.id = SAI_SWITCH_ATTR_RESTART_WARM;
-    attr.value.booldata = flag;
-
-    for (auto& sw: switches)
-    {
-        auto rid = sw.second->getRid();
-
-        auto strRid = sai_serialize_object_id(rid);
-
-        auto status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, rid, &attr);
-
-        if (status != SAI_STATUS_SUCCESS)
-        {
-            SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_RESTART_WARM=%s: %s:%s",
-                    (flag ? "true" : "false"),
-                    strRid.c_str(),
-                    sai_serialize_status(status).c_str());
-
-            result = status;
-        }
-    }
-
-    return result;
-}
-
-sai_status_t setPreShutdownOnAllSwitches()
-{
-    SWSS_LOG_ENTER();
-
-    sai_status_t result = SAI_STATUS_SUCCESS;
-
-    sai_attribute_t attr;
-
-    attr.id = SAI_SWITCH_ATTR_PRE_SHUTDOWN;
-    attr.value.booldata = true;
-
-    for (auto& sw: switches)
-    {
-        auto rid = sw.second->getRid();
-
-        auto strRid = sai_serialize_object_id(rid);
-
-        auto status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, rid, &attr);
-
-        if (status != SAI_STATUS_SUCCESS)
-        {
-            SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_PRE_SHUTDOWN=true: %s:%s",
-                    strRid.c_str(),
-                    sai_serialize_status(status).c_str());
-
-            result = status;
-        }
-    }
-
-    return result;
-}
-
-sai_status_t setUninitDataPlaneOnRemovalOnAllSwitches()
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_NOTICE("Fast/warm reboot requested, keeping data plane running");
-
-    sai_status_t result = SAI_STATUS_SUCCESS;
-
-    sai_attribute_t attr;
-
-    attr.id = SAI_SWITCH_ATTR_UNINIT_DATA_PLANE_ON_REMOVAL;
-    attr.value.booldata = false;
-
-    for (auto& sw: switches)
-    {
-        auto rid = sw.second->getRid();
-
-        auto strRid = sai_serialize_object_id(rid);
-
-        auto status = g_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, rid, &attr);
-
-        if (status != SAI_STATUS_SUCCESS)
-        {
-            SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_UNINIT_DATA_PLANE_ON_REMOVAL=false: %s:%s",
-                    strRid.c_str(),
-                    sai_serialize_status(status).c_str());
-
-            result = status;
-        }
-    }
-
-    return result;
-}
-
 /**
  * When set to true extra logging will be added for tracking references.  This
  * is useful for debugging, but for production operations this will produce too
@@ -535,7 +402,7 @@ int syncd_main(int argc, char **argv)
 
                 g_syncd->m_manager->removeAllCounters();
 
-                status = setRestartWarmOnAllSwitches(true);
+                status = g_syncd->setRestartWarmOnAllSwitches(true);
 
                 if (status != SAI_STATUS_SUCCESS)
                 {
@@ -548,7 +415,7 @@ int syncd_main(int argc, char **argv)
                     continue;
                 }
 
-                status = setPreShutdownOnAllSwitches();
+                status = g_syncd->setPreShutdownOnAllSwitches();
 
                 if (status == SAI_STATUS_SUCCESS)
                 {
@@ -569,7 +436,7 @@ int syncd_main(int argc, char **argv)
 
                     // Restore cold shutdown.
 
-                    setRestartWarmOnAllSwitches(false);
+                    g_syncd->setRestartWarmOnAllSwitches(false);
                 }
             }
             else if (sel == flexCounter.get())
@@ -624,7 +491,7 @@ int syncd_main(int argc, char **argv)
         {
             SWSS_LOG_NOTICE("Warm Reboot requested, keeping data plane running");
 
-            status = setRestartWarmOnAllSwitches(true);
+            status = g_syncd->setRestartWarmOnAllSwitches(true);
 
             if (status != SAI_STATUS_SUCCESS)
             {
@@ -642,14 +509,14 @@ int syncd_main(int argc, char **argv)
 
     if (shutdownType == SYNCD_RESTART_TYPE_FAST || shutdownType == SYNCD_RESTART_TYPE_WARM)
     {
-        setUninitDataPlaneOnRemovalOnAllSwitches();
+        g_syncd->setUninitDataPlaneOnRemovalOnAllSwitches();
     }
 
 #endif
 
     g_syncd->m_manager->removeAllCounters();
 
-    status = removeAllSwitches();
+    status = g_syncd->removeAllSwitches();
 
     // Stop notification thread after removing switch
     g_processor->stopNotificationsProcessingThread();

@@ -2954,7 +2954,7 @@ void Syncd::performWarmRestartSingleSwitch(
     {
         SWSS_LOG_TIMER("Warm boot: create switch VID: %s", sai_serialize_object_id(switchVid).c_str());
 
-        status = g_vendorSai->create(SAI_OBJECT_TYPE_SWITCH, &switchRid, 0, (uint32_t)attrs.size(), attrs.data());
+        status = m_vendorSai->create(SAI_OBJECT_TYPE_SWITCH, &switchRid, 0, (uint32_t)attrs.size(), attrs.data());
     }
 
     if (status != SAI_STATUS_SUCCESS)
@@ -3157,4 +3157,137 @@ void Syncd::setSaiApiLogLevel()
                 std::bind(&Syncd::saiLoglevelNotify, this, _1, _2),
                 sai_serialize_log_level(SAI_LOG_LEVEL_NOTICE));
     }
+}
+
+sai_status_t Syncd::removeAllSwitches()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_NOTICE("Removing all switches");
+
+    // TODO mutex ?
+
+    sai_status_t result = SAI_STATUS_SUCCESS;
+
+    for (auto& sw: switches)
+    {
+        auto rid = sw.second->getRid();
+
+        auto strRid = sai_serialize_object_id(rid);
+
+        SWSS_LOG_TIMER("removing switch RID %s", strRid.c_str());
+
+        auto status = m_vendorSai->remove(SAI_OBJECT_TYPE_SWITCH, rid);
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_NOTICE("Can't delete a switch RID %s: %s",
+                    strRid.c_str(),
+                    sai_serialize_status(status).c_str());
+
+            result = status;
+        }
+    }
+
+    return result;
+}
+
+sai_status_t Syncd::setRestartWarmOnAllSwitches(
+        _In_ bool flag)
+{
+    SWSS_LOG_ENTER();
+
+    sai_status_t result = SAI_STATUS_SUCCESS;
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_SWITCH_ATTR_RESTART_WARM;
+    attr.value.booldata = flag;
+
+    for (auto& sw: switches)
+    {
+        auto rid = sw.second->getRid();
+
+        auto strRid = sai_serialize_object_id(rid);
+
+        auto status = m_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, rid, &attr);
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_RESTART_WARM=%s: %s:%s",
+                    (flag ? "true" : "false"),
+                    strRid.c_str(),
+                    sai_serialize_status(status).c_str());
+
+            result = status;
+        }
+    }
+
+    return result;
+}
+
+sai_status_t Syncd::setPreShutdownOnAllSwitches()
+{
+    SWSS_LOG_ENTER();
+
+    sai_status_t result = SAI_STATUS_SUCCESS;
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_SWITCH_ATTR_PRE_SHUTDOWN;
+    attr.value.booldata = true;
+
+    for (auto& sw: switches)
+    {
+        auto rid = sw.second->getRid();
+
+        auto strRid = sai_serialize_object_id(rid);
+
+        auto status = m_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, rid, &attr);
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_PRE_SHUTDOWN=true: %s:%s",
+                    strRid.c_str(),
+                    sai_serialize_status(status).c_str());
+
+            result = status;
+        }
+    }
+
+    return result;
+}
+
+sai_status_t Syncd::setUninitDataPlaneOnRemovalOnAllSwitches()
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_NOTICE("Fast/warm reboot requested, keeping data plane running");
+
+    sai_status_t result = SAI_STATUS_SUCCESS;
+
+    sai_attribute_t attr;
+
+    attr.id = SAI_SWITCH_ATTR_UNINIT_DATA_PLANE_ON_REMOVAL;
+    attr.value.booldata = false;
+
+    for (auto& sw: switches)
+    {
+        auto rid = sw.second->getRid();
+
+        auto strRid = sai_serialize_object_id(rid);
+
+        auto status = m_vendorSai->set(SAI_OBJECT_TYPE_SWITCH, rid, &attr);
+
+        if (status != SAI_STATUS_SUCCESS)
+        {
+            SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_UNINIT_DATA_PLANE_ON_REMOVAL=false: %s:%s",
+                    strRid.c_str(),
+                    sai_serialize_status(status).c_str());
+
+            result = status;
+        }
+    }
+
+    return result;
 }

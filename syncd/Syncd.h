@@ -76,6 +76,17 @@ namespace syncd
 
             void sendShutdownRequestAfterException();
 
+        public: // shutdown actions for all switches
+
+            sai_status_t removeAllSwitches();
+
+            sai_status_t setRestartWarmOnAllSwitches(
+                    _In_ bool flag);
+
+            sai_status_t setPreShutdownOnAllSwitches();
+
+            sai_status_t setUninitDataPlaneOnRemovalOnAllSwitches();
+
         private:
 
             void loadProfileMap();
