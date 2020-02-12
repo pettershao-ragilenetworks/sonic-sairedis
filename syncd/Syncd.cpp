@@ -32,47 +32,6 @@
 extern bool g_veryFirstRun;
 extern std::shared_ptr<syncd::NotificationHandler> g_handler;
 
-sai_status_t processQuadEvent(
-        _In_ sai_common_api_t api,
-        _In_ const swss::KeyOpFieldsValuesTuple &kco);
-
-sai_status_t processBulkEntry(
-        _In_ sai_object_type_t objectType,
-        _In_ const std::vector<std::string> &objectIds,
-        _In_ sai_common_api_t api,
-        _In_ const std::vector<std::shared_ptr<saimeta::SaiAttributeList>> &attributes);
-
-sai_status_t processBulkOid(
-        _In_ sai_object_type_t objectType,
-        _In_ const std::vector<std::string> &objectIds,
-        _In_ sai_common_api_t api,
-        _In_ const std::vector<std::shared_ptr<saimeta::SaiAttributeList>> &attributes);
-
-void sendApiResponse(
-        _In_ sai_common_api_t api,
-        _In_ sai_status_t status,
-        _In_ uint32_t object_count = 0,
-        _In_ sai_status_t * object_statuses = NULL);
-
-sai_status_t processOid(
-        _In_ sai_object_type_t objectType,
-        _In_ const std::string &strObjectId,
-        _In_ sai_common_api_t api,
-        _In_ uint32_t attr_count,
-        _In_ sai_attribute_t *attr_list);
-
-void sendGetResponse(
-        _In_ sai_object_type_t objectType,
-        _In_ const std::string &strObjectId,
-        _In_ sai_object_id_t switch_id,
-        _In_ sai_status_t status,
-        _In_ uint32_t attr_count,
-        _In_ sai_attribute_t *attr_list);
-
-void get_port_related_objects(
-        _In_ sai_object_id_t port_rid,
-        _Out_ std::vector<sai_object_id_t>& related);
-
 using namespace syncd;
 using namespace saimeta;
 using namespace std::placeholders;
