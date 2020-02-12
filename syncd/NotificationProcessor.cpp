@@ -13,7 +13,10 @@
 using namespace syncd;
 using namespace saimeta;
 
-NotificationProcessor::NotificationProcessor()
+NotificationProcessor::NotificationProcessor(
+        _In_ std::function<void(const swss::KeyOpFieldsValuesTuple&)> synchronizer):
+    m_synchronizer(synchronizer)
+
 {
     SWSS_LOG_ENTER();
 
@@ -585,10 +588,16 @@ void NotificationProcessor::handle_switch_shutdown_request(
 }
 
 void NotificationProcessor::processNotification(
-        _In_ const swss::KeyOpFieldsValuesTuple &item)
+        _In_ const swss::KeyOpFieldsValuesTuple& item)
 {
-    std::lock_guard<std::mutex> lock(g_mutex);
+    SWSS_LOG_ENTER();
 
+    m_synchronizer(item);
+}
+
+void NotificationProcessor::syncProcessNotification(
+        _In_ const swss::KeyOpFieldsValuesTuple& item)
+{
     SWSS_LOG_ENTER();
 
     std::string notification = kfvKey(item);
@@ -633,7 +642,7 @@ void NotificationProcessor::ntf_process_function()
         m_cv.wait(ulock);
 
         // this is notifications processing thread context, which is different
-        // from SAI notifications context, we can safe use g_mutex here,
+        // from SAI notifications context, we can safe use syncd mutex here,
         // processing each notification is under same mutex as processing main
         // events, counters and reinit
 

@@ -5,6 +5,7 @@
 #include <thread>
 #include <memory>
 #include <condition_variable>
+#include <functional>
 
 namespace syncd
 {
@@ -12,7 +13,8 @@ namespace syncd
     {
         public:
 
-            NotificationProcessor();
+            NotificationProcessor(
+                    _In_ std::function<void(const swss::KeyOpFieldsValuesTuple&)> synchronizer);
 
             virtual ~NotificationProcessor();
 
@@ -93,7 +95,12 @@ namespace syncd
                     _In_ const std::string &data);
 
             void processNotification(
-                    _In_ const swss::KeyOpFieldsValuesTuple &item);
+                    _In_ const swss::KeyOpFieldsValuesTuple& item);
+
+        public:
+
+            void syncProcessNotification(
+                    _In_ const swss::KeyOpFieldsValuesTuple& item);
 
         private:
 
@@ -109,5 +116,7 @@ namespace syncd
             // determine whether notification thread is running
 
             bool m_runThread;
+
+            std::function<void(const swss::KeyOpFieldsValuesTuple&)> m_synchronizer;
     };
 }

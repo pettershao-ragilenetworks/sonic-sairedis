@@ -202,6 +202,9 @@ namespace syncd
                     _In_ uint32_t attr_count,
                     _In_ sai_attribute_t *attr_list);
 
+            void syncProcessNotification(
+                    _In_ const swss::KeyOpFieldsValuesTuple& item);
+
         private:
 
             void inspectAsic();
@@ -330,5 +333,32 @@ namespace syncd
 
             std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> m_switches;
 
+        private:
+
+            /**
+             * @brief Syncd mutex for thread synchronization
+             *
+             * Purpose of this mutex is to synchronize multiple threads like
+             * main thread, counters and notifications as well as all
+             * operations which require multiple Redis DB access.
+             *
+             * For example: query DB for next VID id number, and then put map
+             * RID and VID to Redis. From syncd point of view this entire
+             * operation should be atomic and no other thread should access DB
+             * or make assumption on previous information until entire
+             * operation will finish.
+             *
+             * Mutex must be used in 4 places:
+             *
+             * - notification processing
+             * - main event loop processing
+             * - syncd hard init when switches are created
+             *   (notifications could be sent during that)
+             * - in case of exception when sending shutdown request
+             *   (other notifications can still arrive at this point)
+             *
+             * * getting flex counter - here we skip using mutex
+             */
+            std::mutex m_mutex;
     };
 }

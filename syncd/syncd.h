@@ -18,8 +18,6 @@
 #define SWITCH_SAI_THRIFT_RPC_SERVER_PORT 9092
 #endif // SAITHRIFT
 
-extern std::mutex g_mutex;
-
 extern std::shared_ptr<syncd::VirtualOidTranslator> g_translator; // TODO move to syncd object
 
 void redisClearVidToRidMap();

@@ -19,18 +19,11 @@
 
 #define DEF_SAI_WARM_BOOT_DATA_FILE "/var/warmboot/sai-warmboot.bin"
 
-// TODO mutex must be used in 4 places
-// - notification processing
-// - main event loop processing
-// - syncd hard init when switches are created
-//   (notifications could be sent during that)
-// - in case of exception when sending shutdown request
-//   (other notifications can still arrive at this point)
-
 #include "syncd.h" // TODO to be removed
 
 extern bool g_veryFirstRun;
 extern std::shared_ptr<syncd::NotificationHandler> g_handler;
+extern std::shared_ptr<syncd::NotificationProcessor> g_processor;
 
 using namespace syncd;
 using namespace saimeta;
@@ -145,7 +138,7 @@ void Syncd::processEvent(
 {
     SWSS_LOG_ENTER();
 
-    std::lock_guard<std::mutex> lock(g_mutex); // TODO
+    std::lock_guard<std::mutex> lock(m_mutex);
 
     do
     {
@@ -1077,7 +1070,7 @@ void Syncd::processFlexCounterGroupEvent( // TODO must be moved to go via ASIC c
 {
     SWSS_LOG_ENTER();
 
-    std::lock_guard<std::mutex> lock(g_mutex); // TODO
+    std::lock_guard<std::mutex> lock(m_mutex);
 
     swss::KeyOpFieldsValuesTuple kco;
 
@@ -1106,7 +1099,7 @@ void Syncd::processFlexCounterEvent( // TODO must be moved to go via ASIC channe
 {
     SWSS_LOG_ENTER();
 
-    std::lock_guard<std::mutex> lock(g_mutex); // TODO
+    std::lock_guard<std::mutex> lock(m_mutex);
 
     swss::KeyOpFieldsValuesTuple kco;
 
@@ -2599,7 +2592,7 @@ void Syncd::onSyncdStart(
 {
     SWSS_LOG_ENTER();
 
-    std::lock_guard<std::mutex> lock(g_mutex); // TODO
+    std::lock_guard<std::mutex> lock(m_mutex);
 
     /*
      * It may happen that after initialize we will receive some port
@@ -3035,7 +3028,7 @@ void Syncd::sendShutdownRequestAfterException()
 {
     SWSS_LOG_ENTER();
 
-    std::lock_guard<std::mutex> lock(g_mutex); // TODO
+    std::lock_guard<std::mutex> lock(m_mutex);
 
     if (notifications == nullptr)
     {
@@ -3253,4 +3246,14 @@ sai_status_t Syncd::setUninitDataPlaneOnRemovalOnAllSwitches()
     }
 
     return result;
+}
+
+void Syncd::syncProcessNotification(
+        _In_ const swss::KeyOpFieldsValuesTuple& item)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+
+    SWSS_LOG_ENTER();
+
+    g_processor->syncProcessNotification(item);
 }

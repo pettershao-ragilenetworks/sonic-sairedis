@@ -35,24 +35,10 @@ std::string fdbFlushSha;
  * will call getQueueSize() when queue pointer could be null (this=0x0).
  */
 
-std::shared_ptr<NotificationProcessor> g_processor = std::make_shared<NotificationProcessor>();
-std::shared_ptr<NotificationHandler> g_handler = std::make_shared<NotificationHandler>(g_processor);
+std::shared_ptr<NotificationProcessor> g_processor;// = std::make_shared<NotificationProcessor>();
+std::shared_ptr<NotificationHandler> g_handler; // = std::make_shared<NotificationHandler>(g_processor);
 
 std::shared_ptr<Syncd> g_syncd;
-
-/**
- * @brief Global mutex for thread synchronization
- *
- * Purpose of this mutex is to synchronize multiple threads like main thread,
- * counters and notifications as well as all operations which require multiple
- * Redis DB access.
- *
- * For example: query DB for next VID id number, and then put map RID and VID
- * to Redis. From syncd point of view this entire operation should be atomic
- * and no other thread should access DB or make assumption on previous
- * information until entire operation will finish.
- */
-std::mutex g_mutex;
 
 std::shared_ptr<swss::DBConnector>          dbAsic;
 std::shared_ptr<swss::RedisClient>          g_redisClient;
@@ -168,6 +154,18 @@ int syncd_main(int argc, char **argv)
 
     bool isWarmStart = swss::WarmStart::isWarmStart(); // since global, can be applied in main
 
+    MetadataLogger::initialize();
+
+    // TODO move to syncd object
+    auto commandLineOptions = CommandLineOptionsParser::parseCommandLine(argc, argv);
+
+    std::shared_ptr<sairedis::SaiInterface> vendorSai = std::make_shared<VendorSai>();
+
+    g_syncd = std::make_shared<Syncd>(vendorSai, commandLineOptions, isWarmStart);
+
+    g_processor = std::make_shared<NotificationProcessor>(std::bind(&Syncd::syncProcessNotification, g_syncd.get(), _1));
+    g_handler = std::make_shared<NotificationHandler>(g_processor);
+
     SwitchNotifications sn;
 
     sn.onFdbEvent = std::bind(&NotificationHandler::onFdbEvent, g_handler.get(), _1, _2);
@@ -177,15 +175,6 @@ int syncd_main(int argc, char **argv)
     sn.onSwitchStateChange = std::bind(&NotificationHandler::onSwitchStateChange, g_handler.get(), _1, _2);
 
     g_handler->setSwitchNotifications(sn.getSwitchNotifications());
-
-    MetadataLogger::initialize();
-
-    // TODO move to syncd object
-    auto commandLineOptions = CommandLineOptionsParser::parseCommandLine(argc, argv);
-
-    std::shared_ptr<sairedis::SaiInterface> vendorSai = std::make_shared<VendorSai>();
-
-    g_syncd = std::make_shared<Syncd>(vendorSai, commandLineOptions, isWarmStart);
 
     SWSS_LOG_NOTICE("command line: %s", commandLineOptions->getCommandLineString().c_str());
 
