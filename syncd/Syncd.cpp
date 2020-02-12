@@ -1359,7 +1359,7 @@ sai_status_t Syncd::processOidCreate(
 
     if (objectType == SAI_OBJECT_TYPE_SWITCH)
     {
-        SWSS_LOG_NOTICE("creating switch number %zu", switches.size() + 1);
+        SWSS_LOG_NOTICE("creating switch number %zu", m_switches.size() + 1);
     }
     else
     {
@@ -1397,14 +1397,14 @@ sai_status_t Syncd::processOidCreate(
              * constructor, like getting all queues, ports, etc.
              */
 
-            switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, objectRid, m_vendorSai);
+            m_switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, objectRid, m_vendorSai);
 
             startDiagShell(switchRid);
         }
 
         if (objectType == SAI_OBJECT_TYPE_PORT)
         {
-            switches.at(switchVid)->onPostPortCreate(objectRid, objectVid);
+            m_switches.at(switchVid)->onPostPortCreate(objectRid, objectVid);
         }
     }
 
@@ -1426,7 +1426,7 @@ sai_status_t Syncd::processOidRemove(
     {
         sai_object_id_t switchVid = VidManager::switchIdQuery(objectVid);
 
-        switches.at(switchVid)->collectPortRelatedObjects(rid);
+        m_switches.at(switchVid)->collectPortRelatedObjects(rid);
     }
 
     sai_status_t status = m_vendorSai->remove(objectType, rid);
@@ -1477,14 +1477,14 @@ sai_status_t Syncd::processOidRemove(
 
             sai_object_id_t switchVid = VidManager::switchIdQuery(objectVid);
 
-            if (switches.at(switchVid)->isDiscoveredRid(rid))
+            if (m_switches.at(switchVid)->isDiscoveredRid(rid))
             {
-                switches.at(switchVid)->removeExistingObjectReference(rid);
+                m_switches.at(switchVid)->removeExistingObjectReference(rid);
             }
 
             if (objectType == SAI_OBJECT_TYPE_PORT)
             {
-                switches.at(switchVid)->postPortRemove(rid);
+                m_switches.at(switchVid)->postPortRemove(rid);
             }
         }
     }
@@ -2228,7 +2228,7 @@ sai_status_t Syncd::onApplyViewInFastFastBoot()
 
     sai_status_t all = SAI_STATUS_SUCCESS;
 
-    for (auto& kvp: switches)
+    for (auto& kvp: m_switches)
     {
         sai_attribute_t attr;
 
@@ -2300,11 +2300,11 @@ sai_status_t Syncd::applyView()
                 temporaryMap.size());
     }
 
-    if (currentMap.size() != switches.size())
+    if (currentMap.size() != m_switches.size())
     {
         SWSS_LOG_THROW("current asic view switches %zu != defined switches %zu, FATAL",
                 currentMap.size(),
-                switches.size());
+                m_switches.size());
     }
 
     // VID of switches must match for each map
@@ -2317,7 +2317,7 @@ sai_status_t Syncd::applyView()
                     sai_serialize_object_id(kvp.first).c_str());
         }
 
-        if (switches.find(kvp.first) == switches.end())
+        if (m_switches.find(kvp.first) == m_switches.end())
         {
             SWSS_LOG_THROW("switch VID %s missing from ASIC, FATAL",
                     sai_serialize_object_id(kvp.first).c_str());
@@ -2330,11 +2330,11 @@ sai_status_t Syncd::applyView()
 
     try
     {
-        for (auto& kvp: switches)
+        for (auto& kvp: m_switches)
         {
             auto switchVid = kvp.first;
 
-            auto sw = switches.at(switchVid);
+            auto sw = m_switches.at(switchVid);
 
             /*
              * We are starting first stage here, it still can throw exceptions
@@ -2638,16 +2638,16 @@ void Syncd::onSyncdStart(
      * recreate switches map.
      */
 
-    if (switches.size())
+    if (m_switches.size())
     {
-        SWSS_LOG_THROW("performing hard reinit, but there are %zu switches defined, bug!", switches.size());
+        SWSS_LOG_THROW("performing hard reinit, but there are %zu switches defined, bug!", m_switches.size());
     }
 
     HardReiniter hr(m_vendorSai);
 
-    hr.hardReinit();
+    m_switches = hr.hardReinit();
 
-    for (auto& sw: switches)
+    for (auto& sw: m_switches)
     {
         startDiagShell(sw.second->getRid());
     }
@@ -2703,7 +2703,7 @@ void Syncd::onSwitchCreateInInitViewMode(
      * context config file.
      */
 
-    if (switches.find(switchVid) == switches.end())
+    if (m_switches.find(switchVid) == m_switches.end())
     {
         /*
          * Switch with particular VID don't exists yet, so lets create it.  We
@@ -2745,7 +2745,7 @@ void Syncd::onSwitchCreateInInitViewMode(
 
         // make switch initialization and get all default data
 
-        switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid, m_vendorSai);
+        m_switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid, m_vendorSai);
 
         startDiagShell(switchRid);
     }
@@ -2757,7 +2757,7 @@ void Syncd::onSwitchCreateInInitViewMode(
          * since it's deterministic created.
          */
 
-        auto sw = switches.at(switchVid);
+        auto sw = m_switches.at(switchVid);
 
         // switches VID must match, since it's deterministic
 
@@ -2933,7 +2933,7 @@ void Syncd::performWarmRestartSingleSwitch(
 
     // perform all get operations on existing switch
 
-    auto sw = switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid, m_vendorSai, true);
+    auto sw = m_switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid, m_vendorSai, true);
 
     startDiagShell(switchRid);
 }
@@ -3045,9 +3045,9 @@ void Syncd::sendShutdownRequestAfterException()
 
     try
     {
-        if (switches.size())
+        if (m_switches.size())
         {
-            for (auto& kvp: switches)
+            for (auto& kvp: m_switches)
             {
                 sendShutdownRequest(kvp.second->getVid());
             }
@@ -3132,7 +3132,7 @@ sai_status_t Syncd::removeAllSwitches()
 
     sai_status_t result = SAI_STATUS_SUCCESS;
 
-    for (auto& sw: switches)
+    for (auto& sw: m_switches)
     {
         auto rid = sw.second->getRid();
 
@@ -3167,7 +3167,7 @@ sai_status_t Syncd::setRestartWarmOnAllSwitches(
     attr.id = SAI_SWITCH_ATTR_RESTART_WARM;
     attr.value.booldata = flag;
 
-    for (auto& sw: switches)
+    for (auto& sw: m_switches)
     {
         auto rid = sw.second->getRid();
 
@@ -3200,7 +3200,7 @@ sai_status_t Syncd::setPreShutdownOnAllSwitches()
     attr.id = SAI_SWITCH_ATTR_PRE_SHUTDOWN;
     attr.value.booldata = true;
 
-    for (auto& sw: switches)
+    for (auto& sw: m_switches)
     {
         auto rid = sw.second->getRid();
 
@@ -3234,7 +3234,7 @@ sai_status_t Syncd::setUninitDataPlaneOnRemovalOnAllSwitches()
     attr.id = SAI_SWITCH_ATTR_UNINIT_DATA_PLANE_ON_REMOVAL;
     attr.value.booldata = false;
 
-    for (auto& sw: switches)
+    for (auto& sw: m_switches)
     {
         auto rid = sw.second->getRid();
 

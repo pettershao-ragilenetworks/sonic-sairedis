@@ -20,8 +20,6 @@
 
 extern std::mutex g_mutex;
 
-extern std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> switches;
-
 extern std::shared_ptr<syncd::VirtualOidTranslator> g_translator; // TODO move to syncd object
 
 void redisClearVidToRidMap();

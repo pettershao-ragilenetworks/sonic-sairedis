@@ -1,6 +1,7 @@
 #pragma once
 
-#include "lib/inc/SaiInterface.h"
+#include "SaiInterface.h"
+#include "SaiSwitch.h"
 
 #include <string>
 #include <unordered_map>
@@ -26,7 +27,7 @@ namespace syncd
 
         public:
 
-            void hardReinit();
+            std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> hardReinit();
 
         private:
 

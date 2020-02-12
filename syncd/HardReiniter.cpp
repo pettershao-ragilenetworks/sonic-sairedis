@@ -129,7 +129,7 @@ void HardReiniter::readAsicState()
     }
 }
 
-void HardReiniter::hardReinit()
+std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> HardReiniter::hardReinit()
 {
     SWSS_LOG_ENTER();
 
@@ -183,6 +183,8 @@ void HardReiniter::hardReinit()
 
     redisSetVidAndRidMap(vid2rid);
 
+    std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> switches;
+
     for (auto& sr: vec)
     {
         sr->postRemoveActions();
@@ -191,6 +193,8 @@ void HardReiniter::hardReinit()
 
         switches[sw->getVid()] = sw;
     }
+
+    return switches;
 }
 
 void HardReiniter::redisSetVidAndRidMap(

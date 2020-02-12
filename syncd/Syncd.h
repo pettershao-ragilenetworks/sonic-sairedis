@@ -4,6 +4,7 @@
 #include "FlexCounterManager.h"
 #include "VendorSai.h"
 #include "AsicView.h"
+#include "SaiSwitch.h"
 
 #include "meta/SaiAttributeList.h"
 
@@ -326,6 +327,8 @@ namespace syncd
             std::map<std::string, std::string> m_profileMap;
 
             std::map<std::string, std::string>::iterator m_profileIter;
+
+            std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> m_switches;
 
     };
 }
