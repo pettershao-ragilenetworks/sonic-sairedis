@@ -80,8 +80,6 @@ std::map<sai_object_id_t, std::shared_ptr<SaiSwitch>> switches;
 
 std::shared_ptr<VirtualOidTranslator> g_translator; // TODO move to syncd object
 
-std::shared_ptr<CommandLineOptions> g_commandLineOptions; // TODO move to syncd object
-
 bool g_veryFirstRun = false;
 
 syncd_restart_type_t handleRestartQuery(
@@ -185,16 +183,16 @@ int syncd_main(int argc, char **argv)
     MetadataLogger::initialize();
 
     // TODO move to syncd object
-    g_commandLineOptions = CommandLineOptionsParser::parseCommandLine(argc, argv);
+    auto commandLineOptions = CommandLineOptionsParser::parseCommandLine(argc, argv);
 
-    g_syncd = std::make_shared<Syncd>(g_vendorSai, g_commandLineOptions, isWarmStart);
+    g_syncd = std::make_shared<Syncd>(g_vendorSai, commandLineOptions, isWarmStart);
 
-    SWSS_LOG_NOTICE("command line: %s", g_commandLineOptions->getCommandLineString().c_str());
+    SWSS_LOG_NOTICE("command line: %s", commandLineOptions->getCommandLineString().c_str());
 
 #ifdef SAITHRIFT
-    if (g_commandLineOptions->m_portMapFile.size() > 0)
+    if (commandLineOptions->m_portMapFile.size() > 0)
     {
-        auto map = PortMapParser::parsePortMap(g_commandLineOptions->m_portMapFile);
+        auto map = PortMapParser::parsePortMap(commandLineOptions->m_portMapFile);
 
         PortMap::setGlobalPortMap(map);
     }
@@ -263,7 +261,7 @@ int syncd_main(int argc, char **argv)
     }
 
 #ifdef SAITHRIFT
-    if (g_commandLineOptions->m_runRPCServer)
+    if (commandLineOptions->m_runRPCServer)
     {
         start_sai_thrift_rpc_server(SWITCH_SAI_THRIFT_RPC_SERVER_PORT);
         SWSS_LOG_NOTICE("rpcserver started");
@@ -280,7 +278,7 @@ int syncd_main(int argc, char **argv)
 
     try
     {
-        g_syncd->onSyncdStart(g_commandLineOptions->m_startType == SAI_START_TYPE_WARM_BOOT);
+        g_syncd->onSyncdStart(commandLineOptions->m_startType == SAI_START_TYPE_WARM_BOOT);
 
         // create notifications processing thread after we create_switch to
         // make sure, we have switch_id translated to VID before we start
@@ -309,7 +307,7 @@ int syncd_main(int argc, char **argv)
 
         SWSS_LOG_NOTICE("starting main loop, ONLY restart query");
 
-        if (g_commandLineOptions->m_disableExitSleep)
+        if (commandLineOptions->m_disableExitSleep)
             runMainLoop = false;
     }
 
@@ -428,11 +426,11 @@ int syncd_main(int argc, char **argv)
 
             s->addSelectable(restartQuery.get());
 
-            if (g_commandLineOptions->m_disableExitSleep)
+            if (commandLineOptions->m_disableExitSleep)
                 runMainLoop = false;
 
             // make sure that if second exception will arise, then we break the loop
-            g_commandLineOptions->m_disableExitSleep = true;
+            commandLineOptions->m_disableExitSleep = true;
 
             twd.setEndTime();
         }
