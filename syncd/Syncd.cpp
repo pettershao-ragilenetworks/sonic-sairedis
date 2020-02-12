@@ -21,7 +21,6 @@
 
 #include "syncd.h" // TODO to be removed
 
-extern bool g_veryFirstRun;
 extern std::shared_ptr<syncd::NotificationHandler> g_handler;
 extern std::shared_ptr<syncd::NotificationProcessor> g_processor;
 
@@ -37,7 +36,9 @@ Syncd::Syncd(
     m_isWarmStart(isWarmStart),
     m_firstInitWasPerformed(false),
     m_asicInitViewMode(false), // by default we are in APPLY view mode
-    m_vendorSai(vendorSai)
+    m_vendorSai(vendorSai),
+    m_veryFirstRun(false)
+
 {
     SWSS_LOG_ENTER();
 
@@ -75,7 +76,7 @@ void Syncd::performStartupLogic()
         }
     }
 
-    if (m_commandLineOptions->m_startType == SAI_START_TYPE_WARM_BOOT && g_veryFirstRun)
+    if (m_commandLineOptions->m_startType == SAI_START_TYPE_WARM_BOOT && m_veryFirstRun)
     {
         SWSS_LOG_WARN("warm start requested, but this is very first syncd start, forcing cold start");
 
@@ -2034,7 +2035,7 @@ sai_status_t Syncd::processNotifySyncd(
 
     auto redisNotifySyncd = sai_deserialize_redis_notify_syncd(key);
 
-    if (g_veryFirstRun && m_firstInitWasPerformed && redisNotifySyncd == SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW)
+    if (m_veryFirstRun && m_firstInitWasPerformed && redisNotifySyncd == SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW)
     {
         /*
          * Make sure that when second INIT view arrives, then we will jump to
@@ -2042,9 +2043,9 @@ sai_status_t Syncd::processNotifySyncd(
          * exists and will fail with creating multiple switches error.
          */
 
-        g_veryFirstRun = false;
+        m_veryFirstRun = false;
     }
-    else if (g_veryFirstRun)
+    else if (m_veryFirstRun)
     {
         SWSS_LOG_NOTICE("very first run is TRUE, op = %s", key.c_str());
 
@@ -2073,7 +2074,7 @@ sai_status_t Syncd::processNotifySyncd(
         }
         else if (redisNotifySyncd == SAI_REDIS_NOTIFY_SYNCD_APPLY_VIEW)
         {
-            g_veryFirstRun = false;
+            m_veryFirstRun = false;
 
             m_asicInitViewMode = false;
 

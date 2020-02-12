@@ -42,27 +42,10 @@ std::shared_ptr<swss::DBConnector>          dbAsic;
 std::shared_ptr<swss::RedisClient>          g_redisClient;
 std::shared_ptr<swss::NotificationProducer> notifications;
 
-/**
- * @brief Contains map of all created switches.
- *
- * This syncd implementation supports only one switch but it's written in
- * a way that could be extended to use multiple switches in the future, some
- * refactoring needs to be made in marked places.
- *
- * To support multiple switches VIDTORID and RIDTOVID db entries needs to be
- * made per switch like HIDDEN and LANES. Best way is to wrap vid/rid map to
- * functions that will return right key.
- *
- * Key is switch VID.
- */
-std::map<sai_object_id_t, std::shared_ptr<SaiSwitch>> switches;
-
 // TODO we must be sure that all threads and notifications will be stopped
 // before destructor will be called on those objects
 
 std::shared_ptr<VirtualOidTranslator> g_translator; // TODO move to syncd object
-
-bool g_veryFirstRun = false;
 
 syncd_restart_type_t handleRestartQuery(
         _In_ swss::NotificationConsumer &restartQuery)
@@ -218,7 +201,7 @@ int syncd_main(int argc, char **argv)
     std::string fdbFlushLuaScript = swss::loadLuaScript("fdb_flush.lua");
     fdbFlushSha = swss::loadRedisScript(dbAsic.get(), fdbFlushLuaScript);
 
-    g_veryFirstRun = isVeryFirstRun();
+    g_syncd->m_veryFirstRun = isVeryFirstRun();
 
     g_syncd->performStartupLogic();
 

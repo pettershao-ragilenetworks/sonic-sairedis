@@ -27,6 +27,8 @@ AsicView::AsicView(
 {
     SWSS_LOG_ENTER();
 
+    m_enableRefernceCountLogs = false;
+
     fromDump(dump);
 }
 

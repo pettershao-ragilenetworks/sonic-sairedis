@@ -331,7 +331,24 @@ namespace syncd
 
             std::map<std::string, std::string>::iterator m_profileIter;
 
+
+            /**
+             * @brief Contains map of all created switches.
+             *
+             * This syncd implementation supports only one switch but it's
+             * written in a way that could be extended to use multiple switches
+             * in the future, some refactoring needs to be made in marked
+             * places.
+             *
+             * To support multiple switches VIDTORID and RIDTOVID db entries
+             * needs to be made per switch like HIDDEN and LANES. Best way is
+             * to wrap vid/rid map to functions that will return right key.
+             *
+             * Key is switch VID.
+             */
             std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> m_switches;
+
+            bool m_veryFirstRun;
 
         private:
 
