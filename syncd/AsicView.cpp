@@ -1,11 +1,10 @@
 #include "AsicView.h"
-
-#include "swss/logger.h"
+#include "VidManager.h"
 
 #include "meta/sai_serialize.h"
 #include "meta/SaiAttributeList.h"
 
-#include "VidManager.h"
+#include "swss/logger.h"
 
 #include <inttypes.h>
 
@@ -14,14 +13,12 @@
 using namespace syncd;
 using namespace saimeta;
 
-extern bool enableRefernceCountLogs; // TODO to be removed
-
 AsicView::AsicView():
     m_asicOperationId(0)
 {
     SWSS_LOG_ENTER();
 
-    // empty
+    m_enableRefernceCountLogs = false;
 }
 
 AsicView::AsicView(
@@ -1089,7 +1086,7 @@ void AsicView::dumpRef(const std::string & asicName)
 {
     SWSS_LOG_ENTER();
 
-    if (enableRefernceCountLogs == false)
+    if (m_enableRefernceCountLogs == false)
         return;
 
     SWSS_LOG_NOTICE("dump references in ASIC VIEW: %s", asicName.c_str());
@@ -1231,7 +1228,7 @@ void AsicView::updateNonObjectIdVidReferenceCountByValue(
 
             m_vidReference[vid] += value;
 
-            if (enableRefernceCountLogs)
+            if (m_enableRefernceCountLogs)
             {
                 SWSS_LOG_WARN("updated vid %s refrence to %d",
                         sai_serialize_object_id(vid).c_str(),

@@ -16,7 +16,6 @@
 using namespace syncd;
 using namespace saimeta;
 
-extern bool enableRefernceCountLogs;
 extern std::shared_ptr<NotificationHandler> g_handler;
 extern std::shared_ptr<VirtualOidTranslator> g_translator; // TODO move to syncd object
 
@@ -39,6 +38,8 @@ ComparisonLogic::ComparisonLogic(
     m_temp(temp)
 {
     SWSS_LOG_ENTER();
+
+    m_enableRefernceCountLogs = false;
 
     // will inside filter only RID/VID to this particular switch
 
@@ -108,7 +109,7 @@ void ComparisonLogic::compareViews()
      * Call main method!
      */
 
-    if (enableRefernceCountLogs)
+    if (m_enableRefernceCountLogs)
     {
         current.dumpRef("current START");
         temp.dumpRef("temp START");
@@ -3100,7 +3101,7 @@ sai_status_t ComparisonLogic::asic_process_event(
 
     SWSS_LOG_INFO("key: %s op: %s", key.c_str(), op.c_str());
 
-    if (enableRefernceCountLogs)
+    if (m_enableRefernceCountLogs)
     {
         SWSS_LOG_NOTICE("ASIC OP BEFORE : key: %s op: %s", key.c_str(), op.c_str());
 
@@ -3166,7 +3167,7 @@ sai_status_t ComparisonLogic::asic_process_event(
         status = asic_handle_generic(current, temporary, meta_key, api, attr_count, attr_list);
     }
 
-    if (enableRefernceCountLogs)
+    if (m_enableRefernceCountLogs)
     {
         SWSS_LOG_NOTICE("ASIC OP AFTER : key: %s op: %s", key.c_str(), op.c_str());
 

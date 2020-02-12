@@ -38,8 +38,6 @@ std::string fdbFlushSha;
 std::shared_ptr<NotificationProcessor> g_processor;// = std::make_shared<NotificationProcessor>();
 std::shared_ptr<NotificationHandler> g_handler; // = std::make_shared<NotificationHandler>(g_processor);
 
-std::shared_ptr<Syncd> g_syncd;
-
 std::shared_ptr<swss::DBConnector>          dbAsic;
 std::shared_ptr<swss::RedisClient>          g_redisClient;
 std::shared_ptr<swss::NotificationProducer> notifications;
@@ -132,13 +130,6 @@ void redisClearRidToVidMap()
     g_redisClient->del(RIDTOVID);
 }
 
-/**
- * When set to true extra logging will be added for tracking references.  This
- * is useful for debugging, but for production operations this will produce too
- * much noise in logs, and we still can replay scenario using recordings.
- */
-bool enableRefernceCountLogs = false;
-
 int syncd_main(int argc, char **argv)
 {
     swss::Logger::getInstance().setMinPrio(swss::Logger::SWSS_DEBUG);
@@ -156,12 +147,11 @@ int syncd_main(int argc, char **argv)
 
     MetadataLogger::initialize();
 
-    // TODO move to syncd object
     auto commandLineOptions = CommandLineOptionsParser::parseCommandLine(argc, argv);
 
     std::shared_ptr<sairedis::SaiInterface> vendorSai = std::make_shared<VendorSai>();
 
-    g_syncd = std::make_shared<Syncd>(vendorSai, commandLineOptions, isWarmStart);
+    auto g_syncd = std::make_shared<Syncd>(vendorSai, commandLineOptions, isWarmStart);
 
     g_processor = std::make_shared<NotificationProcessor>(std::bind(&Syncd::syncProcessNotification, g_syncd.get(), _1));
     g_handler = std::make_shared<NotificationHandler>(g_processor);

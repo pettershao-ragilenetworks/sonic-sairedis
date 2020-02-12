@@ -300,6 +300,8 @@ namespace syncd
 
         private:
 
+            bool m_enableRefernceCountLogs;
+
             /**
              * @brief Virtual ID reference map.
              *

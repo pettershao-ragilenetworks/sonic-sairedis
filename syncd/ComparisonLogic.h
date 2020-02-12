@@ -199,6 +199,17 @@ namespace syncd
 
         private:
 
+
+            /**
+             * @brief Enable reference count logs.
+             *
+             * When set to true extra logging will be added for tracking
+             * references.  This is useful for debugging, but for production
+             * operations this will produce too much noise in logs, and we
+             * still can replay scenario using recordings.
+             */
+            bool m_enableRefernceCountLogs;
+
             std::shared_ptr<sairedis::SaiInterface> m_vendorSai;
 
             std::shared_ptr<SaiSwitch> m_switch;
