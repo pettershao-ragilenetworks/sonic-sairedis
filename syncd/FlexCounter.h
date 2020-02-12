@@ -4,12 +4,15 @@ extern "C" {
 #include "sai.h"
 }
 
+#include "SaiInterface.h"
+
 #include "swss/table.h"
 
 #include <vector>
 #include <set>
 #include <condition_variable>
 #include <unordered_map>
+#include <memory>
 
 namespace syncd
 {
@@ -22,7 +25,8 @@ namespace syncd
         public:
 
             FlexCounter(
-                    _In_ const std::string& instanceId);
+                    _In_ const std::string& instanceId,
+                    _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai);
 
             virtual ~FlexCounter();
 
@@ -392,5 +396,7 @@ namespace syncd
             bool m_enable;
 
             collect_counters_handler_unordered_map_t m_collectCountersHandlers;
+
+            std::shared_ptr<sairedis::SaiInterface> m_vendorSai;
     };
 }

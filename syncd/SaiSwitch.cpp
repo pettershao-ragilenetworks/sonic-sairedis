@@ -19,6 +19,62 @@ using namespace syncd;
 const int maxLanesPerPort = 8;
 
 /*
+ * NOTE: If real ID will change during hard restarts, then we need to remap all
+ * VID/RID, but we can only do that if we will save entire tree with all
+ * dependencies.
+ */
+
+SaiSwitch::SaiSwitch(
+        _In_ sai_object_id_t switch_vid,
+        _In_ sai_object_id_t switch_rid,
+        _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,
+        _In_ bool warmBoot):
+    m_vendorSai(vendorSai),
+    m_warmBoot(warmBoot)
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_TIMER("constructor");
+
+    m_switch_rid = switch_rid;
+    m_switch_vid = switch_vid;
+
+    GlobalSwitchId::setSwitchId(m_switch_rid);
+
+    m_hardware_info = saiGetHardwareInfo();
+
+    /*
+     * Discover put objects to redis needs to be called before checking lane
+     * map and ports, since it will deduce whether put discovered objects to
+     * redis to not interfere with possible user created objects previously.
+     *
+     * TODO: When user will use sairedis we need to send discovered view
+     * with all objects dependencies to sairedis so metadata db could
+     * be populated, and all references could be increased.
+     */
+
+    helperDiscover();
+
+    helperSaveDiscoveredObjectsToRedis();
+
+    helperInternalOids();
+
+    helperCheckLaneMap();
+
+    helperLoadColdVids();
+
+    helperPopulateWarmBootVids();
+
+    saiGetMacAddress(m_default_mac_address);
+
+    if (warmBoot)
+    {
+        checkWarmBootDiscoveredRids();
+    }
+}
+
+
+/*
  * NOTE: all those methods could be implemented inside SaiSwitch class so then
  * we could skip using switch_id in params and even they could be public then.
  */
@@ -31,7 +87,7 @@ sai_uint32_t SaiSwitch::saiGetPortCount() const
 
     attr.id = SAI_SWITCH_ATTR_PORT_NUMBER;
 
-    sai_status_t status = g_vendorSai->get(SAI_OBJECT_TYPE_SWITCH, m_switch_rid, 1, &attr);
+    sai_status_t status = m_vendorSai->get(SAI_OBJECT_TYPE_SWITCH, m_switch_rid, 1, &attr);
 
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -53,7 +109,7 @@ void SaiSwitch::saiGetMacAddress(
 
     attr.id = SAI_SWITCH_ATTR_SRC_MAC_ADDRESS;
 
-    sai_status_t status = g_vendorSai->get(SAI_OBJECT_TYPE_SWITCH, m_switch_rid, 1, &attr);
+    sai_status_t status = m_vendorSai->get(SAI_OBJECT_TYPE_SWITCH, m_switch_rid, 1, &attr);
 
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -92,7 +148,7 @@ std::string SaiSwitch::saiGetHardwareInfo() const
     attr.value.s8list.count = MAX_HARDWARE_INFO_LENGTH;
     attr.value.s8list.list = (int8_t*)info;
 
-    sai_status_t status = g_vendorSai->get(SAI_OBJECT_TYPE_SWITCH, m_switch_rid, 1, &attr);
+    sai_status_t status = m_vendorSai->get(SAI_OBJECT_TYPE_SWITCH, m_switch_rid, 1, &attr);
 
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -131,7 +187,7 @@ std::vector<sai_object_id_t> SaiSwitch::saiGetPortList() const
      * NOTE: We assume port list is always returned in the same order.
      */
 
-    sai_status_t status = g_vendorSai->get(SAI_OBJECT_TYPE_SWITCH, m_switch_rid, 1, &attr);
+    sai_status_t status = m_vendorSai->get(SAI_OBJECT_TYPE_SWITCH, m_switch_rid, 1, &attr);
 
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -171,7 +227,7 @@ std::unordered_map<sai_uint32_t, sai_object_id_t> SaiSwitch::saiGetHardwareLaneM
         attr.value.u32list.count = maxLanesPerPort;
         attr.value.u32list.list = lanes;
 
-        sai_status_t status = g_vendorSai->get(SAI_OBJECT_TYPE_PORT, port_rid, 1, &attr);
+        sai_status_t status = m_vendorSai->get(SAI_OBJECT_TYPE_PORT, port_rid, 1, &attr);
 
         if (status != SAI_STATUS_SUCCESS)
         {
@@ -399,11 +455,11 @@ void SaiSwitch::redisSetDummyAsicStateForRealObjectId(
 
     sai_object_id_t vid = g_translator->translateRidToVid(rid, m_switch_vid);
 
-    sai_object_type_t objectType = g_vendorSai->objectTypeQuery(rid);
+    sai_object_type_t objectType = m_vendorSai->objectTypeQuery(rid);
 
     if (objectType == SAI_OBJECT_TYPE_NULL)
     {
-        SWSS_LOG_THROW("g_vendorSai->objectTypeQuery returned NULL type for RID: %s",
+        SWSS_LOG_THROW("m_vendorSai->objectTypeQuery returned NULL type for RID: %s",
                 sai_serialize_object_id(rid).c_str());
     }
 
@@ -489,11 +545,11 @@ void SaiSwitch::removeExistingObject(
                 sai_serialize_object_id(rid).c_str());
     }
 
-    sai_object_type_t ot = g_vendorSai->objectTypeQuery(rid);
+    sai_object_type_t ot = m_vendorSai->objectTypeQuery(rid);
 
     if (ot == SAI_OBJECT_TYPE_NULL)
     {
-        SWSS_LOG_THROW("g_vendorSai->objectTypeQuery returned NULL on RID %s",
+        SWSS_LOG_THROW("m_vendorSai->objectTypeQuery returned NULL on RID %s",
                 sai_serialize_object_id(rid).c_str());
     }
 
@@ -503,7 +559,7 @@ void SaiSwitch::removeExistingObject(
 
     SWSS_LOG_INFO("removing %s", sai_serialize_object_meta_key(meta_key).c_str());
 
-    sai_status_t status = g_vendorSai->remove(meta_key.objecttype, meta_key.objectkey.key.object_id);
+    sai_status_t status = m_vendorSai->remove(meta_key.objecttype, meta_key.objectkey.key.object_id);
 
     if (status == SAI_STATUS_SUCCESS)
     {
@@ -557,7 +613,7 @@ sai_object_id_t SaiSwitch::helperGetSwitchAttrOid(
 
     attr.id = attr_id;
 
-    sai_status_t status = g_vendorSai->get(SAI_OBJECT_TYPE_SWITCH, m_switch_rid, 1, &attr);
+    sai_status_t status = m_vendorSai->get(SAI_OBJECT_TYPE_SWITCH, m_switch_rid, 1, &attr);
 
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -710,7 +766,7 @@ bool SaiSwitch::isNonRemovableRid(
         return true;
     }
 
-    sai_object_type_t ot = g_vendorSai->objectTypeQuery(rid);
+    sai_object_type_t ot = m_vendorSai->objectTypeQuery(rid);
 
     /*
      * List of objects after init (mlnx 2700):
@@ -773,7 +829,7 @@ void SaiSwitch::helperDiscover()
 {
     SWSS_LOG_ENTER();
 
-    SaiDiscovery sd(g_vendorSai);
+    SaiDiscovery sd(m_vendorSai);
 
     m_discovered_rids = sd.discover(m_switch_rid);
 
@@ -858,11 +914,11 @@ void SaiSwitch::redisSaveColdBootDiscoveredVids() const
     {
         sai_object_id_t vid = g_translator->translateRidToVid(rid, m_switch_vid);
 
-        sai_object_type_t objectType = g_vendorSai->objectTypeQuery(rid);
+        sai_object_type_t objectType = m_vendorSai->objectTypeQuery(rid);
 
         if (objectType == SAI_OBJECT_TYPE_NULL)
         {
-            SWSS_LOG_THROW("g_vendorSai->objectTypeQuery returned NULL type for RID: %s",
+            SWSS_LOG_THROW("m_vendorSai->objectTypeQuery returned NULL type for RID: %s",
                     sai_serialize_object_id(rid).c_str());
         }
 
@@ -1030,59 +1086,6 @@ void SaiSwitch::helperPopulateWarmBootVids()
     }
 }
 
-/*
- * NOTE: If real ID will change during hard restarts, then we need to remap all
- * VID/RID, but we can only do that if we will save entire tree with all
- * dependencies.
- */
-
-SaiSwitch::SaiSwitch(
-        _In_ sai_object_id_t switch_vid,
-        _In_ sai_object_id_t switch_rid,
-        _In_ bool warmBoot):
-    m_warmBoot(warmBoot)
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_TIMER("constructor");
-
-    m_switch_rid = switch_rid;
-    m_switch_vid = switch_vid;
-
-    GlobalSwitchId::setSwitchId(m_switch_rid);
-
-    m_hardware_info = saiGetHardwareInfo();
-
-    /*
-     * Discover put objects to redis needs to be called before checking lane
-     * map and ports, since it will deduce whether put discovered objects to
-     * redis to not interfere with possible user created objects previously.
-     *
-     * TODO: When user will use sairedis we need to send discovered view
-     * with all objects dependencies to sairedis so metadata db could
-     * be populated, and all references could be increased.
-     */
-
-    helperDiscover();
-
-    helperSaveDiscoveredObjectsToRedis();
-
-    helperInternalOids();
-
-    helperCheckLaneMap();
-
-    helperLoadColdVids();
-
-    helperPopulateWarmBootVids();
-
-    saiGetMacAddress(m_default_mac_address);
-
-    if (warmBoot)
-    {
-        checkWarmBootDiscoveredRids();
-    }
-}
-
 std::vector<uint32_t> SaiSwitch::saiGetPortLanes(
         _In_ sai_object_id_t port_rid)
 {
@@ -1098,7 +1101,7 @@ std::vector<uint32_t> SaiSwitch::saiGetPortLanes(
     attr.value.u32list.count = maxLanesPerPort;
     attr.value.u32list.list = lanes.data();
 
-    sai_status_t status = g_vendorSai->get(SAI_OBJECT_TYPE_PORT, port_rid, 1, &attr);
+    sai_status_t status = m_vendorSai->get(SAI_OBJECT_TYPE_PORT, port_rid, 1, &attr);
 
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -1146,7 +1149,7 @@ void SaiSwitch::onPostPortCreate(
 {
     SWSS_LOG_ENTER();
 
-    SaiDiscovery sd(g_vendorSai);
+    SaiDiscovery sd(m_vendorSai);
 
     auto discovered = sd.discover(port_rid);
 
@@ -1225,7 +1228,7 @@ void SaiSwitch::collectPortRelatedObjects(
         // add/remove some of related objects (this should also be tracked in
         // SaiSwitch class internally
 
-        auto status = g_vendorSai->get(SAI_OBJECT_TYPE_PORT, portRid, 1, &attr);
+        auto status = m_vendorSai->get(SAI_OBJECT_TYPE_PORT, portRid, 1, &attr);
 
         if (status != SAI_STATUS_SUCCESS)
         {

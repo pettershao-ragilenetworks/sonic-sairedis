@@ -13,8 +13,10 @@ using namespace syncd;
 // TODO move all redis access to db object connector
 
 VirtualOidTranslator::VirtualOidTranslator(
-        _In_ std::shared_ptr<sairedis::VirtualObjectIdManager> virtualObjectIdManager):
-    m_virtualObjectIdManager(virtualObjectIdManager)
+        _In_ std::shared_ptr<sairedis::VirtualObjectIdManager> virtualObjectIdManager,
+        _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai):
+    m_virtualObjectIdManager(virtualObjectIdManager),
+    m_vendorSai(vendorSai)
 {
     SWSS_LOG_ENTER();
 
@@ -56,9 +58,7 @@ sai_object_id_t VirtualOidTranslator::translateRidToVid(
 
     if (pvid != NULL)
     {
-        /*
-         * Object exists.
-         */
+        // object exists
 
         std::string strVid = *pvid;
 
@@ -69,13 +69,13 @@ sai_object_id_t VirtualOidTranslator::translateRidToVid(
         return vid;
     }
 
-    SWSS_LOG_DEBUG("spotted new RID 0x%" PRIx64, rid);
+    SWSS_LOG_DEBUG("spotted new RID %s", sai_serialize_object_id(rid).c_str());
 
-    sai_object_type_t object_type = g_vendorSai->objectTypeQuery(rid); // TODO move to std::function or wrapper class
+    sai_object_type_t object_type = m_vendorSai->objectTypeQuery(rid); // TODO move to std::function or wrapper class
 
     if (object_type == SAI_OBJECT_TYPE_NULL)
     {
-        SWSS_LOG_THROW("g_vendorSai->objectTypeQuery returned NULL type for RID 0x%" PRIx64, rid);
+        SWSS_LOG_THROW("vendorSai->objectTypeQuery returned NULL type for RID 0x%" PRIx64, rid);
     }
 
     if (object_type == SAI_OBJECT_TYPE_SWITCH)

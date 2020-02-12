@@ -6,8 +6,11 @@ extern "C"{
 
 #include "VirtualObjectIdManager.h"
 
+#include "SaiInterface.h"
+
 #include <mutex>
 #include <unordered_map>
+#include <memory>
 
 // TODO can be child class (redis translator etc)
 
@@ -18,7 +21,9 @@ namespace syncd
         public:
 
             VirtualOidTranslator(
-                _In_ std::shared_ptr<sairedis::VirtualObjectIdManager> virtualObjectIdManager);
+                _In_ std::shared_ptr<sairedis::VirtualObjectIdManager> virtualObjectIdManager,
+                _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai);
+
 
             virtual ~VirtualOidTranslator() = default;
 
@@ -92,6 +97,8 @@ namespace syncd
         private:
 
             std::shared_ptr<sairedis::VirtualObjectIdManager> m_virtualObjectIdManager;
+
+            std::shared_ptr<sairedis::SaiInterface> m_vendorSai;
 
             std::mutex m_mutex;
 

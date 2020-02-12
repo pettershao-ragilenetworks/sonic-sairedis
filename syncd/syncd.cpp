@@ -38,8 +38,6 @@ std::string fdbFlushSha;
 std::shared_ptr<NotificationProcessor> g_processor = std::make_shared<NotificationProcessor>();
 std::shared_ptr<NotificationHandler> g_handler = std::make_shared<NotificationHandler>(g_processor);
 
-std::shared_ptr<sairedis::SaiInterface> g_vendorSai = std::make_shared<VendorSai>();
-
 std::shared_ptr<Syncd> g_syncd;
 
 /**
@@ -185,7 +183,9 @@ int syncd_main(int argc, char **argv)
     // TODO move to syncd object
     auto commandLineOptions = CommandLineOptionsParser::parseCommandLine(argc, argv);
 
-    g_syncd = std::make_shared<Syncd>(g_vendorSai, commandLineOptions, isWarmStart);
+    std::shared_ptr<sairedis::SaiInterface> vendorSai = std::make_shared<VendorSai>();
+
+    g_syncd = std::make_shared<Syncd>(vendorSai, commandLineOptions, isWarmStart);
 
     SWSS_LOG_NOTICE("command line: %s", commandLineOptions->getCommandLineString().c_str());
 
@@ -225,7 +225,7 @@ int syncd_main(int argc, char **argv)
                 redisVidIndexGenerator);
 
     // TODO move to syncd object
-    g_translator = std::make_shared<VirtualOidTranslator>(virtualObjectIdManager);
+    g_translator = std::make_shared<VirtualOidTranslator>(virtualObjectIdManager,  vendorSai);
 
     /*
      * At the end we cant use producer consumer concept since if one process
@@ -251,7 +251,7 @@ int syncd_main(int argc, char **argv)
     auto test_services = smt.getServiceMethodTable();
 
     // TODO need per api test service method table static template
-    sai_status_t status = g_vendorSai->initialize(0, &test_services);
+    sai_status_t status = vendorSai->initialize(0, &test_services);
 
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -490,7 +490,7 @@ int syncd_main(int argc, char **argv)
 
     SWSS_LOG_NOTICE("calling api uninitialize");
 
-    status = g_vendorSai->uninitialize();
+    status = vendorSai->uninitialize();
 
     if (status != SAI_STATUS_SUCCESS)
     {

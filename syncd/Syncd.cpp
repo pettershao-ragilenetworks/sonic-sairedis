@@ -91,7 +91,7 @@ Syncd::Syncd(
 
     setSaiApiLogLevel();
 
-    m_manager = std::make_shared<FlexCounterManager>();
+    m_manager = std::make_shared<FlexCounterManager>(m_vendorSai);
 
     m_profileIter = m_profileMap.begin();
 
@@ -1438,7 +1438,7 @@ sai_status_t Syncd::processOidCreate(
              * constructor, like getting all queues, ports, etc.
              */
 
-            switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, objectRid);
+            switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, objectRid, m_vendorSai);
 
             startDiagShell(switchRid);
         }
@@ -2786,7 +2786,7 @@ void Syncd::onSwitchCreateInInitViewMode(
 
         // make switch initialization and get all default data
 
-        switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid);
+        switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid, m_vendorSai);
 
         startDiagShell(switchRid);
     }
@@ -2974,7 +2974,7 @@ void Syncd::performWarmRestartSingleSwitch(
 
     // perform all get operations on existing switch
 
-    auto sw = switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid, true);
+    auto sw = switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid, m_vendorSai, true);
 
     startDiagShell(switchRid);
 }

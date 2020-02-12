@@ -18,8 +18,6 @@
 #define SWITCH_SAI_THRIFT_RPC_SERVER_PORT 9092
 #endif // SAITHRIFT
 
-extern std::shared_ptr<sairedis::SaiInterface> g_vendorSai;
-
 extern std::mutex g_mutex;
 
 extern std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> switches;

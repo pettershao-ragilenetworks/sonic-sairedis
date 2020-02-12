@@ -6,6 +6,15 @@ using namespace syncd;
 
 #define MUTEX std::lock_guard<std::mutex> _lock(m_mutex);
 
+FlexCounterManager::FlexCounterManager(
+        _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai):
+    m_vendorSai(vendorSai)
+{
+    SWSS_LOG_ENTER();
+
+    // empty
+}
+
 std::shared_ptr<FlexCounter> FlexCounterManager::getInstance(
         _In_ const std::string& instanceId)
 {
@@ -15,7 +24,7 @@ std::shared_ptr<FlexCounter> FlexCounterManager::getInstance(
 
     if (m_flexCounters.count(instanceId) == 0)
     {
-        auto counter = std::make_shared<FlexCounter>(instanceId);
+        auto counter = std::make_shared<FlexCounter>(instanceId, m_vendorSai);
 
         m_flexCounters[instanceId] = counter;
     }

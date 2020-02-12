@@ -14,12 +14,12 @@ using namespace syncd;
 #define MUTEX std::unique_lock<std::mutex> _lock(m_mtx);
 #define MUTEX_UNLOCK _lock.unlock();
 
-extern std::shared_ptr<sairedis::SaiInterface> g_vendorSai;
-
 FlexCounter::FlexCounter(
-        _In_ const std::string& instanceId):
+        _In_ const std::string& instanceId,
+        _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai):
     m_pollInterval(0),
-    m_instanceId(instanceId)
+    m_instanceId(instanceId),
+    m_vendorSai(vendorSai)
 {
     SWSS_LOG_ENTER();
 
@@ -271,7 +271,7 @@ void FlexCounter::setQueueCounterList(
     // Check if queue is able to provide the statistic
     std::vector<uint64_t> queueStats(supportedIds.size());
 
-    sai_status_t status = g_vendorSai->getStats(
+    sai_status_t status = m_vendorSai->getStats(
             SAI_OBJECT_TYPE_QUEUE,
             queueRid,
             static_cast<uint32_t>(supportedIds.size()),
@@ -352,7 +352,7 @@ void FlexCounter::setPriorityGroupCounterList(
     // Check if PG is able to provide the statistic
     std::vector<uint64_t> priorityGroupStats(supportedIds.size());
 
-    sai_status_t status = g_vendorSai->getStats(
+    sai_status_t status = m_vendorSai->getStats(
             SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP,
             priorityGroupRid,
             static_cast<uint32_t>(supportedIds.size()),
@@ -970,7 +970,7 @@ void FlexCounter::collectPortCounters(
         std::vector<uint64_t> portStats(portCounterIds.size());
 
         // Get port stats
-        sai_status_t status = g_vendorSai->getStats(
+        sai_status_t status = m_vendorSai->getStats(
                 SAI_OBJECT_TYPE_PORT,
                 portId,
                 static_cast<uint32_t>(portCounterIds.size()),
@@ -1015,7 +1015,7 @@ void FlexCounter::collectPortDebugCounters(
         std::vector<uint64_t> portStats(portCounterIds.size());
 
         // Get port stats
-        sai_status_t status = g_vendorSai->getStatsExt(
+        sai_status_t status = m_vendorSai->getStatsExt(
                 SAI_OBJECT_TYPE_PORT,
                 portId,
                 static_cast<uint32_t>(portCounterIds.size()),
@@ -1064,13 +1064,13 @@ void FlexCounter::collectQueueCounters(
         sai_status_t status = -1;
         // TODO: replace if with get_queue_stats_ext() call when it is fully supported
         // Example:
-        // sai_status_t status = g_vendorSai->getStatsExt(
+        // sai_status_t status = m_vendorSai->getStatsExt(
         //         queueId,
         //         static_cast<uint32_t>(queueCounterIds.size()),
         //         queueCounterIds.data(),
         //         m_statsMode,
         //         queueStats.data());
-        status = g_vendorSai->getStats(
+        status = m_vendorSai->getStats(
                 SAI_OBJECT_TYPE_QUEUE,
                 queueId,
                 static_cast<uint32_t>(queueCounterIds.size()),
@@ -1085,7 +1085,7 @@ void FlexCounter::collectQueueCounters(
 
         if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR)
         {
-            status = g_vendorSai->clearStats(
+            status = m_vendorSai->clearStats(
                     SAI_OBJECT_TYPE_QUEUE,
                     queueId,
                     static_cast<uint32_t>(queueCounterIds.size()),
@@ -1135,7 +1135,7 @@ void FlexCounter::collectQueueAttrs(
         }
 
         // Get queue attr
-        sai_status_t status = g_vendorSai->get(
+        sai_status_t status = m_vendorSai->get(
                 SAI_OBJECT_TYPE_QUEUE,
                 queueId,
                 static_cast<uint32_t>(queueAttrIds.size()),
@@ -1182,7 +1182,7 @@ void FlexCounter::collectPriorityGroupCounters(
         // Get PG stats
         sai_status_t status = -1;
         // TODO: replace if with get_ingress_priority_group_stats_ext() call when it is fully supported
-        status = g_vendorSai->getStats(
+        status = m_vendorSai->getStats(
                 SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP,
                 priorityGroupId,
                 static_cast<uint32_t>(priorityGroupCounterIds.size()),
@@ -1202,7 +1202,7 @@ void FlexCounter::collectPriorityGroupCounters(
 
         if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR)
         {
-            status = g_vendorSai->clearStats(
+            status = m_vendorSai->clearStats(
                     SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP,
                     priorityGroupId,
                     static_cast<uint32_t>(priorityGroupCounterIds.size()),
@@ -1252,7 +1252,7 @@ void FlexCounter::collectSwitchDebugCounters(
         std::vector<uint64_t> switchStats(switchCounterIds.size());
 
         // Get port stats
-        sai_status_t status = g_vendorSai->getStatsExt(
+        sai_status_t status = m_vendorSai->getStatsExt(
                 SAI_OBJECT_TYPE_SWITCH,
                 switchId,
                 static_cast<uint32_t>(switchCounterIds.size()),
@@ -1303,7 +1303,7 @@ void FlexCounter::collectPriorityGroupAttrs(
         }
 
         // Get PG attr
-        sai_status_t status = g_vendorSai->get(
+        sai_status_t status = m_vendorSai->get(
                 SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP,
                 priorityGroupId,
                 static_cast<uint32_t>(priorityGroupAttrIds.size()),
@@ -1348,7 +1348,7 @@ void FlexCounter::collectRifCounters(
         std::vector<uint64_t> rifStats(rifCounterIds.size());
 
         // Get rif stats
-        sai_status_t status = g_vendorSai->getStats(
+        sai_status_t status = m_vendorSai->getStats(
                 SAI_OBJECT_TYPE_ROUTER_INTERFACE,
                 rifId,
                 static_cast<uint32_t>(rifCounterIds.size()),
@@ -1396,7 +1396,7 @@ void FlexCounter::collectBufferPoolCounters(
         // Get buffer pool stats
         sai_status_t status = -1;
 
-        status = g_vendorSai->getStats(
+        status = m_vendorSai->getStats(
                 SAI_OBJECT_TYPE_BUFFER_POOL,
                 bufferPoolId,
                 static_cast<uint32_t>(bufferPoolCounterIds.size()),
@@ -1415,7 +1415,7 @@ void FlexCounter::collectBufferPoolCounters(
         }
         if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR || bufferPoolStatsMode == SAI_STATS_MODE_READ_AND_CLEAR)
         {
-            status = g_vendorSai->clearStats(
+            status = m_vendorSai->clearStats(
                     SAI_OBJECT_TYPE_BUFFER_POOL,
                     bufferPoolId,
                     static_cast<uint32_t>(bufferPoolCounterIds.size()),
@@ -1620,7 +1620,7 @@ void FlexCounter::updateSupportedPortCounters(
     {
         sai_port_stat_t counter = static_cast<sai_port_stat_t>(id);
 
-        sai_status_t status = g_vendorSai->getStats(SAI_OBJECT_TYPE_PORT, portRid, 1, (sai_stat_id_t *)&counter, &value);
+        sai_status_t status = m_vendorSai->getStats(SAI_OBJECT_TYPE_PORT, portRid, 1, (sai_stat_id_t *)&counter, &value);
 
         if (status != SAI_STATUS_SUCCESS)
         {
@@ -1654,7 +1654,7 @@ std::vector<sai_port_stat_t> FlexCounter::saiCheckSupportedPortDebugCounters(
             continue;
         }
 
-        sai_status_t status = g_vendorSai->getStatsExt(
+        sai_status_t status = m_vendorSai->getStatsExt(
                 SAI_OBJECT_TYPE_PORT,
                 portId,
                 1,
@@ -1690,7 +1690,7 @@ void FlexCounter::updateSupportedQueueCounters(
 
     for (auto &counter : counterIds)
     {
-        sai_status_t status = g_vendorSai->getStats(
+        sai_status_t status = m_vendorSai->getStats(
                 SAI_OBJECT_TYPE_QUEUE,
                 queueId,
                 1, (const sai_stat_id_t *)&counter,
@@ -1709,7 +1709,7 @@ void FlexCounter::updateSupportedQueueCounters(
 
         if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR)
         {
-            status = g_vendorSai->clearStats(SAI_OBJECT_TYPE_QUEUE, queueId, 1, (const sai_stat_id_t *)&counter);
+            status = m_vendorSai->clearStats(SAI_OBJECT_TYPE_QUEUE, queueId, 1, (const sai_stat_id_t *)&counter);
             if (status != SAI_STATUS_SUCCESS)
             {
                 SWSS_LOG_NOTICE("%s: clear counter %s is not supported on queue %s, rv: %s",
@@ -1738,7 +1738,7 @@ void FlexCounter::updateSupportedPriorityGroupCounters(
 
     for (auto &counter : counterIds)
     {
-        sai_status_t status = g_vendorSai->getStats(
+        sai_status_t status = m_vendorSai->getStats(
                 SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP,
                 priorityGroupRid,
                 1,
@@ -1758,7 +1758,7 @@ void FlexCounter::updateSupportedPriorityGroupCounters(
 
         if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR)
         {
-            status = g_vendorSai->clearStats(
+            status = m_vendorSai->clearStats(
                     SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP,
                     priorityGroupRid,
                     1,
@@ -1795,7 +1795,7 @@ void FlexCounter::updateSupportedRifCounters(
     {
         sai_router_interface_stat_t counter = static_cast<sai_router_interface_stat_t>(cntr_id);
 
-        sai_status_t status = g_vendorSai->getStats(
+        sai_status_t status = m_vendorSai->getStats(
                 SAI_OBJECT_TYPE_ROUTER_INTERFACE,
                 rifRid,
                 1,
@@ -1828,7 +1828,7 @@ void FlexCounter::updateSupportedBufferPoolCounters(
 
     for (const auto &counterId : counterIds)
     {
-        sai_status_t status = g_vendorSai->getStats(
+        sai_status_t status = m_vendorSai->getStats(
                 SAI_OBJECT_TYPE_BUFFER_POOL,
                 bufferPoolId,
                 1,
@@ -1848,7 +1848,7 @@ void FlexCounter::updateSupportedBufferPoolCounters(
 
         if (m_statsMode == SAI_STATS_MODE_READ_AND_CLEAR || statsMode == SAI_STATS_MODE_READ_AND_CLEAR)
         {
-            status = g_vendorSai->clearStats(
+            status = m_vendorSai->clearStats(
                     SAI_OBJECT_TYPE_BUFFER_POOL,
                     bufferPoolId,
                     1,
@@ -1886,7 +1886,7 @@ std::vector<sai_switch_stat_t> FlexCounter::saiCheckSupportedSwitchDebugCounters
             continue;
         }
 
-        sai_status_t status = g_vendorSai->getStatsExt(
+        sai_status_t status = m_vendorSai->getStatsExt(
                 SAI_OBJECT_TYPE_SWITCH,
                 switchId,
                 1, (const sai_stat_id_t *)&counter,

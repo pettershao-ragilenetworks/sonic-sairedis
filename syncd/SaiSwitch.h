@@ -4,11 +4,14 @@ extern "C" {
 #include "sai.h"
 }
 
+#include "SaiInterface.h"
+
 #include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
 #include <map>
+#include <memory>
 
 namespace syncd
 {
@@ -24,6 +27,7 @@ namespace syncd
             SaiSwitch(
                     _In_ sai_object_id_t switch_vid,
                     _In_ sai_object_id_t switch_rid,
+                    _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,
                     _In_ bool warmBoot = false);
 
             virtual ~SaiSwitch() = default;
@@ -391,6 +395,8 @@ namespace syncd
             std::set<sai_object_id_t> m_coldBootDiscoveredVids;
 
             std::set<sai_object_id_t> m_warmBootDiscoveredVids;
+
+            std::shared_ptr<sairedis::SaiInterface> m_vendorSai;
 
             bool m_warmBoot;
 
