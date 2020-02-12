@@ -55,6 +55,11 @@ namespace syncd
                     _In_ uint32_t count,
                     _In_ const sai_fdb_event_notification_data_t *data);
 
+            void processFlushEvent(
+                    _In_ sai_object_id_t portOid,
+                    _In_ sai_object_id_t bvId,
+                    _In_ int flush_static);
+
         private: // processors
 
             void process_on_switch_state_change(
