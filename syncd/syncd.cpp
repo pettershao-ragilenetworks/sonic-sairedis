@@ -40,8 +40,6 @@ std::shared_ptr<NotificationHandler> g_handler = std::make_shared<NotificationHa
 
 std::shared_ptr<sairedis::SaiInterface> g_vendorSai = std::make_shared<VendorSai>();
 
-std::shared_ptr<sairedis::VirtualObjectIdManager> g_virtualObjectIdManager;
-
 std::shared_ptr<Syncd> g_syncd;
 
 /**
@@ -219,17 +217,17 @@ int syncd_main(int argc, char **argv)
     std::shared_ptr<swss::ConsumerTable> flexCounter = std::make_shared<swss::ConsumerTable>(dbFlexCounter.get(), FLEX_COUNTER_TABLE);
     std::shared_ptr<swss::ConsumerTable> flexCounterGroup = std::make_shared<swss::ConsumerTable>(dbFlexCounter.get(), FLEX_COUNTER_GROUP_TABLE);
 
-    // TODO move to syncd object
-    g_translator = std::make_shared<VirtualOidTranslator>();
-
     auto switchConfigContainer = std::make_shared<sairedis::SwitchConfigContainer>();
     auto redisVidIndexGenerator = std::make_shared<sairedis::RedisVidIndexGenerator>(dbAsic, REDIS_KEY_VIDCOUNTER);
 
-    g_virtualObjectIdManager =
+    auto virtualObjectIdManager =
         std::make_shared<sairedis::VirtualObjectIdManager>(
                 0, // TODO global context, get from command line
                 switchConfigContainer,
                 redisVidIndexGenerator);
+
+    // TODO move to syncd object
+    g_translator = std::make_shared<VirtualOidTranslator>(virtualObjectIdManager);
 
     /*
      * At the end we cant use producer consumer concept since if one process
@@ -339,7 +337,7 @@ int syncd_main(int argc, char **argv)
                  * lead to unable to find some objects.
                  */
 
-                SWSS_LOG_NOTICE("is asic queue empty: %d",asicState->empty());
+                SWSS_LOG_NOTICE("is asic queue empty: %d", asicState->empty());
 
                 while (!asicState->empty())
                 {

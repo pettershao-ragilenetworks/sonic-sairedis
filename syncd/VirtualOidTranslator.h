@@ -4,6 +4,8 @@ extern "C"{
 #include "saimetadata.h"
 }
 
+#include "VirtualObjectIdManager.h"
+
 #include <mutex>
 #include <unordered_map>
 
@@ -15,7 +17,8 @@ namespace syncd
     {
         public:
 
-            VirtualOidTranslator() = default;
+            VirtualOidTranslator(
+                _In_ std::shared_ptr<sairedis::VirtualObjectIdManager> virtualObjectIdManager);
 
             virtual ~VirtualOidTranslator() = default;
 
@@ -87,6 +90,8 @@ namespace syncd
             void clearLocalCache();
 
         private:
+
+            std::shared_ptr<sairedis::VirtualObjectIdManager> m_virtualObjectIdManager;
 
             std::mutex m_mutex;
 

@@ -12,7 +12,14 @@ using namespace syncd;
 
 // TODO move all redis access to db object connector
 
-extern std::shared_ptr<sairedis::VirtualObjectIdManager> g_virtualObjectIdManager;
+VirtualOidTranslator::VirtualOidTranslator(
+        _In_ std::shared_ptr<sairedis::VirtualObjectIdManager> virtualObjectIdManager):
+    m_virtualObjectIdManager(virtualObjectIdManager)
+{
+    SWSS_LOG_ENTER();
+
+    // empty
+}
 
 sai_object_id_t VirtualOidTranslator::translateRidToVid(
         _In_ sai_object_id_t rid,
@@ -81,7 +88,7 @@ sai_object_id_t VirtualOidTranslator::translateRidToVid(
         SWSS_LOG_THROW("RID 0x%" PRIx64 " is switch object, but not in local or redis db, bug!", rid);
     }
 
-    vid = g_virtualObjectIdManager->allocateNewObjectId(object_type, switchVid); // TODO to std::function or separate object
+    vid = m_virtualObjectIdManager->allocateNewObjectId(object_type, switchVid); // TODO to std::function or separate object
 
     SWSS_LOG_DEBUG("translated RID 0x%" PRIx64 " to VID 0x%" PRIx64, rid, vid);
 

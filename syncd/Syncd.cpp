@@ -3067,6 +3067,8 @@ void Syncd::sendShutdownRequest(
 
     std::vector<swss::FieldValueTuple> entry;
 
+    // TODO use g_handler->onSwitchShutdownRequest(switchVid); (but this should be per switch)
+
     notifications->send(SAI_SWITCH_NOTIFICATION_NAME_SWITCH_SHUTDOWN_REQUEST, s, entry);
 }
 
