@@ -64,15 +64,20 @@ uint32_t VidManager::getSwitchIndex(
 
     SWSS_LOG_THROW("invalid obejct id: %s, should be SWITCH",
             sai_serialize_object_id(objectId).c_str());
-
 }
 
 uint32_t VidManager::getGlobalContext(
-        _In_ sai_object_id_t obejctId)
+        _In_ sai_object_id_t objectId)
 {
     SWSS_LOG_ENTER();
 
-    SWSS_LOG_ERROR("not implemented, FIXME");
+    auto swid = sairedis::VirtualObjectIdManager::switchIdQuery(objectId);
 
-    return 0; // TODO implement
+    if (swid == SAI_NULL_OBJECT_ID)
+    {
+        SWSS_LOG_THROW("invalid object id %s",
+                sai_serialize_object_id(objectId).c_str());
+    }
+
+    return sairedis::VirtualObjectIdManager::getGlobalContext(objectId);
 }
