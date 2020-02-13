@@ -141,6 +141,16 @@ namespace sairedis
             static uint32_t getSwitchIndex(
                     _In_ sai_object_id_t obejctId);
 
+            /**
+             * @brief Get global context.
+             *
+             * Index range is <0..255>.
+             *
+             * Returns global context for given oid. If oid is invalid, returns 0.
+             */
+            static uint32_t getGlobalContext(
+                    _In_ sai_object_id_t objectId);
+
         private:
 
             /**

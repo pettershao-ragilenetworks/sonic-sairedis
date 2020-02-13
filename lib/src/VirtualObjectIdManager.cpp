@@ -377,3 +377,13 @@ uint32_t VirtualObjectIdManager::getSwitchIndex(
 
     return (uint32_t)SAI_REDIS_GET_SWITCH_INDEX(switchId);
 }
+
+uint32_t VirtualObjectIdManager::getGlobalContext(
+        _In_ sai_object_id_t objectId)
+{
+    SWSS_LOG_ENTER();
+
+    auto switchId = switchIdQuery(objectId);
+
+    return (uint32_t)SAI_REDIS_GET_GLOBAL_CONTEXT(switchId);
+}
