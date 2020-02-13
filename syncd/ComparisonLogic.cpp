@@ -44,8 +44,8 @@ ComparisonLogic::ComparisonLogic(
     // will inside filter only RID/VID to this particular switch
 
     // TODO move outside switch ? since later could be in different ASIC_DB
-    m_current->m_ridToVid = m_switch->redisGetRidToVidMap();
-    m_current->m_vidToRid = m_switch->redisGetVidToRidMap();
+    m_current->m_ridToVid = m_switch->getRidToVidMap();
+    m_current->m_vidToRid = m_switch->getVidToRidMap();
 
     /*
      * Those calls could be calls to SAI, but when this will be separate lib

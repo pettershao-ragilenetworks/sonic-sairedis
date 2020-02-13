@@ -39,6 +39,10 @@ namespace syncd
 
             std::string getHardwareInfo() const;
 
+            std::unordered_map<sai_object_id_t, sai_object_id_t> getVidToRidMap() const;
+
+            std::unordered_map<sai_object_id_t, sai_object_id_t> getRidToVidMap() const;
+
             /**
              * @brief Indicates whether RID was discovered on switch init.
              *
@@ -101,9 +105,6 @@ namespace syncd
             /*
              * Redis Static Methods.
              */
-
-            static std::unordered_map<sai_object_id_t, sai_object_id_t> redisGetObjectMap(
-                    _In_ const std::string &key);
 
             /**
              * @brief Gets discovered objects on the switch.
@@ -250,24 +251,7 @@ namespace syncd
             void saiGetMacAddress(
                     _Out_ sai_mac_t &mac) const;
 
-            /*
-             * Redis Methods.
-             */
-
-            std::unordered_map<sai_uint32_t, sai_object_id_t> redisGetLaneMap() const;
-
-        public:
-
-            std::unordered_map<sai_object_id_t, sai_object_id_t> redisGetVidToRidMap() const;
-
-            std::unordered_map<sai_object_id_t, sai_object_id_t> redisGetRidToVidMap() const;
-
         private:
-
-            void redisSaveLaneMap(
-                    _In_ const std::unordered_map<sai_uint32_t, sai_object_id_t> &map) const;
-
-            void redisClearLaneMap() const;
 
             void redisSetDummyAsicStateForRealObjectId(
                     _In_ sai_object_id_t rid) const;
@@ -317,9 +301,6 @@ namespace syncd
             /*
              * Other Methods.
              */
-
-            std::string getRedisLanesKey() const;
-            std::string getRedisHiddenKey() const;
 
             bool isWarmBoot() const;
 

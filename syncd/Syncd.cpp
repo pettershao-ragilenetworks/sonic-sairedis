@@ -38,7 +38,6 @@ Syncd::Syncd(
     m_asicInitViewMode(false), // by default we are in APPLY view mode
     m_vendorSai(vendorSai),
     m_veryFirstRun(false)
-
 {
     SWSS_LOG_ENTER();
 
@@ -49,6 +48,13 @@ Syncd::Syncd(
     m_profileIter = m_profileMap.begin();
 
     loadProfileMap();
+}
+
+Syncd::~Syncd()
+{
+    SWSS_LOG_ENTER();
+
+    // empty
 }
 
 void Syncd::performStartupLogic()
@@ -103,13 +109,6 @@ void Syncd::performStartupLogic()
     {
         m_profileMap[SAI_KEY_BOOT_TYPE] = std::to_string(m_commandLineOptions->m_startType); // number value is needed
     }
-}
-
-Syncd::~Syncd()
-{
-    SWSS_LOG_ENTER();
-
-    // empty
 }
 
 bool Syncd::getAsicInitViewMode() const

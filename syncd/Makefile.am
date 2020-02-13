@@ -16,6 +16,7 @@ endif
 
 noinst_LIBRARIES = libsyncd.a
 libsyncd_a_SOURCES = \
+				RedisClient.cpp \
 				WarmRestartTable.cpp \
 				RequestShutdownCommandLineOptions.cpp \
 				GlobalSwitchId.cpp \

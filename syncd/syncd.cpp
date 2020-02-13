@@ -121,20 +121,33 @@ int syncd_main(int argc, char **argv)
 
     swss::Logger::getInstance().setMinPrio(swss::Logger::SWSS_NOTICE);
 
-    swss::Logger::linkToDbNative("syncd"); // TODO fix also in discovery
+    swss::Logger::linkToDbNative("syncd");
 
     swss::WarmStart::initialize("syncd", "syncd");
     swss::WarmStart::checkWarmStart("syncd", "syncd");
 
-    bool isWarmStart = swss::WarmStart::isWarmStart(); // since global, can be applied in main
+    bool isWarmStart = swss::WarmStart::isWarmStart();
 
     MetadataLogger::initialize();
 
     auto commandLineOptions = CommandLineOptionsParser::parseCommandLine(argc, argv);
 
-    std::shared_ptr<sairedis::SaiInterface> vendorSai = std::make_shared<VendorSai>();
+#ifdef SAITHRIFT
+
+    if (commandLineOptions->m_portMapFile.size() > 0)
+    {
+        auto map = PortMapParser::parsePortMap(commandLineOptions->m_portMapFile);
+
+        PortMap::setGlobalPortMap(map);
+    }
+
+#endif // SAITHRIFT
+
+    auto vendorSai = std::make_shared<VendorSai>();
 
     auto g_syncd = std::make_shared<Syncd>(vendorSai, commandLineOptions, isWarmStart);
+
+    /////////////////
 
     g_processor = std::make_shared<NotificationProcessor>(std::bind(&Syncd::syncProcessNotification, g_syncd.get(), _1));
     g_handler = std::make_shared<NotificationHandler>(g_processor);
@@ -150,15 +163,6 @@ int syncd_main(int argc, char **argv)
     g_handler->setSwitchNotifications(sn.getSwitchNotifications());
 
     SWSS_LOG_NOTICE("command line: %s", commandLineOptions->getCommandLineString().c_str());
-
-#ifdef SAITHRIFT
-    if (commandLineOptions->m_portMapFile.size() > 0)
-    {
-        auto map = PortMapParser::parsePortMap(commandLineOptions->m_portMapFile);
-
-        PortMap::setGlobalPortMap(map);
-    }
-#endif // SAITHRIFT
 
     // we need STATE_DB ASIC_DB and COUNTERS_DB
 

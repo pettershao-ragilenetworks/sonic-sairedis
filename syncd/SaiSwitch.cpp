@@ -3,20 +3,20 @@
 #include "SaiDiscovery.h"
 #include "VidManager.h"
 #include "GlobalSwitchId.h"
-
-#include "sairediscommon.h"
+#include "RedisClient.h"
 
 #include "meta/sai_serialize.h"
 #include "swss/logger.h"
 
-// TODO to be removed
-#include "syncd.h"
+#include "syncd.h" // TODO to be removed
 
 using namespace syncd;
 
 #define MAX_OBJLIST_LEN 128
 
 const int maxLanesPerPort = 8;
+
+std::shared_ptr<RedisClient> g_client = std::make_shared<RedisClient>();
 
 /*
  * NOTE: If real ID will change during hard restarts, then we need to remap all
@@ -247,155 +247,25 @@ std::unordered_map<sai_uint32_t, sai_object_id_t> SaiSwitch::saiGetHardwareLaneM
     return map;
 }
 
-std::string SaiSwitch::getRedisLanesKey() const
+std::unordered_map<sai_object_id_t, sai_object_id_t> SaiSwitch::getVidToRidMap() const
 {
     SWSS_LOG_ENTER();
 
-    /*
-     * Each switch will have it's own lanes in format LANES:oid:0xYYYYYYYY.
-     *
-     * NOTE: To support multiple switches LANES needs to be made per switch.
-     *
-     * return std::string(LANES) + ":" + sai_serialize_object_id(m_switch_vid);
-     */
-
-    return std::string(LANES);
+    return g_client->getVidToRidMap(m_switch_vid);
 }
 
-void SaiSwitch::redisClearLaneMap() const
+std::unordered_map<sai_object_id_t, sai_object_id_t> SaiSwitch::getRidToVidMap() const
 {
     SWSS_LOG_ENTER();
 
-    auto key = getRedisLanesKey();
-
-    g_redisClient->del(key);
-}
-
-std::unordered_map<sai_uint32_t, sai_object_id_t> SaiSwitch::redisGetLaneMap() const
-{
-    SWSS_LOG_ENTER();
-
-    auto key = getRedisLanesKey();
-
-    auto hash = g_redisClient->hgetall(key);
-
-    SWSS_LOG_DEBUG("previous lanes: %lu", hash.size());
-
-    std::unordered_map<sai_uint32_t, sai_object_id_t> map;
-
-    for (auto &kv: hash)
-    {
-        const std::string &str_key = kv.first;
-        const std::string &str_value = kv.second;
-
-        sai_uint32_t lane;
-        sai_object_id_t portId;
-
-        sai_deserialize_number(str_key, lane);
-
-        sai_deserialize_object_id(str_value, portId);
-
-        map[lane] = portId;
-    }
-
-    return map;
-}
-
-void SaiSwitch::redisSaveLaneMap(
-        _In_ const std::unordered_map<sai_uint32_t, sai_object_id_t> &map) const
-{
-    SWSS_LOG_ENTER();
-
-    redisClearLaneMap();
-
-    for (auto const &it: map)
-    {
-        sai_uint32_t lane = it.first;
-        sai_object_id_t portId = it.second;
-
-        std::string strLane = sai_serialize_number(lane);
-        std::string strPortId = sai_serialize_object_id(portId);
-
-        auto key = getRedisLanesKey();
-
-        g_redisClient->hset(key, strLane, strPortId);
-    }
-}
-
-std::unordered_map<sai_object_id_t, sai_object_id_t> SaiSwitch::redisGetObjectMap(
-        _In_ const std::string &key)
-{
-    SWSS_LOG_ENTER();
-
-    auto hash = g_redisClient->hgetall(key);
-
-    std::unordered_map<sai_object_id_t, sai_object_id_t> map;
-
-    for (auto &kv: hash)
-    {
-        const std::string &str_key = kv.first;
-        const std::string &str_value = kv.second;
-
-        sai_object_id_t objectIdKey;
-        sai_object_id_t objectIdValue;
-
-        sai_deserialize_object_id(str_key, objectIdKey);
-
-        sai_deserialize_object_id(str_value, objectIdValue);
-
-        map[objectIdKey] = objectIdValue;
-    }
-
-    return map;
-}
-
-std::unordered_map<sai_object_id_t, sai_object_id_t> SaiSwitch::redisGetVidToRidMap() const
-{
-    SWSS_LOG_ENTER();
-
-    auto map = redisGetObjectMap(VIDTORID);
-
-    std::unordered_map<sai_object_id_t, sai_object_id_t> filtered;
-
-    for (auto& v2r: map)
-    {
-        auto switchId = VidManager::switchIdQuery(v2r.first);
-
-        if (switchId == m_switch_vid)
-        {
-            filtered[v2r.first] = v2r.second;
-        }
-    }
-
-    return filtered;
-}
-
-std::unordered_map<sai_object_id_t, sai_object_id_t> SaiSwitch::redisGetRidToVidMap() const
-{
-    SWSS_LOG_ENTER();
-
-    auto map = redisGetObjectMap(RIDTOVID);
-
-    std::unordered_map<sai_object_id_t, sai_object_id_t> filtered;
-
-    for (auto& r2v: map)
-    {
-        auto switchId = VidManager::switchIdQuery(r2v.second);
-
-        if (switchId == m_switch_vid)
-        {
-            filtered[r2v.first] = r2v.second;
-        }
-    }
-
-    return filtered;
+    return g_client->getRidToVidMap(m_switch_vid);
 }
 
 void SaiSwitch::helperCheckLaneMap()
 {
     SWSS_LOG_ENTER();
 
-    auto redisLaneMap = redisGetLaneMap();
+    auto redisLaneMap = g_client->getLaneMap(m_switch_vid);
 
     auto laneMap = saiGetHardwareLaneMap();
 
@@ -403,7 +273,7 @@ void SaiSwitch::helperCheckLaneMap()
     {
         SWSS_LOG_INFO("no lanes defined in redis, seems like it is first syncd start");
 
-        redisSaveLaneMap(laneMap);
+        g_client->saveLaneMap(m_switch_vid, laneMap);
 
         redisLaneMap = laneMap; // copy
     }
@@ -433,21 +303,6 @@ void SaiSwitch::helperCheckLaneMap()
     }
 }
 
-std::string SaiSwitch::getRedisHiddenKey() const
-{
-    SWSS_LOG_ENTER();
-
-    /*
-     * Each switch will have it's own hidden in format HIDDEN:oid:0xYYYYYYYY.
-     *
-     * NOTE: To support multiple switches HIDDEN needs to me made per switch.
-     *
-     * return std::string(HIDDEN) + ":" + sai_serialize_object_id(m_switch_vid);
-     */
-
-    return std::string(HIDDEN);
-}
-
 void SaiSwitch::redisSetDummyAsicStateForRealObjectId(
         _In_ sai_object_id_t rid) const
 {
@@ -455,21 +310,7 @@ void SaiSwitch::redisSetDummyAsicStateForRealObjectId(
 
     sai_object_id_t vid = g_translator->translateRidToVid(rid, m_switch_vid);
 
-    sai_object_type_t objectType = m_vendorSai->objectTypeQuery(rid);
-
-    if (objectType == SAI_OBJECT_TYPE_NULL)
-    {
-        SWSS_LOG_THROW("m_vendorSai->objectTypeQuery returned NULL type for RID: %s",
-                sai_serialize_object_id(rid).c_str());
-    }
-
-    std::string strObjectType = sai_serialize_object_type(objectType);
-
-    std::string strVid = sai_serialize_object_id(vid);
-
-    std::string strKey = ASIC_STATE_TABLE + (":" + strObjectType + ":" + strVid);
-
-    g_redisClient->hset(strKey, "NULL", "NULL");
+    g_client->setDummyAsicStateObject(vid);
 }
 
 sai_object_id_t SaiSwitch::getVid() const
@@ -641,9 +482,7 @@ sai_object_id_t SaiSwitch::helperGetSwitchAttrOid(
      * Get value value of the same attribute from redis.
      */
 
-    auto key = getRedisHiddenKey();
-
-    auto ptr_redis_rid_str = g_redisClient->hget(key, meta->attridname);
+    auto ptr_redis_rid_str = g_client->getSwitchHiddenAttribute(m_switch_vid, meta->attridname);
 
     if (ptr_redis_rid_str == NULL)
     {
@@ -655,9 +494,7 @@ sai_object_id_t SaiSwitch::helperGetSwitchAttrOid(
 
         SWSS_LOG_INFO("redis %s id is not defined yet in redis", meta->attridname);
 
-        std::string rid_str = sai_serialize_object_id(rid);
-
-        g_redisClient->hset(key, meta->attridname, rid_str);
+        g_client->saveSwitchHiddenAttribute(m_switch_vid, meta->attridname, rid);
 
         m_default_rid_map[attr_id] = rid;
 
@@ -840,33 +677,7 @@ void SaiSwitch::helperLoadColdVids()
 {
     SWSS_LOG_ENTER();
 
-    auto hash = g_redisClient->hgetall(COLDVIDS);
-
-    /*
-     * NOTE: some objects may not exists after 2nd restart, like VLAN_MEMBER or
-     * BRIDGE_PORT, since user could decide to remove them on previous boot.
-     */
-
-    for (auto kvp: hash)
-    {
-        auto strVid = kvp.first;
-
-        sai_object_id_t vid;
-        sai_deserialize_object_id(strVid, vid);
-
-        /*
-         * Just make sure that vid in COLDVIDS is present in current vid2rid map
-         */
-
-        auto rid = g_redisClient->hget(VIDTORID, strVid);
-
-        if (rid == nullptr)
-        {
-            SWSS_LOG_INFO("no RID for VID %s, probably object was removed previously", strVid.c_str());
-        }
-
-         m_coldBootDiscoveredVids.insert(vid);
-    }
+    m_coldBootDiscoveredVids = g_client->getColdVids(m_switch_vid);
 
     SWSS_LOG_NOTICE("read %zu COLD VIDS", m_coldBootDiscoveredVids.size());
 }
@@ -910,26 +721,16 @@ void SaiSwitch::redisSaveColdBootDiscoveredVids() const
 {
     SWSS_LOG_ENTER();
 
+    std::set<sai_object_id_t> coldVids;
+
     for (sai_object_id_t rid: m_discovered_rids)
     {
         sai_object_id_t vid = g_translator->translateRidToVid(rid, m_switch_vid);
 
-        sai_object_type_t objectType = m_vendorSai->objectTypeQuery(rid);
-
-        if (objectType == SAI_OBJECT_TYPE_NULL)
-        {
-            SWSS_LOG_THROW("m_vendorSai->objectTypeQuery returned NULL type for RID: %s",
-                    sai_serialize_object_id(rid).c_str());
-        }
-
-        std::string strObjectType = sai_serialize_object_type(objectType);
-
-        std::string strVid = sai_serialize_object_id(vid);
-
-        g_redisClient->hset(COLDVIDS, strVid, strObjectType);
+        coldVids.insert(vid);
     }
 
-    SWSS_LOG_NOTICE("put default discovered vids to redis");
+    g_client->saveColdBootDiscoveredVids(m_switch_vid, coldVids);
 }
 
 void SaiSwitch::helperSaveDiscoveredObjectsToRedis()
@@ -978,15 +779,17 @@ void SaiSwitch::helperSaveDiscoveredObjectsToRedis()
      * method getNonRemovableObjects would be nice, then we could put those
      * objects to the view every time, and not put only discovered objects that
      * reflect removable objects like vlan member.
+     *
+     * This must be per switch.
      */
-
-    auto keys = g_redisClient->keys(ASIC_STATE_TABLE ":*");
 
     const int ObjectsTreshold = 32;
 
-    bool manyObjectsPresent = keys.size() > ObjectsTreshold;
+    size_t keys = g_client->getAsicObjectsSize(m_switch_vid);
 
-    SWSS_LOG_NOTICE("objects in ASIC state table present: %zu", keys.size());
+    bool manyObjectsPresent = keys > ObjectsTreshold;
+
+    SWSS_LOG_NOTICE("objects in ASIC state table present: %zu", keys);
 
     if (manyObjectsPresent)
     {
@@ -1128,15 +931,7 @@ void SaiSwitch::redisUpdatePortLaneMap(
 
     auto lanes = saiGetPortLanes(port_rid);
 
-    for (uint32_t lane: lanes)
-    {
-        std::string strLane = sai_serialize_number(lane);
-        std::string strPortId = sai_serialize_object_id(port_rid);
-
-        auto key = getRedisLanesKey();
-
-        g_redisClient->hset(key, strLane, strPortId);
-    }
+    g_client->setPortLanes(m_switch_vid, port_rid, lanes);
 
     SWSS_LOG_NOTICE("added %zu lanes to redis lane map for port RID %s",
             lanes.size(),
@@ -1284,19 +1079,18 @@ void SaiSwitch::postPortRemove(
 
         // remove from RID2VID and VID2RID map in redis
 
-        std::string strRid = sai_serialize_object_id(rid);
-
-        auto pvid = g_redisClient->hget(RIDTOVID, strRid);
+        auto pvid = g_client->getVidForRid(rid);
 
         if (pvid == nullptr)
         {
-            SWSS_LOG_THROW("expected rid %s to be present in RIDTOVID", strRid.c_str());
+            SWSS_LOG_THROW("expected rid %s to be present in RIDTOVID",
+                   sai_serialize_object_id(rid).c_str());
         }
 
-        std::string str_vid = *pvid;
+        std::string strVid = *pvid;
 
         sai_object_id_t vid;
-        sai_deserialize_object_id(str_vid, vid);
+        sai_deserialize_object_id(strVid, vid);
 
         // TODO should this remove rid,vid and object be as db op?
 
@@ -1304,33 +1098,10 @@ void SaiSwitch::postPortRemove(
 
         // remove from ASIC DB
 
-        sai_object_type_t ot = VidManager::objectTypeQuery(vid);
-
-        std::string key = ASIC_STATE_TABLE + std::string(":") + sai_serialize_object_type(ot) + ":" + str_vid;
-
-        SWSS_LOG_INFO("removing ASIC DB key: %s", key.c_str());
-
-        g_redisClient->del(key);
+        g_client->removeAsicObject(vid);
     }
 
-    int removed = 0;
-
-    // key - lane number, value - port RID
-    auto map = redisGetLaneMap();
-
-    for (auto& kv: map)
-    {
-        if (kv.second == portRid)
-        {
-            auto key = getRedisLanesKey();
-
-            std::string strLane = sai_serialize_number(kv.first);
-
-            g_redisClient->hdel(key, strLane);
-
-            removed++;
-        }
-    }
+    int removed = g_client->removePortFromLanesMap(m_switch_vid, portRid);
 
     SWSS_LOG_NOTICE("removed %u lanes from redis lane map for port RID %s",
             removed,
@@ -1359,7 +1130,7 @@ void SaiSwitch::checkWarmBootDiscoveredRids()
      * Assumption here is that during warm boot ASIC state will not change.
      */
 
-    auto rid2vid = redisGetRidToVidMap();
+    auto rid2vid = getRidToVidMap();
 
     bool success = true;
 

@@ -1,10 +1,12 @@
 #include "NotificationProcessor.h"
-#include "sairediscommon.h"
+#include "RedisClient.h"
 
-#include "swss/logger.h"
+#include "sairediscommon.h" // TODO to be removed
 
 #include "meta/sai_serialize.h"
 #include "meta/SaiAttributeList.h"
+
+#include "swss/logger.h"
 
 #include "syncd.h" // TODO to be removed
 
@@ -12,6 +14,8 @@
 
 using namespace syncd;
 using namespace saimeta;
+
+extern std::shared_ptr<RedisClient> g_client;
 
 NotificationProcessor::NotificationProcessor(
         _In_ std::function<void(const swss::KeyOpFieldsValuesTuple&)> synchronizer):
@@ -145,13 +149,12 @@ void NotificationProcessor::redisPutFdbEntryToAsicView(
             fdb->attr,
             false);
 
-    sai_object_type_t objectType = SAI_OBJECT_TYPE_FDB_ENTRY;
+    sai_object_meta_key_t metaKey;
 
-    std::string strObjectType = sai_serialize_object_type(objectType);
+    metaKey.objecttype = SAI_OBJECT_TYPE_FDB_ENTRY;
+    metaKey.objectkey.key.fdb_entry = fdb->fdb_entry;
 
     std::string strFdbEntry = sai_serialize_fdb_entry(fdb->fdb_entry);
-
-    std::string key = ASIC_STATE_TABLE + (":" + strObjectType + ":" + strFdbEntry);
 
     if ((fdb->fdb_entry.switch_id == SAI_NULL_OBJECT_ID ||
          fdb->fdb_entry.bv_id == SAI_NULL_OBJECT_ID) &&
@@ -163,8 +166,10 @@ void NotificationProcessor::redisPutFdbEntryToAsicView(
 
     if (fdb->event_type == SAI_FDB_EVENT_AGED)
     {
-        SWSS_LOG_DEBUG("remove fdb entry %s for SAI_FDB_EVENT_AGED",key.c_str());
-        g_redisClient->del(key);
+        SWSS_LOG_DEBUG("remove fdb entry %s for SAI_FDB_EVENT_AGED",
+                sai_serialize_object_meta_key(metaKey).c_str());
+
+        g_client->removeAsicObject(metaKey);
         return;
     }
 
@@ -176,7 +181,7 @@ void NotificationProcessor::redisPutFdbEntryToAsicView(
 
         for (uint32_t i = 0; i < fdb->attr_count; i++)
         {
-            if(fdb->attr[i].id == SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID)
+            if (fdb->attr[i].id == SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID)
             {
                 port_oid = fdb->attr[i].value.oid;
             }
@@ -190,37 +195,40 @@ void NotificationProcessor::redisPutFdbEntryToAsicView(
         return;
     }
 
-    for (const auto &e: entry)
+    if (fdb->event_type == SAI_FDB_EVENT_LEARNED)
     {
-        const std::string &strField = fvField(e);
-        const std::string &strValue = fvValue(e);
+        // currently we need to add type manually since fdb event don't contain type
+        sai_attribute_t attr;
 
-        g_redisClient->hset(key, strField, strValue);
+        attr.id = SAI_FDB_ENTRY_ATTR_TYPE;
+        attr.value.s32 = SAI_FDB_ENTRY_TYPE_DYNAMIC;
+
+        auto objectType = SAI_OBJECT_TYPE_FDB_ENTRY;
+
+        auto meta = sai_metadata_get_attr_metadata(objectType, attr.id);
+
+        if (meta == NULL)
+        {
+            SWSS_LOG_THROW("unable to get metadata for object type %s, attribute %d",
+                    sai_serialize_object_type(objectType).c_str(),
+                    attr.id);
+            /*
+             * TODO We should notify orch agent here. And also this probably should
+             * not be here, but on redis side, getting through metadata.
+             */
+        }
+
+        std::string strAttrId = sai_serialize_attr_id(*meta);
+        std::string strAttrValue = sai_serialize_attr_value(*meta, attr);
+
+        entry.emplace_back(strAttrId, strAttrValue);
+
+        g_client->createAsicObject(metaKey, entry);
+        return;
     }
 
-    // currently we need to add type manually since fdb event don't contain type
-    sai_attribute_t attr;
-
-    attr.id = SAI_FDB_ENTRY_ATTR_TYPE;
-    attr.value.s32 = SAI_FDB_ENTRY_TYPE_DYNAMIC;
-
-    auto meta = sai_metadata_get_attr_metadata(objectType, attr.id);
-
-    if (meta == NULL)
-    {
-        SWSS_LOG_THROW("unable to get metadata for object type %s, attribute %d",
-                sai_serialize_object_type(objectType).c_str(),
-                attr.id);
-        /*
-         * TODO We should notify orch agent here. And also this probably should
-         * not be here, but on redis side, getting through metadata.
-         */
-    }
-
-    std::string strAttrId = sai_serialize_attr_id(*meta);
-    std::string strAttrValue = sai_serialize_attr_value(*meta, attr);
-
-    g_redisClient->hset(key, strAttrId, strAttrValue);
+    SWSS_LOG_ERROR("event type %s not supported, FIXME",
+            sai_serialize_fdb_event(fdb->event_type).c_str());
 }
 
 /**
