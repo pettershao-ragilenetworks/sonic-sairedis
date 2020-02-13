@@ -31,6 +31,9 @@ sai_status_t transfer_attributes(
 
 // serialize
 
+std::string sai_serialize_fdb_event(
+        _In_ sai_fdb_event_t event);
+
 std::string sai_serialize_ipv6(
         _In_ const sai_ip6_t& ip);
 
