@@ -93,6 +93,12 @@ namespace syncd
 
             std::vector<std::string> getAsicStateKeys() const;
 
+            void removeColdVid(
+                    _In_ sai_object_id_t vid);
+
+            std::unordered_map<std::string, std::string> getAttributesFromAsicKey(
+                    _In_ const std::string& key) const;
+
         private:
 
             std::string getRedisLanesKey(

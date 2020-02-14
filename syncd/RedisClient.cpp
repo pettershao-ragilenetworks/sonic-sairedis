@@ -520,3 +520,21 @@ std::vector<std::string> RedisClient::getAsicStateKeys() const
 
     return g_redisClient->keys(ASIC_STATE_TABLE ":*");
 }
+
+void RedisClient::removeColdVid(
+        _In_ sai_object_id_t vid)
+{
+    SWSS_LOG_ENTER();
+
+    auto strVid = sai_serialize_object_id(vid);
+
+    g_redisClient->hdel(COLDVIDS, strVid);
+}
+
+std::unordered_map<std::string, std::string> RedisClient::getAttributesFromAsicKey(
+        _In_ const std::string& key) const
+{
+    SWSS_LOG_ENTER();
+
+    return g_redisClient->hgetall(key);
+}

@@ -3,6 +3,7 @@
 #include "CommandLineOptions.h"
 #include "NotificationHandler.h"
 #include "Workaround.h"
+#include "RedisClient.h"
 
 #include "swss/logger.h"
 
@@ -14,6 +15,8 @@
 
 using namespace syncd;
 using namespace saimeta;
+
+extern std::shared_ptr<RedisClient> g_client;
 
 extern std::shared_ptr<NotificationHandler> g_handler;
 
@@ -1077,11 +1080,12 @@ void SingleReiniter::postRemoveActions()
                 if (m_ridToVidMap.find(rid) == m_ridToVidMap.end())
                     continue;
 
-                std::string strVid = sai_serialize_object_id(m_ridToVidMap.at(rid));
+                auto vid = m_ridToVidMap.at(rid);
 
-                SWSS_LOG_INFO("removing existing VID: %s", strVid.c_str());
+                SWSS_LOG_INFO("removing existing cold VID: %s",
+                        sai_serialize_object_id(vid).c_str());
 
-                g_redisClient->hdel(COLDVIDS, strVid);
+                g_client->removeColdVid(vid);
             }
         }
     }
@@ -1096,7 +1100,7 @@ std::shared_ptr<SaiAttributeList> SingleReiniter::redisGetAttributesFromAsicKey(
 
     std::vector<swss::FieldValueTuple> values;
 
-    auto hash = g_redisClient->hgetall(key);
+    auto hash = g_client->getAttributesFromAsicKey(key);
 
     for (auto &kv: hash)
     {
