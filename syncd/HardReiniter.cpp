@@ -1,6 +1,7 @@
 #include "HardReiniter.h"
 #include "VidManager.h"
 #include "SingleReiniter.h"
+#include "RedisClient.h"
 
 #include "sairediscommon.h"
 
@@ -11,6 +12,8 @@
 #include "syncd.h" // TODO to be removed
 
 using namespace syncd;
+
+extern std::shared_ptr<RedisClient> g_client;
 
 HardReiniter::HardReiniter(
         _In_ std::shared_ptr<sairedis::SaiInterface> sai):
@@ -28,58 +31,6 @@ HardReiniter::~HardReiniter()
     // empty
 }
 
-std::vector<std::string> HardReiniter::redisGetAsicStateKeys()
-{
-    SWSS_LOG_ENTER();
-
-    return g_redisClient->keys(ASIC_STATE_TABLE + std::string(":*"));
-}
-
-std::unordered_map<sai_object_id_t, sai_object_id_t> HardReiniter::redisGetObjectMap(
-        _In_ const std::string &key)
-{
-    SWSS_LOG_ENTER();
-
-    auto hash = g_redisClient->hgetall(key);
-
-    std::unordered_map<sai_object_id_t, sai_object_id_t> map;
-
-    for (auto &kv: hash)
-    {
-        const std::string &str_key = kv.first;
-        const std::string &str_value = kv.second;
-
-        sai_object_id_t objectIdKey;
-        sai_object_id_t objectIdValue;
-
-        sai_deserialize_object_id(str_key, objectIdKey);
-
-        sai_deserialize_object_id(str_value, objectIdValue);
-
-        map[objectIdKey] = objectIdValue;
-    }
-
-    return map;
-}
-
-std::unordered_map<sai_object_id_t, sai_object_id_t> HardReiniter::redisGetVidToRidMap()
-{
-    SWSS_LOG_ENTER();
-
-    // NOTE: To support multiple switches VIDTORID must be per switch.
-
-    return redisGetObjectMap(VIDTORID);
-}
-
-std::unordered_map<sai_object_id_t, sai_object_id_t> HardReiniter::redisGetRidToVidMap()
-{
-    SWSS_LOG_ENTER();
-
-    // NOTE: To support multiple switches RIDTOVID must be per switch.
-
-    return redisGetObjectMap(RIDTOVID);
-}
-
 void HardReiniter::readAsicState()
 {
     SWSS_LOG_ENTER();
@@ -88,8 +39,8 @@ void HardReiniter::readAsicState()
 
     // Repopulate asic view from redis db after hard asic initialize.
 
-    m_vidToRidMap = redisGetVidToRidMap();
-    m_ridToVidMap = redisGetRidToVidMap();
+    m_vidToRidMap = g_client->getVidToRidMap();
+    m_ridToVidMap = g_client->getRidToVidMap();
 
     for (auto& v2r: m_vidToRidMap)
     {
@@ -105,7 +56,7 @@ void HardReiniter::readAsicState()
         m_switchRidToVid[switchId][r2v.first] = r2v.second;
     }
 
-    std::vector<std::string> asicStateKeys = redisGetAsicStateKeys();
+    auto asicStateKeys = g_client->getAsicStateKeys();
 
     for (const auto &key: asicStateKeys)
     {
@@ -181,7 +132,14 @@ std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> HardReiniter::hardR
     // will also modify redis database we need to execute this after we put vid
     // and rid map
 
-    redisSetVidAndRidMap(vid2rid);
+    /*
+     * NOTE: clear can be done after recreating all switches unless vid/rid map
+     * will be per switch. An all this must be ATOMIC.
+     *
+     * This needs to be addressed when we want to support multiple switches.
+     */
+
+    g_client->setVidAndRidMap(vid2rid);
 
     std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> switches;
 
@@ -195,29 +153,4 @@ std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> HardReiniter::hardR
     }
 
     return switches;
-}
-
-void HardReiniter::redisSetVidAndRidMap(
-        _In_ const std::unordered_map<sai_object_id_t, sai_object_id_t> &map)
-{
-    SWSS_LOG_ENTER();
-
-    /*
-     * TODO clear can be done after recreating all switches unless vid/rid map
-     * will be per switch. An all this must be ATOMIC.
-     *
-     * This needs to be addressed when we want to support multiple switches.
-     */
-
-    redisClearVidToRidMap();
-    redisClearRidToVidMap();
-
-    for (auto &kv: map)
-    {
-        std::string strVid = sai_serialize_object_id(kv.first);
-        std::string strRid = sai_serialize_object_id(kv.second);
-
-        g_redisClient->hset(VIDTORID, strVid, strRid);
-        g_redisClient->hset(RIDTOVID, strRid, strVid);
-    }
 }

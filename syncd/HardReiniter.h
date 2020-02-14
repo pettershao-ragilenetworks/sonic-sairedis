@@ -36,14 +36,6 @@ namespace syncd
             void redisSetVidAndRidMap(
                     _In_ const std::unordered_map<sai_object_id_t, sai_object_id_t> &map);
 
-            std::vector<std::string> redisGetAsicStateKeys();
-
-            std::unordered_map<sai_object_id_t, sai_object_id_t> redisGetObjectMap(
-                    _In_ const std::string &key);
-
-            std::unordered_map<sai_object_id_t, sai_object_id_t> redisGetVidToRidMap();
-            std::unordered_map<sai_object_id_t, sai_object_id_t> redisGetRidToVidMap();
-
         private:
 
             ObjectIdMap m_vidToRidMap;
