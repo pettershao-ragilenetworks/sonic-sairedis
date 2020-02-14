@@ -188,6 +188,20 @@ std::unordered_map<sai_object_id_t, sai_object_id_t> RedisClient::getRidToVidMap
     return filtered;
 }
 
+std::unordered_map<sai_object_id_t, sai_object_id_t> RedisClient::getVidToRidMap() const
+{
+    SWSS_LOG_ENTER();
+
+    return getObjectMap(VIDTORID);
+}
+
+std::unordered_map<sai_object_id_t, sai_object_id_t> RedisClient::getRidToVidMap() const
+{
+    SWSS_LOG_ENTER();
+
+    return getObjectMap(RIDTOVID);
+}
+
 void RedisClient::setDummyAsicStateObject(
         _In_ sai_object_id_t objectVid)
 {
@@ -482,3 +496,27 @@ void RedisClient::createAsicObject(
     }
 }
 
+void RedisClient::setVidAndRidMap(
+        _In_ const std::unordered_map<sai_object_id_t, sai_object_id_t>& map)
+{
+    SWSS_LOG_ENTER();
+
+    g_redisClient->del(VIDTORID);
+    g_redisClient->del(RIDTOVID);
+
+    for (auto &kv: map)
+    {
+        std::string strVid = sai_serialize_object_id(kv.first);
+        std::string strRid = sai_serialize_object_id(kv.second);
+
+        g_redisClient->hset(VIDTORID, strVid, strRid);
+        g_redisClient->hset(RIDTOVID, strRid, strVid);
+    }
+}
+
+std::vector<std::string> RedisClient::getAsicStateKeys() const
+{
+    SWSS_LOG_ENTER();
+
+    return g_redisClient->keys(ASIC_STATE_TABLE ":*");
+}

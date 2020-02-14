@@ -40,6 +40,10 @@ namespace syncd
             std::unordered_map<sai_object_id_t, sai_object_id_t> getRidToVidMap(
                     _In_ sai_object_id_t switchVid) const;
 
+            std::unordered_map<sai_object_id_t, sai_object_id_t> getVidToRidMap() const;
+
+            std::unordered_map<sai_object_id_t, sai_object_id_t> getRidToVidMap() const;
+
             void setDummyAsicStateObject(
                     _In_ sai_object_id_t objectVid);
 
@@ -83,6 +87,11 @@ namespace syncd
             void createAsicObject(
                     _In_ const sai_object_meta_key_t& metaKey,
                     _In_ const std::vector<swss::FieldValueTuple>& attrs);
+
+            void setVidAndRidMap(
+                    _In_ const std::unordered_map<sai_object_id_t, sai_object_id_t>& map);
+
+            std::vector<std::string> getAsicStateKeys() const;
 
         private:
 
