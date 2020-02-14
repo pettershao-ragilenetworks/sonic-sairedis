@@ -99,6 +99,8 @@ namespace syncd
             std::unordered_map<std::string, std::string> getAttributesFromAsicKey(
                     _In_ const std::string& key) const;
 
+            bool hasNoHiddenKeysDefined() const;
+
         private:
 
             std::string getRedisLanesKey(

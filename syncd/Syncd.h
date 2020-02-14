@@ -22,7 +22,7 @@ namespace syncd
             Syncd(const Syncd&) = delete;
             Syncd& operator=(const Syncd&) = delete;
 
-            public:
+        public:
 
             Syncd(
                     _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,

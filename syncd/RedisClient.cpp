@@ -538,3 +538,13 @@ std::unordered_map<std::string, std::string> RedisClient::getAttributesFromAsicK
 
     return g_redisClient->hgetall(key);
 }
+
+bool RedisClient::hasNoHiddenKeysDefined() const
+{
+    SWSS_LOG_ENTER();
+
+    auto keys = g_redisClient->keys(HIDDEN "*");
+
+    return keys.size() == 0;
+}
+

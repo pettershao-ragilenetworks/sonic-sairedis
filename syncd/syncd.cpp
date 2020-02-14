@@ -13,6 +13,7 @@
 #include "RequestShutdown.h"
 #include "MetadataLogger.h"
 #include "WarmRestartTable.h"
+#include "RedisClient.h"
 
 #include "meta/sai_serialize.h"
 
@@ -25,6 +26,8 @@
 
 using namespace syncd;
 using namespace std::placeholders;
+
+extern std::shared_ptr<RedisClient> g_client;
 
 std::string fdbFlushSha;
 
@@ -81,9 +84,7 @@ bool isVeryFirstRun()
      * this is first run, let's query HIDDEN ?
      */
 
-    auto keys = g_redisClient->keys(HIDDEN);
-
-    bool firstRun = keys.size() == 0;
+    bool firstRun = g_client->hasNoHiddenKeysDefined();
 
     SWSS_LOG_NOTICE("First Run: %s", firstRun ? "True" : "False");
 
@@ -97,20 +98,6 @@ void timerWatchdogCallback(
     SWSS_LOG_ENTER();
 
     SWSS_LOG_ERROR("main loop execution exceeded %ld ms", span);
-}
-
-void redisClearVidToRidMap()
-{
-    SWSS_LOG_ENTER();
-
-    g_redisClient->del(VIDTORID);
-}
-
-void redisClearRidToVidMap()
-{
-    SWSS_LOG_ENTER();
-
-    g_redisClient->del(RIDTOVID);
 }
 
 int syncd_main(int argc, char **argv)

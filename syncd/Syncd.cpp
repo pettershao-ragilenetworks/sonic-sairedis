@@ -4,6 +4,7 @@
 #include "Workaround.h"
 #include "ComparisonLogic.h"
 #include "HardReiniter.h"
+#include "RedisClient.h"
 
 #include "lib/inc/sairediscommon.h"
 
@@ -27,6 +28,8 @@ extern std::shared_ptr<syncd::NotificationProcessor> g_processor;
 using namespace syncd;
 using namespace saimeta;
 using namespace std::placeholders;
+
+extern std::shared_ptr<RedisClient> g_client;
 
 Syncd::Syncd(
         _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,
@@ -2516,25 +2519,22 @@ void Syncd::updateRedisDatabase(
     /*
      * Remove previous RID2VID maps and apply new map.
      *
-     * TODO: This needs to be done per switch, we can't remove all maps.
+     * NOTE: This needs to be done per switch, we can't remove all maps.
      */
 
-    redisClearVidToRidMap();
-    redisClearRidToVidMap();
-
     // TODO check if those 2 maps are consistent
+
+    std::unordered_map<sai_object_id_t, sai_object_id_t> allVid2Rid;
 
     for (auto& tv: temporaryViews)
     {
         for (auto &kv: tv->m_ridToVid)
         {
-            std::string strVid = sai_serialize_object_id(kv.second);
-            std::string strRid = sai_serialize_object_id(kv.first);
-
-            g_redisClient->hset(VIDTORID, strVid, strRid);
-            g_redisClient->hset(RIDTOVID, strRid, strVid);
+            allVid2Rid[kv.second] = kv.first;
         }
     }
+
+    g_client->setVidAndRidMap(allVid2Rid);
 
     SWSS_LOG_NOTICE("updated redis database");
 }

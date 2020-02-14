@@ -19,10 +19,6 @@
 #endif // SAITHRIFT
 
 extern std::shared_ptr<syncd::VirtualOidTranslator> g_translator; // TODO move to syncd object
-
-void redisClearVidToRidMap();
-void redisClearRidToVidMap();
-
 extern std::shared_ptr<swss::NotificationProducer>  notifications;
 extern std::shared_ptr<swss::RedisClient>   g_redisClient;
 extern std::shared_ptr<swss::DBConnector>   dbAsic;
