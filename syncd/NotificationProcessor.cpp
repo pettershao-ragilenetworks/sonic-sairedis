@@ -96,7 +96,7 @@ sai_fdb_entry_type_t NotificationProcessor::getFdbEntryType(
     return (sai_fdb_entry_type_t)ret;
 }
 
-void NotificationProcessor::processFlushEvent(
+void NotificationProcessor::processFlushEvent( // TODO move to RedisClient
         _In_ sai_object_id_t portOid,
         _In_ sai_object_id_t bvId,
         _In_ int flush_static)

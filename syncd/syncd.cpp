@@ -24,6 +24,10 @@
 
 #include <inttypes.h>
 
+#ifdef SAITHRIFT
+#define SWITCH_SAI_THRIFT_RPC_SERVER_PORT 9092
+#endif // SAITHRIFT
+
 using namespace syncd;
 using namespace std::placeholders;
 

@@ -16,13 +16,13 @@ endif
 
 noinst_LIBRARIES = libsyncd.a
 libsyncd_a_SOURCES = \
+				Syncd.cpp \
 				RedisClient.cpp \
 				WarmRestartTable.cpp \
 				RequestShutdownCommandLineOptions.cpp \
 				GlobalSwitchId.cpp \
 				MetadataLogger.cpp \
 				Workaround.cpp \
-				Syncd.cpp \
 				ServiceMethodTable.cpp \
 				SwitchNotifications.cpp \
 				ComparisonLogic.cpp \

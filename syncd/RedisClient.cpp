@@ -467,6 +467,30 @@ void RedisClient::removeAsicObject(
     g_redisClient->del(key);
 }
 
+void RedisClient::setAsicObject(
+        _In_ const sai_object_meta_key_t& metaKey,
+        _In_ const std::string& attr,
+        _In_ const std::string& value)
+{
+    SWSS_LOG_ENTER();
+
+    std::string key = (ASIC_STATE_TABLE ":") + sai_serialize_object_meta_key(metaKey);
+
+    g_redisClient->hset(key, attr, value);
+}
+
+void RedisClient::setTempAsicObject(
+        _In_ const sai_object_meta_key_t& metaKey,
+        _In_ const std::string& attr,
+        _In_ const std::string& value)
+{
+    SWSS_LOG_ENTER();
+
+    std::string key = (TEMP_PREFIX ASIC_STATE_TABLE ":") + sai_serialize_object_meta_key(metaKey);
+
+    g_redisClient->hset(key, attr, value);
+}
+
 void RedisClient::createAsicObject(
         _In_ const sai_object_meta_key_t& metaKey,
         _In_ const std::vector<swss::FieldValueTuple>& attrs)
@@ -477,7 +501,8 @@ void RedisClient::createAsicObject(
 
     if (attrs.size() == 0)
     {
-        SWSS_LOG_THROW("there should be attributes specified: %s", key.c_str());
+        g_redisClient->hset(key, "NULL", "NULL");
+        return;
     }
 
     for (const auto& e: attrs)
@@ -509,6 +534,13 @@ std::vector<std::string> RedisClient::getAsicStateKeys() const
     SWSS_LOG_ENTER();
 
     return g_redisClient->keys(ASIC_STATE_TABLE ":*");
+}
+
+std::vector<std::string> RedisClient::getAsicStateSwitchesKeys() const
+{
+    SWSS_LOG_ENTER();
+
+    return g_redisClient->keys(ASIC_STATE_TABLE ":SAI_OBJECT_TYPE_SWITCH:*");
 }
 
 void RedisClient::removeColdVid(
@@ -611,3 +643,82 @@ sai_object_id_t RedisClient::getRidForVid(
 
     return rid;
 }
+
+void RedisClient::removeAsicStateTable()
+{
+    SWSS_LOG_ENTER();
+
+    const auto &asicStateKeys = g_redisClient->keys(ASIC_STATE_TABLE ":*");
+
+    for (const auto &key: asicStateKeys)
+    {
+        g_redisClient->del(key);
+    }
+}
+
+void RedisClient::removeTempAsicStateTable()
+{
+    SWSS_LOG_ENTER();
+
+    const auto &tempAsicStateKeys = g_redisClient->keys(TEMP_PREFIX ASIC_STATE_TABLE ":*");
+
+    for (const auto &key: tempAsicStateKeys)
+    {
+        g_redisClient->del(key);
+    }
+}
+
+std::map<sai_object_id_t, swss::TableDump> RedisClient::getAsicView()
+{
+    SWSS_LOG_ENTER();
+
+    return getAsicView(ASIC_STATE_TABLE);
+}
+
+std::map<sai_object_id_t, swss::TableDump> RedisClient::getTempAsicView()
+{
+    SWSS_LOG_ENTER();
+
+    return getAsicView(TEMP_PREFIX ASIC_STATE_TABLE);
+}
+
+std::map<sai_object_id_t, swss::TableDump> RedisClient::getAsicView(
+        _In_ const std::string &tableName)
+{
+    SWSS_LOG_ENTER();
+
+    SWSS_LOG_TIMER("get asic view from %s", tableName.c_str());
+
+    swss::DBConnector db("ASIC_DB", 0);
+
+    swss::Table table(&db, tableName);
+
+    swss::TableDump dump;
+
+    table.dump(dump);
+
+    std::map<sai_object_id_t, swss::TableDump> map;
+
+    for (auto& key: dump)
+    {
+        sai_object_meta_key_t mk;
+        sai_deserialize_object_meta_key(key.first, mk);
+
+        auto switchVID = VidManager::switchIdQuery(mk.objectkey.key.object_id);
+
+        map[switchVID][key.first] = key.second;
+    }
+
+    SWSS_LOG_NOTICE("%s switch count: %zu:", tableName.c_str(), map.size());
+
+    for (auto& kvp: map)
+    {
+        SWSS_LOG_NOTICE("%s: objects count: %zu",
+                sai_serialize_object_id(kvp.first).c_str(),
+                kvp.second.size());
+    }
+
+    return map;
+}
+
+

@@ -90,6 +90,8 @@ namespace syncd
 
             std::vector<std::string> getAsicStateKeys() const;
 
+            std::vector<std::string> getAsicStateSwitchesKeys() const;
+
             void removeColdVid(
                     _In_ sai_object_id_t vid);
 
@@ -112,7 +114,28 @@ namespace syncd
             sai_object_id_t getRidForVid(
                     _In_ sai_object_id_t vid);
 
+            void removeAsicStateTable();
+
+            void removeTempAsicStateTable();
+
+            std::map<sai_object_id_t, swss::TableDump> getAsicView();
+
+            std::map<sai_object_id_t, swss::TableDump> getTempAsicView();
+
+            void setAsicObject(
+                    _In_ const sai_object_meta_key_t& metaKey,
+                    _In_ const std::string& attr,
+                    _In_ const std::string& value);
+
+            void setTempAsicObject(
+                    _In_ const sai_object_meta_key_t& metaKey,
+                    _In_ const std::string& attr,
+                    _In_ const std::string& value);
+
         private:
+
+            std::map<sai_object_id_t, swss::TableDump> getAsicView(
+                    _In_ const std::string &tableName);
 
             std::string getRedisLanesKey(
                     _In_ sai_object_id_t switchVid) const;

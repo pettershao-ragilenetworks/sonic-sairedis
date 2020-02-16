@@ -1842,22 +1842,19 @@ void Syncd::snoopGetAttr(
 {
     SWSS_LOG_ENTER();
 
-    /*
-     * Note: strObjectType + ":" + strObjectId is meta_key we can us that
-     * here later on.
-     */
+    std::string mk = sai_serialize_object_type(objectType) + ":" + strObjectId;
 
-    std::string strObjectType = sai_serialize_object_type(objectType);
+    sai_object_meta_key_t metaKey;
+    sai_deserialize_object_meta_key(mk, metaKey);
 
-    // TODO move to database access
-
-    std::string prefix = isInitViewMode() ? TEMP_PREFIX : "";
-
-    std::string key = prefix + (ASIC_STATE_TABLE + (":" + strObjectType + ":" + strObjectId));
-
-    SWSS_LOG_DEBUG("%s", key.c_str());
-
-    g_redisClient->hset(key, attrId, attrValue);
+    if (isInitViewMode())
+    {
+        g_client->setTempAsicObject(metaKey, attrId, attrValue);
+    }
+    else
+    {
+        g_client->setAsicObject(metaKey, attrId, attrValue);
+    }
 }
 
 void Syncd::snoopGetOid(
@@ -1916,11 +1913,7 @@ void Syncd::inspectAsic()
     // Fetch all the keys from ASIC DB
     // Loop through all the keys in ASIC DB
 
-    std::string pattern = ASIC_STATE_TABLE + std::string(":*");
-
-    // TODO move to database access
-
-    for (const auto &key: g_redisClient->keys(pattern))
+    for (const auto &key: g_client->getAsicStateKeys())
     {
         // ASIC_STATE:objecttype:objectid (object id may contain ':')
 
@@ -1939,7 +1932,7 @@ void Syncd::inspectAsic()
 
         // Find all the attrid from ASIC DB, and use them to query ASIC
 
-        auto hash = g_redisClient->hgetall(key);
+        auto hash = g_client->getAttributesFromAsicKey(key);
 
         std::vector<swss::FieldValueTuple> values;
 
@@ -2198,20 +2191,7 @@ void Syncd::clearTempView()
 
     SWSS_LOG_TIMER("clear temp view");
 
-    std::string pattern = TEMP_PREFIX + (ASIC_STATE_TABLE + std::string(":*"));
-
-    /*
-     * NOTE: this must be ATOMIC, and could use lua script.
-     *
-     * We need to expose api to execute user lua script not only predefined.
-     */
-
-    // TODO move to db access
-
-    for (const auto &key: g_redisClient->keys(pattern))
-    {
-        g_redisClient->del(key);
-    }
+    g_client->removeTempAsicStateTable();
 
     // Also clear list of objects removed in init view mode.
 
@@ -2286,8 +2266,8 @@ sai_status_t Syncd::applyView()
 
     // Read current and temporary views from REDIS.
 
-    auto currentMap = redisGetAsicView(ASIC_STATE_TABLE);
-    auto temporaryMap = redisGetAsicView(TEMP_PREFIX ASIC_STATE_TABLE);
+    auto currentMap = g_client->getAsicView();
+    auto temporaryMap = g_client->getTempAsicView();
 
     if (currentMap.size() != temporaryMap.size())
     {
@@ -2463,23 +2443,9 @@ void Syncd::updateRedisDatabase(
 
     SWSS_LOG_TIMER("redis update");
 
-    // Remove Asic State Table
+    g_client->removeAsicStateTable();
 
-    const auto &asicStateKeys = g_redisClient->keys(ASIC_STATE_TABLE + std::string(":*"));
-
-    for (const auto &key: asicStateKeys)
-    {
-        g_redisClient->del(key);
-    }
-
-    // Remove Temp Asic State Table
-
-    const auto &tempAsicStateKeys = g_redisClient->keys(TEMP_PREFIX ASIC_STATE_TABLE + std::string(":*"));
-
-    for (const auto &key: tempAsicStateKeys)
-    {
-        g_redisClient->del(key);
-    }
+    g_client->removeTempAsicStateTable();
 
     // Save temporary views as current view in redis database.
 
@@ -2491,28 +2457,16 @@ void Syncd::updateRedisDatabase(
 
             const auto &attr = obj->getAllAttributes();
 
-            std::string key = std::string(ASIC_STATE_TABLE) + ":" + obj->m_str_object_type + ":" + obj->m_str_object_id;
+            std::vector<swss::FieldValueTuple> entry;
 
-            SWSS_LOG_DEBUG("setting key %s", key.c_str());
-
-            if (attr.size() == 0)
+            for (const auto &ap: attr)
             {
-                /*
-                 * Object has no attributes, so populate using NULL just to
-                 * indicate that object exists.
-                 */
+                const auto saiAttr = ap.second;
 
-                g_redisClient->hset(key, "NULL", "NULL");
+                entry.emplace_back(saiAttr->getStrAttrId(), saiAttr->getStrAttrValue());
             }
-            else
-            {
-                for (const auto &ap: attr)
-                {
-                    const auto saiAttr = ap.second;
 
-                    g_redisClient->hset(key, saiAttr->getStrAttrId(), saiAttr->getStrAttrValue());
-                }
-            }
+            g_client->createAsicObject(obj->m_meta_key, entry);
         }
     }
 
@@ -2545,47 +2499,6 @@ void Syncd::updateRedisDatabase(
 // operations per switch are accessing data base in SaiSwitch class.  This
 // needs to be reorganised to access database per switch basis and get only
 // data that corresponds to each particular switch and access correct db index.
-
-std::map<sai_object_id_t, swss::TableDump> Syncd::redisGetAsicView(
-        _In_ const std::string &tableName)
-{
-    SWSS_LOG_ENTER();
-
-    SWSS_LOG_TIMER("get asic view from %s", tableName.c_str());
-
-    // TODO to db access class
-
-    swss::DBConnector db("ASIC_DB", 0);
-
-    swss::Table table(&db, tableName);
-
-    swss::TableDump dump;
-
-    table.dump(dump);
-
-    std::map<sai_object_id_t, swss::TableDump> map;
-
-    for (auto& key: dump)
-    {
-        sai_object_meta_key_t mk;
-        sai_deserialize_object_meta_key(key.first, mk);
-
-        auto switchVID = VidManager::switchIdQuery(mk.objectkey.key.object_id);
-
-        map[switchVID][key.first] = key.second;
-    }
-
-    SWSS_LOG_NOTICE("%s switch count: %zu:", tableName.c_str(), map.size());
-
-    for (auto& kvp: map)
-    {
-        SWSS_LOG_NOTICE("%s: objects count: %zu",
-                sai_serialize_object_id(kvp.first).c_str(),
-                kvp.second.size());
-    }
-
-    return map;
-}
 
 void Syncd::onSyncdStart(
         _In_ bool warmStart)
@@ -2820,7 +2733,7 @@ void Syncd::performWarmRestartSingleSwitch(
 
     std::vector<swss::FieldValueTuple> values;
 
-    auto hash = g_redisClient->hgetall(key);
+    auto hash = g_client->getAttributesFromAsicKey(key);
 
     SWSS_LOG_NOTICE("switch %s", strSwitchVid.c_str());
 
@@ -2944,7 +2857,7 @@ void Syncd::performWarmRestart()
      * will have need for it.
      */
 
-    auto entries = g_redisClient->keys(ASIC_STATE_TABLE + std::string(":SAI_OBJECT_TYPE_SWITCH:*"));
+    auto entries = g_client->getAsicStateSwitchesKeys();
 
     if (entries.size() == 0)
     {
