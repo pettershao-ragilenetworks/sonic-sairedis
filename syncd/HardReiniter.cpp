@@ -9,8 +9,6 @@
 
 #include "meta/sai_serialize.h"
 
-#include "syncd.h" // TODO to be removed
-
 using namespace syncd;
 
 extern std::shared_ptr<RedisClient> g_client;

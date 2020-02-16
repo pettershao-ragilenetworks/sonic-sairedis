@@ -441,16 +441,6 @@ int RedisClient::removePortFromLanesMap(
     return removed;
 }
 
-std::shared_ptr<std::string> RedisClient::getVidForRid(
-        _In_ sai_object_id_t objectRid) const
-{
-    SWSS_LOG_ENTER();
-
-    auto strRid = sai_serialize_object_id(objectRid);
-
-    return g_redisClient->hget(RIDTOVID, strRid);
-}
-
 void RedisClient::removeAsicObject(
         _In_ sai_object_id_t objectVid) const
 {
@@ -548,3 +538,76 @@ bool RedisClient::hasNoHiddenKeysDefined() const
     return keys.size() == 0;
 }
 
+void RedisClient::removeVidAndRid(
+        _In_ sai_object_id_t vid,
+        _In_ sai_object_id_t rid)
+{
+    SWSS_LOG_ENTER();
+
+    auto strVid = sai_serialize_object_id(vid);
+    auto strRid = sai_serialize_object_id(rid);
+
+    g_redisClient->hdel(VIDTORID, strVid);
+    g_redisClient->hdel(RIDTOVID, strRid);
+}
+
+void RedisClient::insertVidAndRid(
+        _In_ sai_object_id_t vid,
+        _In_ sai_object_id_t rid)
+{
+    SWSS_LOG_ENTER();
+
+    auto strVid = sai_serialize_object_id(vid);
+    auto strRid = sai_serialize_object_id(rid);
+
+    g_redisClient->hset(VIDTORID, strVid, strRid);
+    g_redisClient->hset(RIDTOVID, strRid, strVid);
+}
+
+sai_object_id_t RedisClient::getVidForRid(
+        _In_ sai_object_id_t rid)
+{
+    SWSS_LOG_ENTER();
+
+    auto strRid = sai_serialize_object_id(rid);
+
+    auto pvid = g_redisClient->hget(RIDTOVID, strRid);
+
+    if (pvid == nullptr)
+    {
+        // rid2vid map should never contain null, so we can return NULL which
+        // will mean that mapping don't exists
+
+        return SAI_NULL_OBJECT_ID;
+    }
+
+    sai_object_id_t vid;
+
+    sai_deserialize_object_id(*pvid, vid);
+
+    return vid;
+}
+
+sai_object_id_t RedisClient::getRidForVid(
+        _In_ sai_object_id_t vid)
+{
+    SWSS_LOG_ENTER();
+
+    auto strVid = sai_serialize_object_id(vid);
+
+    auto prid = g_redisClient->hget(VIDTORID, strVid);
+
+    if (prid == nullptr)
+    {
+        // rid2vid map should never contain null, so we can return NULL which
+        // will mean that mapping don't exists
+
+        return SAI_NULL_OBJECT_ID;
+    }
+
+    sai_object_id_t rid;
+
+    sai_deserialize_object_id(*prid, rid);
+
+    return rid;
+}

@@ -75,9 +75,6 @@ namespace syncd
                     _In_ sai_object_id_t switchVid,
                     _In_ sai_object_id_t portRid) const;
 
-            std::shared_ptr<std::string> getVidForRid(
-                    _In_ sai_object_id_t objectRid) const;
-
             void removeAsicObject(
                     _In_ sai_object_id_t objectVid) const;
 
@@ -100,6 +97,20 @@ namespace syncd
                     _In_ const std::string& key) const;
 
             bool hasNoHiddenKeysDefined() const;
+
+            void removeVidAndRid(
+                    _In_ sai_object_id_t vid,
+                    _In_ sai_object_id_t rid);
+
+            void insertVidAndRid(
+                    _In_ sai_object_id_t vid,
+                    _In_ sai_object_id_t rid);
+
+            sai_object_id_t getVidForRid(
+                    _In_ sai_object_id_t rid);
+
+            sai_object_id_t getRidForVid(
+                    _In_ sai_object_id_t vid);
 
         private:
 

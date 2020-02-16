@@ -11,8 +11,6 @@
 
 #include <unistd.h>
 
-#include "syncd.h" // TODO to be removed
-
 using namespace syncd;
 using namespace saimeta;
 

@@ -103,6 +103,8 @@ void NotificationProcessor::processFlushEvent(
 {
     SWSS_LOG_ENTER();
 
+    // TODO this must be per switch if we will have multiple switches, needs to be filtered by switch ID also
+
     /*
        [{ "fdb_entry":"{ \"bridge_id\":\"oid:0x23000000000000\", \"mac\":\"00:00:00:00:00:00\", \"switch_id\":\"oid:0x21000000000000\"}", "fdb_event":"SAI_FDB_EVENT_FLUSHED", "list":[
        {"id":"SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID","value":"oid:0x3a0000000009cf"},

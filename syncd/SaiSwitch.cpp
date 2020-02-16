@@ -1079,18 +1079,13 @@ void SaiSwitch::postPortRemove(
 
         // remove from RID2VID and VID2RID map in redis
 
-        auto pvid = g_client->getVidForRid(rid);
+        auto vid = g_client->getVidForRid(rid);
 
-        if (pvid == nullptr)
+        if (vid == SAI_NULL_OBJECT_ID)
         {
             SWSS_LOG_THROW("expected rid %s to be present in RIDTOVID",
                    sai_serialize_object_id(rid).c_str());
         }
-
-        std::string strVid = *pvid;
-
-        sai_object_id_t vid;
-        sai_deserialize_object_id(strVid, vid);
 
         // TODO should this remove rid,vid and object be as db op?
 

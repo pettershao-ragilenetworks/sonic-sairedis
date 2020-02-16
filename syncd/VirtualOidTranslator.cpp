@@ -1,16 +1,15 @@
 #include "VirtualOidTranslator.h"
 #include "VirtualObjectIdManager.h"
+#include "RedisClient.h"
 
 #include "swss/logger.h"
 #include "meta/sai_serialize.h"
 
 #include <inttypes.h>
 
-#include "syncd.h" // TODO to be removed
-
 using namespace syncd;
 
-// TODO move all redis access to db object connector
+extern std::shared_ptr<RedisClient> g_client;
 
 VirtualOidTranslator::VirtualOidTranslator(
         _In_ std::shared_ptr<sairedis::VirtualObjectIdManager> virtualObjectIdManager,
@@ -50,21 +49,17 @@ sai_object_id_t VirtualOidTranslator::translateRidToVid(
         return it->second;
     }
 
-    sai_object_id_t vid;
-
     std::string strRid = sai_serialize_object_id(rid);
 
-    auto pvid = g_redisClient->hget(RIDTOVID, strRid); // TODO to db object
+    auto vid = g_client->getVidForRid(rid);
 
-    if (pvid != NULL)
+    if (vid != SAI_NULL_OBJECT_ID)
     {
         // object exists
 
-        std::string strVid = *pvid;
-
-        sai_deserialize_object_id(strVid, vid);
-
-        SWSS_LOG_DEBUG("translated RID 0x%" PRIx64 " to VID 0x%" PRIx64, rid, vid);
+        SWSS_LOG_DEBUG("translated RID %s to VID %s",
+                sai_serialize_object_id(rid).c_str(),
+                sai_serialize_object_id(vid).c_str());
 
         return vid;
     }
@@ -90,14 +85,11 @@ sai_object_id_t VirtualOidTranslator::translateRidToVid(
 
     vid = m_virtualObjectIdManager->allocateNewObjectId(object_type, switchVid); // TODO to std::function or separate object
 
-    SWSS_LOG_DEBUG("translated RID 0x%" PRIx64 " to VID 0x%" PRIx64, rid, vid);
+    SWSS_LOG_DEBUG("translated RID %s to VID %s",
+            sai_serialize_object_id(rid).c_str(),
+            sai_serialize_object_id(vid).c_str());
 
-    std::string strVid = sai_serialize_object_id(vid);
-
-    // TODO same as insertRidAndVid
-
-    g_redisClient->hset(RIDTOVID, strRid, strVid); // TODO to db object
-    g_redisClient->hset(VIDTORID, strVid, strRid);
+    g_client->insertVidAndRid(vid, rid);
 
     m_rid2vid[rid] = vid;
     m_vid2rid[vid] = rid;
@@ -118,14 +110,9 @@ bool VirtualOidTranslator::checkRidExists(
     if (m_rid2vid.find(rid) != m_rid2vid.end())
         return true;
 
-    std::string strRid = sai_serialize_object_id(rid);
+    auto vid = g_client->getVidForRid(rid);
 
-    auto pvid = g_redisClient->hget(RIDTOVID, strRid); // TODO use db object
-
-    if (pvid != NULL)
-        return true;
-
-    return false;
+    return vid != SAI_NULL_OBJECT_ID;
 }
 
 void VirtualOidTranslator::translateRidToVid(
@@ -240,13 +227,9 @@ sai_object_id_t VirtualOidTranslator::translateVidToRid(
         return it->second;
     }
 
-    std::string strVid = sai_serialize_object_id(vid);
+    auto rid = g_client->getRidForVid(vid);
 
-    std::string strRid;
-
-    auto prid = g_redisClient->hget(VIDTORID, strVid); // TODO to db object
-
-    if (prid == NULL)
+    if (rid == SAI_NULL_OBJECT_ID)
     {
             /*
              * If user created object that is object id, then it should not
@@ -267,12 +250,6 @@ sai_object_id_t VirtualOidTranslator::translateVidToRid(
                 sai_serialize_object_id(vid).c_str());
     }
 
-    strRid = *prid;
-
-    sai_object_id_t rid;
-
-    sai_deserialize_object_id(strRid, rid);
-
     /*
      * We got this RID from redis db, so put it also to local db so it will be
      * faster to retrieve it late on.
@@ -280,7 +257,9 @@ sai_object_id_t VirtualOidTranslator::translateVidToRid(
 
     m_vid2rid[vid] = rid;
 
-    SWSS_LOG_DEBUG("translated VID 0x%" PRIx64 " to RID 0x%" PRIx64, vid, rid);
+    SWSS_LOG_DEBUG("translated VID %s to RID %s",
+            sai_serialize_object_id(vid).c_str(),
+            sai_serialize_object_id(rid).c_str());
 
     return rid;
 }
@@ -428,20 +407,12 @@ void VirtualOidTranslator::insertRidAndVid(
 
     std::lock_guard<std::mutex> lock(m_mutex);
 
-    /*
-     * TODO: This must be ATOMIC.
-     *
-     * To support multiple switches vid/rid map must be per switch.
-     */
+    // to support multiple switches vid/rid map must be per switch
 
     m_rid2vid[rid] = vid;
     m_vid2rid[vid] = rid;
 
-    auto strVid = sai_serialize_object_id(vid);
-    auto strRid = sai_serialize_object_id(rid);
-
-    g_redisClient->hset(VIDTORID, strVid, strRid);
-    g_redisClient->hset(RIDTOVID, strRid, strVid);
+    g_client->insertVidAndRid(vid, rid);
 }
 
 void VirtualOidTranslator::eraseRidAndVid(
@@ -452,15 +423,7 @@ void VirtualOidTranslator::eraseRidAndVid(
 
     std::lock_guard<std::mutex> lock(m_mutex);
 
-    /*
-     * TODO: This must be ATOMIC.
-     */
-
-    auto strVid = sai_serialize_object_id(vid);
-    auto strRid = sai_serialize_object_id(rid);
-
-    g_redisClient->hdel(VIDTORID, strVid);
-    g_redisClient->hdel(RIDTOVID, strRid);
+    g_client->removeVidAndRid(vid, rid);
 
     // remove from local vid2rid and rid2vid map
 
