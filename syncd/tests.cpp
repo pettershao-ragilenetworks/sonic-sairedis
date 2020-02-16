@@ -48,7 +48,7 @@ extern bool g_syncMode;
         SWSS_LOG_THROW(format ": %s", ##__VA_ARGS__, sai_serialize_status(status).c_str());
 
 using namespace saimeta;
-extern std::shared_ptr<swss::RedisClient>   g_redisClient;
+static std::shared_ptr<swss::RedisClient>   g_redisClient;
 static std::shared_ptr<swss::DBConnector> g_db1;
 
 static sai_next_hop_group_api_t test_next_hop_group_api;

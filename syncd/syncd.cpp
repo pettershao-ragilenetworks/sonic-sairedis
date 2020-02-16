@@ -31,7 +31,7 @@
 using namespace syncd;
 using namespace std::placeholders;
 
-extern std::shared_ptr<RedisClient> g_client;
+std::shared_ptr<RedisClient> g_client;
 
 std::string fdbFlushSha;
 
@@ -46,7 +46,6 @@ std::shared_ptr<NotificationProcessor> g_processor;// = std::make_shared<Notific
 std::shared_ptr<NotificationHandler> g_handler; // = std::make_shared<NotificationHandler>(g_processor);
 
 std::shared_ptr<swss::DBConnector>          dbAsic;
-std::shared_ptr<swss::RedisClient>          g_redisClient;
 std::shared_ptr<swss::NotificationProducer> notifications;
 
 // TODO we must be sure that all threads and notifications will be stopped
@@ -162,7 +161,7 @@ int syncd_main(int argc, char **argv)
 
     WarmRestartTable warmRestartTable("STATE_DB");
 
-    g_redisClient = std::make_shared<swss::RedisClient>(dbAsic.get());
+    g_client = std::make_shared<RedisClient>(dbAsic);
 
     std::shared_ptr<swss::ConsumerTable> asicState = std::make_shared<swss::ConsumerTable>(dbAsic.get(), ASIC_STATE_TABLE);
     std::shared_ptr<swss::NotificationConsumer> restartQuery = std::make_shared<swss::NotificationConsumer>(dbAsic.get(), SYNCD_NOTIFICATION_CHANNEL_RESTARTQUERY);

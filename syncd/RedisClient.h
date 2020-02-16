@@ -5,6 +5,7 @@ extern "C" {
 }
 
 #include "swss/table.h"
+#include "swss/redisclient.h"
 
 #include <string>
 #include <unordered_map>
@@ -18,7 +19,8 @@ namespace syncd
     {
         public:
 
-            RedisClient();
+            RedisClient(
+                    _In_ std::shared_ptr<swss::DBConnector> dbAsic);
 
             virtual ~RedisClient();
 
@@ -149,5 +151,10 @@ namespace syncd
             std::unordered_map<sai_object_id_t, sai_object_id_t> getObjectMap(
                     _In_ const std::string& key) const;
 
+        private:
+
+            std::shared_ptr<swss::RedisClient> m_redisClient;
+
+            std::shared_ptr<swss::DBConnector> m_dbAsic;
     };
 }

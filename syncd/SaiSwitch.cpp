@@ -16,7 +16,7 @@ using namespace syncd;
 
 const int maxLanesPerPort = 8;
 
-std::shared_ptr<RedisClient> g_client = std::make_shared<RedisClient>();
+extern std::shared_ptr<RedisClient> g_client;
 
 /*
  * NOTE: If real ID will change during hard restarts, then we need to remap all
