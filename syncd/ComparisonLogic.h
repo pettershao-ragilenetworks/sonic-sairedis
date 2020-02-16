@@ -7,6 +7,7 @@ extern "C"{
 #include "AsicView.h"
 #include "VendorSai.h"
 #include "SaiSwitch.h"
+#include "VirtualOidTranslator.h"
 
 #include <set>
 
@@ -27,7 +28,9 @@ namespace syncd
 
         public:
 
-            bool checkAsicVsDatabaseConsistency();
+            bool checkAsicVsDatabaseConsistency(
+                    _In_ std::shared_ptr<VirtualOidTranslator> translator);
+
 
             void executeOperationsOnAsic();
 

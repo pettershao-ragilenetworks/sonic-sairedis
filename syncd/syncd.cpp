@@ -51,8 +51,6 @@ std::shared_ptr<swss::NotificationProducer> notifications;
 // TODO we must be sure that all threads and notifications will be stopped
 // before destructor will be called on those objects
 
-std::shared_ptr<VirtualOidTranslator> g_translator; // TODO move to syncd object
-
 syncd_restart_type_t handleRestartQuery(
         _In_ swss::NotificationConsumer &restartQuery)
 {
@@ -181,7 +179,9 @@ int syncd_main(int argc, char **argv)
                 redisVidIndexGenerator);
 
     // TODO move to syncd object
-    g_translator = std::make_shared<VirtualOidTranslator>(virtualObjectIdManager,  vendorSai);
+    g_syncd->m_translator = std::make_shared<VirtualOidTranslator>(virtualObjectIdManager,  vendorSai);
+
+    g_processor->m_translator = g_syncd->m_translator; // TODO as param
 
     /*
      * At the end we cant use producer consumer concept since if one process

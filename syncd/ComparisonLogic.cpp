@@ -17,7 +17,6 @@ using namespace syncd;
 using namespace saimeta;
 
 extern std::shared_ptr<NotificationHandler> g_handler;
-extern std::shared_ptr<VirtualOidTranslator> g_translator; // TODO move to syncd object
 
 /*
  * NOTE: All methods taking current and temporary view could be moved to
@@ -2177,7 +2176,8 @@ void ComparisonLogic::populateExistingObjects(
     }
 }
 
-bool ComparisonLogic::checkAsicVsDatabaseConsistency()
+bool ComparisonLogic::checkAsicVsDatabaseConsistency(
+        _In_ std::shared_ptr<VirtualOidTranslator> translator)
 {
     SWSS_LOG_ENTER();
 
@@ -2200,7 +2200,7 @@ bool ComparisonLogic::checkAsicVsDatabaseConsistency()
 
             // translate all VID's to RIDs in non object is's
 
-            g_translator->translateVidToRid(meta_key);
+            translator->translateVidToRid(meta_key);
 
             auto info = sai_metadata_get_object_type_info(obj->getObjectType());
 
@@ -2256,7 +2256,7 @@ bool ComparisonLogic::checkAsicVsDatabaseConsistency()
 
                 // translate all VIDs from DB to RIDs for compare
 
-                g_translator->translateVidToRid(obj->getObjectType(), 1, &attr);
+                translator->translateVidToRid(obj->getObjectType(), 1, &attr);
 
                 // get attr value with RIDs
 

@@ -236,7 +236,7 @@ sai_status_t Syncd::processAttrEnumValuesCapabilityQuery(
     sai_object_id_t switchVid;
     sai_deserialize_object_id(strSwitchVid, switchVid);
 
-    sai_object_id_t switchRid = g_translator->translateVidToRid(switchVid);
+    sai_object_id_t switchRid = m_translator->translateVidToRid(switchVid);
 
     auto& values = kfvFieldsValues(kco);
 
@@ -303,7 +303,7 @@ sai_status_t Syncd::processObjectTypeGetAvailabilityQuery(
     sai_object_id_t switchVid;
     sai_deserialize_object_id(strSwitchVid, switchVid);
 
-    const sai_object_id_t switchRid = g_translator->translateVidToRid(switchVid);
+    const sai_object_id_t switchRid = m_translator->translateVidToRid(switchVid);
 
     std::vector<swss::FieldValueTuple> values = kfvFieldsValues(kco);
 
@@ -321,7 +321,7 @@ sai_status_t Syncd::processObjectTypeGetAvailabilityQuery(
 
     uint32_t attr_count = list.get_attr_count();
 
-    g_translator->translateVidToRid(objectType, attr_count, attr_list);
+    m_translator->translateVidToRid(objectType, attr_count, attr_list);
 
     uint64_t count;
 
@@ -357,7 +357,7 @@ sai_status_t Syncd::processFdbFlush(
     sai_object_id_t switchVid;
     sai_deserialize_object_id(strSwitchVid, switchVid);
 
-    sai_object_id_t switchRid = g_translator->translateVidToRid(switchVid);
+    sai_object_id_t switchRid = m_translator->translateVidToRid(switchVid);
 
     auto& values = kfvFieldsValues(kco);
 
@@ -376,7 +376,7 @@ sai_status_t Syncd::processFdbFlush(
     sai_attribute_t *attr_list = list.get_attr_list();
     uint32_t attr_count = list.get_attr_count();
 
-    g_translator->translateVidToRid(SAI_OBJECT_TYPE_FDB_FLUSH, attr_count, attr_list);
+    m_translator->translateVidToRid(SAI_OBJECT_TYPE_FDB_FLUSH, attr_count, attr_list);
 
     sai_status_t status = m_vendorSai->flushFdbEntries(switchRid, attr_count, attr_list);
 
@@ -395,7 +395,7 @@ sai_status_t Syncd::processClearStatsEvent(
     sai_object_meta_key_t metaKey;
     sai_deserialize_object_meta_key(key, metaKey);
 
-    g_translator->translateVidToRid(metaKey);
+    m_translator->translateVidToRid(metaKey);
 
     auto info = sai_metadata_get_object_type_info(metaKey.objecttype);
 
@@ -437,7 +437,7 @@ sai_status_t Syncd::processGetStatsEvent(
 
     // TODO get stats on created object in init view mode could fail
 
-    g_translator->translateVidToRid(metaKey);
+    m_translator->translateVidToRid(metaKey);
 
     auto info = sai_metadata_get_object_type_info(metaKey.objecttype);
 
@@ -559,7 +559,7 @@ sai_status_t Syncd::processBulkQuadEvent(
             sai_attribute_t *attr_list = list->get_attr_list();
             uint32_t attr_count = list->get_attr_count();
 
-            g_translator->translateVidToRid(objectType, attr_count, attr_list);
+            m_translator->translateVidToRid(objectType, attr_count, attr_list);
         }
     }
 
@@ -668,7 +668,7 @@ sai_status_t Syncd::processEntry(
 {
     SWSS_LOG_ENTER();
 
-    g_translator->translateVidToRid(metaKey);
+    m_translator->translateVidToRid(metaKey);
 
     switch (api)
     {
@@ -972,7 +972,7 @@ sai_status_t Syncd::processQuadInInitViewModeGet(
          * and it have RID defined, so we can query it.
          */
 
-        sai_object_id_t rid = g_translator->translateVidToRid(objectVid);
+        sai_object_id_t rid = m_translator->translateVidToRid(objectVid);
 
         sai_object_meta_key_t metaKey;
 
@@ -1128,7 +1128,7 @@ void Syncd::processFlexCounterEvent( // TODO must be moved to go via ASIC channe
 
     sai_object_id_t rid;
 
-    if (!g_translator->tryTranslateVidToRid(vid, rid))
+    if (!m_translator->tryTranslateVidToRid(vid, rid))
     {
         SWSS_LOG_WARN("port VID %s, was not found (probably port was removed/splitted) and will remove from counters now",
                 sai_serialize_object_id(vid).c_str());
@@ -1223,7 +1223,7 @@ sai_status_t Syncd::processQuadEvent(
 
         SWSS_LOG_DEBUG("translating VID to RIDs on all attributes");
 
-        g_translator->translateVidToRid(metaKey.objecttype, attr_count, attr_list);
+        m_translator->translateVidToRid(metaKey.objecttype, attr_count, attr_list);
     }
 
     auto info = sai_metadata_get_object_type_info(metaKey.objecttype);
@@ -1262,7 +1262,7 @@ sai_status_t Syncd::processQuadEvent(
         if (info->isobjectid && api == SAI_COMMON_API_SET)
         {
             sai_object_id_t vid = metaKey.objectkey.key.object_id;
-            sai_object_id_t rid = g_translator->translateVidToRid(vid);
+            sai_object_id_t rid = m_translator->translateVidToRid(vid);
 
             SWSS_LOG_ERROR("VID: %s RID: %s",
                     sai_serialize_object_id(vid).c_str(),
@@ -1366,7 +1366,7 @@ sai_status_t Syncd::processOidCreate(
          * objects.
          */
 
-        switchRid = g_translator->translateVidToRid(switchVid);
+        switchRid = m_translator->translateVidToRid(switchVid);
     }
 
     sai_object_id_t objectRid;
@@ -1380,7 +1380,7 @@ sai_status_t Syncd::processOidCreate(
          * virtual id's to redis db.
          */
 
-        g_translator->insertRidAndVid(objectRid, objectVid);
+        m_translator->insertRidAndVid(objectRid, objectVid);
 
         SWSS_LOG_INFO("saved VID %s to RID %s",
                 sai_serialize_object_id(objectVid).c_str(),
@@ -1393,7 +1393,7 @@ sai_status_t Syncd::processOidCreate(
              * constructor, like getting all queues, ports, etc.
              */
 
-            m_switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, objectRid, m_vendorSai);
+            m_switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, objectRid, m_translator, m_vendorSai);
 
             startDiagShell(switchRid);
         }
@@ -1416,7 +1416,7 @@ sai_status_t Syncd::processOidRemove(
     sai_object_id_t objectVid;
     sai_deserialize_object_id(strObjectId, objectVid);
 
-    sai_object_id_t rid = g_translator->translateVidToRid(objectVid);
+    sai_object_id_t rid = m_translator->translateVidToRid(objectVid);
 
     if (objectType == SAI_OBJECT_TYPE_PORT)
     {
@@ -1432,7 +1432,7 @@ sai_status_t Syncd::processOidRemove(
         // remove all related objects from REDIS DB and also from existing
         // object references since at this point they are no longer valid
 
-        g_translator->eraseRidAndVid(rid, objectVid);
+        m_translator->eraseRidAndVid(rid, objectVid);
 
         if (objectType == SAI_OBJECT_TYPE_SWITCH)
         {
@@ -1498,7 +1498,7 @@ sai_status_t Syncd::processOidSet(
     sai_object_id_t objectVid;
     sai_deserialize_object_id(strObjectId, objectVid);
 
-    sai_object_id_t rid = g_translator->translateVidToRid(objectVid);
+    sai_object_id_t rid = m_translator->translateVidToRid(objectVid);
 
     sai_status_t status = m_vendorSai->set(objectType, rid, attr);
 
@@ -1521,7 +1521,7 @@ sai_status_t Syncd::processOidGet(
     sai_object_id_t objectVid;
     sai_deserialize_object_id(strObjectId, objectVid);
 
-    sai_object_id_t rid = g_translator->translateVidToRid(objectVid);
+    sai_object_id_t rid = m_translator->translateVidToRid(objectVid);
 
     return m_vendorSai->get(objectType, rid, attr_count, attr_list);
 }
@@ -1657,7 +1657,7 @@ void Syncd::sendGetResponse(
 
     if (status == SAI_STATUS_SUCCESS)
     {
-        g_translator->translateRidToVid(objectType, switchVid, attr_count, attr_list);
+        m_translator->translateRidToVid(objectType, switchVid, attr_count, attr_list);
 
         /*
          * Normal serialization + translate RID to VID.
@@ -1961,7 +1961,7 @@ void Syncd::inspectAsic()
             continue;
         }
 
-        g_translator->translateVidToRid(metaKey);
+        m_translator->translateVidToRid(metaKey);
 
         sai_status_t status = m_vendorSai->get(metaKey, attr_count, attr_list);
 
@@ -2136,7 +2136,7 @@ sai_status_t Syncd::processNotifySyncd(
              * there should be no issue.
              */
 
-            g_translator->clearLocalCache();
+            m_translator->clearLocalCache();
         }
         else
         {
@@ -2365,7 +2365,7 @@ sai_status_t Syncd::applyView()
     {
         if (m_commandLineOptions->m_enableConsistencyCheck)
         {
-            bool consistent = cl->checkAsicVsDatabaseConsistency();
+            bool consistent = cl->checkAsicVsDatabaseConsistency(m_translator);
 
             if (!consistent && m_commandLineOptions->m_enableUnittests)
             {
@@ -2549,7 +2549,7 @@ void Syncd::onSyncdStart(
         SWSS_LOG_THROW("performing hard reinit, but there are %zu switches defined, bug!", m_switches.size());
     }
 
-    HardReiniter hr(m_vendorSai);
+    HardReiniter hr(m_translator, m_vendorSai);
 
     m_switches = hr.hardReinit();
 
@@ -2647,11 +2647,11 @@ void Syncd::onSwitchCreateInInitViewMode(
                 sai_serialize_object_id(switchVid).c_str(),
                 sai_serialize_object_id(switchRid).c_str());
 
-        g_translator->insertRidAndVid(switchRid, switchVid);
+        m_translator->insertRidAndVid(switchRid, switchVid);
 
         // make switch initialization and get all default data
 
-        m_switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid, m_vendorSai);
+        m_switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid, m_translator, m_vendorSai);
 
         startDiagShell(switchRid);
     }
@@ -2758,7 +2758,7 @@ void Syncd::performWarmRestartSingleSwitch(
 
     sai_deserialize_object_id(strSwitchVid, switchVid);
 
-    sai_object_id_t originalSwitchRid = g_translator->translateVidToRid(switchVid);
+    sai_object_id_t originalSwitchRid = m_translator->translateVidToRid(switchVid);
 
     sai_object_id_t switchRid;
 
@@ -2839,7 +2839,7 @@ void Syncd::performWarmRestartSingleSwitch(
 
     // perform all get operations on existing switch
 
-    auto sw = m_switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid, m_vendorSai, true);
+    auto sw = m_switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid, m_translator, m_vendorSai, true);
 
     startDiagShell(switchRid);
 }

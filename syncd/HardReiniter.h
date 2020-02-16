@@ -2,6 +2,7 @@
 
 #include "SaiInterface.h"
 #include "SaiSwitch.h"
+#include "VirtualOidTranslator.h"
 
 #include <string>
 #include <unordered_map>
@@ -21,7 +22,8 @@ namespace syncd
         public:
 
             HardReiniter(
-                   _In_ std::shared_ptr<sairedis::SaiInterface> sai);
+                    _In_ std::shared_ptr<VirtualOidTranslator> translator,
+                    _In_ std::shared_ptr<sairedis::SaiInterface> sai);
 
             virtual ~HardReiniter();
 
@@ -47,5 +49,7 @@ namespace syncd
             std::map<sai_object_id_t, std::vector<std::string>> m_switchMap;
 
             std::shared_ptr<sairedis::SaiInterface> m_vendorSai;
+
+            std::shared_ptr<VirtualOidTranslator> m_translator;
     };
 }

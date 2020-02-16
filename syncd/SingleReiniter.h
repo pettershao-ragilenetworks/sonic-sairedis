@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SaiSwitch.h"
+#include "VirtualOidTranslator.h"
 
 #include "lib/inc/SaiInterface.h"
 
@@ -24,10 +25,11 @@ namespace syncd
         public:
 
             SingleReiniter(
-                   _In_ std::shared_ptr<sairedis::SaiInterface> sai,
-                   _In_ const ObjectIdMap& vidToRidMap,
-                   _In_ const ObjectIdMap& ridToVidMap,
-                   _In_ const std::vector<std::string>& asicKeys);
+                    _In_ std::shared_ptr<VirtualOidTranslator> translator,
+                    _In_ std::shared_ptr<sairedis::SaiInterface> sai,
+                    _In_ const ObjectIdMap& vidToRidMap,
+                    _In_ const ObjectIdMap& ridToVidMap,
+                    _In_ const std::vector<std::string>& asicKeys);
 
             virtual ~SingleReiniter();
 
@@ -122,5 +124,7 @@ namespace syncd
             sai_object_id_t m_switch_vid;
 
             std::shared_ptr<SaiSwitch> m_sw;
+
+            std::shared_ptr<VirtualOidTranslator> m_translator;
     };
 }

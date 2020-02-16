@@ -27,10 +27,12 @@ extern std::shared_ptr<RedisClient> g_client;
 SaiSwitch::SaiSwitch(
         _In_ sai_object_id_t switch_vid,
         _In_ sai_object_id_t switch_rid,
+        _In_ std::shared_ptr<VirtualOidTranslator> translator,
         _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,
         _In_ bool warmBoot):
     m_vendorSai(vendorSai),
-    m_warmBoot(warmBoot)
+    m_warmBoot(warmBoot),
+    m_translator(translator)
 {
     SWSS_LOG_ENTER();
 
@@ -308,7 +310,7 @@ void SaiSwitch::redisSetDummyAsicStateForRealObjectId(
 {
     SWSS_LOG_ENTER();
 
-    sai_object_id_t vid = g_translator->translateRidToVid(rid, m_switch_vid);
+    sai_object_id_t vid = m_translator->translateRidToVid(rid, m_switch_vid);
 
     g_client->setDummyAsicStateObject(vid);
 }
@@ -553,7 +555,7 @@ bool SaiSwitch::isColdBootDiscoveredRid(
      * except objects that were removed like VLAN_MEMBER.
      */
 
-    sai_object_id_t vid = g_translator->translateRidToVid(rid, m_switch_vid);
+    sai_object_id_t vid = m_translator->translateRidToVid(rid, m_switch_vid);
 
     return coldBootDiscoveredVids.find(vid) != coldBootDiscoveredVids.end();
 }
@@ -702,7 +704,7 @@ std::set<sai_object_id_t> SaiSwitch::getColdBootDiscoveredVids() const
 
     for (sai_object_id_t rid: m_discovered_rids)
     {
-        sai_object_id_t vid = g_translator->translateRidToVid(rid, m_switch_vid);
+        sai_object_id_t vid = m_translator->translateRidToVid(rid, m_switch_vid);
 
         discoveredVids.insert(vid);
     }
@@ -725,7 +727,7 @@ void SaiSwitch::redisSaveColdBootDiscoveredVids() const
 
     for (sai_object_id_t rid: m_discovered_rids)
     {
-        sai_object_id_t vid = g_translator->translateRidToVid(rid, m_switch_vid);
+        sai_object_id_t vid = m_translator->translateRidToVid(rid, m_switch_vid);
 
         coldVids.insert(vid);
     }
@@ -883,7 +885,7 @@ void SaiSwitch::helperPopulateWarmBootVids()
 
     for (sai_object_id_t rid: m_discovered_rids)
     {
-        sai_object_id_t vid = g_translator->translateRidToVid(rid, m_switch_vid);
+        sai_object_id_t vid = m_translator->translateRidToVid(rid, m_switch_vid);
 
        m_warmBootDiscoveredVids.insert(vid);
     }
@@ -1089,7 +1091,7 @@ void SaiSwitch::postPortRemove(
 
         // TODO should this remove rid,vid and object be as db op?
 
-        g_translator->eraseRidAndVid(rid, vid);
+        m_translator->eraseRidAndVid(rid, vid);
 
         // remove from ASIC DB
 

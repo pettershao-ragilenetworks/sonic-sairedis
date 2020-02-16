@@ -67,7 +67,7 @@ void NotificationProcessor::process_on_switch_state_change(
 {
     SWSS_LOG_ENTER();
 
-    sai_object_id_t switch_vid = g_translator->translateRidToVid(switch_rid, SAI_NULL_OBJECT_ID);
+    sai_object_id_t switch_vid = m_translator->translateRidToVid(switch_rid, SAI_NULL_OBJECT_ID);
 
     auto s = sai_serialize_switch_oper_status(switch_vid, switch_oper_status);
 
@@ -273,7 +273,7 @@ bool NotificationProcessor::check_fdb_event_notification_data(
 
     bool result = true;
 
-    if (!g_translator->checkRidExists(data.fdb_entry.bv_id))
+    if (!m_translator->checkRidExists(data.fdb_entry.bv_id))
     {
         SWSS_LOG_ERROR("bv_id RID 0x%" PRIx64 " is not present on local ASIC DB: %s", data.fdb_entry.bv_id,
                 sai_serialize_fdb_entry(data.fdb_entry).c_str());
@@ -281,7 +281,7 @@ bool NotificationProcessor::check_fdb_event_notification_data(
         result = false;
     }
 
-    if (!g_translator->checkRidExists(data.fdb_entry.switch_id) || data.fdb_entry.switch_id == SAI_NULL_OBJECT_ID)
+    if (!m_translator->checkRidExists(data.fdb_entry.switch_id) || data.fdb_entry.switch_id == SAI_NULL_OBJECT_ID)
     {
         SWSS_LOG_ERROR("switch_id RID 0x%" PRIx64 " is not present on local ASIC DB: %s", data.fdb_entry.bv_id,
                 sai_serialize_fdb_entry(data.fdb_entry).c_str());
@@ -305,7 +305,7 @@ bool NotificationProcessor::check_fdb_event_notification_data(
         if (meta->attrvaluetype != SAI_ATTR_VALUE_TYPE_OBJECT_ID)
             continue;
 
-        if (!g_translator->checkRidExists(attr.value.oid))
+        if (!m_translator->checkRidExists(attr.value.oid))
         {
             SWSS_LOG_WARN("RID 0x%" PRIx64 " on %s is not present on local ASIC DB", attr.value.oid, meta->attridname);
 
@@ -357,11 +357,11 @@ void NotificationProcessor::process_on_fdb_event(
 
         SWSS_LOG_DEBUG("fdb %u: type: %d", i, fdb->event_type);
 
-        fdb->fdb_entry.switch_id = g_translator->translateRidToVid(fdb->fdb_entry.switch_id, SAI_NULL_OBJECT_ID);
+        fdb->fdb_entry.switch_id = m_translator->translateRidToVid(fdb->fdb_entry.switch_id, SAI_NULL_OBJECT_ID);
 
-        fdb->fdb_entry.bv_id = g_translator->translateRidToVid(fdb->fdb_entry.bv_id, fdb->fdb_entry.switch_id);
+        fdb->fdb_entry.bv_id = m_translator->translateRidToVid(fdb->fdb_entry.bv_id, fdb->fdb_entry.switch_id);
 
-        g_translator->translateRidToVid(SAI_OBJECT_TYPE_FDB_ENTRY, fdb->fdb_entry.switch_id, fdb->attr_count, fdb->attr);
+        m_translator->translateRidToVid(SAI_OBJECT_TYPE_FDB_ENTRY, fdb->fdb_entry.switch_id, fdb->attr_count, fdb->attr);
 
         /*
          * Currently because of brcm bug, we need to install fdb entries in
@@ -405,7 +405,7 @@ void NotificationProcessor::process_on_queue_deadlock_event(
          * switch vid.
          */
 
-        deadlock_data->queue_id = g_translator->translateRidToVid(deadlock_data->queue_id, SAI_NULL_OBJECT_ID);
+        deadlock_data->queue_id = m_translator->translateRidToVid(deadlock_data->queue_id, SAI_NULL_OBJECT_ID);
     }
 
     std::string s = sai_serialize_queue_deadlock_ntf(count, data);
@@ -434,7 +434,7 @@ void NotificationProcessor::process_on_port_state_change(
          * switch vid.
          */
 
-        oper_stat->port_id = g_translator->translateRidToVid(oper_stat->port_id, SAI_NULL_OBJECT_ID);
+        oper_stat->port_id = m_translator->translateRidToVid(oper_stat->port_id, SAI_NULL_OBJECT_ID);
     }
 
     std::string s = sai_serialize_port_oper_status_ntf(count, data);
@@ -447,7 +447,7 @@ void NotificationProcessor::process_on_switch_shutdown_request(
 {
     SWSS_LOG_ENTER();
 
-    sai_object_id_t switch_vid = g_translator->translateRidToVid(switch_rid, SAI_NULL_OBJECT_ID);
+    sai_object_id_t switch_vid = m_translator->translateRidToVid(switch_rid, SAI_NULL_OBJECT_ID);
 
     std::string s = sai_serialize_switch_shutdown_request(switch_vid);
 

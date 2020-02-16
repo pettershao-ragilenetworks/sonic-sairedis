@@ -5,6 +5,7 @@
 #include "VendorSai.h"
 #include "AsicView.h"
 #include "SaiSwitch.h"
+#include "VirtualOidTranslator.h"
 
 #include "meta/SaiAttributeList.h"
 
@@ -349,6 +350,8 @@ namespace syncd
             std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> m_switches;
 
             bool m_veryFirstRun;
+
+            std::shared_ptr<VirtualOidTranslator> m_translator;
 
         private:
 

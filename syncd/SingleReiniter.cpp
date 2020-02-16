@@ -19,6 +19,7 @@ extern std::shared_ptr<RedisClient> g_client;
 extern std::shared_ptr<NotificationHandler> g_handler;
 
 SingleReiniter::SingleReiniter(
+        _In_ std::shared_ptr<VirtualOidTranslator> translator,
         _In_ std::shared_ptr<sairedis::SaiInterface> sai,
         _In_ const ObjectIdMap& vidToRidMap,
         _In_ const ObjectIdMap& ridToVidMap,
@@ -26,7 +27,8 @@ SingleReiniter::SingleReiniter(
     m_vendorSai(sai),
     m_vidToRidMap(vidToRidMap),
     m_ridToVidMap(ridToVidMap),
-    m_asicKeys(asicKeys)
+    m_asicKeys(asicKeys),
+    m_translator(translator)
 {
     SWSS_LOG_ENTER();
 
@@ -313,7 +315,7 @@ void SingleReiniter::processSwitches()
          * object, so when doing discover we will get full default ASIC view.
          */
 
-        m_sw = std::make_shared<SaiSwitch>(m_switch_vid, m_switch_rid, m_vendorSai);
+        m_sw = std::make_shared<SaiSwitch>(m_switch_vid, m_switch_rid, m_translator, m_vendorSai);
 
         /*
          * We processed switch. We have switch vid/rid so we can process all

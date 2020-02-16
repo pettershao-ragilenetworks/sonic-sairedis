@@ -1,6 +1,7 @@
 #pragma once
 
 #include "NotificationQueue.h"
+#include "VirtualOidTranslator.h"
 
 #include <thread>
 #include <memory>
@@ -106,6 +107,10 @@ namespace syncd
 
             void syncProcessNotification(
                     _In_ const swss::KeyOpFieldsValuesTuple& item);
+
+        public: // TODO to private
+
+            std::shared_ptr<VirtualOidTranslator> m_translator;
 
         private:
 
