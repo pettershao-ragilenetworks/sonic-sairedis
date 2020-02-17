@@ -17,6 +17,7 @@
 
 #include "meta/sai_serialize.h"
 
+#include "swss/notificationproducer.h"
 #include "swss/notificationconsumer.h"
 #include "swss/select.h"
 #include "swss/warm_restart.h"

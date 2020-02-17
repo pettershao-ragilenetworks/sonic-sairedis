@@ -10,6 +10,7 @@
 
 #include "swss/logger.h"
 #include "swss/tokenize.h"
+#include "swss/notificationproducer.h"
 
 #include "meta/sai_serialize.h"
 
@@ -24,6 +25,7 @@
 
 extern std::shared_ptr<syncd::NotificationHandler> g_handler;
 extern std::shared_ptr<syncd::NotificationProcessor> g_processor;
+extern std::shared_ptr<swss::NotificationProducer>  notifications;
 
 using namespace syncd;
 using namespace saimeta;

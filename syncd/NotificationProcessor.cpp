@@ -7,6 +7,7 @@
 #include "meta/SaiAttributeList.h"
 
 #include "swss/logger.h"
+#include "swss/notificationproducer.h"
 
 #include "syncd.h" // TODO to be removed
 
@@ -14,6 +15,10 @@
 
 using namespace syncd;
 using namespace saimeta;
+
+extern std::shared_ptr<swss::NotificationProducer>  notifications;
+extern std::shared_ptr<swss::DBConnector>   dbAsic;
+extern std::string fdbFlushSha;
 
 NotificationProcessor::NotificationProcessor(
         _In_ std::shared_ptr<RedisClient> client,
