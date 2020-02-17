@@ -9,13 +9,13 @@
 
 using namespace syncd;
 
-extern std::shared_ptr<RedisClient> g_client;
-
 VirtualOidTranslator::VirtualOidTranslator(
+        _In_ std::shared_ptr<RedisClient> client,
         _In_ std::shared_ptr<sairedis::VirtualObjectIdManager> virtualObjectIdManager,
         _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai):
     m_virtualObjectIdManager(virtualObjectIdManager),
-    m_vendorSai(vendorSai)
+    m_vendorSai(vendorSai),
+    m_client(client)
 {
     SWSS_LOG_ENTER();
 
@@ -51,7 +51,7 @@ sai_object_id_t VirtualOidTranslator::translateRidToVid(
 
     std::string strRid = sai_serialize_object_id(rid);
 
-    auto vid = g_client->getVidForRid(rid);
+    auto vid = m_client->getVidForRid(rid);
 
     if (vid != SAI_NULL_OBJECT_ID)
     {
@@ -89,7 +89,7 @@ sai_object_id_t VirtualOidTranslator::translateRidToVid(
             sai_serialize_object_id(rid).c_str(),
             sai_serialize_object_id(vid).c_str());
 
-    g_client->insertVidAndRid(vid, rid);
+    m_client->insertVidAndRid(vid, rid);
 
     m_rid2vid[rid] = vid;
     m_vid2rid[vid] = rid;
@@ -110,7 +110,7 @@ bool VirtualOidTranslator::checkRidExists(
     if (m_rid2vid.find(rid) != m_rid2vid.end())
         return true;
 
-    auto vid = g_client->getVidForRid(rid);
+    auto vid = m_client->getVidForRid(rid);
 
     return vid != SAI_NULL_OBJECT_ID;
 }
@@ -227,7 +227,7 @@ sai_object_id_t VirtualOidTranslator::translateVidToRid(
         return it->second;
     }
 
-    auto rid = g_client->getRidForVid(vid);
+    auto rid = m_client->getRidForVid(vid);
 
     if (rid == SAI_NULL_OBJECT_ID)
     {
@@ -412,7 +412,7 @@ void VirtualOidTranslator::insertRidAndVid(
     m_rid2vid[rid] = vid;
     m_vid2rid[vid] = rid;
 
-    g_client->insertVidAndRid(vid, rid);
+    m_client->insertVidAndRid(vid, rid);
 }
 
 void VirtualOidTranslator::eraseRidAndVid(
@@ -423,7 +423,7 @@ void VirtualOidTranslator::eraseRidAndVid(
 
     std::lock_guard<std::mutex> lock(m_mutex);
 
-    g_client->removeVidAndRid(vid, rid);
+    m_client->removeVidAndRid(vid, rid);
 
     // remove from local vid2rid and rid2vid map
 

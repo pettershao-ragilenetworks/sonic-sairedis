@@ -2,6 +2,7 @@
 
 #include "NotificationQueue.h"
 #include "VirtualOidTranslator.h"
+#include "RedisClient.h"
 
 #include <thread>
 #include <memory>
@@ -15,6 +16,7 @@ namespace syncd
         public:
 
             NotificationProcessor(
+                    _In_ std::shared_ptr<RedisClient> client,
                     _In_ std::function<void(const swss::KeyOpFieldsValuesTuple&)> synchronizer);
 
             virtual ~NotificationProcessor();
@@ -128,5 +130,7 @@ namespace syncd
             bool m_runThread;
 
             std::function<void(const swss::KeyOpFieldsValuesTuple&)> m_synchronizer;
+
+            std::shared_ptr<RedisClient> m_client;
     };
 }

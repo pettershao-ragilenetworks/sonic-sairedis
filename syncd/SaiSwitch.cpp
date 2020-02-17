@@ -16,8 +16,6 @@ using namespace syncd;
 
 const int maxLanesPerPort = 8;
 
-extern std::shared_ptr<RedisClient> g_client;
-
 /*
  * NOTE: If real ID will change during hard restarts, then we need to remap all
  * VID/RID, but we can only do that if we will save entire tree with all
@@ -27,12 +25,14 @@ extern std::shared_ptr<RedisClient> g_client;
 SaiSwitch::SaiSwitch(
         _In_ sai_object_id_t switch_vid,
         _In_ sai_object_id_t switch_rid,
+        _In_ std::shared_ptr<RedisClient> client,
         _In_ std::shared_ptr<VirtualOidTranslator> translator,
         _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,
         _In_ bool warmBoot):
     m_vendorSai(vendorSai),
     m_warmBoot(warmBoot),
-    m_translator(translator)
+    m_translator(translator),
+    m_client(client)
 {
     SWSS_LOG_ENTER();
 
@@ -253,21 +253,21 @@ std::unordered_map<sai_object_id_t, sai_object_id_t> SaiSwitch::getVidToRidMap()
 {
     SWSS_LOG_ENTER();
 
-    return g_client->getVidToRidMap(m_switch_vid);
+    return m_client->getVidToRidMap(m_switch_vid);
 }
 
 std::unordered_map<sai_object_id_t, sai_object_id_t> SaiSwitch::getRidToVidMap() const
 {
     SWSS_LOG_ENTER();
 
-    return g_client->getRidToVidMap(m_switch_vid);
+    return m_client->getRidToVidMap(m_switch_vid);
 }
 
 void SaiSwitch::helperCheckLaneMap()
 {
     SWSS_LOG_ENTER();
 
-    auto redisLaneMap = g_client->getLaneMap(m_switch_vid);
+    auto redisLaneMap = m_client->getLaneMap(m_switch_vid);
 
     auto laneMap = saiGetHardwareLaneMap();
 
@@ -275,7 +275,7 @@ void SaiSwitch::helperCheckLaneMap()
     {
         SWSS_LOG_INFO("no lanes defined in redis, seems like it is first syncd start");
 
-        g_client->saveLaneMap(m_switch_vid, laneMap);
+        m_client->saveLaneMap(m_switch_vid, laneMap);
 
         redisLaneMap = laneMap; // copy
     }
@@ -312,7 +312,7 @@ void SaiSwitch::redisSetDummyAsicStateForRealObjectId(
 
     sai_object_id_t vid = m_translator->translateRidToVid(rid, m_switch_vid);
 
-    g_client->setDummyAsicStateObject(vid);
+    m_client->setDummyAsicStateObject(vid);
 }
 
 sai_object_id_t SaiSwitch::getVid() const
@@ -484,7 +484,7 @@ sai_object_id_t SaiSwitch::helperGetSwitchAttrOid(
      * Get value value of the same attribute from redis.
      */
 
-    auto ptr_redis_rid_str = g_client->getSwitchHiddenAttribute(m_switch_vid, meta->attridname);
+    auto ptr_redis_rid_str = m_client->getSwitchHiddenAttribute(m_switch_vid, meta->attridname);
 
     if (ptr_redis_rid_str == NULL)
     {
@@ -496,7 +496,7 @@ sai_object_id_t SaiSwitch::helperGetSwitchAttrOid(
 
         SWSS_LOG_INFO("redis %s id is not defined yet in redis", meta->attridname);
 
-        g_client->saveSwitchHiddenAttribute(m_switch_vid, meta->attridname, rid);
+        m_client->saveSwitchHiddenAttribute(m_switch_vid, meta->attridname, rid);
 
         m_default_rid_map[attr_id] = rid;
 
@@ -679,7 +679,7 @@ void SaiSwitch::helperLoadColdVids()
 {
     SWSS_LOG_ENTER();
 
-    m_coldBootDiscoveredVids = g_client->getColdVids(m_switch_vid);
+    m_coldBootDiscoveredVids = m_client->getColdVids(m_switch_vid);
 
     SWSS_LOG_NOTICE("read %zu COLD VIDS", m_coldBootDiscoveredVids.size());
 }
@@ -732,7 +732,7 @@ void SaiSwitch::redisSaveColdBootDiscoveredVids() const
         coldVids.insert(vid);
     }
 
-    g_client->saveColdBootDiscoveredVids(m_switch_vid, coldVids);
+    m_client->saveColdBootDiscoveredVids(m_switch_vid, coldVids);
 }
 
 void SaiSwitch::helperSaveDiscoveredObjectsToRedis()
@@ -787,7 +787,7 @@ void SaiSwitch::helperSaveDiscoveredObjectsToRedis()
 
     const int ObjectsTreshold = 32;
 
-    size_t keys = g_client->getAsicObjectsSize(m_switch_vid);
+    size_t keys = m_client->getAsicObjectsSize(m_switch_vid);
 
     bool manyObjectsPresent = keys > ObjectsTreshold;
 
@@ -933,7 +933,7 @@ void SaiSwitch::redisUpdatePortLaneMap(
 
     auto lanes = saiGetPortLanes(port_rid);
 
-    g_client->setPortLanes(m_switch_vid, port_rid, lanes);
+    m_client->setPortLanes(m_switch_vid, port_rid, lanes);
 
     SWSS_LOG_NOTICE("added %zu lanes to redis lane map for port RID %s",
             lanes.size(),
@@ -1081,7 +1081,7 @@ void SaiSwitch::postPortRemove(
 
         // remove from RID2VID and VID2RID map in redis
 
-        auto vid = g_client->getVidForRid(rid);
+        auto vid = m_client->getVidForRid(rid);
 
         if (vid == SAI_NULL_OBJECT_ID)
         {
@@ -1095,10 +1095,10 @@ void SaiSwitch::postPortRemove(
 
         // remove from ASIC DB
 
-        g_client->removeAsicObject(vid);
+        m_client->removeAsicObject(vid);
     }
 
-    int removed = g_client->removePortFromLanesMap(m_switch_vid, portRid);
+    int removed = m_client->removePortFromLanesMap(m_switch_vid, portRid);
 
     SWSS_LOG_NOTICE("removed %u lanes from redis lane map for port RID %s",
             removed,

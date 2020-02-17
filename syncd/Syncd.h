@@ -6,6 +6,7 @@
 #include "AsicView.h"
 #include "SaiSwitch.h"
 #include "VirtualOidTranslator.h"
+#include "RedisClient.h"
 
 #include "meta/SaiAttributeList.h"
 
@@ -40,6 +41,8 @@ namespace syncd
                     _In_ bool enable);
 
             bool isInitViewMode() const;
+
+            bool isVeryFirstRun();
 
             void onSyncdStart(
                     _In_ bool warmStart);
@@ -352,6 +355,8 @@ namespace syncd
             bool m_veryFirstRun;
 
             std::shared_ptr<VirtualOidTranslator> m_translator;
+
+            std::shared_ptr<RedisClient> m_client;
 
         private:
 

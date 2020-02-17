@@ -15,12 +15,11 @@
 using namespace syncd;
 using namespace saimeta;
 
-extern std::shared_ptr<RedisClient> g_client;
-
 NotificationProcessor::NotificationProcessor(
+        _In_ std::shared_ptr<RedisClient> client,
         _In_ std::function<void(const swss::KeyOpFieldsValuesTuple&)> synchronizer):
-    m_synchronizer(synchronizer)
-
+    m_synchronizer(synchronizer),
+    m_client(client)
 {
     SWSS_LOG_ENTER();
 
@@ -171,7 +170,7 @@ void NotificationProcessor::redisPutFdbEntryToAsicView(
         SWSS_LOG_DEBUG("remove fdb entry %s for SAI_FDB_EVENT_AGED",
                 sai_serialize_object_meta_key(metaKey).c_str());
 
-        g_client->removeAsicObject(metaKey);
+        m_client->removeAsicObject(metaKey);
         return;
     }
 
@@ -225,7 +224,7 @@ void NotificationProcessor::redisPutFdbEntryToAsicView(
 
         entry.emplace_back(strAttrId, strAttrValue);
 
-        g_client->createAsicObject(metaKey, entry);
+        m_client->createAsicObject(metaKey, entry);
         return;
     }
 

@@ -3,6 +3,7 @@
 #include "SaiInterface.h"
 #include "SaiSwitch.h"
 #include "VirtualOidTranslator.h"
+#include "RedisClient.h"
 
 #include <string>
 #include <unordered_map>
@@ -22,6 +23,7 @@ namespace syncd
         public:
 
             HardReiniter(
+                    _In_ std::shared_ptr<RedisClient> client,
                     _In_ std::shared_ptr<VirtualOidTranslator> translator,
                     _In_ std::shared_ptr<sairedis::SaiInterface> sai);
 
@@ -51,5 +53,7 @@ namespace syncd
             std::shared_ptr<sairedis::SaiInterface> m_vendorSai;
 
             std::shared_ptr<VirtualOidTranslator> m_translator;
+
+            std::shared_ptr<RedisClient> m_client;
     };
 }

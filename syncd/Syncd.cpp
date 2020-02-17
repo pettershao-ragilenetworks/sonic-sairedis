@@ -29,8 +29,6 @@ using namespace syncd;
 using namespace saimeta;
 using namespace std::placeholders;
 
-extern std::shared_ptr<RedisClient> g_client;
-
 Syncd::Syncd(
         _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,
         _In_ std::shared_ptr<CommandLineOptions> cmd,
@@ -1393,7 +1391,7 @@ sai_status_t Syncd::processOidCreate(
              * constructor, like getting all queues, ports, etc.
              */
 
-            m_switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, objectRid, m_translator, m_vendorSai);
+            m_switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, objectRid, m_client, m_translator, m_vendorSai);
 
             startDiagShell(switchRid);
         }
@@ -1849,11 +1847,11 @@ void Syncd::snoopGetAttr(
 
     if (isInitViewMode())
     {
-        g_client->setTempAsicObject(metaKey, attrId, attrValue);
+        m_client->setTempAsicObject(metaKey, attrId, attrValue);
     }
     else
     {
-        g_client->setAsicObject(metaKey, attrId, attrValue);
+        m_client->setAsicObject(metaKey, attrId, attrValue);
     }
 }
 
@@ -1913,7 +1911,7 @@ void Syncd::inspectAsic()
     // Fetch all the keys from ASIC DB
     // Loop through all the keys in ASIC DB
 
-    for (const auto &key: g_client->getAsicStateKeys())
+    for (const auto &key: m_client->getAsicStateKeys())
     {
         // ASIC_STATE:objecttype:objectid (object id may contain ':')
 
@@ -1932,7 +1930,7 @@ void Syncd::inspectAsic()
 
         // Find all the attrid from ASIC DB, and use them to query ASIC
 
-        auto hash = g_client->getAttributesFromAsicKey(key);
+        auto hash = m_client->getAttributesFromAsicKey(key);
 
         std::vector<swss::FieldValueTuple> values;
 
@@ -2191,7 +2189,7 @@ void Syncd::clearTempView()
 
     SWSS_LOG_TIMER("clear temp view");
 
-    g_client->removeTempAsicStateTable();
+    m_client->removeTempAsicStateTable();
 
     // Also clear list of objects removed in init view mode.
 
@@ -2266,8 +2264,8 @@ sai_status_t Syncd::applyView()
 
     // Read current and temporary views from REDIS.
 
-    auto currentMap = g_client->getAsicView();
-    auto temporaryMap = g_client->getTempAsicView();
+    auto currentMap = m_client->getAsicView();
+    auto temporaryMap = m_client->getTempAsicView();
 
     if (currentMap.size() != temporaryMap.size())
     {
@@ -2443,9 +2441,9 @@ void Syncd::updateRedisDatabase(
 
     SWSS_LOG_TIMER("redis update");
 
-    g_client->removeAsicStateTable();
+    m_client->removeAsicStateTable();
 
-    g_client->removeTempAsicStateTable();
+    m_client->removeTempAsicStateTable();
 
     // Save temporary views as current view in redis database.
 
@@ -2466,7 +2464,7 @@ void Syncd::updateRedisDatabase(
                 entry.emplace_back(saiAttr->getStrAttrId(), saiAttr->getStrAttrValue());
             }
 
-            g_client->createAsicObject(obj->m_meta_key, entry);
+            m_client->createAsicObject(obj->m_meta_key, entry);
         }
     }
 
@@ -2488,7 +2486,7 @@ void Syncd::updateRedisDatabase(
         }
     }
 
-    g_client->setVidAndRidMap(allVid2Rid);
+    m_client->setVidAndRidMap(allVid2Rid);
 
     SWSS_LOG_NOTICE("updated redis database");
 }
@@ -2549,7 +2547,7 @@ void Syncd::onSyncdStart(
         SWSS_LOG_THROW("performing hard reinit, but there are %zu switches defined, bug!", m_switches.size());
     }
 
-    HardReiniter hr(m_translator, m_vendorSai);
+    HardReiniter hr(m_client, m_translator, m_vendorSai);
 
     m_switches = hr.hardReinit();
 
@@ -2651,7 +2649,7 @@ void Syncd::onSwitchCreateInInitViewMode(
 
         // make switch initialization and get all default data
 
-        m_switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid, m_translator, m_vendorSai);
+        m_switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid, m_client, m_translator, m_vendorSai);
 
         startDiagShell(switchRid);
     }
@@ -2733,7 +2731,7 @@ void Syncd::performWarmRestartSingleSwitch(
 
     std::vector<swss::FieldValueTuple> values;
 
-    auto hash = g_client->getAttributesFromAsicKey(key);
+    auto hash = m_client->getAttributesFromAsicKey(key);
 
     SWSS_LOG_NOTICE("switch %s", strSwitchVid.c_str());
 
@@ -2839,7 +2837,7 @@ void Syncd::performWarmRestartSingleSwitch(
 
     // perform all get operations on existing switch
 
-    auto sw = m_switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid, m_translator, m_vendorSai, true);
+    auto sw = m_switches[switchVid] = std::make_shared<SaiSwitch>(switchVid, switchRid, m_client, m_translator, m_vendorSai, true);
 
     startDiagShell(switchRid);
 }
@@ -2857,7 +2855,7 @@ void Syncd::performWarmRestart()
      * will have need for it.
      */
 
-    auto entries = g_client->getAsicStateSwitchesKeys();
+    auto entries = m_client->getAsicStateSwitchesKeys();
 
     if (entries.size() == 0)
     {
@@ -3169,4 +3167,29 @@ void Syncd::syncProcessNotification(
     SWSS_LOG_ENTER();
 
     g_processor->syncProcessNotification(item);
+}
+
+bool Syncd::isVeryFirstRun()
+{
+    SWSS_LOG_ENTER();
+
+    /*
+     * If lane map is not defined in redis db then we assume this is very first
+     * start of syncd later on we can add additional checks here.
+     *
+     * TODO: if we add more switches then we need lane maps per switch.
+     * TODO: we also need other way to check if this is first start
+     *
+     * We could use VIDCOUNTER also, but if something is defined in the DB then
+     * we assume this is not the first start.
+     *
+     * TODO we need to fix this, since when there will be queue, it will still think
+     * this is first run, let's query HIDDEN ?
+     */
+
+    bool firstRun = m_client->hasNoHiddenKeysDefined();
+
+    SWSS_LOG_NOTICE("First Run: %s", firstRun ? "True" : "False");
+
+    return firstRun;
 }

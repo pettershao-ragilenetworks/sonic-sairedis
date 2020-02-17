@@ -31,8 +31,6 @@
 using namespace syncd;
 using namespace std::placeholders;
 
-std::shared_ptr<RedisClient> g_client;
-
 std::string fdbFlushSha;
 
 /*
@@ -66,32 +64,6 @@ syncd_restart_type_t handleRestartQuery(
 
     return RequestShutdownCommandLineOptions::stringToRestartType(op);
 }
-
-bool isVeryFirstRun()
-{
-    SWSS_LOG_ENTER();
-
-    /*
-     * If lane map is not defined in redis db then we assume this is very first
-     * start of syncd later on we can add additional checks here.
-     *
-     * TODO: if we add more switches then we need lane maps per switch.
-     * TODO: we also need other way to check if this is first start
-     *
-     * We could use VIDCOUNTER also, but if something is defined in the DB then
-     * we assume this is not the first start.
-     *
-     * TODO we need to fix this, since when there will be queue, it will still think
-     * this is first run, let's query HIDDEN ?
-     */
-
-    bool firstRun = g_client->hasNoHiddenKeysDefined();
-
-    SWSS_LOG_NOTICE("First Run: %s", firstRun ? "True" : "False");
-
-    return firstRun;
-}
-
 
 void timerWatchdogCallback(
         _In_ int64_t span)
@@ -137,7 +109,18 @@ int syncd_main(int argc, char **argv)
 
     /////////////////
 
-    g_processor = std::make_shared<NotificationProcessor>(std::bind(&Syncd::syncProcessNotification, g_syncd.get(), _1));
+    SWSS_LOG_NOTICE("command line: %s", commandLineOptions->getCommandLineString().c_str());
+
+    // we need STATE_DB ASIC_DB and COUNTERS_DB
+
+    dbAsic = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
+    std::shared_ptr<swss::DBConnector> dbNtf = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
+
+    WarmRestartTable warmRestartTable("STATE_DB");
+
+    g_syncd->m_client = std::make_shared<RedisClient>(dbAsic);
+
+    g_processor = std::make_shared<NotificationProcessor>(g_syncd->m_client, std::bind(&Syncd::syncProcessNotification, g_syncd.get(), _1));
     g_handler = std::make_shared<NotificationHandler>(g_processor);
 
     SwitchNotifications sn;
@@ -149,17 +132,6 @@ int syncd_main(int argc, char **argv)
     sn.onSwitchStateChange = std::bind(&NotificationHandler::onSwitchStateChange, g_handler.get(), _1, _2);
 
     g_handler->setSwitchNotifications(sn.getSwitchNotifications());
-
-    SWSS_LOG_NOTICE("command line: %s", commandLineOptions->getCommandLineString().c_str());
-
-    // we need STATE_DB ASIC_DB and COUNTERS_DB
-
-    dbAsic = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
-    std::shared_ptr<swss::DBConnector> dbNtf = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
-
-    WarmRestartTable warmRestartTable("STATE_DB");
-
-    g_client = std::make_shared<RedisClient>(dbAsic);
 
     std::shared_ptr<swss::ConsumerTable> asicState = std::make_shared<swss::ConsumerTable>(dbAsic.get(), ASIC_STATE_TABLE);
     std::shared_ptr<swss::NotificationConsumer> restartQuery = std::make_shared<swss::NotificationConsumer>(dbAsic.get(), SYNCD_NOTIFICATION_CHANNEL_RESTARTQUERY);
@@ -179,7 +151,7 @@ int syncd_main(int argc, char **argv)
                 redisVidIndexGenerator);
 
     // TODO move to syncd object
-    g_syncd->m_translator = std::make_shared<VirtualOidTranslator>(virtualObjectIdManager,  vendorSai);
+    g_syncd->m_translator = std::make_shared<VirtualOidTranslator>(g_syncd->m_client, virtualObjectIdManager,  vendorSai);
 
     g_processor->m_translator = g_syncd->m_translator; // TODO as param
 
@@ -195,7 +167,7 @@ int syncd_main(int argc, char **argv)
     std::string fdbFlushLuaScript = swss::loadLuaScript("fdb_flush.lua");
     fdbFlushSha = swss::loadRedisScript(dbAsic.get(), fdbFlushLuaScript);
 
-    g_syncd->m_veryFirstRun = isVeryFirstRun();
+    g_syncd->m_veryFirstRun = g_syncd->isVeryFirstRun();
 
     g_syncd->performStartupLogic();
 

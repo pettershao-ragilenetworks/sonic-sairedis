@@ -14,11 +14,10 @@
 using namespace syncd;
 using namespace saimeta;
 
-extern std::shared_ptr<RedisClient> g_client;
-
 extern std::shared_ptr<NotificationHandler> g_handler;
 
 SingleReiniter::SingleReiniter(
+        _In_ std::shared_ptr<RedisClient> client,
         _In_ std::shared_ptr<VirtualOidTranslator> translator,
         _In_ std::shared_ptr<sairedis::SaiInterface> sai,
         _In_ const ObjectIdMap& vidToRidMap,
@@ -28,7 +27,8 @@ SingleReiniter::SingleReiniter(
     m_vidToRidMap(vidToRidMap),
     m_ridToVidMap(ridToVidMap),
     m_asicKeys(asicKeys),
-    m_translator(translator)
+    m_translator(translator),
+    m_client(client)
 {
     SWSS_LOG_ENTER();
 
@@ -315,7 +315,7 @@ void SingleReiniter::processSwitches()
          * object, so when doing discover we will get full default ASIC view.
          */
 
-        m_sw = std::make_shared<SaiSwitch>(m_switch_vid, m_switch_rid, m_translator, m_vendorSai);
+        m_sw = std::make_shared<SaiSwitch>(m_switch_vid, m_switch_rid, m_client, m_translator, m_vendorSai);
 
         /*
          * We processed switch. We have switch vid/rid so we can process all
@@ -1085,7 +1085,7 @@ void SingleReiniter::postRemoveActions()
                 SWSS_LOG_INFO("removing existing cold VID: %s",
                         sai_serialize_object_id(vid).c_str());
 
-                g_client->removeColdVid(vid);
+                m_client->removeColdVid(vid);
             }
         }
     }
@@ -1100,7 +1100,7 @@ std::shared_ptr<SaiAttributeList> SingleReiniter::redisGetAttributesFromAsicKey(
 
     std::vector<swss::FieldValueTuple> values;
 
-    auto hash = g_client->getAttributesFromAsicKey(key);
+    auto hash = m_client->getAttributesFromAsicKey(key);
 
     for (auto &kv: hash)
     {

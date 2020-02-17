@@ -6,6 +6,7 @@ extern "C" {
 
 #include "SaiInterface.h"
 #include "VirtualOidTranslator.h"
+#include "RedisClient.h"
 
 #include <set>
 #include <string>
@@ -28,6 +29,7 @@ namespace syncd
             SaiSwitch(
                     _In_ sai_object_id_t switch_vid,
                     _In_ sai_object_id_t switch_rid,
+                    _In_ std::shared_ptr<RedisClient> client,
                     _In_ std::shared_ptr<VirtualOidTranslator> translator,
                     _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,
                     _In_ bool warmBoot = false);
@@ -386,5 +388,7 @@ namespace syncd
             std::map<sai_object_id_t, std::set<sai_object_id_t>> m_portRelatedObjects;
 
             std::shared_ptr<VirtualOidTranslator> m_translator;
+
+            std::shared_ptr<RedisClient> m_client;
     };
 }

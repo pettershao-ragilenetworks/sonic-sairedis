@@ -11,13 +11,13 @@
 
 using namespace syncd;
 
-extern std::shared_ptr<RedisClient> g_client;
-
 HardReiniter::HardReiniter(
+        _In_ std::shared_ptr<RedisClient> client,
         _In_ std::shared_ptr<VirtualOidTranslator> translator,
         _In_ std::shared_ptr<sairedis::SaiInterface> sai):
     m_vendorSai(sai),
-    m_translator(translator)
+    m_translator(translator),
+    m_client(client)
 {
     SWSS_LOG_ENTER();
 
@@ -39,8 +39,8 @@ void HardReiniter::readAsicState()
 
     // Repopulate asic view from redis db after hard asic initialize.
 
-    m_vidToRidMap = g_client->getVidToRidMap();
-    m_ridToVidMap = g_client->getRidToVidMap();
+    m_vidToRidMap = m_client->getVidToRidMap();
+    m_ridToVidMap = m_client->getRidToVidMap();
 
     for (auto& v2r: m_vidToRidMap)
     {
@@ -56,7 +56,7 @@ void HardReiniter::readAsicState()
         m_switchRidToVid[switchId][r2v.first] = r2v.second;
     }
 
-    auto asicStateKeys = g_client->getAsicStateKeys();
+    auto asicStateKeys = m_client->getAsicStateKeys();
 
     for (const auto &key: asicStateKeys)
     {
@@ -93,6 +93,7 @@ std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> HardReiniter::hardR
     for (auto& kvp: m_switchMap)
     {
         auto sr = std::make_shared<SingleReiniter>(
+                m_client,
                 m_translator,
                 m_vendorSai,
                 m_switchVidToRid.at(kvp.first),
@@ -140,7 +141,7 @@ std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> HardReiniter::hardR
      * This needs to be addressed when we want to support multiple switches.
      */
 
-    g_client->setVidAndRidMap(vid2rid);
+    m_client->setVidAndRidMap(vid2rid);
 
     std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> switches;
 
