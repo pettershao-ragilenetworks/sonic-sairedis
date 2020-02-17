@@ -134,6 +134,12 @@ namespace syncd
                     _In_ const std::string& attr,
                     _In_ const std::string& value);
 
+            void processFlushEvent(
+                    _In_ sai_object_id_t switchVid,
+                    _In_ sai_object_id_t portVid,
+                    _In_ sai_object_id_t bvId,
+                    _In_ sai_fdb_flush_entry_type_t type);
+
         private:
 
             std::map<sai_object_id_t, swss::TableDump> getAsicView(
@@ -156,5 +162,8 @@ namespace syncd
             std::shared_ptr<swss::RedisClient> m_redisClient;
 
             std::shared_ptr<swss::DBConnector> m_dbAsic;
+
+            std::string m_fdbFlushSha;
+
     };
 }

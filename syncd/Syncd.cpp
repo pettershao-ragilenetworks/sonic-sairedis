@@ -21,8 +21,6 @@
 
 #define DEF_SAI_WARM_BOOT_DATA_FILE "/var/warmboot/sai-warmboot.bin"
 
-#include "syncd.h" // TODO to be removed
-
 extern std::shared_ptr<syncd::NotificationHandler> g_handler;
 extern std::shared_ptr<syncd::NotificationProcessor> g_processor;
 extern std::shared_ptr<swss::NotificationProducer>  notifications;

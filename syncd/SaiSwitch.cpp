@@ -8,8 +8,6 @@
 #include "meta/sai_serialize.h"
 #include "swss/logger.h"
 
-#include "syncd.h" // TODO to be removed
-
 using namespace syncd;
 
 #define MAX_OBJLIST_LEN 128

@@ -6,6 +6,7 @@
 #include "meta/sai_serialize.h"
 
 #include "swss/logger.h"
+#include "swss/redisapi.h"
 
 using namespace syncd;
 
@@ -22,7 +23,10 @@ RedisClient::RedisClient(
     SWSS_LOG_ENTER();
 
     m_redisClient = std::make_shared<swss::RedisClient>(dbAsic.get());
-    // empty
+
+    std::string fdbFlushLuaScript = swss::loadLuaScript("fdb_flush.lua"); // TODO script must be updated to version 2
+
+    m_fdbFlushSha = swss::loadRedisScript(dbAsic.get(), fdbFlushLuaScript);
 }
 
 RedisClient::~RedisClient()
@@ -730,3 +734,47 @@ std::map<sai_object_id_t, swss::TableDump> RedisClient::getAsicView(
 }
 
 
+void RedisClient::processFlushEvent(
+        _In_ sai_object_id_t switchVid,
+        _In_ sai_object_id_t portVid,
+        _In_ sai_object_id_t bvId,
+        _In_ sai_fdb_flush_entry_type_t type)
+{
+    SWSS_LOG_ENTER();
+
+    // TODO this must be per switch if we will have multiple switches, needs to be filtered by switch ID also
+
+    /*
+       [{ "fdb_entry":"{ \"bridge_id\":\"oid:0x23000000000000\", \"mac\":\"00:00:00:00:00:00\", \"switch_id\":\"oid:0x21000000000000\"}", "fdb_event":"SAI_FDB_EVENT_FLUSHED", "list":[
+       {"id":"SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID","value":"oid:0x3a0000000009cf"},
+       {"id":"SAI_FDB_ENTRY_ATTR_TYPE","value":"SAI_FDB_ENTRY_TYPE_DYNAMIC"},
+       {"id":"SAI_FDB_ENTRY_ATTR_PACKET_ACTION","value":"SAI_PACKET_ACTION_FORWARD"} ] }]
+    */
+
+    SWSS_LOG_NOTICE("received a flush port fdb event, portVid = %s, bvId = %s",
+            sai_serialize_object_id(portVid).c_str(),
+            sai_serialize_object_id(bvId).c_str());
+
+    // TODO script must be updated to version 2
+
+    std::string pattern = (bvId == SAI_NULL_OBJECT_ID)
+        ? (ASIC_STATE_TABLE ":SAI_OBJECT_TYPE_FDB_ENTRY:*")
+        : (ASIC_STATE_TABLE ":SAI_OBJECT_TYPE_FDB_ENTRY:*" + sai_serialize_object_id(bvId) + "*");
+
+    std::string portStr = (portVid == SAI_NULL_OBJECT_ID) ? "" : sai_serialize_object_id(portVid);
+
+    SWSS_LOG_NOTICE("pattern %s, portStr %s", pattern.c_str(), portStr.c_str());
+
+    swss::RedisCommand command;
+
+    int flush_static = (type == SAI_FDB_FLUSH_ENTRY_TYPE_STATIC) ? 1 : 0;
+
+    command.format(
+            "EVALSHA %s 3 %s %s %s",
+            m_fdbFlushSha.c_str(),
+            pattern.c_str(),
+            portStr.c_str(),
+            std::to_string(flush_static).c_str());
+
+    swss::RedisReply r(m_dbAsic.get(), command);
+}

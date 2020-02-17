@@ -1,7 +1,7 @@
 #include "NotificationProcessor.h"
 #include "RedisClient.h"
 
-#include "sairediscommon.h" // TODO to be removed
+#include "sairediscommon.h"
 
 #include "meta/sai_serialize.h"
 #include "meta/SaiAttributeList.h"
@@ -9,16 +9,12 @@
 #include "swss/logger.h"
 #include "swss/notificationproducer.h"
 
-#include "syncd.h" // TODO to be removed
-
 #include <inttypes.h>
 
 using namespace syncd;
 using namespace saimeta;
 
 extern std::shared_ptr<swss::NotificationProducer>  notifications;
-extern std::shared_ptr<swss::DBConnector>   dbAsic;
-extern std::string fdbFlushSha;
 
 NotificationProcessor::NotificationProcessor(
         _In_ std::shared_ptr<RedisClient> client,
@@ -100,46 +96,6 @@ sai_fdb_entry_type_t NotificationProcessor::getFdbEntryType(
     return (sai_fdb_entry_type_t)ret;
 }
 
-void NotificationProcessor::processFlushEvent( // TODO move to RedisClient
-        _In_ sai_object_id_t portOid,
-        _In_ sai_object_id_t bvId,
-        _In_ int flush_static)
-{
-    SWSS_LOG_ENTER();
-
-    // TODO this must be per switch if we will have multiple switches, needs to be filtered by switch ID also
-
-    /*
-       [{ "fdb_entry":"{ \"bridge_id\":\"oid:0x23000000000000\", \"mac\":\"00:00:00:00:00:00\", \"switch_id\":\"oid:0x21000000000000\"}", "fdb_event":"SAI_FDB_EVENT_FLUSHED", "list":[
-       {"id":"SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID","value":"oid:0x3a0000000009cf"},
-       {"id":"SAI_FDB_ENTRY_ATTR_TYPE","value":"SAI_FDB_ENTRY_TYPE_DYNAMIC"},
-       {"id":"SAI_FDB_ENTRY_ATTR_PACKET_ACTION","value":"SAI_PACKET_ACTION_FORWARD"} ] }]
-    */
-
-    SWSS_LOG_NOTICE("received a flush port fdb event, portOid = %s, bvId = %s",
-            sai_serialize_object_id(portOid).c_str(),
-            sai_serialize_object_id(bvId).c_str());
-
-    std::string pattern = (bvId == SAI_NULL_OBJECT_ID)
-        ? (ASIC_STATE_TABLE ":SAI_OBJECT_TYPE_FDB_ENTRY:*")
-        : (ASIC_STATE_TABLE ":SAI_OBJECT_TYPE_FDB_ENTRY:*" + sai_serialize_object_id(bvId) + "*");
-
-    std::string portStr = (portOid == SAI_NULL_OBJECT_ID) ? "" : sai_serialize_object_id(portOid);
-
-    SWSS_LOG_NOTICE("pattern %s, portStr %s", pattern.c_str(), portStr.c_str());
-
-    swss::RedisCommand command;
-
-    command.format(
-            "EVALSHA %s 3 %s %s %s",
-            fdbFlushSha.c_str(),
-            pattern.c_str(),
-            portStr.c_str(),
-            std::to_string(flush_static).c_str());
-
-    swss::RedisReply r(dbAsic.get(), command);
-}
-
 void NotificationProcessor::redisPutFdbEntryToAsicView(
         _In_ const sai_fdb_event_notification_data_t *fdb)
 {
@@ -183,7 +139,8 @@ void NotificationProcessor::redisPutFdbEntryToAsicView(
     {
         sai_object_id_t bv_id = fdb->fdb_entry.bv_id;
         sai_object_id_t port_oid = 0;
-        int flush_static = 0;
+
+        sai_fdb_flush_entry_type_t type = SAI_FDB_FLUSH_ENTRY_TYPE_ALL;
 
         for (uint32_t i = 0; i < fdb->attr_count; i++)
         {
@@ -191,13 +148,15 @@ void NotificationProcessor::redisPutFdbEntryToAsicView(
             {
                 port_oid = fdb->attr[i].value.oid;
             }
-            else if(fdb->attr[i].id == SAI_FDB_ENTRY_ATTR_TYPE)
+            else if (fdb->attr[i].id == SAI_FDB_ENTRY_ATTR_TYPE)
             {
-                flush_static = (fdb->attr[i].value.s32 == SAI_FDB_ENTRY_TYPE_STATIC) ? 1 : 0;
+                type = (fdb->attr[i].value.s32 == SAI_FDB_ENTRY_TYPE_STATIC)
+                    ? SAI_FDB_FLUSH_ENTRY_TYPE_STATIC
+                    : SAI_FDB_FLUSH_ENTRY_TYPE_DYNAMIC;
             }
         }
 
-        processFlushEvent(port_oid, bv_id, flush_static);
+        m_client->processFlushEvent(fdb->fdb_entry.switch_id, port_oid, bv_id, type);
         return;
     }
 

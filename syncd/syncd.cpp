@@ -1,4 +1,3 @@
-#include "syncd.h"
 #include "sairediscommon.h"
 
 #include "TimerWatchdog.h"
@@ -21,7 +20,6 @@
 #include "swss/notificationconsumer.h"
 #include "swss/select.h"
 #include "swss/warm_restart.h"
-#include "swss/redisapi.h"
 
 #include <inttypes.h>
 
@@ -31,8 +29,6 @@
 
 using namespace syncd;
 using namespace std::placeholders;
-
-std::string fdbFlushSha;
 
 /*
  * Make sure that notification queue pointer is populated before we start
@@ -164,9 +160,6 @@ int syncd_main(int argc, char **argv)
 
     g_syncd->m_getResponse  = std::make_shared<swss::ProducerTable>(dbAsic.get(), REDIS_TABLE_GETRESPONSE);
     notifications = std::make_shared<swss::NotificationProducer>(dbNtf.get(), REDIS_TABLE_NOTIFICATIONS);
-
-    std::string fdbFlushLuaScript = swss::loadLuaScript("fdb_flush.lua");
-    fdbFlushSha = swss::loadRedisScript(dbAsic.get(), fdbFlushLuaScript);
 
     g_syncd->m_veryFirstRun = g_syncd->isVeryFirstRun();
 
