@@ -6,7 +6,7 @@
 #include "HardReiniter.h"
 #include "RedisClient.h"
 
-#include "lib/inc/sairediscommon.h"
+#include "sairediscommon.h"
 
 #include "swss/logger.h"
 #include "swss/tokenize.h"
@@ -23,7 +23,7 @@
 
 extern std::shared_ptr<syncd::NotificationHandler> g_handler;
 extern std::shared_ptr<syncd::NotificationProcessor> g_processor;
-extern std::shared_ptr<swss::NotificationProducer>  notifications;
+extern std::shared_ptr<swss::NotificationProducer>  g_notifications;
 
 using namespace syncd;
 using namespace saimeta;
@@ -2932,7 +2932,13 @@ void Syncd::sendShutdownRequest(
 
     // TODO use g_handler->onSwitchShutdownRequest(switchVid); (but this should be per switch)
 
-    notifications->send(SAI_SWITCH_NOTIFICATION_NAME_SWITCH_SHUTDOWN_REQUEST, s, entry);
+    if (g_notifications == nullptr)
+    {
+        SWSS_LOG_WARN("notifications pointer is NULL");
+        return;
+    }
+
+    g_notifications->send(SAI_SWITCH_NOTIFICATION_NAME_SWITCH_SHUTDOWN_REQUEST, s, entry);
 }
 
 void Syncd::sendShutdownRequestAfterException()
@@ -2940,12 +2946,6 @@ void Syncd::sendShutdownRequestAfterException()
     SWSS_LOG_ENTER();
 
     std::lock_guard<std::mutex> lock(m_mutex);
-
-    if (notifications == nullptr)
-    {
-        SWSS_LOG_WARN("notifications pointer is NULL");
-        return;
-    }
 
     try
     {

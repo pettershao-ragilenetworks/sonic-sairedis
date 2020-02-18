@@ -3,8 +3,6 @@
 #include "SingleReiniter.h"
 #include "RedisClient.h"
 
-#include "sairediscommon.h"
-
 #include "swss/logger.h"
 
 #include "meta/sai_serialize.h"

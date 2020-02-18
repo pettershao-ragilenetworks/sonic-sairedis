@@ -39,9 +39,7 @@ using namespace std::placeholders;
 
 std::shared_ptr<NotificationProcessor> g_processor;// = std::make_shared<NotificationProcessor>();
 std::shared_ptr<NotificationHandler> g_handler; // = std::make_shared<NotificationHandler>(g_processor);
-
-std::shared_ptr<swss::DBConnector>          dbAsic;
-std::shared_ptr<swss::NotificationProducer> notifications;
+std::shared_ptr<swss::NotificationProducer> g_notifications;
 
 // TODO we must be sure that all threads and notifications will be stopped
 // before destructor will be called on those objects
@@ -110,7 +108,7 @@ int syncd_main(int argc, char **argv)
 
     // we need STATE_DB ASIC_DB and COUNTERS_DB
 
-    dbAsic = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
+    auto dbAsic = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
     std::shared_ptr<swss::DBConnector> dbNtf = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
 
     WarmRestartTable warmRestartTable("STATE_DB");
@@ -159,7 +157,7 @@ int syncd_main(int argc, char **argv)
      */
 
     g_syncd->m_getResponse  = std::make_shared<swss::ProducerTable>(dbAsic.get(), REDIS_TABLE_GETRESPONSE);
-    notifications = std::make_shared<swss::NotificationProducer>(dbNtf.get(), REDIS_TABLE_NOTIFICATIONS);
+    g_notifications = std::make_shared<swss::NotificationProducer>(dbNtf.get(), REDIS_TABLE_NOTIFICATIONS);
 
     g_syncd->m_veryFirstRun = g_syncd->isVeryFirstRun();
 
