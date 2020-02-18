@@ -21,7 +21,6 @@
 
 #define DEF_SAI_WARM_BOOT_DATA_FILE "/var/warmboot/sai-warmboot.bin"
 
-extern std::shared_ptr<syncd::NotificationProcessor> g_processor;
 extern std::shared_ptr<swss::NotificationProducer>  g_notifications;
 
 using namespace syncd;
@@ -3165,7 +3164,7 @@ void Syncd::syncProcessNotification(
 
     SWSS_LOG_ENTER();
 
-    g_processor->syncProcessNotification(item);
+    m_processor->syncProcessNotification(item);
 }
 
 bool Syncd::isVeryFirstRun()

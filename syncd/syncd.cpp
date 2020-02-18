@@ -37,7 +37,6 @@ using namespace std::placeholders;
  * will call getQueueSize() when queue pointer could be null (this=0x0).
  */
 
-std::shared_ptr<NotificationProcessor> g_processor;// = std::make_shared<NotificationProcessor>();
 std::shared_ptr<swss::NotificationProducer> g_notifications;
 
 // TODO we must be sure that all threads and notifications will be stopped
@@ -113,8 +112,8 @@ int syncd_main(int argc, char **argv)
 
     g_syncd->m_client = std::make_shared<RedisClient>(dbAsic);
 
-    g_processor = std::make_shared<NotificationProcessor>(g_syncd->m_client, std::bind(&Syncd::syncProcessNotification, g_syncd.get(), _1));
-    g_syncd->m_handler = std::make_shared<NotificationHandler>(g_processor);
+    g_syncd->m_processor = std::make_shared<NotificationProcessor>(g_syncd->m_client, std::bind(&Syncd::syncProcessNotification, g_syncd.get(), _1));
+    g_syncd->m_handler = std::make_shared<NotificationHandler>(g_syncd->m_processor);
 
     SwitchNotifications sn;
 
@@ -146,7 +145,7 @@ int syncd_main(int argc, char **argv)
     // TODO move to syncd object
     g_syncd->m_translator = std::make_shared<VirtualOidTranslator>(g_syncd->m_client, virtualObjectIdManager,  vendorSai);
 
-    g_processor->m_translator = g_syncd->m_translator; // TODO as param
+    g_syncd->m_processor->m_translator = g_syncd->m_translator; // TODO as param
 
     /*
      * At the end we cant use producer consumer concept since if one process
@@ -204,7 +203,7 @@ int syncd_main(int argc, char **argv)
         // make sure, we have switch_id translated to VID before we start
         // processing possible quick fdb notifications, and pointer for
         // notification queue is created before we create switch
-        g_processor->startNotificationsProcessingThread();
+        g_syncd->m_processor->startNotificationsProcessingThread();
 
         SWSS_LOG_NOTICE("syncd listening for events");
 
@@ -401,7 +400,7 @@ int syncd_main(int argc, char **argv)
     status = g_syncd->removeAllSwitches();
 
     // Stop notification thread after removing switch
-    g_processor->stopNotificationsProcessingThread();
+    g_syncd->m_processor->stopNotificationsProcessingThread();
 
     if (shutdownType == SYNCD_RESTART_TYPE_WARM)
     {

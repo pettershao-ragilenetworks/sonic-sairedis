@@ -8,6 +8,7 @@
 #include "VirtualOidTranslator.h"
 #include "RedisClient.h"
 #include "NotificationHandler.h"
+#include "NotificationProcessor.h"
 
 #include "meta/SaiAttributeList.h"
 
@@ -360,6 +361,8 @@ namespace syncd
             std::shared_ptr<RedisClient> m_client;
 
             std::shared_ptr<NotificationHandler> m_handler;
+
+            std::shared_ptr<syncd::NotificationProcessor> m_processor;
 
         private:
 
