@@ -38,7 +38,6 @@ using namespace std::placeholders;
  */
 
 std::shared_ptr<NotificationProcessor> g_processor;// = std::make_shared<NotificationProcessor>();
-std::shared_ptr<NotificationHandler> g_handler; // = std::make_shared<NotificationHandler>(g_processor);
 std::shared_ptr<swss::NotificationProducer> g_notifications;
 
 // TODO we must be sure that all threads and notifications will be stopped
@@ -109,24 +108,23 @@ int syncd_main(int argc, char **argv)
     // we need STATE_DB ASIC_DB and COUNTERS_DB
 
     auto dbAsic = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
-    std::shared_ptr<swss::DBConnector> dbNtf = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
 
-    WarmRestartTable warmRestartTable("STATE_DB");
+    std::shared_ptr<swss::DBConnector> dbNtf = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
 
     g_syncd->m_client = std::make_shared<RedisClient>(dbAsic);
 
     g_processor = std::make_shared<NotificationProcessor>(g_syncd->m_client, std::bind(&Syncd::syncProcessNotification, g_syncd.get(), _1));
-    g_handler = std::make_shared<NotificationHandler>(g_processor);
+    g_syncd->m_handler = std::make_shared<NotificationHandler>(g_processor);
 
     SwitchNotifications sn;
 
-    sn.onFdbEvent = std::bind(&NotificationHandler::onFdbEvent, g_handler.get(), _1, _2);
-    sn.onPortStateChange = std::bind(&NotificationHandler::onPortStateChange, g_handler.get(), _1, _2);
-    sn.onQueuePfcDeadlock = std::bind(&NotificationHandler::onQueuePfcDeadlock, g_handler.get(), _1, _2);
-    sn.onSwitchShutdownRequest = std::bind(&NotificationHandler::onSwitchShutdownRequest, g_handler.get(), _1);
-    sn.onSwitchStateChange = std::bind(&NotificationHandler::onSwitchStateChange, g_handler.get(), _1, _2);
+    sn.onFdbEvent = std::bind(&NotificationHandler::onFdbEvent, g_syncd->m_handler.get(), _1, _2);
+    sn.onPortStateChange = std::bind(&NotificationHandler::onPortStateChange, g_syncd->m_handler.get(), _1, _2);
+    sn.onQueuePfcDeadlock = std::bind(&NotificationHandler::onQueuePfcDeadlock, g_syncd->m_handler.get(), _1, _2);
+    sn.onSwitchShutdownRequest = std::bind(&NotificationHandler::onSwitchShutdownRequest, g_syncd->m_handler.get(), _1);
+    sn.onSwitchStateChange = std::bind(&NotificationHandler::onSwitchStateChange, g_syncd->m_handler.get(), _1, _2);
 
-    g_handler->setSwitchNotifications(sn.getSwitchNotifications());
+    g_syncd->m_handler->setSwitchNotifications(sn.getSwitchNotifications());
 
     std::shared_ptr<swss::ConsumerTable> asicState = std::make_shared<swss::ConsumerTable>(dbAsic.get(), ASIC_STATE_TABLE);
     std::shared_ptr<swss::NotificationConsumer> restartQuery = std::make_shared<swss::NotificationConsumer>(dbAsic.get(), SYNCD_NOTIFICATION_CHANNEL_RESTARTQUERY);
@@ -169,6 +167,8 @@ int syncd_main(int argc, char **argv)
     smt.profileGetNextValue = std::bind(&Syncd::profileGetNextValue, g_syncd.get(), _1, _2, _3);
 
     auto test_services = smt.getServiceMethodTable();
+
+    WarmRestartTable warmRestartTable("STATE_DB");
 
     // TODO need per api test service method table static template
     sai_status_t status = vendorSai->initialize(0, &test_services);

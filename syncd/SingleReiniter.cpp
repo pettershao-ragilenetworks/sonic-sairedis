@@ -14,12 +14,11 @@
 using namespace syncd;
 using namespace saimeta;
 
-extern std::shared_ptr<NotificationHandler> g_handler;
-
 SingleReiniter::SingleReiniter(
         _In_ std::shared_ptr<RedisClient> client,
         _In_ std::shared_ptr<VirtualOidTranslator> translator,
         _In_ std::shared_ptr<sairedis::SaiInterface> sai,
+        _In_ std::shared_ptr<NotificationHandler> handler,
         _In_ const ObjectIdMap& vidToRidMap,
         _In_ const ObjectIdMap& ridToVidMap,
         _In_ const std::vector<std::string>& asicKeys):
@@ -28,7 +27,8 @@ SingleReiniter::SingleReiniter(
     m_ridToVidMap(ridToVidMap),
     m_asicKeys(asicKeys),
     m_translator(translator),
-    m_client(client)
+    m_client(client),
+    m_handler(handler)
 {
     SWSS_LOG_ENTER();
 
@@ -233,7 +233,7 @@ void SingleReiniter::processSwitches()
          * point to callbacks in syncd memory.
          */
 
-        g_handler->updateNotificationsPointers(attrCount, attrList); // TODO need per switch template static
+        m_handler->updateNotificationsPointers(attrCount, attrList); // TODO need per switch template static
 
         /*
          * Now we need to select only attributes MANDATORY_ON_CREATE and

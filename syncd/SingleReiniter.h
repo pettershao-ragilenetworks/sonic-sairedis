@@ -3,6 +3,7 @@
 #include "SaiSwitch.h"
 #include "VirtualOidTranslator.h"
 #include "RedisClient.h"
+#include "NotificationHandler.h"
 
 #include "lib/inc/SaiInterface.h"
 
@@ -29,6 +30,7 @@ namespace syncd
                     _In_ std::shared_ptr<RedisClient> client,
                     _In_ std::shared_ptr<VirtualOidTranslator> translator,
                     _In_ std::shared_ptr<sairedis::SaiInterface> sai,
+                    _In_ std::shared_ptr<NotificationHandler> handler,
                     _In_ const ObjectIdMap& vidToRidMap,
                     _In_ const ObjectIdMap& ridToVidMap,
                     _In_ const std::vector<std::string>& asicKeys);
@@ -130,5 +132,7 @@ namespace syncd
             std::shared_ptr<VirtualOidTranslator> m_translator;
 
             std::shared_ptr<RedisClient> m_client;
+
+            std::shared_ptr<NotificationHandler> m_handler;
     };
 }

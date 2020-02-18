@@ -21,7 +21,6 @@
 
 #define DEF_SAI_WARM_BOOT_DATA_FILE "/var/warmboot/sai-warmboot.bin"
 
-extern std::shared_ptr<syncd::NotificationHandler> g_handler;
 extern std::shared_ptr<syncd::NotificationProcessor> g_processor;
 extern std::shared_ptr<swss::NotificationProducer>  g_notifications;
 
@@ -1203,7 +1202,7 @@ sai_status_t Syncd::processQuadEvent(
          * TODO: must be done per switch, and switch may not exists yet
          */
 
-        g_handler->updateNotificationsPointers(attr_count, attr_list);
+        m_handler->updateNotificationsPointers(attr_count, attr_list);
     }
 
     if (isInitViewMode())
@@ -2321,7 +2320,7 @@ sai_status_t Syncd::applyView()
             auto current = std::make_shared<AsicView>(currentMap.at(switchVid));
             auto temp = std::make_shared<AsicView>(temporaryMap.at(switchVid));
 
-            auto cl = std::make_shared<ComparisonLogic>(m_vendorSai, sw, m_initViewRemovedVidSet, current, temp);
+            auto cl = std::make_shared<ComparisonLogic>(m_vendorSai, sw, m_handler, m_initViewRemovedVidSet, current, temp);
 
             cl->compareViews();
 
@@ -2547,7 +2546,7 @@ void Syncd::onSyncdStart(
         SWSS_LOG_THROW("performing hard reinit, but there are %zu switches defined, bug!", m_switches.size());
     }
 
-    HardReiniter hr(m_client, m_translator, m_vendorSai);
+    HardReiniter hr(m_client, m_translator, m_vendorSai, m_handler);
 
     m_switches = hr.hardReinit();
 
@@ -2812,7 +2811,7 @@ void Syncd::performWarmRestartSingleSwitch(
     }
 
     // TODO support multiple notification handlers
-    g_handler->updateNotificationsPointers((uint32_t)attrs.size(), attrs.data());
+    m_handler->updateNotificationsPointers((uint32_t)attrs.size(), attrs.data());
 
     sai_status_t status;
 
@@ -2930,7 +2929,7 @@ void Syncd::sendShutdownRequest(
 
     std::vector<swss::FieldValueTuple> entry;
 
-    // TODO use g_handler->onSwitchShutdownRequest(switchVid); (but this should be per switch)
+    // TODO use m_handler->onSwitchShutdownRequest(switchVid); (but this should be per switch)
 
     if (g_notifications == nullptr)
     {

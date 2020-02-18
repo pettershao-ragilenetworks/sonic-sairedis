@@ -16,8 +16,6 @@
 using namespace syncd;
 using namespace saimeta;
 
-extern std::shared_ptr<NotificationHandler> g_handler;
-
 /*
  * NOTE: All methods taking current and temporary view could be moved to
  * transition class etc to just use class members instead of passing those
@@ -27,6 +25,7 @@ extern std::shared_ptr<NotificationHandler> g_handler;
 ComparisonLogic::ComparisonLogic(
         _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,
         _In_ std::shared_ptr<SaiSwitch> sw,
+        _In_ std::shared_ptr<NotificationHandler> handler,
         _In_ std::set<sai_object_id_t> initViewRemovedVids,
         _In_ std::shared_ptr<AsicView> current,
         _In_ std::shared_ptr<AsicView> temp):
@@ -34,7 +33,8 @@ ComparisonLogic::ComparisonLogic(
     m_switch(sw),
     m_initViewRemovedVids(initViewRemovedVids),
     m_current(current),
-    m_temp(temp)
+    m_temp(temp),
+    m_handler(handler)
 {
     SWSS_LOG_ENTER();
 
@@ -3155,7 +3155,7 @@ sai_status_t ComparisonLogic::asic_process_event(
     if (object_type == SAI_OBJECT_TYPE_SWITCH)
     {
         // only because user could change notifications he wanted to subscribe
-        g_handler->updateNotificationsPointers(attr_count, attr_list);
+        m_handler->updateNotificationsPointers(attr_count, attr_list);
     }
 
     if (info->isnonobjectid)

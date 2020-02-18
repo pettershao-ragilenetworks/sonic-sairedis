@@ -12,10 +12,12 @@ using namespace syncd;
 HardReiniter::HardReiniter(
         _In_ std::shared_ptr<RedisClient> client,
         _In_ std::shared_ptr<VirtualOidTranslator> translator,
-        _In_ std::shared_ptr<sairedis::SaiInterface> sai):
+        _In_ std::shared_ptr<sairedis::SaiInterface> sai,
+        _In_ std::shared_ptr<NotificationHandler> handler):
     m_vendorSai(sai),
     m_translator(translator),
-    m_client(client)
+    m_client(client),
+    m_handler(handler)
 {
     SWSS_LOG_ENTER();
 
@@ -94,6 +96,7 @@ std::map<sai_object_id_t, std::shared_ptr<syncd::SaiSwitch>> HardReiniter::hardR
                 m_client,
                 m_translator,
                 m_vendorSai,
+                m_handler,
                 m_switchVidToRid.at(kvp.first),
                 m_switchRidToVid.at(kvp.first),
                 kvp.second);
