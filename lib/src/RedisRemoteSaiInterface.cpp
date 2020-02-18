@@ -100,9 +100,11 @@ sai_status_t RedisRemoteSaiInterface::uninitialize(void)
         return SAI_STATUS_FAILURE;
     }
 
-    clear_local_state();
-
     m_redisChannel = nullptr; // will stop thread
+
+    // clear local state after stopping threads
+
+    clear_local_state();
 
     m_initialized = false;
 
