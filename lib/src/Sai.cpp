@@ -97,6 +97,8 @@ sai_status_t Sai::uninitialize(void)
     SWSS_LOG_ENTER();
     REDIS_CHECK_API_INITIALIZED();
 
+    SWSS_LOG_NOTICE("begin");
+
     m_redisSai->uninitialize(); // will stop threads
 
     m_redisSai = nullptr;
@@ -106,6 +108,8 @@ sai_status_t Sai::uninitialize(void)
     m_recorder = nullptr;
 
     m_apiInitialized = false;
+
+    SWSS_LOG_NOTICE("end");
 
     return SAI_STATUS_SUCCESS;
 }

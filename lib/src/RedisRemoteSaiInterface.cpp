@@ -91,6 +91,8 @@ sai_status_t RedisRemoteSaiInterface::uninitialize(void)
 {
     SWSS_LOG_ENTER();
 
+    SWSS_LOG_NOTICE("begin");
+
     if (!m_initialized)
     {
         SWSS_LOG_ERROR("not initialized");
@@ -103,6 +105,8 @@ sai_status_t RedisRemoteSaiInterface::uninitialize(void)
     m_redisChannel = nullptr; // will stop thread
 
     m_initialized = false;
+
+    SWSS_LOG_NOTICE("end");
 
     return SAI_STATUS_SUCCESS;
 }
