@@ -173,6 +173,8 @@ sai_status_t Sai::uninitialize(void)
     SWSS_LOG_ENTER();
     VS_CHECK_API_INITIALIZED();
 
+    SWSS_LOG_NOTICE("begin");
+
     // no mutex on uninitialized to prevent deadlock
     // if some thread would try to gram api mutex
     // so threads must be stopped first
@@ -198,6 +200,8 @@ sai_status_t Sai::uninitialize(void)
     m_meta = nullptr;
 
     m_apiInitialized = false;
+
+    SWSS_LOG_NOTICE("end");
 
     return SAI_STATUS_SUCCESS;
 }
