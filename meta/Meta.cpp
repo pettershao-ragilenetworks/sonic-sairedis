@@ -77,6 +77,8 @@ void Meta::meta_init_db()
 {
     SWSS_LOG_ENTER();
 
+    SWSS_LOG_NOTICE("begin");
+
     /*
      * This DB will contain objects from all switches.
      *
@@ -94,6 +96,8 @@ void Meta::meta_init_db()
     // m_unittestsEnabled = false
 
     m_warmBoot = false;
+
+    SWSS_LOG_NOTICE("end");
 }
 
 bool Meta::isEmpty()
