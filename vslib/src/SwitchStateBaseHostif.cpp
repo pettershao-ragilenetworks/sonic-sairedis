@@ -32,7 +32,7 @@ using namespace saivs;
 
 #define ETH_FRAME_BUFFER_SIZE (0x4000)
 
-#define MAX_INTERFACE_NAME_LEN IFNAMSIZ
+#define MAX_INTERFACE_NAME_LEN (IFNAMSIZ-1)
 
 #define SAI_VS_VETH_PREFIX   "v"
 
@@ -59,7 +59,7 @@ int SwitchStateBase::vs_create_tap_device(
 
     ifr.ifr_flags = (short int)flags;  // IFF_TUN or IFF_TAP, IFF_NO_PI
 
-    strncpy(ifr.ifr_name, dev, IFNAMSIZ);
+    strncpy(ifr.ifr_name, dev, MAX_INTERFACE_NAME_LEN);
 
     int err = ioctl(fd, TUNSETIFF, (void *) &ifr);
 
@@ -92,7 +92,7 @@ int SwitchStateBase::vs_set_dev_mac_address(
 
     struct ifreq ifr;
 
-    strncpy(ifr.ifr_name, dev, IFNAMSIZ);
+    strncpy(ifr.ifr_name, dev, MAX_INTERFACE_NAME_LEN);
 
     memcpy(ifr.ifr_hwaddr.sa_data, mac, 6);
 
@@ -241,7 +241,7 @@ int SwitchStateBase::ifup(
 
     memset(&ifr, 0, sizeof ifr);
 
-    strncpy(ifr.ifr_name, dev , IFNAMSIZ);
+    strncpy(ifr.ifr_name, dev , MAX_INTERFACE_NAME_LEN);
 
     int err = ioctl(s, SIOCGIFFLAGS, &ifr);
 
@@ -308,7 +308,7 @@ int SwitchStateBase::promisc(
 
     memset(&ifr, 0, sizeof ifr);
 
-    strncpy(ifr.ifr_name, dev , IFNAMSIZ);
+    strncpy(ifr.ifr_name, dev , MAX_INTERFACE_NAME_LEN);
 
     int err = ioctl(s, SIOCGIFFLAGS, &ifr);
 
@@ -352,7 +352,7 @@ int SwitchStateBase::vs_set_dev_mtu(
 
     struct ifreq ifr;
 
-    strncpy(ifr.ifr_name, name, IFNAMSIZ);
+    strncpy(ifr.ifr_name, name, MAX_INTERFACE_NAME_LEN);
 
     ifr.ifr_mtu = mtu;
 
