@@ -420,9 +420,10 @@ namespace syncd
             std::shared_ptr<swss::ConsumerTable> m_flexCounter;
             std::shared_ptr<swss::ConsumerTable> m_flexCounterGroup;
 
+            std::shared_ptr<swss::NotificationProducer> m_notifications;
+
             std::shared_ptr<sairedis::SwitchConfigContainer> m_switchConfigContainer;
             std::shared_ptr<sairedis::RedisVidIndexGenerator> m_redisVidIndexGenerator;
             std::shared_ptr<sairedis::VirtualObjectIdManager> m_virtualObjectIdManager;
-
     };
 }

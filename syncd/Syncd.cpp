@@ -24,8 +24,6 @@
 
 #define DEF_SAI_WARM_BOOT_DATA_FILE "/var/warmboot/sai-warmboot.bin"
 
-std::shared_ptr<swss::NotificationProducer> g_notifications;
-
 using namespace syncd;
 using namespace saimeta;
 using namespace std::placeholders;
@@ -59,9 +57,11 @@ Syncd::Syncd(
 
     m_dbNtf = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
 
+    m_notifications = std::make_shared<swss::NotificationProducer>(m_dbNtf.get(), REDIS_TABLE_NOTIFICATIONS);
+
     m_client = std::make_shared<RedisClient>(m_dbAsic);
 
-    m_processor = std::make_shared<NotificationProcessor>(m_client, std::bind(&Syncd::syncProcessNotification, this, _1));
+    m_processor = std::make_shared<NotificationProcessor>(m_notifications, m_client, std::bind(&Syncd::syncProcessNotification, this, _1));
     m_handler = std::make_shared<NotificationHandler>(m_processor);
 
     m_sn.onFdbEvent = std::bind(&NotificationHandler::onFdbEvent, m_handler.get(), _1, _2);
@@ -101,7 +101,6 @@ Syncd::Syncd(
      */
 
     m_getResponse  = std::make_shared<swss::ProducerTable>(m_dbAsic.get(), REDIS_TABLE_GETRESPONSE);
-    g_notifications = std::make_shared<swss::NotificationProducer>(m_dbNtf.get(), REDIS_TABLE_NOTIFICATIONS);
 
     m_veryFirstRun = isVeryFirstRun();
 
@@ -3006,13 +3005,13 @@ void Syncd::sendShutdownRequest(
 
     // TODO use m_handler->onSwitchShutdownRequest(switchVid); (but this should be per switch)
 
-    if (g_notifications == nullptr)
+    if (m_notifications == nullptr)
     {
         SWSS_LOG_WARN("notifications pointer is NULL");
         return;
     }
 
-    g_notifications->send(SAI_SWITCH_NOTIFICATION_NAME_SWITCH_SHUTDOWN_REQUEST, s, entry);
+    m_notifications->send(SAI_SWITCH_NOTIFICATION_NAME_SWITCH_SHUTDOWN_REQUEST, s, entry);
 }
 
 void Syncd::sendShutdownRequestAfterException()

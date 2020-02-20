@@ -14,13 +14,13 @@
 using namespace syncd;
 using namespace saimeta;
 
-extern std::shared_ptr<swss::NotificationProducer>  g_notifications;
-
 NotificationProcessor::NotificationProcessor(
+        _In_ std::shared_ptr<swss::NotificationProducer> producer,
         _In_ std::shared_ptr<RedisClient> client,
         _In_ std::function<void(const swss::KeyOpFieldsValuesTuple&)> synchronizer):
     m_synchronizer(synchronizer),
-    m_client(client)
+    m_client(client),
+    m_notifications(producer)
 {
     SWSS_LOG_ENTER();
 
@@ -45,7 +45,7 @@ void NotificationProcessor::sendNotification(
 
     SWSS_LOG_INFO("%s %s", op.c_str(), data.c_str());
 
-    g_notifications->send(op, data, entry);
+    m_notifications->send(op, data, entry);
 
     SWSS_LOG_DEBUG("notification send successfull");
 }
