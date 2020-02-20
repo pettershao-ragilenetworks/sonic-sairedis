@@ -5,10 +5,13 @@
 #include "ComparisonLogic.h"
 #include "HardReiniter.h"
 #include "RedisClient.h"
+#include "RequestShutdown.h"
+#include "WarmRestartTable.h"
 
 #include "sairediscommon.h"
 
 #include "swss/logger.h"
+#include "swss/select.h"
 #include "swss/tokenize.h"
 #include "swss/notificationproducer.h"
 
@@ -21,7 +24,7 @@
 
 #define DEF_SAI_WARM_BOOT_DATA_FILE "/var/warmboot/sai-warmboot.bin"
 
-extern std::shared_ptr<swss::NotificationProducer>  g_notifications;
+std::shared_ptr<swss::NotificationProducer> g_notifications;
 
 using namespace syncd;
 using namespace saimeta;
@@ -47,6 +50,79 @@ Syncd::Syncd(
     m_profileIter = m_profileMap.begin();
 
     loadProfileMap();
+
+    SWSS_LOG_NOTICE("command line: %s", m_commandLineOptions->getCommandLineString().c_str());
+
+    // we need STATE_DB ASIC_DB and COUNTERS_DB
+
+    m_dbAsic = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
+
+    m_dbNtf = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
+
+    m_client = std::make_shared<RedisClient>(m_dbAsic);
+
+    m_processor = std::make_shared<NotificationProcessor>(m_client, std::bind(&Syncd::syncProcessNotification, this, _1));
+    m_handler = std::make_shared<NotificationHandler>(m_processor);
+
+    m_sn.onFdbEvent = std::bind(&NotificationHandler::onFdbEvent, m_handler.get(), _1, _2);
+    m_sn.onPortStateChange = std::bind(&NotificationHandler::onPortStateChange, m_handler.get(), _1, _2);
+    m_sn.onQueuePfcDeadlock = std::bind(&NotificationHandler::onQueuePfcDeadlock, m_handler.get(), _1, _2);
+    m_sn.onSwitchShutdownRequest = std::bind(&NotificationHandler::onSwitchShutdownRequest, m_handler.get(), _1);
+    m_sn.onSwitchStateChange = std::bind(&NotificationHandler::onSwitchStateChange, m_handler.get(), _1, _2);
+
+    m_handler->setSwitchNotifications(m_sn.getSwitchNotifications());
+
+    m_asicState = std::make_shared<swss::ConsumerTable>(m_dbAsic.get(), ASIC_STATE_TABLE);
+    m_restartQuery = std::make_shared<swss::NotificationConsumer>(m_dbAsic.get(), SYNCD_NOTIFICATION_CHANNEL_RESTARTQUERY);
+
+    // TODO to be moved to ASIC_DB
+    m_dbFlexCounter = std::make_shared<swss::DBConnector>("FLEX_COUNTER_DB", 0);
+    m_flexCounter = std::make_shared<swss::ConsumerTable>(m_dbFlexCounter.get(), FLEX_COUNTER_TABLE);
+    m_flexCounterGroup = std::make_shared<swss::ConsumerTable>(m_dbFlexCounter.get(), FLEX_COUNTER_GROUP_TABLE);
+
+    m_switchConfigContainer = std::make_shared<sairedis::SwitchConfigContainer>();
+    m_redisVidIndexGenerator = std::make_shared<sairedis::RedisVidIndexGenerator>(m_dbAsic, REDIS_KEY_VIDCOUNTER);
+
+    m_virtualObjectIdManager =
+        std::make_shared<sairedis::VirtualObjectIdManager>(
+                0, // TODO global context, get from command line
+                m_switchConfigContainer,
+                m_redisVidIndexGenerator);
+
+    // TODO move to syncd object
+    m_translator = std::make_shared<VirtualOidTranslator>(m_client, m_virtualObjectIdManager,  vendorSai);
+
+    m_processor->m_translator = m_translator; // TODO as param
+
+    /*
+     * At the end we cant use producer consumer concept since if one process
+     * will restart there may be something in the queue also "remove" from
+     * response queue will also trigger another "response".
+     */
+
+    m_getResponse  = std::make_shared<swss::ProducerTable>(m_dbAsic.get(), REDIS_TABLE_GETRESPONSE);
+    g_notifications = std::make_shared<swss::NotificationProducer>(m_dbNtf.get(), REDIS_TABLE_NOTIFICATIONS);
+
+    m_veryFirstRun = isVeryFirstRun();
+
+    performStartupLogic();
+
+    m_smt.profileGetValue = std::bind(&Syncd::profileGetValue, this, _1, _2);
+    m_smt.profileGetNextValue = std::bind(&Syncd::profileGetNextValue, this, _1, _2, _3);
+
+    m_test_services = m_smt.getServiceMethodTable();
+
+    sai_status_t status = vendorSai->initialize(0, &m_test_services);
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_ERROR("FATAL: failed to sai_api_initialize: %s",
+                sai_serialize_status(status).c_str());
+
+        abort();
+    }
+
+    SWSS_LOG_NOTICE("syncd started");
 }
 
 Syncd::~Syncd()
@@ -3191,3 +3267,246 @@ bool Syncd::isVeryFirstRun()
 
     return firstRun;
 }
+
+void Syncd::run()
+{
+    SWSS_LOG_ENTER();
+
+    WarmRestartTable warmRestartTable("STATE_DB"); // TODO from config
+
+    syncd_restart_type_t shutdownType = SYNCD_RESTART_TYPE_COLD;
+
+    volatile bool runMainLoop = true;
+
+    std::shared_ptr<swss::Select> s = std::make_shared<swss::Select>();
+
+    try
+    {
+        onSyncdStart(m_commandLineOptions->m_startType == SAI_START_TYPE_WARM_BOOT);
+
+        // create notifications processing thread after we create_switch to
+        // make sure, we have switch_id translated to VID before we start
+        // processing possible quick fdb notifications, and pointer for
+        // notification queue is created before we create switch
+        m_processor->startNotificationsProcessingThread();
+
+        SWSS_LOG_NOTICE("syncd listening for events");
+
+        s->addSelectable(m_asicState.get());
+        s->addSelectable(m_restartQuery.get());
+        s->addSelectable(m_flexCounter.get());
+        s->addSelectable(m_flexCounterGroup.get());
+
+        SWSS_LOG_NOTICE("starting main loop");
+    }
+    catch(const std::exception &e)
+    {
+        SWSS_LOG_ERROR("Runtime error during syncd init: %s", e.what());
+
+        sendShutdownRequestAfterException();
+
+        s = std::make_shared<swss::Select>();
+
+        s->addSelectable(m_restartQuery.get());
+
+        SWSS_LOG_NOTICE("starting main loop, ONLY restart query");
+
+        if (m_commandLineOptions->m_disableExitSleep)
+            runMainLoop = false;
+    }
+
+    while(runMainLoop)
+    {
+        try
+        {
+            swss::Selectable *sel = NULL;
+
+            int result = s->select(&sel);
+
+            if (sel == m_restartQuery.get())
+            {
+                /*
+                 * This is actual a bad design, since selectable may pick up
+                 * multiple events from the queue, and after restart those
+                 * events will be forgotten since they were consumed already and
+                 * this may lead to forget populate object table which will
+                 * lead to unable to find some objects.
+                 */
+
+                SWSS_LOG_NOTICE("is asic queue empty: %d", m_asicState->empty());
+
+                while (!m_asicState->empty())
+                {
+                    processEvent(*m_asicState.get());
+                }
+
+                SWSS_LOG_NOTICE("drained queue");
+
+                shutdownType = handleRestartQuery(*m_restartQuery);
+
+                if (shutdownType != SYNCD_RESTART_TYPE_PRE_SHUTDOWN)
+                {
+                    // break out the event handling loop to shutdown syncd
+                    runMainLoop = false;
+                    break;
+                }
+
+                // Handle switch pre-shutdown and wait for the final shutdown
+                // event
+
+                SWSS_LOG_TIMER("warm pre-shutdown");
+
+                m_manager->removeAllCounters();
+
+                sai_status_t status = setRestartWarmOnAllSwitches(true);
+
+                if (status != SAI_STATUS_SUCCESS)
+                {
+                    SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_RESTART_WARM=true: %s for pre-shutdown",
+                            sai_serialize_status(status).c_str());
+
+                    shutdownType = SYNCD_RESTART_TYPE_COLD;
+
+                    warmRestartTable.setFlagFailed();
+                    continue;
+                }
+
+                status = setPreShutdownOnAllSwitches();
+
+                if (status == SAI_STATUS_SUCCESS)
+                {
+                    warmRestartTable.setPreShutdown(true);
+
+                    s = std::make_shared<swss::Select>(); // make sure previous select is destroyed
+
+                    s->addSelectable(m_restartQuery.get());
+
+                    SWSS_LOG_NOTICE("switched to PRE_SHUTDOWN, from now on accepting only shurdown requests");
+                }
+                else
+                {
+                    SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_PRE_SHUTDOWN=true: %s",
+                            sai_serialize_status(status).c_str());
+
+                    warmRestartTable.setPreShutdown(false);
+
+                    // Restore cold shutdown.
+
+                    setRestartWarmOnAllSwitches(false);
+                }
+            }
+            else if (sel == m_flexCounter.get())
+            {
+                processFlexCounterEvent(*(swss::ConsumerTable*)sel);
+            }
+            else if (sel == m_flexCounterGroup.get())
+            {
+                processFlexCounterGroupEvent(*(swss::ConsumerTable*)sel);
+            }
+            else if (sel == m_asicState.get())
+            {
+                processEvent(*(swss::ConsumerTable*)sel);
+            }
+            else
+            {
+                SWSS_LOG_ERROR("select failed: %d", result);
+            }
+        }
+        catch(const std::exception &e)
+        {
+            SWSS_LOG_ERROR("Runtime error: %s", e.what());
+
+            sendShutdownRequestAfterException();
+
+            s = std::make_shared<swss::Select>();
+
+            s->addSelectable(m_restartQuery.get());
+
+            if (m_commandLineOptions->m_disableExitSleep)
+                runMainLoop = false;
+
+            // make sure that if second exception will arise, then we break the loop
+            m_commandLineOptions->m_disableExitSleep = true;
+        }
+    }
+
+    if (shutdownType == SYNCD_RESTART_TYPE_WARM)
+    {
+        const char *warmBootWriteFile = profileGetValue(0, SAI_KEY_WARM_BOOT_WRITE_FILE);
+
+        SWSS_LOG_NOTICE("using warmBootWriteFile: '%s'", warmBootWriteFile);
+
+        if (warmBootWriteFile == NULL)
+        {
+            SWSS_LOG_WARN("user requested warm shutdown but warmBootWriteFile is not specified, forcing cold shutdown");
+
+            shutdownType = SYNCD_RESTART_TYPE_COLD;
+            warmRestartTable.setWarmShutdown(false);
+        }
+        else
+        {
+            SWSS_LOG_NOTICE("Warm Reboot requested, keeping data plane running");
+
+            sai_status_t status = setRestartWarmOnAllSwitches(true);
+
+            if (status != SAI_STATUS_SUCCESS)
+            {
+                SWSS_LOG_ERROR("Failed to set SAI_SWITCH_ATTR_RESTART_WARM=true: %s, fall back to cold restart",
+                        sai_serialize_status(status).c_str());
+
+                shutdownType = SYNCD_RESTART_TYPE_COLD;
+
+                warmRestartTable.setFlagFailed();
+            }
+        }
+    }
+
+#ifdef SAI_SUPPORT_UNINIT_DATA_PLANE_ON_REMOVAL
+
+    if (shutdownType == SYNCD_RESTART_TYPE_FAST || shutdownType == SYNCD_RESTART_TYPE_WARM)
+    {
+        setUninitDataPlaneOnRemovalOnAllSwitches();
+    }
+
+#endif
+
+    m_manager->removeAllCounters();
+
+    sai_status_t status = removeAllSwitches();
+
+    // Stop notification thread after removing switch
+    m_processor->stopNotificationsProcessingThread();
+
+    if (shutdownType == SYNCD_RESTART_TYPE_WARM)
+    {
+        warmRestartTable.setWarmShutdown(status == SAI_STATUS_SUCCESS);
+    }
+
+    SWSS_LOG_NOTICE("calling api uninitialize");
+
+    status = m_vendorSai->uninitialize();
+
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_ERROR("failed to uninitialize api: %s", sai_serialize_status(status).c_str());
+    }
+
+    SWSS_LOG_NOTICE("uninitialize finished");
+}
+
+syncd_restart_type_t Syncd::handleRestartQuery(
+        _In_ swss::NotificationConsumer &restartQuery)
+{
+    SWSS_LOG_ENTER();
+
+    std::string op;
+    std::string data;
+    std::vector<swss::FieldValueTuple> values;
+
+    restartQuery.pop(op, data, values);
+
+    SWSS_LOG_NOTICE("received %s switch shutdown event", op.c_str());
+
+    return RequestShutdownCommandLineOptions::stringToRestartType(op);
+}
+

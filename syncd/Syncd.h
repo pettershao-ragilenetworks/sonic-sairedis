@@ -9,11 +9,16 @@
 #include "RedisClient.h"
 #include "NotificationHandler.h"
 #include "NotificationProcessor.h"
+#include "SwitchNotifications.h"
+#include "ServiceMethodTable.h"
+#include "RedisVidIndexGenerator.h"
+#include "RequestShutdown.h"
 
 #include "meta/SaiAttributeList.h"
 
 #include "swss/consumertable.h"
 #include "swss/producertable.h"
+#include "swss/notificationconsumer.h"
 
 #include <memory>
 
@@ -48,6 +53,8 @@ namespace syncd
 
             void onSyncdStart(
                     _In_ bool warmStart);
+
+            void run();
 
         public: // TODO private
 
@@ -246,6 +253,9 @@ namespace syncd
             void diagShellThreadProc(
                     _In_ sai_object_id_t switchRid);
 
+            syncd_restart_type_t handleRestartQuery(
+                    _In_ swss::NotificationConsumer &restartQuery);
+
         private:
 
             /**
@@ -305,6 +315,12 @@ namespace syncd
             bool m_isWarmStart;
 
             bool m_firstInitWasPerformed;
+
+            SwitchNotifications m_sn;
+
+            ServiceMethodTable m_smt;
+
+            sai_service_method_table_t m_test_services;
 
         public: // TODO to private
 
@@ -391,5 +407,22 @@ namespace syncd
              * * getting flex counter - here we skip using mutex
              */
             std::mutex m_mutex;
+
+            std::shared_ptr<swss::DBConnector> m_dbAsic;
+
+            std::shared_ptr<swss::DBConnector> m_dbNtf;
+
+            std::shared_ptr<swss::ConsumerTable> m_asicState;
+
+            std::shared_ptr<swss::NotificationConsumer> m_restartQuery;
+
+            std::shared_ptr<swss::DBConnector> m_dbFlexCounter;
+            std::shared_ptr<swss::ConsumerTable> m_flexCounter;
+            std::shared_ptr<swss::ConsumerTable> m_flexCounterGroup;
+
+            std::shared_ptr<sairedis::SwitchConfigContainer> m_switchConfigContainer;
+            std::shared_ptr<sairedis::RedisVidIndexGenerator> m_redisVidIndexGenerator;
+            std::shared_ptr<sairedis::VirtualObjectIdManager> m_virtualObjectIdManager;
+
     };
 }
