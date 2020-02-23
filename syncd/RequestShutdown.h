@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RequestShutdownCommandLineOptions.h"
+#include "ContextConfig.h"
 
 #include "swss/sal.h"
 
@@ -26,5 +27,7 @@ namespace syncd
         private:
 
             std::shared_ptr<RequestShutdownCommandLineOptions> m_options;
+
+            std::shared_ptr<sairedis::ContextConfig> m_contextConfig;
     };
 }

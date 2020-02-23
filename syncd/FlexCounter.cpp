@@ -16,10 +16,12 @@ using namespace syncd;
 
 FlexCounter::FlexCounter(
         _In_ const std::string& instanceId,
-        _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai):
+        _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,
+        _In_ const std::string& dbCounters):
     m_pollInterval(0),
     m_instanceId(instanceId),
-    m_vendorSai(vendorSai)
+    m_vendorSai(vendorSai),
+    m_dbCounters(dbCounters)
 {
     SWSS_LOG_ENTER();
 
@@ -1518,7 +1520,7 @@ void FlexCounter::flexCounterThreadRunFunction()
 {
     SWSS_LOG_ENTER();
 
-    swss::DBConnector db("COUNTERS_DB", 0);
+    swss::DBConnector db(m_dbCounters, 0);
     swss::RedisPipeline pipeline(&db);
     swss::Table countersTable(&pipeline, COUNTERS_TABLE, true);
 

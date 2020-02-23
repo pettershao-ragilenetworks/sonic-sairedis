@@ -40,6 +40,8 @@ libsyncd_a_SOURCES = \
 				../lib/src/SwitchConfigContainer.cpp \
 				../lib/src/VirtualObjectIdManager.cpp \
 				../lib/src/RedisVidIndexGenerator.cpp \
+				../lib/src/ContextConfig.cpp \
+				../lib/src/ContextConfigContainer.cpp \
 				VidManager.cpp \
 				VidManager.cpp \
 				AsicOperation.cpp \
@@ -77,6 +79,10 @@ syncd_request_shutdown_SOURCES = \
 								 RequestShutdown.cpp \
 								 RequestShutdownCommandLineOptions.cpp \
 								 RequestShutdownCommandLineOptionsParser.cpp \
+								 ../lib/src/SwitchConfig.cpp \
+								 ../lib/src/SwitchConfigContainer.cpp \
+								 ../lib/src/ContextConfig.cpp \
+								 ../lib/src/ContextConfigContainer.cpp \
 								 syncd_request_shutdown.cpp
 
 syncd_request_shutdown_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON)

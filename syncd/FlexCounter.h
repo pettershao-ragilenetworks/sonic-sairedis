@@ -26,7 +26,8 @@ namespace syncd
 
             FlexCounter(
                     _In_ const std::string& instanceId,
-                    _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai);
+                    _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,
+                    _In_ const std::string& dbCounters);
 
             virtual ~FlexCounter();
 
@@ -398,5 +399,7 @@ namespace syncd
             collect_counters_handler_unordered_map_t m_collectCountersHandlers;
 
             std::shared_ptr<sairedis::SaiInterface> m_vendorSai;
+
+            std::string m_dbCounters;
     };
 }

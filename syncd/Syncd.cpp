@@ -7,6 +7,7 @@
 #include "RedisClient.h"
 #include "RequestShutdown.h"
 #include "WarmRestartTable.h"
+#include "ContextConfigContainer.h"
 
 #include "sairediscommon.h"
 
@@ -43,19 +44,28 @@ Syncd::Syncd(
 
     setSaiApiLogLevel();
 
-    m_manager = std::make_shared<FlexCounterManager>(m_vendorSai);
+    SWSS_LOG_NOTICE("command line: %s", m_commandLineOptions->getCommandLineString().c_str());
+
+    auto ccc = sairedis::ContextConfigContainer::loadFromFile(m_commandLineOptions->m_contextConfig.c_str());
+
+    m_contextConfig = ccc->get(m_commandLineOptions->m_globalContext);
+
+    if (m_contextConfig == nullptr)
+    {
+        SWSS_LOG_THROW("no context config defined at global context %u", m_commandLineOptions->m_globalContext);
+    }
+
+    m_manager = std::make_shared<FlexCounterManager>(m_vendorSai, m_contextConfig->m_dbCounters);
 
     m_profileIter = m_profileMap.begin();
 
     loadProfileMap();
 
-    SWSS_LOG_NOTICE("command line: %s", m_commandLineOptions->getCommandLineString().c_str());
-
     // we need STATE_DB ASIC_DB and COUNTERS_DB
 
-    m_dbAsic = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
+    m_dbAsic = std::make_shared<swss::DBConnector>(m_contextConfig->m_dbAsic, 0);
 
-    m_dbNtf = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
+    m_dbNtf = std::make_shared<swss::DBConnector>(m_contextConfig->m_dbAsic, 0);
 
     m_notifications = std::make_shared<swss::NotificationProducer>(m_dbNtf.get(), REDIS_TABLE_NOTIFICATIONS);
 
@@ -76,7 +86,7 @@ Syncd::Syncd(
     m_restartQuery = std::make_shared<swss::NotificationConsumer>(m_dbAsic.get(), SYNCD_NOTIFICATION_CHANNEL_RESTARTQUERY);
 
     // TODO to be moved to ASIC_DB
-    m_dbFlexCounter = std::make_shared<swss::DBConnector>("FLEX_COUNTER_DB", 0);
+    m_dbFlexCounter = std::make_shared<swss::DBConnector>(m_contextConfig->m_dbFlex, 0);
     m_flexCounter = std::make_shared<swss::ConsumerTable>(m_dbFlexCounter.get(), FLEX_COUNTER_TABLE);
     m_flexCounterGroup = std::make_shared<swss::ConsumerTable>(m_dbFlexCounter.get(), FLEX_COUNTER_GROUP_TABLE);
 

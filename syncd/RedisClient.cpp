@@ -701,9 +701,7 @@ std::map<sai_object_id_t, swss::TableDump> RedisClient::getAsicView(
 
     SWSS_LOG_TIMER("get asic view from %s", tableName.c_str());
 
-    swss::DBConnector db("ASIC_DB", 0);
-
-    swss::Table table(&db, tableName);
+    swss::Table table(m_dbAsic.get(), tableName);
 
     swss::TableDump dump;
 

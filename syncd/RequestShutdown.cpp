@@ -1,4 +1,5 @@
 #include "RequestShutdown.h"
+#include "ContextConfigContainer.h"
 
 #include "swss/logger.h"
 #include "swss/notificationproducer.h"
@@ -13,7 +14,14 @@ RequestShutdown::RequestShutdown(
 {
     SWSS_LOG_ENTER();
 
-    // empty
+    auto ccc = sairedis::ContextConfigContainer::loadFromFile(m_options->m_contextConfig.c_str());
+
+    m_contextConfig = ccc->get(m_options->m_globalContext);
+
+    if (m_contextConfig == nullptr)
+    {
+        SWSS_LOG_THROW("no context config defined at global context %u", m_options->m_globalContext);
+    }
 }
 
 RequestShutdown::~RequestShutdown()
@@ -27,9 +35,8 @@ void RequestShutdown::send()
 {
     SWSS_LOG_ENTER();
 
-    // TODO with multiple syncd will need to load config and global context flag
+    swss::DBConnector db(m_contextConfig->m_dbAsic, 0);
 
-    swss::DBConnector db("ASIC_DB", 0);
     swss::NotificationProducer restartQuery(&db, SYNCD_NOTIFICATION_CHANNEL_RESTARTQUERY);
 
     std::vector<swss::FieldValueTuple> values;

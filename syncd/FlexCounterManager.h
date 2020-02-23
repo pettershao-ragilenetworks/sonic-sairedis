@@ -9,7 +9,8 @@ namespace syncd
         public:
 
             FlexCounterManager(
-                    _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai);
+                    _In_ std::shared_ptr<sairedis::SaiInterface> vendorSai,
+                    _In_ const std::string& dbCounters);
 
             virtual ~FlexCounterManager() = default;
 
@@ -47,6 +48,8 @@ namespace syncd
                 std::mutex m_mutex;
 
                 std::shared_ptr<sairedis::SaiInterface> m_vendorSai;
+
+                std::string m_dbCounters;
     };
 }
 
