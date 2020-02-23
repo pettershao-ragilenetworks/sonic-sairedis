@@ -1,5 +1,7 @@
 #pragma once
 
+#include "swss/sal.h"
+
 #include <string>
 #include <memory>
 
@@ -10,6 +12,10 @@ namespace sairedis
         public:
 
             SwitchConfig();
+
+            SwitchConfig(
+                    _In_ uint32_t switchIndex,
+                    _In_ const std::string& hwinfo);
 
             virtual ~SwitchConfig() = default;
 
