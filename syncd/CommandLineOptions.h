@@ -72,6 +72,10 @@ namespace syncd
 
             std::string m_profileMapFile;
 
+            uint32_t m_globalContext;
+
+            std::string m_contextConfig;
+
 #ifdef SAITHRIFT
             bool m_runRPCServer;
             std::string m_portMapFile;

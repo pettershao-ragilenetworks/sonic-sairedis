@@ -23,6 +23,10 @@ CommandLineOptions::CommandLineOptions()
 
     m_profileMapFile = "";
 
+    m_globalContext = 0;
+
+    m_contextConfig = "";
+
 #ifdef SAITHRIFT
 
     m_runRPCServer = false;
@@ -47,6 +51,8 @@ std::string CommandLineOptions::getCommandLineString() const
     ss << " EnableSyncMode=" << (m_enableSyncMode ? "YES" : "NO");
     ss << " StartType=" << startTypeToString(m_startType);
     ss << " ProfileMapFile=" << m_profileMapFile;
+    ss << " GlobalContext=" << m_globalContext;
+    ss << " ContextConfig=" << m_contextConfig;
 
 #ifdef SAITHRIFT
 
