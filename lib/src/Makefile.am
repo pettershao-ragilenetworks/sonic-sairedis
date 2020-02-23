@@ -9,6 +9,8 @@ endif
 lib_LTLIBRARIES = libsairedis.la
 
 libsairedis_la_SOURCES = \
+						 ContextConfigContainer.cpp \
+						 ContextConfig.cpp \
 						 SaiInterface.cpp \
 						 SwitchConfig.cpp \
 						 SwitchConfigContainer.cpp \
@@ -83,7 +85,7 @@ bin_PROGRAMS = tests
 
 tests_SOURCES = tests.cpp
 tests_CPPFLAGS = $(DBGFLAGS) $(AM_CPPFLAGS) $(CFLAGS_COMMON)
-tests_LDADD = -lhiredis -lswsscommon -lpthread $(top_srcdir)/meta/libsaimetadata.la $(top_srcdir)/meta/libsaimeta.la
+tests_LDADD = -lhiredis -lswsscommon -lpthread $(top_srcdir)/meta/libsaimetadata.la $(top_srcdir)/meta/libsaimeta.la libsairedis.la
 
 TESTS = tests
 

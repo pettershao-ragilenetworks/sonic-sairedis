@@ -2,6 +2,8 @@ extern "C" {
 #include "saimetadata.h"
 }
 
+#include "ContextConfigContainer.h"
+
 #include "swss/logger.h"
 #include "swss/table.h"
 
@@ -15,6 +17,7 @@ extern "C" {
 #include <vector>
 
 using namespace saimeta;
+using namespace sairedis;
 
 sai_object_type_t sai_object_type_query(
         _In_ sai_object_id_t objectId)
@@ -654,9 +657,20 @@ void test_serialize_bulk_create_oid(int n, int per)
     std::cout << "ms: " << (double)us.count()/1000.0 / n << " n " << n << " / per " << per << std::endl;
 }
 
+void test_ContextConfigContainer()
+{
+    SWSS_LOG_ENTER();
+
+    auto ccc = ContextConfigContainer::loadFromFile("context_config.json");
+}
+
 int main()
 {
     SWSS_LOG_ENTER();
+
+    std::cout << " * test ContextConfigContainer" << std::endl;
+
+    test_ContextConfigContainer();
 
     std::cout << " * test remove" << std::endl;
 
