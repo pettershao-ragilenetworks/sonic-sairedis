@@ -42,5 +42,11 @@ namespace syncd
         private:
 
             syncd_restart_type_t m_restartType;
+
+        public:
+
+            uint32_t m_globalContext;
+
+            std::string m_contextConfig;
     };
 }

@@ -9,7 +9,7 @@ RequestShutdownCommandLineOptions::RequestShutdownCommandLineOptions():
 {
     SWSS_LOG_ENTER();
 
-    // empty
+    m_globalContext = 0;
 }
 
 RequestShutdownCommandLineOptions::~RequestShutdownCommandLineOptions()
