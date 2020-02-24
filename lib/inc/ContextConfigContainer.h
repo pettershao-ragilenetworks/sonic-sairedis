@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <map>
+#include <set>
 
 namespace sairedis
 {
@@ -24,6 +25,8 @@ namespace sairedis
 
             std::shared_ptr<ContextConfig> get(
                     _In_ uint32_t guid);
+
+            std::set<std::shared_ptr<ContextConfig>> getAllContextConfigs();
 
         public:
 

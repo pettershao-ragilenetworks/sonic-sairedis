@@ -137,3 +137,17 @@ std::shared_ptr<ContextConfigContainer> ContextConfigContainer::loadFromFile(
 
     return ccc;
 }
+
+std::set<std::shared_ptr<ContextConfig>> ContextConfigContainer::getAllContextConfigs()
+{
+    SWSS_LOG_ENTER();
+
+    std::set<std::shared_ptr<ContextConfig>> set;
+
+    for (auto&item: m_map)
+    {
+        set.insert(item.second);
+    }
+
+    return set;
+}
