@@ -1,6 +1,7 @@
 #include "Sai.h"
 #include "SaiInternal.h"
 #include "SwitchConfigContainer.h"
+#include "ContextConfigContainer.h"
 
 #include "meta/Meta.h"
 #include "meta/sai_serialize.h"
@@ -8,10 +9,20 @@
 // TODO - simplify recorder
 
 using namespace sairedis;
+using namespace std::placeholders;
 
 #define REDIS_CHECK_API_INITIALIZED()                                       \
     if (!m_apiInitialized) {                                                \
         SWSS_LOG_ERROR("%s: api not initialized", __PRETTY_FUNCTION__);     \
+        return SAI_STATUS_FAILURE; }
+
+#define REDIS_CHECK_CONTEXT(oid)                                            \
+    auto _globalContext = VirtualObjectIdManager::getGlobalContext(oid);    \
+    auto context = getContext(_globalContext);                              \
+    if (context == nullptr) {                                               \
+        SWSS_LOG_ERROR("no context at index %u for oid %s",                 \
+                _globalContext,                                             \
+                sai_serialize_object_id(oid).c_str());                      \
         return SAI_STATUS_FAILURE; }
 
 Sai::Sai()
@@ -65,27 +76,18 @@ sai_status_t Sai::initialize(
 
     memcpy(&m_service_method_table, service_method_table, sizeof(m_service_method_table));
 
-    auto sc = std::make_shared<SwitchConfig>();
-
-    sc->m_switchIndex = 0;
-    sc->m_hardwareInfo = "";
-
-    auto scc = std::make_shared<SwitchConfigContainer>();
-
-    scc->insert(sc);
-
     m_recorder = std::make_shared<Recorder>();
 
-    // will create notification thread
-    m_redisSai = std::make_shared<RedisRemoteSaiInterface>(
-            0, // global context (later syncd config with db and switches config)
-            scc,
-            std::bind(&Sai::handle_notification, this, std::placeholders::_1),
-            m_recorder);
+    const char* contextConfig = service_method_table->profile_get_value(0, SAI_REDIS_KEY_CONTEXT_CONFIG);
 
-    m_meta = std::make_shared<saimeta::Meta>(m_redisSai);
+    auto ccc = ContextConfigContainer::loadFromFile(contextConfig);
 
-    m_redisSai->setMeta(m_meta);
+    for (auto&cc: ccc->getAllContextConfigs())
+    {
+        auto context = std::make_shared<Context>(cc, m_recorder, std::bind(&Sai::handle_notification, this, _1, _2));
+
+        m_contextMap[cc->m_guid] = context;
+    }
 
     m_apiInitialized = true;
 
@@ -99,11 +101,7 @@ sai_status_t Sai::uninitialize(void)
 
     SWSS_LOG_NOTICE("begin");
 
-    m_redisSai->uninitialize(); // will stop threads
-
-    m_redisSai = nullptr;
-
-    m_meta = nullptr;
+    m_contextMap.clear();
 
     m_recorder = nullptr;
 
@@ -127,7 +125,30 @@ sai_status_t Sai::create(
     SWSS_LOG_ENTER();
     REDIS_CHECK_API_INITIALIZED();
 
-    return m_meta->create(
+    REDIS_CHECK_CONTEXT(switchId);
+
+    if (objectType == SAI_OBJECT_TYPE_SWITCH && attr_count > 0 && attr_list)
+    {
+        uint32_t globalContext = 0; // default
+
+        if (attr_list[attr_count - 1].id == SAI_REDIS_SWITCH_ATTR_CONTEXT)
+        {
+            globalContext = attr_list[--attr_count].value.u32;
+        }
+
+        SWSS_LOG_NOTICE("request switch create with context %u", globalContext);
+
+        context = getContext(globalContext);
+
+        if (context == nullptr)
+        {
+            SWSS_LOG_ERROR("no global context defined at index %u", globalContext);
+
+            return SAI_STATUS_FAILURE;
+        }
+    }
+
+    return context->m_meta->create(
             objectType,
             objectId,
             switchId,
@@ -142,8 +163,9 @@ sai_status_t Sai::remove(
     MUTEX();
     SWSS_LOG_ENTER();
     REDIS_CHECK_API_INITIALIZED();
+    REDIS_CHECK_CONTEXT(objectId);
 
-    return m_meta->remove(objectType, objectId);
+    return context->m_meta->remove(objectType, objectId);
 }
 
 sai_status_t Sai::set(
@@ -159,10 +181,25 @@ sai_status_t Sai::set(
     {
         // skip metadata if attribute is redis extension attribute
 
-        return m_redisSai->set(objectType, objectId, attr);
+        bool success = true;
+
+        for (auto& kvp: m_contextMap)
+        {
+            sai_status_t status = kvp.second->m_redisSai->set(objectType, objectId, attr);
+
+            success &= (status == SAI_STATUS_SUCCESS);
+
+            SWSS_LOG_NOTICE("setting attribute 0x%x status: %s",
+                    attr->id,
+                    sai_serialize_status(status).c_str());
+        }
+
+        return success ? SAI_STATUS_SUCCESS : SAI_STATUS_FAILURE;
     }
 
-    return m_meta->set(objectType, objectId, attr);
+    REDIS_CHECK_CONTEXT(objectId);
+
+    return context->m_meta->set(objectType, objectId, attr);
 }
 
 sai_status_t Sai::get(
@@ -174,8 +211,9 @@ sai_status_t Sai::get(
     MUTEX();
     SWSS_LOG_ENTER();
     REDIS_CHECK_API_INITIALIZED();
+    REDIS_CHECK_CONTEXT(objectId);
 
-    return m_meta->get(
+    return context->m_meta->get(
             objectType,
             objectId,
             attr_count,
@@ -184,16 +222,17 @@ sai_status_t Sai::get(
 
 // QUAD ENTRY
 
-#define DECLARE_CREATE_ENTRY(OT,ot)                         \
-sai_status_t Sai::create(                                   \
-        _In_ const sai_ ## ot ## _t* entry,                 \
-        _In_ uint32_t attr_count,                           \
-        _In_ const sai_attribute_t *attr_list)              \
-{                                                           \
-    MUTEX();                                                \
-    SWSS_LOG_ENTER();                                       \
-    REDIS_CHECK_API_INITIALIZED();                          \
-    return m_meta->create(entry, attr_count, attr_list);    \
+#define DECLARE_CREATE_ENTRY(OT,ot)                                 \
+sai_status_t Sai::create(                                           \
+        _In_ const sai_ ## ot ## _t* entry,                         \
+        _In_ uint32_t attr_count,                                   \
+        _In_ const sai_attribute_t *attr_list)                      \
+{                                                                   \
+    MUTEX();                                                        \
+    SWSS_LOG_ENTER();                                               \
+    REDIS_CHECK_API_INITIALIZED();                                  \
+    REDIS_CHECK_CONTEXT(entry->switch_id);                          \
+    return context->m_meta->create(entry, attr_count, attr_list);   \
 }
 
 DECLARE_CREATE_ENTRY(FDB_ENTRY,fdb_entry);
@@ -213,7 +252,8 @@ sai_status_t Sai::remove(                                   \
     MUTEX();                                                \
     SWSS_LOG_ENTER();                                       \
     REDIS_CHECK_API_INITIALIZED();                          \
-    return m_meta->remove(entry);                           \
+    REDIS_CHECK_CONTEXT(entry->switch_id);                  \
+    return context->m_meta->remove(entry);                  \
 }
 
 DECLARE_REMOVE_ENTRY(FDB_ENTRY,fdb_entry);
@@ -233,7 +273,8 @@ sai_status_t Sai::set(                                      \
     MUTEX();                                                \
     SWSS_LOG_ENTER();                                       \
     REDIS_CHECK_API_INITIALIZED();                          \
-    return m_meta->set(entry, attr);                        \
+    REDIS_CHECK_CONTEXT(entry->switch_id);                  \
+    return context->m_meta->set(entry, attr);               \
 }
 
 DECLARE_SET_ENTRY(FDB_ENTRY,fdb_entry);
@@ -245,16 +286,17 @@ DECLARE_SET_ENTRY(NEIGHBOR_ENTRY,neighbor_entry);
 DECLARE_SET_ENTRY(ROUTE_ENTRY,route_entry);
 DECLARE_SET_ENTRY(NAT_ENTRY,nat_entry);
 
-#define DECLARE_GET_ENTRY(OT,ot)                            \
-sai_status_t Sai::get(                                      \
-        _In_ const sai_ ## ot ## _t* entry,                 \
-        _In_ uint32_t attr_count,                           \
-        _Inout_ sai_attribute_t *attr_list)                 \
-{                                                           \
-    MUTEX();                                                \
-    SWSS_LOG_ENTER();                                       \
-    REDIS_CHECK_API_INITIALIZED();                          \
-    return m_meta->get(entry, attr_count, attr_list);       \
+#define DECLARE_GET_ENTRY(OT,ot)                                \
+sai_status_t Sai::get(                                          \
+        _In_ const sai_ ## ot ## _t* entry,                     \
+        _In_ uint32_t attr_count,                               \
+        _Inout_ sai_attribute_t *attr_list)                     \
+{                                                               \
+    MUTEX();                                                    \
+    SWSS_LOG_ENTER();                                           \
+    REDIS_CHECK_API_INITIALIZED();                              \
+    REDIS_CHECK_CONTEXT(entry->switch_id);                      \
+    return context->m_meta->get(entry, attr_count, attr_list);  \
 }
 
 DECLARE_GET_ENTRY(FDB_ENTRY,fdb_entry);
@@ -278,8 +320,9 @@ sai_status_t Sai::getStats(
     MUTEX();
     SWSS_LOG_ENTER();
     REDIS_CHECK_API_INITIALIZED();
+    REDIS_CHECK_CONTEXT(object_id);
 
-    return m_meta->getStats(
+    return context->m_meta->getStats(
             object_type,
             object_id,
             number_of_counters,
@@ -298,8 +341,9 @@ sai_status_t Sai::getStatsExt(
     MUTEX();
     SWSS_LOG_ENTER();
     REDIS_CHECK_API_INITIALIZED();
+    REDIS_CHECK_CONTEXT(object_id);
 
-    return m_meta->getStatsExt(
+    return context->m_meta->getStatsExt(
             object_type,
             object_id,
             number_of_counters,
@@ -317,8 +361,9 @@ sai_status_t Sai::clearStats(
     MUTEX();
     SWSS_LOG_ENTER();
     REDIS_CHECK_API_INITIALIZED();
+    REDIS_CHECK_CONTEXT(object_id);
 
-    return m_meta->clearStats(
+    return context->m_meta->clearStats(
             object_type,
             object_id,
             number_of_counters,
@@ -340,8 +385,9 @@ sai_status_t Sai::bulkCreate(
     MUTEX();
     SWSS_LOG_ENTER();
     REDIS_CHECK_API_INITIALIZED();
+    REDIS_CHECK_CONTEXT(switch_id);
 
-    return m_meta->bulkCreate(
+    return context->m_meta->bulkCreate(
             object_type,
             switch_id,
             object_count,
@@ -362,8 +408,9 @@ sai_status_t Sai::bulkRemove(
     MUTEX();
     SWSS_LOG_ENTER();
     REDIS_CHECK_API_INITIALIZED();
+    REDIS_CHECK_CONTEXT(*object_id);
 
-    return m_meta->bulkRemove(
+    return context->m_meta->bulkRemove(
             object_type,
             object_count,
             object_id,
@@ -382,8 +429,9 @@ sai_status_t Sai::bulkSet(
     MUTEX();
     SWSS_LOG_ENTER();
     REDIS_CHECK_API_INITIALIZED();
+    REDIS_CHECK_CONTEXT(*object_id);
 
-    return m_meta->bulkSet(
+    return context->m_meta->bulkSet(
             object_type,
             object_count,
             object_id,
@@ -406,7 +454,8 @@ sai_status_t Sai::bulkCreate(                               \
     MUTEX();                                                \
     SWSS_LOG_ENTER();                                       \
     REDIS_CHECK_API_INITIALIZED();                          \
-    return m_meta->bulkCreate(                              \
+    REDIS_CHECK_CONTEXT(entries->switch_id);                \
+    return context->m_meta->bulkCreate(                     \
             object_count,                                   \
             entries,                                        \
             attr_count,                                     \
@@ -432,7 +481,8 @@ sai_status_t Sai::bulkRemove(                               \
     MUTEX();                                                \
     SWSS_LOG_ENTER();                                       \
     REDIS_CHECK_API_INITIALIZED();                          \
-    return m_meta->bulkRemove(                              \
+    REDIS_CHECK_CONTEXT(entries->switch_id);                \
+    return context->m_meta->bulkRemove(                     \
             object_count,                                   \
             entries,                                        \
             mode,                                           \
@@ -456,7 +506,8 @@ sai_status_t Sai::bulkSet(                                  \
     MUTEX();                                                \
     SWSS_LOG_ENTER();                                       \
     REDIS_CHECK_API_INITIALIZED();                          \
-    return m_meta->bulkSet(                                 \
+    REDIS_CHECK_CONTEXT(entries->switch_id);                \
+    return context->m_meta->bulkSet(                        \
             object_count,                                   \
             entries,                                        \
             attr_list,                                      \
@@ -478,8 +529,9 @@ sai_status_t Sai::flushFdbEntries(
     MUTEX();
     SWSS_LOG_ENTER();
     REDIS_CHECK_API_INITIALIZED();
+    REDIS_CHECK_CONTEXT(switch_id);
 
-    return m_meta->flushFdbEntries(
+    return context->m_meta->flushFdbEntries(
             switch_id,
             attr_count,
             attr_list);
@@ -497,8 +549,9 @@ sai_status_t Sai::objectTypeGetAvailability(
     MUTEX();
     SWSS_LOG_ENTER();
     REDIS_CHECK_API_INITIALIZED();
+    REDIS_CHECK_CONTEXT(switchId);
 
-    return m_meta->objectTypeGetAvailability(
+    return context->m_meta->objectTypeGetAvailability(
             switchId,
             objectType,
             attrCount,
@@ -515,8 +568,9 @@ sai_status_t Sai::queryAattributeEnumValuesCapability(
     MUTEX();
     SWSS_LOG_ENTER();
     REDIS_CHECK_API_INITIALIZED();
+    REDIS_CHECK_CONTEXT(switch_id);
 
-    return m_meta->queryAattributeEnumValuesCapability(
+    return context->m_meta->queryAattributeEnumValuesCapability(
             switch_id,
             object_type,
             attr_id,
@@ -561,7 +615,12 @@ sai_status_t Sai::logSet(
     SWSS_LOG_ENTER();
     REDIS_CHECK_API_INITIALIZED();
 
-    return m_meta->logSet(api, log_level);
+    for (auto&kvp: m_contextMap)
+    {
+        kvp.second->m_meta->logSet(api, log_level);
+    }
+
+    return SAI_STATUS_SUCCESS;
 }
 
 /*
@@ -580,7 +639,8 @@ sai_status_t Sai::logSet(
  */
 
 sai_switch_notifications_t Sai::handle_notification(
-        _In_ std::shared_ptr<Notification> notification)
+        _In_ std::shared_ptr<Notification> notification,
+        _In_ Context* context)
 {
     MUTEX();
     SWSS_LOG_ENTER();
@@ -592,7 +652,20 @@ sai_switch_notifications_t Sai::handle_notification(
         return { };
     }
 
-    return m_redisSai->syncProcessNotification(notification);
+    return context->m_redisSai->syncProcessNotification(notification);
+}
+
+std::shared_ptr<Context> Sai::getContext(
+        _In_ uint32_t globalContext)
+{
+    SWSS_LOG_ENTER();
+
+    auto it = m_contextMap.find(globalContext);
+
+    if (it == m_contextMap.end())
+        return nullptr;
+
+    return it->second;
 }
 
 std::string joinFieldValues(
@@ -641,4 +714,3 @@ std::vector<swss::FieldValueTuple> serialize_counter_id_list(
 
     return values;
 }
-

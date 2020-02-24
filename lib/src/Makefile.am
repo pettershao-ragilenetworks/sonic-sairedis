@@ -9,6 +9,7 @@ endif
 lib_LTLIBRARIES = libsairedis.la
 
 libsairedis_la_SOURCES = \
+						 Context.cpp \
 						 ContextConfigContainer.cpp \
 						 ContextConfig.cpp \
 						 SaiInterface.cpp \

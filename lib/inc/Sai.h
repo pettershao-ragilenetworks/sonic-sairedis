@@ -3,6 +3,7 @@
 #include "RedisRemoteSaiInterface.h"
 #include "Notification.h"
 #include "Recorder.h"
+#include "Context.h"
 
 #include "meta/Meta.h"
 
@@ -12,6 +13,7 @@
 #include <vector>
 #include <memory>
 #include <mutex>
+#include <map>
 
 #define SAIREDIS_SAI_DECLARE_REMOVE_ENTRY(ot)                       \
     virtual sai_status_t remove(                                    \
@@ -248,7 +250,11 @@ namespace sairedis
         private:
 
             sai_switch_notifications_t handle_notification(
-                    _In_ std::shared_ptr<Notification> notification);
+                    _In_ std::shared_ptr<Notification> notification,
+                    _In_ Context* context);
+
+            std::shared_ptr<Context> getContext(
+                    _In_ uint32_t globalContext);
 
         private:
 
@@ -256,9 +262,7 @@ namespace sairedis
 
             std::recursive_mutex m_apimutex;
 
-            std::shared_ptr<saimeta::Meta> m_meta;
-
-            std::shared_ptr<RedisRemoteSaiInterface> m_redisSai;
+            std::map<uint32_t, std::shared_ptr<Context>> m_contextMap;
 
             sai_service_method_table_t m_service_method_table;
 
