@@ -15,19 +15,21 @@ using namespace sairedis;
 #define REDIS_ASIC_STATE_COMMAND_GETRESPONSE_TIMEOUT_MS (60*1000)
 
 RedisChannel::RedisChannel(
+        _In_ const std::string& dbAsic,
         _In_ Callback callback):
-    m_callback(callback)
+    m_callback(callback),
+    m_dbAsic(dbAsic)
 {
     SWSS_LOG_ENTER();
 
     // TODO this connection info must be obtained from config
 
-    m_db                    = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
+    m_db                    = std::make_shared<swss::DBConnector>(dbAsic, 0);
     m_redisPipeline         = std::make_shared<swss::RedisPipeline>(m_db.get()); //enable default pipeline 128
     m_asicState             = std::make_shared<swss::ProducerTable>(m_redisPipeline.get(), ASIC_STATE_TABLE, true);
     m_getConsumer           = std::make_shared<swss::ConsumerTable>(m_db.get(), REDIS_TABLE_GETRESPONSE);
 
-    m_dbNtf                 = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
+    m_dbNtf                 = std::make_shared<swss::DBConnector>(dbAsic, 0);
     m_notificationConsumer  = std::make_shared<swss::NotificationConsumer>(m_dbNtf.get(), REDIS_TABLE_NOTIFICATIONS);
 
     m_runNotificationThread = true;

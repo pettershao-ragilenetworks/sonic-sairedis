@@ -26,6 +26,7 @@ namespace sairedis
         public:
 
             RedisChannel(
+                    _In_ const std::string& dbAsic,
                     _In_ Callback callback);
 
             virtual ~RedisChannel();
@@ -61,6 +62,8 @@ namespace sairedis
             Callback m_callback;
 
         private:
+
+            std::string m_dbAsic;
 
             /**
              * @brief Asic state channel.
