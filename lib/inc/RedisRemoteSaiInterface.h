@@ -73,6 +73,7 @@ namespace sairedis
             RedisRemoteSaiInterface(
                     _In_ uint32_t globalContext,
                     _In_ std::shared_ptr<SwitchConfigContainer> scc,
+                    _In_ const std::string& dbAsic,
                     _In_ std::function<sai_switch_notifications_t(std::shared_ptr<Notification>)> notificationCallback,
                     _In_ std::shared_ptr<Recorder> recorder);
 
@@ -450,5 +451,7 @@ namespace sairedis
             std::shared_ptr<RedisChannel> m_redisChannel;
 
             std::function<sai_switch_notifications_t(std::shared_ptr<Notification>)> m_notificationCallback;
+
+            std::string m_dbAsic;
     };
 }

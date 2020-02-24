@@ -28,12 +28,14 @@ std::vector<swss::FieldValueTuple> serialize_counter_id_list(
 RedisRemoteSaiInterface::RedisRemoteSaiInterface(
         _In_ uint32_t globalContext,
         _In_ std::shared_ptr<SwitchConfigContainer> scc,
+        _In_ const std::string& dbAsic,
         _In_ std::function<sai_switch_notifications_t(std::shared_ptr<Notification>)> notificationCallback,
         _In_ std::shared_ptr<Recorder> recorder):
     m_globalContext(globalContext),
     m_switchConfigContainer(scc),
     m_recorder(recorder),
-    m_notificationCallback(notificationCallback)
+    m_notificationCallback(notificationCallback),
+    m_dbAsic(dbAsic)
 {
     SWSS_LOG_ENTER();
 
@@ -72,6 +74,7 @@ sai_status_t RedisRemoteSaiInterface::initialize(
     m_syncMode = false;
 
     m_redisChannel = std::make_shared<RedisChannel>(
+            m_dbAsic,
             std::bind(&RedisRemoteSaiInterface::handleNotification, this, _1, _2, _3));
 
     auto db = m_redisChannel->getDbConnector();
