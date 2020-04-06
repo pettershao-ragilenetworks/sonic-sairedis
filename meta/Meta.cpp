@@ -2958,7 +2958,7 @@ sai_status_t Meta::meta_generic_validation_remove(
 
         SWSS_LOG_ERROR("object 0x%" PRIx64 " reference count is %d, can't remove", oid, count);
 
-        return SAI_STATUS_INVALID_PARAMETER;
+        return SAI_STATUS_OBJECT_IN_USE;
     }
 
     if (meta_key.objecttype == SAI_OBJECT_TYPE_PORT)
@@ -2985,14 +2985,6 @@ sai_status_t Meta::meta_port_remove_validation(
         // user didn't query any queues, ipgs or scheduler groups
         // for this port, then we can just skip this
         return SAI_STATUS_SUCCESS;
-    }
-
-    if (m_oids.getObjectReferenceCount(port_id) != 0)
-    {
-        SWSS_LOG_ERROR("port %s reference count is not zero, can't remove",
-                sai_serialize_object_id(port_id).c_str());
-
-        return SAI_STATUS_OBJECT_IN_USE;
     }
 
     if (!meta_is_object_in_default_state(port_id))
