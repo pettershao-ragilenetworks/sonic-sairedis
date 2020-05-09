@@ -53,6 +53,7 @@ libsairedis_la_SOURCES = \
 						 sai_redis_l2mc.cpp \
 						 sai_redis_l2mcgroup.cpp \
 						 sai_redis_lag.cpp \
+						 sai_redis_macsec.cpp \
 						 sai_redis_mcastfdb.cpp \
 						 sai_redis_mirror.cpp \
 						 sai_redis_mpls.cpp \

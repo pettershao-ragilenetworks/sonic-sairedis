@@ -69,6 +69,7 @@ libsaivs_la_SOURCES = \
 					  sai_vs_l2mc.cpp \
 					  sai_vs_l2mcgroup.cpp \
 					  sai_vs_lag.cpp \
+					  sai_vs_macsec.cpp \
 					  sai_vs_mcastfdb.cpp \
 					  sai_vs_mirror.cpp \
 					  sai_vs_mpls.cpp \

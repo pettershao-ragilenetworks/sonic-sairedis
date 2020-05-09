@@ -1110,13 +1110,14 @@ json sai_serialize_qos_map_params(
 
     json j;
 
-    j["tc"]     = params.tc;
-    j["dscp"]   = params.dscp;
-    j["dot1p"]  = params.dot1p;
-    j["prio"]   = params.prio;
-    j["pg"]     = params.pg;
-    j["qidx"]   = params.queue_index;
-    j["color"]  = sai_serialize_packet_color(params.color);
+    j["tc"]       = params.tc;
+    j["dscp"]     = params.dscp;
+    j["dot1p"]    = params.dot1p;
+    j["prio"]     = params.prio;
+    j["pg"]       = params.pg;
+    j["qidx"]     = params.queue_index;
+    j["mpls_exp"] = params.mpls_exp;
+    j["color"]    = sai_serialize_packet_color(params.color);
 
     return j;
 }
@@ -2089,6 +2090,7 @@ void sai_deserialize_qos_map_params(
     params.prio           = j["prio"];
     params.pg             = j["pg"];
     params.queue_index    = j["qidx"];
+    params.mpls_exp       = j["mpls_exp"];
 
     sai_deserialize_packet_color(j["color"], params.color);
 }
