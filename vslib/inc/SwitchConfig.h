@@ -6,10 +6,6 @@
 #include <string>
 #include <memory>
 
-extern "C" {
-#include "sai.h"     // for sai_switch_type_t
-}
-
 namespace saivs
 {
     typedef enum _sai_vs_switch_type_t
@@ -17,8 +13,6 @@ namespace saivs
         SAI_VS_SWITCH_TYPE_NONE,
 
         SAI_VS_SWITCH_TYPE_BCM56850,
-
-        SAI_VS_SWITCH_TYPE_BCM81724,
 
         SAI_VS_SWITCH_TYPE_MLNX2700,
 
@@ -44,10 +38,6 @@ namespace saivs
 
         public:
 
-            static bool parseSaiSwitchType(
-                    _In_ const char* saiSwitchTypeStr,
-                    _Out_ sai_switch_type_t& saiSwitchType);
-
             static bool parseSwitchType(
                     _In_ const char* switchTypeStr,
                     _Out_ sai_vs_switch_type_t& switchType);
@@ -60,8 +50,6 @@ namespace saivs
                     _In_ const char* useTapDeviceStr);
 
         public:
-
-            sai_switch_type_t m_saiSwitchType;
 
             sai_vs_switch_type_t m_switchType;
 

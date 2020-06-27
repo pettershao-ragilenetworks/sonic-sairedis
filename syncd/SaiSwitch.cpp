@@ -59,19 +59,13 @@ SaiSwitch::SaiSwitch(
 
     helperInternalOids();
 
-    if (getSwitchType() == SAI_SWITCH_TYPE_NPU) 
-    {
-        helperCheckLaneMap();
-    }
+    helperCheckLaneMap();
 
     helperLoadColdVids();
 
     helperPopulateWarmBootVids();
 
-    if (getSwitchType() == SAI_SWITCH_TYPE_NPU) 
-    {
-        saiGetMacAddress(m_default_mac_address);
-    }
+    saiGetMacAddress(m_default_mac_address);
 
     if (warmBoot)
     {
@@ -135,26 +129,6 @@ void SaiSwitch::getDefaultMacAddress(
     SWSS_LOG_ENTER();
 
     memcpy(mac, m_default_mac_address, sizeof(sai_mac_t));
-}
-
-sai_switch_type_t SaiSwitch::getSwitchType() const
-{
-    SWSS_LOG_ENTER();
-
-    sai_attribute_t attr;
-
-    attr.id = SAI_SWITCH_ATTR_TYPE;
-
-    sai_status_t status = m_vendorSai->get(SAI_OBJECT_TYPE_SWITCH, m_switch_rid, 1, &attr);
-
-    if (status != SAI_STATUS_SUCCESS)
-    {
-        SWSS_LOG_THROW("failed to get switch type");
-    }
-
-    SWSS_LOG_ERROR("switch type: '%s'", (attr.value.s32 == SAI_SWITCH_TYPE_NPU ? "SAI_SWITCH_TYPE_NPU" : "SAI_SWITCH_TYPE_PHY"));
-
-    return (sai_switch_type_t) attr.value.s32;
 }
 
 #define MAX_HARDWARE_INFO_LENGTH 0x1000
@@ -911,7 +885,7 @@ void SaiSwitch::helperPopulateWarmBootVids()
     {
         sai_object_id_t vid = m_translator->translateRidToVid(rid, m_switch_vid);
 
-        m_warmBootDiscoveredVids.insert(vid);
+       m_warmBootDiscoveredVids.insert(vid);
     }
 }
 
