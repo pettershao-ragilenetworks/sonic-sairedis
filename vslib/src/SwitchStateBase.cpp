@@ -409,7 +409,6 @@ sai_status_t SwitchStateBase::setPort(
             {
                 SWSS_LOG_ERROR("failed to set MTU on portId %s",
                     sai_serialize_object_id(portId).c_str());
-
                 return SAI_STATUS_FAILURE;
             }
         }
@@ -722,6 +721,11 @@ sai_status_t SwitchStateBase::set_switch_default_attributes()
 
     CHECK_STATUS(set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr));
 
+    attr.id = SAI_SWITCH_ATTR_TYPE;
+    attr.value.s32 = SAI_SWITCH_TYPE_NPU;
+
+    CHECK_STATUS(set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr));
+
     attr.id = SAI_SWITCH_ATTR_WARM_RECOVER;
     attr.value.booldata = false;
 
@@ -820,7 +824,6 @@ sai_status_t SwitchStateBase::create_ports()
         sai_object_id_t port_id;
 
         CHECK_STATUS(create(SAI_OBJECT_TYPE_PORT, &port_id, m_switch_id, 0, NULL));
-
         m_port_list.push_back(port_id);
 
         sai_attribute_t attr;
