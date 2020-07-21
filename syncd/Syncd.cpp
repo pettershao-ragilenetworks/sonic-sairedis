@@ -19,6 +19,7 @@
 #include "meta/sai_serialize.h"
 
 #include <unistd.h>
+#include <inttypes.h>
 
 #include <iterator>
 #include <algorithm>
@@ -3172,7 +3173,7 @@ void Syncd::performWarmRestartSingleSwitch(
 
     if (originalSwitchRid != switchRid)
     {
-        SWSS_LOG_THROW("Unexpected RID 0x%lx (expected 0x%lx)",
+        SWSS_LOG_THROW("Unexpected RID 0x%" PRIx64 " (expected 0x%" PRIx64 " )",
                        switchRid, originalSwitchRid);
     }
 
