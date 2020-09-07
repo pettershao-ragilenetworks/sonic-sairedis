@@ -8,6 +8,7 @@
 #include "RequestShutdown.h"
 #include "WarmRestartTable.h"
 #include "ContextConfigContainer.h"
+#include "BreakConfigParser.h"
 
 #include "sairediscommon.h"
 
@@ -133,6 +134,8 @@ Syncd::Syncd(
 
         abort();
     }
+
+    m_breakConfig = BreakConfigParser::parseBreakConfig(m_commandLineOptions->m_breakConfig);
 
     SWSS_LOG_NOTICE("syncd started");
 }
@@ -2504,7 +2507,25 @@ sai_status_t Syncd::processNotifySyncd(
 
         SWSS_LOG_WARN("syncd received APPLY VIEW, will translate");
 
-        sai_status_t status = applyView();
+        sai_status_t status;
+
+        try
+        {
+            status = applyView();
+        }
+        catch(...)
+        {
+            /*
+             * If apply view will fail with exception, try to send fail
+             * response to sairedis, since later there can be switch shutdown
+             * notification sent, and it will be synchronized with mutex, and
+             * it will not be processed until get response timeout will hit.
+             */
+
+            sendNotifyResponse(SAI_STATUS_FAILURE);
+
+            throw;
+        }
 
         sendNotifyResponse(status);
 
@@ -2710,7 +2731,7 @@ sai_status_t Syncd::applyView()
             auto current = std::make_shared<AsicView>(currentMap.at(switchVid));
             auto temp = std::make_shared<AsicView>(temporaryMap.at(switchVid));
 
-            auto cl = std::make_shared<ComparisonLogic>(m_vendorSai, sw, m_handler, m_initViewRemovedVidSet, current, temp);
+            auto cl = std::make_shared<ComparisonLogic>(m_vendorSai, sw, m_handler, m_initViewRemovedVidSet, current, temp, m_breakConfig);
 
             cl->compareViews();
 
