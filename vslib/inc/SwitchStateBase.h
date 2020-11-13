@@ -98,7 +98,9 @@ namespace saivs
 
         public:
 
-            virtual sai_status_t initialize_default_objects();
+            virtual sai_status_t initialize_default_objects(
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
 
             virtual sai_status_t create_port_dependencies(
                     _In_ sai_object_id_t port_id);

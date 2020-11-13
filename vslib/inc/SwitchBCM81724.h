@@ -97,8 +97,14 @@ namespace saivs
 
         protected:
 
-            virtual sai_status_t refresh_read_only( _In_ const sai_attr_metadata_t *meta, _In_ sai_object_id_t object_id) override;
+            virtual sai_status_t refresh_read_only(
+                    _In_ const sai_attr_metadata_t *meta,
+                    _In_ sai_object_id_t object_id) override;
+
             virtual sai_status_t set_switch_default_attributes();
-            virtual sai_status_t initialize_default_objects() override;
+
+            virtual sai_status_t initialize_default_objects(
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list) override;
     };
 }

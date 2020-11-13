@@ -1429,7 +1429,9 @@ sai_status_t SwitchStateBase::set_number_of_ecmp_groups()
     return set(SAI_OBJECT_TYPE_SWITCH, m_switch_id, &attr);
 }
 
-sai_status_t SwitchStateBase::initialize_default_objects()
+sai_status_t SwitchStateBase::initialize_default_objects(
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
@@ -1453,6 +1455,10 @@ sai_status_t SwitchStateBase::initialize_default_objects()
     CHECK_STATUS(set_switch_default_attributes());
     CHECK_STATUS(create_scheduler_groups());
     CHECK_STATUS(set_static_crm_values());
+
+    // Initialize switch for VOQ attributes
+
+    CHECK_STATUS(initialize_voq_switch_objects(attr_count, attr_list));
 
     return SAI_STATUS_SUCCESS;
 }

@@ -62,7 +62,9 @@ sai_status_t SwitchBCM81724::create_port_dependencies(
     return SAI_STATUS_SUCCESS;
 }
 
-sai_status_t SwitchBCM81724::initialize_default_objects()
+sai_status_t SwitchBCM81724::initialize_default_objects(
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list)
 {
     SWSS_LOG_ENTER();
 
