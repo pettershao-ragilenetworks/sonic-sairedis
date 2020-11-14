@@ -2574,7 +2574,50 @@ sai_status_t SwitchStateBase::create_system_ports(
         {
             attr.value.s32 = SAI_SYSTEM_PORT_TYPE_LOCAL;
 
-            // TODO Need to set local port oid attribute
+            // This is system port of local port. Set the oid of the local port corresponding to this system port
+
+            auto map = m_switchConfig->m_corePortIndexMap;
+
+            if (map)
+            {
+                auto& corePortIndexVector = map->getCorePortIndexVector();
+                size_t n_map = corePortIndexVector.size();
+                size_t idx;
+
+                for (idx = 0; idx < n_map; idx++)
+                {
+                    if (corePortIndexVector[idx][0] == sys_port_cfg_list[i].attached_core_index &&
+                            corePortIndexVector[idx][1] == sys_port_cfg_list[i].attached_core_port_index &&
+                            idx < m_port_list.size())
+                    {
+                        // m_port_list entries are in the same order as lane maps. The core port index maps are in the
+                        // same order as the lane maps. So m_port_list at the index corresponding to the core port index map
+                        // will be the port corresponding to the system port with core port index matching core port index map
+
+                        sai_attribute_t lp_attr;
+
+                        lp_attr.id = SAI_SYSTEM_PORT_ATTR_PORT;
+                        lp_attr.value.oid = m_port_list.at(idx);
+
+                        CHECK_STATUS(set(SAI_OBJECT_TYPE_SYSTEM_PORT, system_port_id, &lp_attr));
+
+                        break;
+                    }
+                }
+
+                if (idx >= n_map)
+                {
+                    SWSS_LOG_ERROR("Core port index not found for system port %d for switch %s. Local port oid is not set!",
+                            sys_port_cfg_list[i].port_id,
+                            sai_serialize_object_id(m_switch_id).c_str());
+                }
+            }
+            else
+            {
+                SWSS_LOG_ERROR("Core port index map for switch %s is NULL. Local port oid is not set for system port %d!",
+                        sai_serialize_object_id(m_switch_id).c_str(),
+                        sys_port_cfg_list[i].port_id);
+            }
         }
 
         CHECK_STATUS(set(SAI_OBJECT_TYPE_SYSTEM_PORT, system_port_id, &attr));
