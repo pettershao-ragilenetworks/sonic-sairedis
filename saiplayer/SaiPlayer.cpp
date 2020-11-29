@@ -1834,9 +1834,9 @@ void SaiPlayer::processBulk(
         if (statuses[i] != expectedStatuses[i])
         {
             /*
-                * If expected statuses are different than received, throw
-                * exception since data don't match.
-                */
+             * If expected statuses are different than received, throw
+             * exception since data don't match.
+             */
             SWSS_LOG_THROW("expected status is %s but returned is %s on %s",
                     sai_serialize_status(expectedStatuses[i]).c_str(),
                     sai_serialize_status(statuses[i]).c_str(),
@@ -2185,14 +2185,23 @@ int SaiPlayer::run()
 
     if (m_commandLineOptions->m_syncMode)
     {
+        SWSS_LOG_WARN("sync mode is depreacated, please use communication mode");
+
         attr.id = SAI_REDIS_SWITCH_ATTR_SYNC_MODE;
         attr.value.booldata = true;
 
         EXIT_ON_ERROR(m_sai->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr));
+
+        m_commandLineOptions->m_redisCommunicationMode = SAI_REDIS_COMMUNICATION_MODE_REDIS_SYNC;
     }
 
+    attr.id = SAI_REDIS_SWITCH_ATTR_REDIS_COMMUNICATION_MODE;
+    attr.value.s32 = m_commandLineOptions->m_redisCommunicationMode;
+
+    EXIT_ON_ERROR(m_sai->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr));
+
     attr.id = SAI_REDIS_SWITCH_ATTR_RECORD;
-    attr.value.booldata = false;
+    attr.value.booldata = m_commandLineOptions->m_enableRecording;
 
     EXIT_ON_ERROR(m_sai->set(SAI_OBJECT_TYPE_SWITCH, switch_id, &attr));
 
@@ -2211,5 +2220,4 @@ int SaiPlayer::run()
     m_sai->uninitialize();
 
     return exitcode;
-
 }

@@ -445,6 +445,8 @@ namespace sairedis
 
             bool m_syncMode;
 
+            sai_redis_communication_mode_t m_redisCommunicationMode;
+
             bool m_initialized;
 
             std::shared_ptr<Recorder> m_recorder;

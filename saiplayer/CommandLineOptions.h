@@ -1,5 +1,7 @@
 #pragma once
 
+#include "sairedis.h"
+
 #include "swss/sal.h"
 
 #include <string>
@@ -32,6 +34,10 @@ namespace saiplayer
             bool m_sleep;
 
             bool m_syncMode;
+
+            sai_redis_communication_mode_t m_redisCommunicationMode;
+
+            bool m_enableRecording;
 
             std::string m_profileMapFile;
 
