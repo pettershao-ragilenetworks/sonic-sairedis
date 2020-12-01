@@ -14,16 +14,19 @@
 
 using namespace saivs;
 
-#define ETH_FRAME_BUFFER_SIZE (0x4000)
-
 MACsecForwarder::MACsecForwarder(
     _In_ const std::string &macsecInterfaceName,
-    _In_ int tapfd):
-    m_tapfd(tapfd),
+    _In_ std::shared_ptr<HostInterfaceInfo> info):
     m_macsecInterfaceName(macsecInterfaceName),
-    m_runThread(true)
+    m_runThread(true),
+    m_info(info)
 {
     SWSS_LOG_ENTER();
+
+    if (m_info == nullptr)
+    {
+        SWSS_LOG_THROW("The HostInterfaceInfo on the MACsec port %s is empty", m_macsecInterfaceName.c_str());
+    }
 
     m_macsecfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 
@@ -112,6 +115,25 @@ void MACsecForwarder::forward()
 
     while (m_runThread)
     {
+        struct msghdr msg;
+        memset(&msg, 0, sizeof(struct msghdr));
+
+        struct sockaddr_storage srcAddr;
+
+        struct iovec iov[1];
+
+        iov[0].iov_base = buffer; // buffer for message
+        iov[0].iov_len = sizeof(buffer);
+
+        char control[CONTROL_MESSAGE_BUFFER_SIZE]; // buffer for control messages
+
+        msg.msg_name = &srcAddr;
+        msg.msg_namelen = sizeof(srcAddr);
+        msg.msg_iov = iov;
+        msg.msg_iovlen = 1;
+        msg.msg_control = control;
+        msg.msg_controllen = sizeof(control);
+
         swss::Selectable *sel = NULL;
         int result = s.select(&sel);
 
@@ -128,7 +150,7 @@ void MACsecForwarder::forward()
         if (sel == &m_exitEvent) // thread end event
             break;
 
-        ssize_t size = read(m_macsecfd, buffer, sizeof(buffer));
+        ssize_t size = recvmsg(m_macsecfd, &msg, 0);
 
         if (size < 0)
         {
@@ -151,30 +173,22 @@ void MACsecForwarder::forward()
 
             continue;
         }
-
-        if (write(m_tapfd, buffer, static_cast<int>(size)) < 0)
+        else if (size < (ssize_t)sizeof(ethhdr))
         {
-            if (errno != ENETDOWN && errno != EIO)
-            {
-                SWSS_LOG_ERROR(
-                    "failed to write to macsec device %s fd %d, errno(%d): %s",
-                    m_macsecInterfaceName.c_str(),
-                    m_macsecfd,
-                    errno,
-                    strerror(errno));
-            }
-
-            if (errno == EBADF)
-            {
-                // bad file descriptor, just end thread
-                SWSS_LOG_ERROR(
-                    "ending thread for macsec device %s fd %d",
-                    m_macsecInterfaceName.c_str(),
-                    m_macsecfd);
-                return;
-            }
+            SWSS_LOG_ERROR("invalid ethernet frame length: %zu", msg.msg_controllen);
 
             continue;
+        }
+
+        size_t length = static_cast<size_t>(size);
+
+        addVlanTag(buffer, length, msg);
+
+        m_info->async_process_packet_for_fdb_event(buffer, length);
+
+        if (!sendTo(m_info->m_tapfd, buffer, length))
+        {
+            break;
         }
     }
 
@@ -182,4 +196,3 @@ void MACsecForwarder::forward()
         "ending thread proc for %s",
         m_macsecInterfaceName.c_str());
 }
-

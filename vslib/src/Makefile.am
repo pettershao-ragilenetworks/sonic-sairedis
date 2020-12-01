@@ -53,7 +53,13 @@ libSaiVS_a_SOURCES = \
 					  SwitchMLNX2700.cpp \
 					  CorePortIndexMap.cpp \
 					  CorePortIndexMapContainer.cpp \
-					  CorePortIndexMapFileParser.cpp
+					  CorePortIndexMapFileParser.cpp \
+					  MACsecFilter.cpp \
+					  MACsecEgressFilter.cpp \
+					  MACsecIngressFilter.cpp \
+					  TrafficForwarder.cpp \
+					  MACsecForwarder.cpp \
+					  TrafficFilterPipes.cpp
 
 libsaivs_la_SOURCES = \
 					  sai_vs_fdb.cpp \

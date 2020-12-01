@@ -90,11 +90,39 @@ void HostInterfaceInfo::async_process_packet_for_fdb_event(
     m_eventQueue->enqueue(std::make_shared<Event>(EventType::EVENT_TYPE_PACKET, payload));
 }
 
-#define ETH_FRAME_BUFFER_SIZE (0x4000)
-#define CONTROL_MESSAGE_BUFFER_SIZE (0x1000)
-#define IEEE_8021Q_ETHER_TYPE (0x8100)
-#define MAC_ADDRESS_SIZE (6)
-#define VLAN_TAG_SIZE (4)
+bool HostInterfaceInfo::installEth2TapFilter(
+        _In_ int priority,
+        _In_ std::shared_ptr<TrafficFilter> filter)
+{
+    SWSS_LOG_ENTER();
+
+    return m_e2tFilters.installFilter(priority, filter);
+}
+
+bool HostInterfaceInfo::uninstallEth2TapFilter(
+        _In_ std::shared_ptr<TrafficFilter> filter)
+{
+    SWSS_LOG_ENTER();
+
+    return m_e2tFilters.uninstallFilter(filter);
+}
+
+bool HostInterfaceInfo::installTap2EthFilter(
+        _In_ int priority,
+        _In_ std::shared_ptr<TrafficFilter> filter)
+{
+    SWSS_LOG_ENTER();
+
+    return m_t2eFilters.installFilter(priority, filter);
+}
+
+bool HostInterfaceInfo::uninstallTap2EthFilter(
+        _In_ std::shared_ptr<TrafficFilter> filter)
+{
+    SWSS_LOG_ENTER();
+
+    return m_t2eFilters.uninstallFilter(filter);
+}
 
 void HostInterfaceInfo::veth2tap_fun()
 {
@@ -161,63 +189,28 @@ void HostInterfaceInfo::veth2tap_fun()
             continue;
         }
 
-        struct cmsghdr *cmsg;
+        // Buffer include the ingress packets
+        // MACsec scenario: EAPOL packets and encrypted packets
+        size_t length = static_cast<size_t>(size);
+        auto ret = m_e2tFilters.execute(buffer, length);
 
-        for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; cmsg = CMSG_NXTHDR(&msg, cmsg))
+        if (ret == TrafficFilter::TERMINATE)
         {
-            if (cmsg->cmsg_level != SOL_PACKET || cmsg->cmsg_type != PACKET_AUXDATA)
-                continue;
-
-            struct tpacket_auxdata* aux = (struct tpacket_auxdata*)CMSG_DATA(cmsg);
-
-            if ((aux->tp_status & TP_STATUS_VLAN_VALID) &&
-                    (aux->tp_status & TP_STATUS_VLAN_TPID_VALID))
-            {
-                SWSS_LOG_DEBUG("got vlan tci: 0x%x, vlanid: %d", aux->tp_vlan_tci, aux->tp_vlan_tci & 0xFFF);
-
-                // inject vlan tag into frame
-
-                // for overlapping buffers
-                memmove(buffer + 2 * MAC_ADDRESS_SIZE + VLAN_TAG_SIZE,
-                        buffer + 2 * MAC_ADDRESS_SIZE,
-                        size - (2 * MAC_ADDRESS_SIZE));
-
-                uint16_t tci = htons(aux->tp_vlan_tci);
-                uint16_t tpid = htons(IEEE_8021Q_ETHER_TYPE);
-
-                uint8_t* pvlan =  (uint8_t *)(buffer + 2 * MAC_ADDRESS_SIZE);
-                memcpy(pvlan, &tpid, sizeof(uint16_t));
-                memcpy(pvlan + sizeof(uint16_t), &tci, sizeof(uint16_t));
-
-                size += VLAN_TAG_SIZE;
-
-                break;
-            }
+            continue;
+        }
+        else if (ret == TrafficFilter::ERROR)
+        {
+            // Error log should be recorded in filter
+            return;
         }
 
-        async_process_packet_for_fdb_event(buffer, size);
+        addVlanTag(buffer, length, msg);
 
-        if (write(m_tapfd, buffer, size) < 0)
+        async_process_packet_for_fdb_event(buffer, length);
+
+        if (!sendTo(m_tapfd, buffer, length))
         {
-            /*
-             * We filter out EIO because of this patch:
-             * https://github.com/torvalds/linux/commit/1bd4978a88ac2589f3105f599b1d404a312fb7f6
-             */
-
-            if (errno != ENETDOWN && errno != EIO)
-            {
-                SWSS_LOG_ERROR("failed to write to tap device fd %d, errno(%d): %s",
-                        m_tapfd, errno, strerror(errno));
-            }
-
-            if (errno == EBADF)
-            {
-                // bad file descriptor, just end thread
-                SWSS_LOG_NOTICE("ending thread for tap fd %d", m_tapfd);
-                return;
-            }
-
-            continue;
+            break;
         }
     }
 
@@ -266,6 +259,22 @@ void HostInterfaceInfo::tap2veth_fun()
             }
 
             continue;
+        }
+
+        // Buffer include the egress packets
+        // MACsec scenario: EAPOL packets and plaintext packets
+        size_t length = static_cast<size_t>(size);
+        auto ret = m_t2eFilters.execute(buffer, length);
+        size = static_cast<ssize_t>(length);
+
+        if (ret == TrafficFilter::TERMINATE)
+        {
+            continue;
+        }
+        else if (ret == TrafficFilter::ERROR)
+        {
+            // Error log should be recorded in filter
+            return;
         }
 
         if (write(m_packet_socket, buffer, (int)size) < 0)
