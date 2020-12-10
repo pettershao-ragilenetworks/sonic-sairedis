@@ -42,6 +42,16 @@ namespace syncd
                     _In_ sai_object_id_t rid,
                     _In_ sai_object_id_t switchVid);
 
+            /*
+             * This method will try get VID for given RID.
+             * Returns true if input RID is null object and out VID is null object.
+             * Returns true if able to find RID and out VID object.
+             * Returns false if not able to find RID and out VID is null object.
+             */
+            bool tryTranslateRidToVid(
+                    _In_ sai_object_id_t rid,
+                    _Out_ sai_object_id_t &vid);
+
             void translateRidToVid(
                     _Inout_ sai_object_list_t& objectList,
                     _In_ sai_object_id_t switchVid);

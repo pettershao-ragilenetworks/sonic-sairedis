@@ -387,6 +387,7 @@ void NotificationProcessor::process_on_port_state_change(
     for (uint32_t i = 0; i < count; i++)
     {
         sai_port_oper_status_notification_t *oper_stat = &data[i];
+        sai_object_id_t rid = oper_stat->port_id;
 
         /*
          * We are using switch_rid as null, since port should be already
@@ -397,7 +398,21 @@ void NotificationProcessor::process_on_port_state_change(
          * switch vid.
          */
 
-        oper_stat->port_id = m_translator->translateRidToVid(oper_stat->port_id, SAI_NULL_OBJECT_ID);
+        SWSS_LOG_INFO("Port RID %s state change notification", 
+                sai_serialize_object_id(rid).c_str());
+
+        if (false == m_translator->tryTranslateRidToVid(rid, oper_stat->port_id))
+        {
+            SWSS_LOG_WARN("Port RID %s transalted to null VID!!!", sai_serialize_object_id(rid).c_str());
+        }
+
+        /*
+         * Port may be in process of removal. OA may recieve notification for VID either
+         * SAI_NULL_OBJECT_ID or non exist at time of processing 
+         */
+
+        SWSS_LOG_INFO("Port VID %s state change notification", 
+                sai_serialize_object_id(oper_stat->port_id).c_str());
     }
 
     std::string s = sai_serialize_port_oper_status_ntf(count, data);
