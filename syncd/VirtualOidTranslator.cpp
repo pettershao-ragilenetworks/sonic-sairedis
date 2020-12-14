@@ -59,7 +59,8 @@ bool VirtualOidTranslator::tryTranslateRidToVid(
 
 sai_object_id_t VirtualOidTranslator::translateRidToVid(
         _In_ sai_object_id_t rid,
-        _In_ sai_object_id_t switchVid)
+        _In_ sai_object_id_t switchVid,
+        _In_ bool translateRemoved)
 {
     SWSS_LOG_ENTER();
 
@@ -99,6 +100,20 @@ sai_object_id_t VirtualOidTranslator::translateRidToVid(
         return vid;
     }
 
+    if (translateRemoved)
+    {
+        auto itr = m_removedRid2vid.find(rid);
+
+        if (itr !=  m_removedRid2vid.end())
+        {
+            SWSS_LOG_WARN("translating removed RID %s, to VID %s",
+                    sai_serialize_object_id(rid).c_str(),
+                    sai_serialize_object_id(itr->second).c_str());
+
+            return itr->second;
+        }
+    }
+
     SWSS_LOG_DEBUG("spotted new RID %s", sai_serialize_object_id(rid).c_str());
 
     sai_object_type_t object_type = m_vendorSai->objectTypeQuery(rid); // TODO move to std::function or wrapper class
@@ -133,7 +148,8 @@ sai_object_id_t VirtualOidTranslator::translateRidToVid(
 }
 
 bool VirtualOidTranslator::checkRidExists(
-        _In_ sai_object_id_t rid)
+        _In_ sai_object_id_t rid,
+        _In_ bool checkRemoved)
 {
     SWSS_LOG_ENTER();
 
@@ -147,18 +163,28 @@ bool VirtualOidTranslator::checkRidExists(
 
     auto vid = m_client->getVidForRid(rid);
 
-    return vid != SAI_NULL_OBJECT_ID;
+    if (vid != SAI_NULL_OBJECT_ID)
+        return true;
+
+    if (checkRemoved && (m_removedRid2vid.find(rid) != m_removedRid2vid.end()))
+    {
+        SWSS_LOG_WARN("removed RID %s exists", sai_serialize_object_id(rid).c_str());
+        return true;
+    }
+
+    return false;
 }
 
 void VirtualOidTranslator::translateRidToVid(
         _Inout_ sai_object_list_t &element,
-        _In_ sai_object_id_t switchVid)
+        _In_ sai_object_id_t switchVid,
+        _In_ bool translateRemoved)
 {
     SWSS_LOG_ENTER();
 
     for (uint32_t i = 0; i < element.count; i++)
     {
-        element.list[i] = translateRidToVid(element.list[i], switchVid);
+        element.list[i] = translateRidToVid(element.list[i], switchVid, translateRemoved);
     }
 }
 
@@ -166,7 +192,8 @@ void VirtualOidTranslator::translateRidToVid(
         _In_ sai_object_type_t objectType,
         _In_ sai_object_id_t switchVid,
         _In_ uint32_t attr_count,
-        _Inout_ sai_attribute_t *attrList)
+        _Inout_ sai_attribute_t *attrList,
+        _In_ bool translateRemoved)
 {
     SWSS_LOG_ENTER();
 
@@ -197,31 +224,31 @@ void VirtualOidTranslator::translateRidToVid(
         switch (meta->attrvaluetype)
         {
             case SAI_ATTR_VALUE_TYPE_OBJECT_ID:
-                attr.value.oid = translateRidToVid(attr.value.oid, switchVid);
+                attr.value.oid = translateRidToVid(attr.value.oid, switchVid, translateRemoved);
                 break;
 
             case SAI_ATTR_VALUE_TYPE_OBJECT_LIST:
-                translateRidToVid(attr.value.objlist, switchVid);
+                translateRidToVid(attr.value.objlist, switchVid, translateRemoved);
                 break;
 
             case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_OBJECT_ID:
                 if (attr.value.aclfield.enable)
-                    attr.value.aclfield.data.oid = translateRidToVid(attr.value.aclfield.data.oid, switchVid);
+                    attr.value.aclfield.data.oid = translateRidToVid(attr.value.aclfield.data.oid, switchVid, translateRemoved);
                 break;
 
             case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_OBJECT_LIST:
                 if (attr.value.aclfield.enable)
-                    translateRidToVid(attr.value.aclfield.data.objlist, switchVid);
+                    translateRidToVid(attr.value.aclfield.data.objlist, switchVid, translateRemoved);
                 break;
 
             case SAI_ATTR_VALUE_TYPE_ACL_ACTION_DATA_OBJECT_ID:
                 if (attr.value.aclaction.enable)
-                    attr.value.aclaction.parameter.oid = translateRidToVid(attr.value.aclaction.parameter.oid, switchVid);
+                    attr.value.aclaction.parameter.oid = translateRidToVid(attr.value.aclaction.parameter.oid, switchVid, translateRemoved);
                 break;
 
             case SAI_ATTR_VALUE_TYPE_ACL_ACTION_DATA_OBJECT_LIST:
                 if (attr.value.aclaction.enable)
-                    translateRidToVid(attr.value.aclaction.parameter.objlist, switchVid);
+                    translateRidToVid(attr.value.aclaction.parameter.objlist, switchVid, translateRemoved);
                 break;
 
             default:
@@ -481,6 +508,8 @@ void VirtualOidTranslator::eraseRidAndVid(
 
     m_rid2vid.erase(rid);
     m_vid2rid.erase(vid);
+
+    m_removedRid2vid[rid] = vid;
 }
 
 void VirtualOidTranslator::clearLocalCache()
@@ -491,4 +520,6 @@ void VirtualOidTranslator::clearLocalCache()
 
     m_rid2vid.clear();
     m_vid2rid.clear();
+
+    m_removedRid2vid.clear();
 }
