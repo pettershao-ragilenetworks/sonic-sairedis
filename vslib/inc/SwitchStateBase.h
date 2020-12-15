@@ -351,6 +351,12 @@ namespace saivs
             bool check_object_list_default_state(
                     _Out_ const std::vector<sai_object_id_t>& objlist);
 
+            sai_status_t createVoqSystemNeighborEntry(
+                    _In_ const std::string &serializedObjectId,
+                    _In_ sai_object_id_t switch_id,
+                    _In_ uint32_t attr_count,
+                    _In_ const sai_attribute_t *attr_list);
+
         protected: // custom debug counter
 
             uint32_t getNewDebugCounterIndex();

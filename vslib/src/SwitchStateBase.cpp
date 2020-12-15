@@ -168,6 +168,12 @@ sai_status_t SwitchStateBase::create(
         return createMACsecSA(object_id, switch_id, attr_count, attr_list);
     }
 
+    if (object_type == SAI_OBJECT_TYPE_NEIGHBOR_ENTRY && m_system_port_list.size())
+    {
+        // Neighbor entry programming for VOQ systems
+        return createVoqSystemNeighborEntry(serializedObjectId, switch_id, attr_count, attr_list);
+    }
+
     return create_internal(object_type, serializedObjectId, switch_id, attr_count, attr_list);
 }
 
@@ -2760,6 +2766,110 @@ sai_status_t SwitchStateBase::refresh_system_port_list(
     // Currently, system ports info are not changing. So no refresh is done
 
     // TODO In the future, when dynamic system port config (add/delete) is implemented, re-visit
+
+    return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t SwitchStateBase::createVoqSystemNeighborEntry(
+        _In_ const std::string &serializedObjectId,
+        _In_ sai_object_id_t switch_id,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    // For VOQ switch, encap index attribute should be set for local neighbors. For
+    // remote neighbors check for presence of encap index supplied from upper layer.
+    // And also validate isLocal and impose encap index flags in the attribute list
+
+    // Determine whether this neighbor is local neighbor or remote neighbor by checking the
+    // RIF id provided. If the port of the RIF is system port, the neighbor is remote neighbor
+
+    bool is_system_neigh = false;
+    sai_attribute_t attr;
+    sai_neighbor_entry_t nbr_entry;
+
+    sai_deserialize_neighbor_entry(serializedObjectId, nbr_entry);
+
+    attr.id = SAI_ROUTER_INTERFACE_ATTR_PORT_ID;
+
+    CHECK_STATUS(get(SAI_OBJECT_TYPE_ROUTER_INTERFACE, nbr_entry.rif_id, 1, &attr));
+
+    if (objectTypeQuery(attr.value.oid) == SAI_OBJECT_TYPE_SYSTEM_PORT)
+    {
+        is_system_neigh = true;
+    }
+
+    uint32_t encap_index = 0;
+    bool impose_encap_index = false;
+    bool is_local = true;
+
+    for (uint32_t i = 0; i < attr_count; i++)
+    {
+        switch (attr_list[i].id)
+        {
+            case SAI_NEIGHBOR_ENTRY_ATTR_ENCAP_INDEX:
+
+                encap_index = attr_list[i].value.u32;
+
+                break;
+
+            case SAI_NEIGHBOR_ENTRY_ATTR_ENCAP_IMPOSE_INDEX:
+
+                impose_encap_index = attr_list[i].value.booldata;
+
+                break;
+
+            case SAI_NEIGHBOR_ENTRY_ATTR_IS_LOCAL:
+
+                is_local = attr_list[i].value.booldata;
+
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    if (impose_encap_index && encap_index == 0)
+    {
+        SWSS_LOG_ERROR("Impose invalid encap index %d for %s neigh %s",
+                encap_index,
+                (is_system_neigh ? "VOQ" : "local"),
+                serializedObjectId.c_str());
+
+        return SAI_STATUS_FAILURE;
+    }
+
+    if (is_system_neigh && is_local)
+    {
+        SWSS_LOG_ERROR("VOQ neigh info mismatch for %s. RIF is remote. attr is_local is true", serializedObjectId.c_str());
+
+        return SAI_STATUS_FAILURE;
+    }
+
+    if (!is_local && encap_index == 0)
+    {
+        SWSS_LOG_ERROR("VOQ neigh info mismatch for %s. attr is_local is false. encap_index is 0", serializedObjectId.c_str());
+
+        return SAI_STATUS_FAILURE;
+    }
+
+    CHECK_STATUS(create_internal(SAI_OBJECT_TYPE_NEIGHBOR_ENTRY, serializedObjectId, switch_id, attr_count, attr_list));
+
+    if (impose_encap_index == false)
+    {
+        // Encap index is not imposed. Assign encap index.
+        // The only requirement for the encap index is it must be locally
+        // unique in asic. Lower 32 bits of the ip address is used as encap index
+
+        encap_index = nbr_entry.ip_address.addr.ip4;
+
+        attr.id = SAI_NEIGHBOR_ENTRY_ATTR_ENCAP_INDEX;
+        attr.value.u32 = encap_index;
+
+        CHECK_STATUS(set_internal(SAI_OBJECT_TYPE_NEIGHBOR_ENTRY, serializedObjectId, &attr));
+    }
 
     return SAI_STATUS_SUCCESS;
 }
