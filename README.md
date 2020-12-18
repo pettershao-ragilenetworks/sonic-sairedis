@@ -40,6 +40,8 @@ For your convenience, you can install prepared packages on Debian Jessie:
 
 Checkout the source: `git clone https://github.com/Azure/sonic-sairedis.git` and install it yourself.
 
+You will also need SAI submodule: `git submodule update --init --recursive`
+
 Get SAI header files into /usr/include/sai. Put the SAI header files that you use to compile
 libsairedis into /usr/include/sai
 
