@@ -13,6 +13,11 @@ extern "C" {
  */
 #define SAI_REDIS_KEY_CONTEXT_CONFIG              "SAI_REDIS_CONTEXT_CONFIG"
 
+/**
+ * @brief Default synchronous operation response timeout in milliseconds.
+ */
+#define SAI_REDIS_DEFAULT_SYNC_OPERATION_RESPONSE_TIMEOUT (60*1000)
+
 typedef enum _sai_redis_notify_syncd_t
 {
     SAI_REDIS_NOTIFY_SYNCD_INIT_VIEW,
@@ -204,5 +209,17 @@ typedef enum _sai_redis_switch_attr_t
      * @default sairedis.rec
      */
     SAI_REDIS_SWITCH_ATTR_RECORDING_FILENAME,
+
+    /**
+     * @brief Synchronous operation response timeout in milliseconds.
+     *
+     * Used for every synchronous API call. In asynchronous mode used for GET
+     * operation.
+     *
+     * @type sai_uint64_t
+     * @flags CREATE_AND_SET
+     * @default 60000
+     */
+    SAI_REDIS_SWITCH_ATTR_SYNC_OPERATION_RESPONSE_TIMEOUT,
 
 } sai_redis_switch_attr_t;
