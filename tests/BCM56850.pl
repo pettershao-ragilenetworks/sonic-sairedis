@@ -653,8 +653,16 @@ sub test_no_lag_label
     play "no_lag_label_B.rec", 2;
 }
 
+sub test_macsec_p2p_establishment
+{
+    fresh_start;
+
+    play "test_macsec_p2p_establishment.rec";
+}
+
 # RUN TESTS
 
+test_macsec_p2p_establishment;
 test_no_lag_label;
 test_lag_label;
 test_bulk_set_multiple;
