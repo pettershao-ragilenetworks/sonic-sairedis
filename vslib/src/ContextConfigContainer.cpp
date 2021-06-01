@@ -8,7 +8,7 @@
 
 using json = nlohmann::json;
 
-using namespace sairedis;
+using namespace saivs;
 
 ContextConfigContainer::ContextConfigContainer()
 {
@@ -30,7 +30,7 @@ std::shared_ptr<ContextConfigContainer> ContextConfigContainer::getDefault()
 
     auto ccc = std::make_shared<ContextConfigContainer>();
 
-    auto cc = std::make_shared<ContextConfig>(0, "syncd", "ASIC_DB", "COUNTERS_DB", "FLEX_COUNTER_DB", "STATE_DB");
+    auto cc = std::make_shared<ContextConfig>(0, "VirtualSwitch");
 
     auto sc = std::make_shared<SwitchConfig>(0, "");
 
@@ -98,29 +98,9 @@ std::shared_ptr<ContextConfigContainer> ContextConfigContainer::loadFromFile(
 
             const std::string& name = item["name"];
 
-            const std::string& dbAsic = item["dbAsic"];
-            const std::string& dbCounters = item["dbCounters"];
-            const std::string& dbFlex = item["dbFlex"];
-            const std::string& dbState = item["dbState"];
+            SWSS_LOG_NOTICE("contextConfig: guid: %u, name: %s", guid, name.c_str());
 
-            SWSS_LOG_NOTICE("contextConfig: %u, %s, %s, %s, %s, %s",
-                    guid,
-                    name.c_str(),
-                    dbAsic.c_str(),
-                    dbCounters.c_str(),
-                    dbFlex.c_str(),
-                    dbState.c_str());
-
-            auto cc = std::make_shared<ContextConfig>(guid, name, dbAsic, dbCounters, dbFlex, dbState);
-
-            cc->m_zmqEnable = item["zmq_enable"];
-            cc->m_zmqEndpoint = item["zmq_endpoint"];
-            cc->m_zmqNtfEndpoint = item["zmq_ntf_endpoint"];
-
-            SWSS_LOG_NOTICE("contextConfig zmq enable %s, endpoint: %s, ntf endpoint: %s",
-                    (cc->m_zmqEnable) ? "true" : "false",
-                    cc->m_zmqEndpoint.c_str(),
-                    cc->m_zmqNtfEndpoint.c_str());
+            auto cc = std::make_shared<ContextConfig>(guid, name);
 
             for (size_t k = 0; k < item["switches"].size(); k++)
             {
