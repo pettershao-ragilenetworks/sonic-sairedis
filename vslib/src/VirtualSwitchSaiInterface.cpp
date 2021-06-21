@@ -901,6 +901,21 @@ sai_status_t VirtualSwitchSaiInterface::queryAattributeEnumValuesCapability(
 
         return SAI_STATUS_SUCCESS;
     }
+    else if (object_type == SAI_OBJECT_TYPE_DEBUG_COUNTER && attr_id == SAI_DEBUG_COUNTER_ATTR_TYPE)
+    {
+        if (enum_values_capability->count < 4)
+        {
+            return SAI_STATUS_BUFFER_OVERFLOW;
+        }
+
+        enum_values_capability->count = 4;
+        enum_values_capability->list[0] = SAI_DEBUG_COUNTER_TYPE_PORT_IN_DROP_REASONS;
+        enum_values_capability->list[1] = SAI_DEBUG_COUNTER_TYPE_PORT_OUT_DROP_REASONS;
+        enum_values_capability->list[2] = SAI_DEBUG_COUNTER_TYPE_SWITCH_IN_DROP_REASONS;
+        enum_values_capability->list[3] = SAI_DEBUG_COUNTER_TYPE_SWITCH_OUT_DROP_REASONS;
+
+        return SAI_STATUS_SUCCESS;
+    }
 
     return SAI_STATUS_NOT_SUPPORTED;
 }
