@@ -831,8 +831,9 @@ sai_status_t VirtualSwitchSaiInterface::queryAattributeEnumValuesCapability(
 
         return SAI_STATUS_SUCCESS;
     }
+    auto ss = m_switchStateMap.at(switch_id);
+    return ss->queryAttrEnumValuesCapability(switch_id, object_type, attr_id, enum_values_capability);
 
-    return SAI_STATUS_NOT_SUPPORTED;
 }
 
 sai_status_t VirtualSwitchSaiInterface::getStats(
