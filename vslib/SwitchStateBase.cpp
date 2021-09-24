@@ -4,6 +4,7 @@
 #include "meta/sai_serialize.h"
 
 #include <net/if.h>
+#include <unistd.h>
 
 #include <algorithm>
 
@@ -1120,7 +1121,14 @@ sai_status_t SwitchStateBase::create_ports()
         return SAI_STATUS_FAILURE;
     }
 
-    auto& lanesVector = map->getLaneVector();
+    auto lanesVector = map->getLaneVector();
+
+    if (m_switchConfig->m_useTapDevice)
+    {
+        SWSS_LOG_DEBUG("Check available lane");
+
+        CHECK_STATUS(filter_available_lanes(lanesVector));
+    }
 
     uint32_t port_count = (uint32_t)lanesVector.size();
 
@@ -2934,6 +2942,49 @@ sai_status_t SwitchStateBase::initialize_voq_switch_objects(
         CHECK_STATUS(create_fabric_ports());
 
         CHECK_STATUS(set_fabric_port_list());
+    }
+
+    return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t SwitchStateBase::filter_available_lanes(
+                    _Inout_ std::vector<std::vector<uint32_t>> &lanes_vector)
+{
+    SWSS_LOG_ENTER();
+
+    auto lanes = lanes_vector.begin();
+
+    while (lanes != lanes_vector.end())
+    {
+        bool available_lane = false;
+
+        for (auto lane: *lanes)
+        {
+            std::string ifname = m_switchConfig->m_laneMap->getInterfaceFromLaneNumber(lane);
+            std::string path = std::string("/sys/class/net/") + ifname + "/operstate";
+
+            if (access(path.c_str(), F_OK) != 0)
+            {
+                SWSS_LOG_WARN("Port %s isn't available", ifname.c_str());
+
+                available_lane &= false;
+
+                break;
+            }
+            else
+            {
+                available_lane = true;
+            }
+        }
+
+        if (!available_lane)
+        {
+            lanes = lanes_vector.erase(lanes);
+        }
+        else
+        {
+            lanes++;
+        }
     }
 
     return SAI_STATUS_SUCCESS;
