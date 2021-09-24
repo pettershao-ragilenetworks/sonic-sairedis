@@ -1034,6 +1034,28 @@ sai_status_t Syncd::processBulkCreateEntry(
         }
         break;
 
+        case SAI_OBJECT_TYPE_MY_SID_ENTRY:
+        {
+            std::vector<sai_my_sid_entry_t> entries(object_count);
+
+            for (uint32_t it = 0; it < object_count; it++)
+            {
+                sai_deserialize_my_sid_entry(objectIds[it], entries[it]);
+
+                entries[it].switch_id = m_translator->translateVidToRid(entries[it].switch_id);
+                entries[it].vr_id = m_translator->translateVidToRid(entries[it].vr_id);
+            }
+
+            status = m_vendorSai->bulkCreate(
+                    object_count,
+                    entries.data(),
+                    attr_counts.data(),
+                    attr_lists.data(),
+                    mode,
+                    statuses.data());
+        }
+        break;
+
         default:
             return SAI_STATUS_NOT_SUPPORTED;
     }
@@ -1119,6 +1141,26 @@ sai_status_t Syncd::processBulkRemoveEntry(
                     mode,
                     statuses.data());
 
+        }
+        break;
+
+        case SAI_OBJECT_TYPE_MY_SID_ENTRY:
+        {
+            std::vector<sai_my_sid_entry_t> entries(object_count);
+
+            for (uint32_t it = 0; it < object_count; it++)
+            {
+                sai_deserialize_my_sid_entry(objectIds[it], entries[it]);
+
+                entries[it].switch_id = m_translator->translateVidToRid(entries[it].switch_id);
+                entries[it].vr_id = m_translator->translateVidToRid(entries[it].vr_id);
+            }
+
+            status = m_vendorSai->bulkRemove(
+                    object_count,
+                    entries.data(),
+                    mode,
+                    statuses.data());
         }
         break;
 
@@ -1237,6 +1279,27 @@ sai_status_t Syncd::processBulkSetEntry(
                     mode,
                     statuses.data());
 
+        }
+        break;
+
+        case SAI_OBJECT_TYPE_MY_SID_ENTRY:
+        {
+            std::vector<sai_my_sid_entry_t> entries(object_count);
+
+            for (uint32_t it = 0; it < object_count; it++)
+            {
+                sai_deserialize_my_sid_entry(objectIds[it], entries[it]);
+
+                entries[it].switch_id = m_translator->translateVidToRid(entries[it].switch_id);
+                entries[it].vr_id = m_translator->translateVidToRid(entries[it].vr_id);
+            }
+
+            status = m_vendorSai->bulkSet(
+                    object_count,
+                    entries.data(),
+                    attr_lists.data(),
+                    mode,
+                    statuses.data());
         }
         break;
 
