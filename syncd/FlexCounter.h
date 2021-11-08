@@ -115,6 +115,9 @@ namespace syncd
             void removeMACsecSA(
                     _In_ sai_object_id_t macsecSAVid);
 
+            void removeAclCounter(
+                    _In_ sai_object_id_t aclCounterVid);
+
             void removeTunnel(
                     _In_ sai_object_id_t tunnelVid);
 
@@ -177,6 +180,11 @@ namespace syncd
                     _In_ sai_object_id_t macsecSAVid,
                     _In_ sai_object_id_t macsecSARid,
                     _In_ const std::vector<sai_macsec_sa_attr_t> &attrIds);
+
+            void setAclCounterAttrList(
+                    _In_ sai_object_id_t aclCounterVid,
+                    _In_ sai_object_id_t aclCounterRid,
+                    _In_ const std::vector<sai_acl_counter_attr_t> &attrIds);
 
         private: // is counter supported
 
@@ -362,6 +370,16 @@ namespace syncd
                 std::vector<sai_macsec_sa_attr_t> m_macsecSAAttrIds;
             };
 
+            struct AclCounterAttrIds
+            {
+                AclCounterAttrIds(
+                        _In_ sai_object_id_t aclCounter,
+                        _In_ const std::vector<sai_acl_counter_attr_t> &aclCounterIds);
+
+                sai_object_id_t m_aclCounterId;
+                std::vector<sai_acl_counter_attr_t> m_aclCounterAttrIds;
+            };
+
             struct TunnelCounterIds
             {
                 TunnelCounterIds(
@@ -371,6 +389,7 @@ namespace syncd
                 sai_object_id_t m_tunnelId;
                 std::vector<sai_tunnel_stat_t> m_tunnelCounterIds;
             };
+
         private:
 
             void collectCounters(
@@ -429,6 +448,9 @@ namespace syncd
             void collectMACsecSAAttrs(
                     _In_ swss::Table &countersTable);
 
+            void collectAclCounterAttrs(
+                    _In_ swss::Table &countersTable);
+
         private:
 
             void addCollectCountersHandler(
@@ -466,11 +488,10 @@ namespace syncd
             std::map<sai_object_id_t, std::shared_ptr<BufferPoolCounterIds>> m_bufferPoolCounterIdsMap;
             std::map<sai_object_id_t, std::shared_ptr<SwitchCounterIds>> m_switchDebugCounterIdsMap;
             std::map<sai_object_id_t, std::shared_ptr<TunnelCounterIds>> m_tunnelCounterIdsMap;
-
             std::map<sai_object_id_t, std::shared_ptr<QueueAttrIds>> m_queueAttrIdsMap;
             std::map<sai_object_id_t, std::shared_ptr<IngressPriorityGroupAttrIds>> m_priorityGroupAttrIdsMap;
-
             std::map<sai_object_id_t, std::shared_ptr<MACsecSAAttrIds>> m_macsecSAAttrIdsMap;
+            std::map<sai_object_id_t, std::shared_ptr<AclCounterAttrIds>> m_aclCounterAttrIdsMap;
 
         private:
 
