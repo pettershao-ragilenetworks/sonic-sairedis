@@ -23,6 +23,7 @@ libSyncd_a_SOURCES = \
 				FlexCounterManager.cpp \
 				GlobalSwitchId.cpp \
 				HardReiniter.cpp \
+				MdioIpcServer.cpp \
 				MetadataLogger.cpp \
 				NotificationHandler.cpp \
 				NotificationProcessor.cpp \
@@ -69,6 +70,10 @@ if SAITHRIFT
 libSyncd_a_CXXFLAGS += -DSAITHRIFT=yes
 syncd_CXXFLAGS += -DSAITHRIFT=yes
 syncd_LDADD += -lrpcserver -lthrift
+endif
+
+if SONIC_ASIC_PLATFORM_BROADCOM
+libSyncd_a_CXXFLAGS += -DMDIO_ACCESS_USE_NPU
 endif
 
 libSyncdRequestShutdown_a_SOURCES = \
