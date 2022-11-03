@@ -24,7 +24,7 @@ saiasiccmp_LDADD = libAsicCmp.a \
 
 if GCOV_ENABLED
 #saiasiccmp_LDADD += -lgcovpreload
-saiasiccmp_LDFLAGS += -Wl,-L$(top_srcdir)/gcovpreload/ -Wl,--no-as-needed,-Bdynamic -lgcov_preload
+saiasiccmp_LDFLAGS = -Wl,-L$(top_srcdir)/gcovpreload/ -Wl,--no-as-needed,-Bdynamic -lgcov_preload
 endif
 
 TESTS = test.sh
