@@ -78,7 +78,7 @@ endif
 
 if GCOV_ENABLED
 #syncd_LDADD += -lgcovpreload
-syncd_LDFLAGS = -Wl,-L$(top_srcdir)/gcovpreload/ -Wl,--no-as-needed,-Bdynamic -lgcov_preload
+syncd_LDFLAGS += -Wl,-L$(top_srcdir)/gcovpreload/ -Wl,--no-as-needed,-Bdynamic -lgcovpreload
 endif
 
 if SONIC_ASIC_PLATFORM_MELLANOX

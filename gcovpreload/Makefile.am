@@ -1,4 +1,5 @@
-projectlibdir=lib
-projectlibdir_PROGRAMS=gcov_preload.so
-gcov_preload_so_SOURCES=gcov_preload.c
-gcov_preload_so_LDFLAGS=-shared-fpic
+lib_PROGRAMS=libgcovpreload.so
+libgcovpreload_so_SOURCES=gcov_preload.c
+libgcovpreload_so_CPPFLAGS=-fPIC
+libgcovpreload_so_CXXFLAGS=-fPIC
+libgcovpreload_so_LDFLAGS=-shared -fPIC
