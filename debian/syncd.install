@@ -1,4 +1,4 @@
-usr/lib/*/libgcovpreload.so usr/lib
+usr/lib/*/libgcovpreload*.so.* usr/lib
 usr/bin/saidump
 usr/bin/saiplayer
 usr/bin/saisdkdump
