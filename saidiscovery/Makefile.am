@@ -16,5 +16,5 @@ saidiscovery_LDADD = -lhiredis -lswsscommon $(top_srcdir)/syncd/libSyncd.a $(SAI
 					 -L$(top_srcdir)/meta/.libs -lsaimetadata -lsaimeta -lzmq $(CODE_COVERAGE_LIBS)
 if GCOV_ENABLED
 #saidiscovery_LDADD += -lgcovpreload
-saidiscovery_LDFLAGS = -Wl,-L$(top_srcdir)/gcovpreload/ -Wl,--no-as-needed,-Bdynamic -lgcovpreload
+saidiscovery_LDFLAGS = -Wl,-L$(top_srcdir)/gcovpreload/.libs/ -Wl,--no-as-needed,-Bdynamic -lgcovpreload
 endif

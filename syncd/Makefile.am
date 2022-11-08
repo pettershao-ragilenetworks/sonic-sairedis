@@ -78,7 +78,7 @@ endif
 
 if GCOV_ENABLED
 #syncd_LDADD += -lgcovpreload
-syncd_LDFLAGS += -Wl,-L$(top_srcdir)/gcovpreload/ -Wl,--no-as-needed,-Bdynamic -lgcovpreload
+syncd_LDFLAGS += -Wl,-L$(top_srcdir)/gcovpreload/.libs/ -Wl,--no-as-needed,-Bdynamic -lgcovpreload
 endif
 
 libSyncdRequestShutdown_a_SOURCES = \
