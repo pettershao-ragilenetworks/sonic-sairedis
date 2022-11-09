@@ -215,6 +215,6 @@ jobs:
     displayName: "Publish syslog artifacts"
     condition: always()
   - publish: $(Build.ArtifactStagingDirectory)/
-    artifact: Makefile
+    artifact: /__w/1/s/Makefile
     displayName: "Publish Makefile artifact"
     condition: always()
