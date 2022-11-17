@@ -15,7 +15,6 @@ if SAITHRIFT
 vssyncd_LDADD += -lrpcserver -lthrift
 endif
 
-
 tests_SOURCES = tests.cpp
 tests_CXXFLAGS = $(DBGFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS_COMMON)
 tests_LDADD = -lhiredis -lswsscommon -lpthread \
